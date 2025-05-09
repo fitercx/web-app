@@ -14,6 +14,8 @@ import { ConfigurationWizardService } from '../../../configuration-wizard/config
 /** Custom Imports */
 import { frequentActivities } from './frequent-activities';
 import { SettingsService } from 'app/settings/settings.service';
+import { Subscription } from 'rxjs';
+import { ThemingService } from 'app/shared/theme-toggle/theming.service';
 
 /**
  * Sidenav component.
@@ -36,6 +38,9 @@ export class SidenavComponent implements OnInit, AfterViewInit {
   mappedActivities: any[] = [];
   /** Collection of possible frequent activities */
   frequentActivities: any[] = frequentActivities;
+
+  public isDarkModeOn: boolean = false;
+  private themeSubscription: Subscription;
 
   /* Refernce of logo */
   @ViewChild('logo') logo: ElementRef<any>;
@@ -60,7 +65,8 @@ export class SidenavComponent implements OnInit, AfterViewInit {
     private authenticationService: AuthenticationService,
     private settingsService: SettingsService,
     private configurationWizardService: ConfigurationWizardService,
-    private popoverService: PopoverService
+    private popoverService: PopoverService,
+    private themingService: ThemingService
   ) {
     this.userActivity = JSON.parse(localStorage.getItem('mifosXLocation'));
   }
@@ -72,6 +78,15 @@ export class SidenavComponent implements OnInit, AfterViewInit {
     const credentials = this.authenticationService.getCredentials();
     this.username = credentials.username;
     this.setMappedAcitivites();
+    this.themeSubscription = this.themingService.theme.subscribe((theme) => {
+      this.isDarkModeOn = theme === this.themingService.themes[0];
+    });
+  }
+
+  ngOnDestroy() {
+    if (this.themeSubscription) {
+      this.themeSubscription.unsubscribe();
+    }
   }
 
   /**
