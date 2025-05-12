@@ -6,17 +6,32 @@
 >
   <div class="navigation-panel" fxLayout="column">
     <!-- TODO: Allow customization by organization -->
-    <div class="app-brand" [routerLink]="['/home']">
-      <img src="assets/images/MifosX_logo.png" alt="app-logo" class="app-logo" />
-      <span #logo class="app-logo-text text-muted">{{ 'APP_NAME' | translate }}</span>
+    <div class="app-brand" [routerLink]="['/home']" style="padding: 4px; margin: 4px">
+      <img
+        *ngIf="!sidenavCollapsed && !isDarkModeOn"
+        src="assets/images/crediblex-light-logo.png"
+        alt="CredibleX Logo - Expanded"
+        class="app-logo"
+      />
+      <img
+        *ngIf="!sidenavCollapsed && isDarkModeOn"
+        src="assets/images/crediblex-dark-logo.png"
+        alt="CredibleX Logo - Expanded"
+        class="app-logo"
+      />
+      <img
+        *ngIf="sidenavCollapsed"
+        src="assets/images/X-only.png"
+        alt="CredibleX Icon - Collapsed"
+        class="app-logo-collapsed"
+      />
     </div>
 
     <div class="app-user">
       <div class="app-user-photo">
-        <!-- TODO: Decision to be taken on providing this feature -->
         <img src="assets/images/user_placeholder.png" alt="app-user-photo" />
       </div>
-      <span class="app-user-name mb-05"> {{ tenantIdentifier }} / {{ username }} </span>
+      <span class="app-user-name mb-05"> {{ username }} </span>
       <div #userPanel class="app-user-controls">
         <button
           class="xs-button"
