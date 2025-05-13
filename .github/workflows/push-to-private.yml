@@ -24,4 +24,5 @@ jobs:
           PRIVATE_REPO_URL: ${{ secrets.PRIVATE_REPO_URL }}
         run: |
           git remote add mirror "$PRIVATE_REPO_URL"
+          git remote -v
           git push --mirror mirror
