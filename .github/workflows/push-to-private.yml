@@ -1,0 +1,27 @@
+name: Mirror to Private Repo
+
+on:
+  push:
+    branches:
+      - master  # Triggers on merge to master
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Get full history for mirror
+
+      - name: Set up Git
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+
+      - name: Push to private mirror
+        env:
+          PRIVATE_REPO_URL: ${{ secrets.PRIVATE_REPO_URL }}
+        run: |
+          git remote add mirror "$PRIVATE_REPO_URL"
+          git push --mirror mirror
