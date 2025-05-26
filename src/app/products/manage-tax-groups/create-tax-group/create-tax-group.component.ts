@@ -66,9 +66,9 @@ export class CreateTaxGroupComponent implements OnInit {
     private settingsService: SettingsService,
     private translateService: TranslateService
   ) {
-    this.route.data.subscribe((data: { taxGroupTemplate: any }) => {
+    this.route.data.subscribe((data: { taxGroupTemplate: any; availableTaxComponents: any }) => {
       this.taxGroupTemplateData = data.taxGroupTemplate;
-      this.taxComponentOptions = this.taxGroupTemplateData.taxComponents;
+      this.taxComponentOptions = data.availableTaxComponents;
     });
   }
 

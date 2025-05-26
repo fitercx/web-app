@@ -443,7 +443,8 @@ const routes: Routes = [
                   component: CreateTaxGroupComponent,
                   data: { title: 'Create Tax Group', breadcrumb: 'Create' },
                   resolve: {
-                    taxGroupTemplate: ManageTaxGroupTemplateResolver
+                    taxGroupTemplate: ManageTaxGroupTemplateResolver,
+                    availableTaxComponents: ManageTaxComponentsResolver
                   }
                 },
                 {
