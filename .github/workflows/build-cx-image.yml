@@ -1,0 +1,125 @@
+name: Create Tag and Build ECR Image
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      hotfix_version:
+        description: 'Specify the hotfix version'
+        required: false
+
+permissions:
+  contents: write
+  deployments: write
+  id-token: write
+  repository-projects: write
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  ci_process:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+  deploy:
+    needs: ci_process
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    name: Deploy new image to ECR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout app repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: '0'
+
+      - name: Calculate Semantic Version for Hotfixes
+        if: ${{ github.event.inputs.hotfix_version }}
+        run: |
+          echo "Hotfix Version: ${{ github.event.inputs.hotfix_version }}"
+          echo "NEW_VERSION=${{ github.event.inputs.hotfix_version }}" >> $GITHUB_ENV
+
+      - name: Calculate Semantic Version
+        if: ${{ !github.event.inputs.hotfix_version }}
+        run: |
+          git fetch --tags
+          CURRENT_VERSION=$(git tag -l --sort=-v:refname 2>/dev/null | head -n 1 || echo '0.0.0')
+          echo "Current Version: $CURRENT_VERSION"
+          git log --oneline --no-decorate -n 1
+          VERSION_BUMP=`git log --oneline --no-decorate -n 1 | grep -Eo "(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert|BREAKING CHANGE)" | head -1`
+          if [ "$VERSION_BUMP" = "BREAKING CHANGE" ]; then 
+            VERSION_TYPE="major"
+          elif [ "$VERSION_BUMP" = "fix" ] || [ "$VERSION_BUMP" = "perf" ]; then 
+            VERSION_TYPE="patch"
+          else 
+            VERSION_TYPE="minor"
+          fi
+          VNUM1=$(echo $CURRENT_VERSION | cut -d. -f1)
+          VNUM2=$(echo $CURRENT_VERSION | cut -d. -f2)
+          VNUM3=$(echo $CURRENT_VERSION | cut -d. -f3)
+          echo "Version type: $VERSION_TYPE"
+          if [ "$VERSION_TYPE" = "major" ]; then 
+            NEW_VERSION="$(( ${VNUM1#v} + 1 )).0.0"
+          elif [ "$VERSION_TYPE" = "minor" ]; then 
+            NEW_VERSION="$VNUM1.$((VNUM2+1)).0"
+          else 
+            NEW_VERSION="$VNUM1.$VNUM2.$((VNUM3+1))"
+          fi
+          echo "New Version: $NEW_VERSION"
+          echo "NEW_VERSION=$NEW_VERSION" >> $GITHUB_ENV
+          echo $NEW_VERSION > version.txt
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: me-central-1
+          role-to-assume: arn:aws:iam::417872680205:role/GitHubActionRole
+          role-session-name: GithubActionSession-BuildMifosImage
+
+      - name: Login to Amazon ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push the image to Amazon ECR
+        run: |
+          IMAGE_TAG="${{ env.NEW_VERSION }}"
+          ECR_REGISTRY=${{ secrets.ECR_REGISTRY }}
+          IMAGE_URI="$ECR_REGISTRY:$IMAGE_TAG"
+          echo "Building image $IMAGE_URI"
+          docker build -t "$IMAGE_URI" .
+          echo "Pushing image to ECR..."
+          docker push "$IMAGE_URI"
+        env:
+          ECR_REGISTRY: ${{ secrets.ECR_REGISTRY }}
+          AWS_DEFAULT_REGION: me-central-1
+          AWS_REGION: me-central-1
+
+      - name: Create and Push Git Tag
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          NEW_TAG="${{ env.NEW_VERSION }}"
+          if [ "${{ github.event.inputs.hotfix_version }}" != "" ]; then
+            NEW_TAG="${{ github.event.inputs.hotfix_version }}"
+          fi
+          git tag $NEW_TAG
+          git push origin $NEW_TAG
+
+      - name: Notify Slack - CI Process Completed
+        uses: act10ns/slack@v2
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          status: ${{ job.status }}
+          message: |
+            *CI pipeline status:* ${{ job.status == 'success' && 'Success :rocket:' || 'Failed :sad:' }}
+            *New Version Image Tag:* ${{ env.NEW_VERSION }}
+            *Pushed by:* ${{ github.actor }}
+            *Last Commit Message:* $(git log -1 --pretty=format:'%s')
+            *Last Commit Author:* $(git log -1 --pretty=format:'%an')
+        if: always()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
