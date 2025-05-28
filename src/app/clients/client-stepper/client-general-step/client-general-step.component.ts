@@ -23,6 +23,9 @@ export class ClientGeneralStepComponent implements OnInit {
   /** Maximum date allowed. */
   maxDate = new Date();
 
+  /** Incorporation validity max 20 years date allowed. */
+  incorpValidityMaxDate = new Date(new Date().setFullYear(new Date().getFullYear() + 20));
+
   /** Client Template */
   @Input() clientTemplate: any;
   /** Create Client Form */
