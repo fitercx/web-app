@@ -26,4 +26,4 @@ jobs:
         run: |
           git remote add mirror "$PRIVATE_REPO_URL"
           git remote -v
-          git push --mirror mirror
+          git push mirror master --force
