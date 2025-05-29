@@ -234,7 +234,7 @@
     <tr mat-header-row *matHeaderRowDef="openLoansColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: openLoansColumns"
+      *matRowDef="let row; columns: openLoansColumns; trackBy: trackById"
       [routerLink]="['../', 'loans-accounts', row.id, 'general']"
       class="select-row"
     ></tr>
@@ -299,14 +299,14 @@
     <tr mat-header-row *matHeaderRowDef="closedLoansColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: closedLoansColumns"
+      *matRowDef="let row; columns: closedLoansColumns; trackBy: trackById"
       [routerLink]="['../', 'loans-accounts', row.id, 'general']"
       class="select-row"
     ></tr>
   </table>
 
   <!-- Saving overview Table -->
-  <div class="heading-content" *ngIf="savingAccounts?.length > 0">
+  <div class="heading-content">
     <div fxLayout="column" fxFlex="50%">
       <div class="heading-name">
         <h3>{{ 'labels.heading.Saving Accounts' | translate }}</h3>
@@ -408,7 +408,7 @@
     <tr mat-header-row *matHeaderRowDef="openSavingsColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: openSavingsColumns"
+      *matRowDef="let row; columns: openSavingsColumns; trackBy: trackById"
       [routerLink]="['../', 'savings-accounts', row.id, 'general']"
     ></tr>
   </table>
@@ -442,13 +442,19 @@
     <tr mat-header-row *matHeaderRowDef="closedSavingsColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: closedSavingsColumns"
+      *matRowDef="let row; columns: closedSavingsColumns; trackBy: trackById"
       [routerLink]="['../', 'savings-accounts', row.id, 'general']"
     ></tr>
   </table>
 
   <!-- Fixed Deposit Table -->
-  <div class="heading-content" *ngIf="savingAccounts?.length > 0">
+  <div
+    class="heading-content"
+    *ngIf="
+      (savingAccounts | accountsFilter: 'saving' : 'open' : 'isFixed')?.length > 0 ||
+      (savingAccounts | accountsFilter: 'saving' : 'closed' : 'isFixed')?.length > 0
+    "
+  >
     <div fxLayout="column" fxFlex="50%">
       <div class="heading-name">
         <h3>{{ 'labels.heading.Fixed Deposit Accounts' | translate }}</h3>
@@ -528,7 +534,7 @@
     <tr mat-header-row *matHeaderRowDef="openSavingsColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: openSavingsColumns"
+      *matRowDef="let row; columns: openSavingsColumns; trackBy: trackById"
       [routerLink]="['../', 'fixed-deposits-accounts', row.id, 'general']"
     ></tr>
   </table>
@@ -563,13 +569,19 @@
     <tr mat-header-row *matHeaderRowDef="closedSavingsColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: closedSavingsColumns"
+      *matRowDef="let row; columns: closedSavingsColumns; trackBy: trackById"
       [routerLink]="['../', 'fixed-deposits-accounts', row.id, 'general']"
     ></tr>
   </table>
 
   <!-- Recurring Deposit Table -->
-  <div class="heading-content" *ngIf="savingAccounts?.length > 0">
+  <div
+    class="heading-content"
+    *ngIf="
+      (savingAccounts | accountsFilter: 'saving' : 'open' : 'isRecurring')?.length > 0 ||
+      (savingAccounts | accountsFilter: 'saving' : 'closed' : 'isRecurring')?.length > 0
+    "
+  >
     <div fxLayout="column" fxFlex="50%">
       <div class="heading-name">
         <h3>{{ 'labels.heading.Recurring Deposit Accounts' | translate }}</h3>
@@ -658,7 +670,7 @@
     <tr mat-header-row *matHeaderRowDef="openSavingsColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: openSavingsColumns"
+      *matRowDef="let row; columns: openSavingsColumns; trackBy: trackById"
       [routerLink]="['../', 'recurring-deposits-accounts', row.id, 'general']"
       class="select-row"
     ></tr>
@@ -695,7 +707,7 @@
     <tr mat-header-row *matHeaderRowDef="closedSavingsColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: closedSavingsColumns"
+      *matRowDef="let row; columns: closedSavingsColumns; trackBy: trackById"
       [routerLink]="['../', 'recurring-deposits-accounts', row.id, 'general']"
       class="select-row"
     ></tr>
@@ -786,7 +798,7 @@
     <tr mat-header-row *matHeaderRowDef="openSharesColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: openSharesColumns"
+      *matRowDef="let row; columns: openSharesColumns; trackBy: trackById"
       [routerLink]="['../', 'shares-accounts', row.id, 'general']"
     ></tr>
   </table>
@@ -828,7 +840,7 @@
     <tr mat-header-row *matHeaderRowDef="closedSharesColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: closedSharesColumns"
+      *matRowDef="let row; columns: closedSharesColumns; trackBy: trackById"
       [routerLink]="['../', 'shares-accounts', row.id, 'general']"
     ></tr>
   </table>
@@ -884,7 +896,7 @@
     <tr mat-header-row *matHeaderRowDef="collateralsColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: collateralsColumns"
+      *matRowDef="let row; columns: collateralsColumns; trackBy: trackById"
       [routerLink]="['../', 'client-collateral', row.collateralId]"
     ></tr>
   </table>

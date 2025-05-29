@@ -225,4 +225,8 @@ export class GeneralTabComponent {
       return 'labels.buttons.View Closed Accounts';
     }
   }
+
+  trackById(index: number, item: any): any {
+    return item.id || item.accountNo || item.collateralId || index;
+  }
 }
