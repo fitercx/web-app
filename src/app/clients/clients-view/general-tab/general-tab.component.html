@@ -45,7 +45,7 @@
     </div>
   </div>
 
-  <table mat-table [dataSource]="upcomingCharges">
+  <table *ngIf="upcomingCharges?.length > 0" mat-table [dataSource]="upcomingCharges">
     <ng-container matColumnDef="Name">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.name' | translate }}</th>
       <td mat-cell *matCellDef="let element">
@@ -127,6 +127,7 @@
     *ngIf="!showClosedLoanAccounts && (loanAccounts | accountsFilter: 'loan')?.length > 0"
     mat-table
     [dataSource]="loanAccounts | accountsFilter: 'loan'"
+    multiTemplateDataRows
   >
     <ng-container matColumnDef="Account No">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Account No' | translate }}</th>
@@ -148,7 +149,7 @@
 
     <ng-container matColumnDef="Original Loan">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Original Loan' | translate }}</th>
-      <td mat-cell *matCellDef="let element">{{ element.originalLoan }}</td>
+      <td mat-cell *matCellDef="let element">{{ element.originalLoan | formatNumber }}</td>
     </ng-container>
     <ng-container matColumnDef="Loan Balance">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Loan Balance' | translate }}</th>
@@ -158,18 +159,6 @@
     <ng-container matColumnDef="Amount Paid">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Amount Paid' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let element">{{ element.amountPaid | formatNumber }}</td>
-    </ng-container>
-
-    <ng-container matColumnDef="Type">
-      <th mat-header-cell class="center" *matHeaderCellDef>{{ 'labels.inputs.Type' | translate }}</th>
-      <td mat-cell class="center" *matCellDef="let element">
-        <i
-          class="fa fa-large"
-          [ngClass]="element.loanType.value === 'Individual' ? 'fa-user' : 'fa-group'"
-          matTooltip="{{ element.loanType.value }}"
-          matTooltipPosition="above"
-        ></i>
-      </td>
     </ng-container>
 
     <ng-container matColumnDef="Actions">
@@ -231,13 +220,71 @@
       </td>
     </ng-container>
 
+    <ng-container matColumnDef="expand">
+      <th mat-header-cell *matHeaderCellDef></th>
+      <td mat-cell *matCellDef="let element" class="expand-cell">
+        <button mat-icon-button (click)="toggleRow(element, $event)" class="expand-button">
+          <mat-icon>{{ expandedElement === element ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="expandedDetail">
+      <td mat-cell *matCellDef="let element" [attr.colspan]="openLoansColumns.length">
+        <div class="detail-row-container" [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
+          <div class="loan-details-expand">
+            <div class="details-grid">
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.Associated Loan ID' | translate }}:</span>
+                <span class="detail-value">{{ element.externalId || '-' }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.DP Name' | translate }}:</span>
+                <span class="detail-value">{{ element.dpName || 'N/A' }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.Planned Closure Date' | translate }}:</span>
+                <span class="detail-value">{{
+                  element.timeline.expectedMaturityDate ? (element.timeline.expectedMaturityDate | dateFormat) : '-'
+                }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.Installment Amount' | translate }}:</span>
+                <span class="detail-value">{{
+                  element.additionalProperties?.effectiveInstallmentAmount
+                    ? (element.additionalProperties.effectiveInstallmentAmount | formatNumber)
+                    : '-'
+                }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.Loan Status' | translate }}:</span>
+                <span class="detail-value">{{ element.status?.value || element.status?.code || '-' }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.DPD' | translate }}:</span>
+                <span class="detail-value">{{ element.dpd || '-' }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.Late Fee' | translate }}:</span>
+                <span class="detail-value">{{
+                  element.additionalProperties?.lateFees ? (element.additionalProperties.lateFees | formatNumber) : '-'
+                }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </td>
+    </ng-container>
+
     <tr mat-header-row *matHeaderRowDef="openLoansColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: openLoansColumns; trackBy: trackById"
+      *matRowDef="let row; columns: openLoansColumns"
       [routerLink]="['../', 'loans-accounts', row.id, 'general']"
       class="select-row"
+      [class.expanded-row]="expandedElement === row"
     ></tr>
+    <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="detail-row"></tr>
   </table>
 
   <!-- Closed Loan Accounts -->
@@ -341,6 +388,11 @@
       </td>
     </ng-container>
 
+    <ng-container matColumnDef="Associated Loan ID">
+      <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Associated Loan ID' | translate }}</th>
+      <td mat-cell *matCellDef="let element">{{ element.additionalProperties?.linkedLoanAccountNumber || '-' }}</td>
+    </ng-container>
+
     <ng-container matColumnDef="Last Active">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Last Active' | translate }}</th>
       <td mat-cell *matCellDef="let element">{{ element.lastActiveTransactionDate | dateFormat }}</td>
@@ -434,6 +486,11 @@
       </td>
     </ng-container>
 
+    <ng-container matColumnDef="Associated Loan ID">
+      <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Associated Loan ID' | translate }}</th>
+      <td mat-cell *matCellDef="let element">{{ element.additionalProperties?.linkedLoanAccountNumber || '-' }}</td>
+    </ng-container>
+
     <ng-container matColumnDef="Closed Date">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Closed Date' | translate }}</th>
       <td mat-cell *matCellDef="let element">{{ element.timeline.closedOnDate | dateFormat }}</td>
@@ -485,6 +542,11 @@
     <ng-container matColumnDef="Saving Account">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Fixed Deposit Product' | translate }}</th>
       <td mat-cell *matCellDef="let element">{{ element.productName }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="Associated Loan ID">
+      <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Associated Loan ID' | translate }}</th>
+      <td mat-cell *matCellDef="let element">{{ element.additionalProperties?.linkedLoanAccountNumber || '-' }}</td>
     </ng-container>
 
     <ng-container matColumnDef="Last Active">
@@ -559,6 +621,11 @@
       <td mat-cell *matCellDef="let element">
         <mifosx-long-text textValue="{{ element.productName }}" chars="35"></mifosx-long-text>
       </td>
+    </ng-container>
+
+    <ng-container matColumnDef="Associated Loan ID">
+      <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Associated Loan ID' | translate }}</th>
+      <td mat-cell *matCellDef="let element">{{ element.additionalProperties?.linkedLoanAccountNumber || '-' }}</td>
     </ng-container>
 
     <ng-container matColumnDef="Closed Date">
@@ -861,7 +928,7 @@
     </div>
   </div>
 
-  <table mat-table [dataSource]="collaterals">
+  <table mat-table [dataSource]="collaterals" *ngIf="collaterals?.length > 0">
     <ng-container matColumnDef="ID">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.ID' | translate }}</th>
       <td mat-cell *matCellDef="let element">{{ element.collateralId }}</td>

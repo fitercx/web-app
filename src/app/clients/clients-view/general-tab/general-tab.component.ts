@@ -1,6 +1,7 @@
 /** Angular Imports */
 import { Component, OnInit } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
+import { animate, state, style, transition, trigger } from '@angular/animations';
 
 /** Custom Services. */
 import { ClientsService } from 'app/clients/clients.service';
@@ -11,7 +12,30 @@ import { ClientsService } from 'app/clients/clients.service';
 @Component({
   selector: 'mifosx-general-tab',
   templateUrl: './general-tab.component.html',
-  styleUrls: ['./general-tab.component.scss']
+  styleUrls: ['./general-tab.component.scss'],
+  animations: [
+    trigger('detailExpand', [
+      state(
+        'collapsed',
+        style({
+          height: '0px',
+          minHeight: '0',
+          padding: '0',
+          overflow: 'hidden'
+        })
+      ),
+      state(
+        'expanded',
+        style({
+          height: '*',
+          padding: '*',
+          overflow: 'visible'
+        })
+      ),
+      transition('expanded <=> collapsed', animate('225ms cubic-bezier(0.4, 0.0, 0.2, 1)'))
+    ])
+
+  ]
 })
 export class GeneralTabComponent {
   /** Open Loan Accounts Columns */
@@ -21,8 +45,8 @@ export class GeneralTabComponent {
     'Original Loan',
     'Loan Balance',
     'Amount Paid',
-    'Type',
-    'Actions'
+    'Actions',
+    'expand'
   ];
   /** Closed Loan Accounts Columns */
   closedLoansColumns: string[] = [
@@ -31,13 +55,14 @@ export class GeneralTabComponent {
     'Original Loan',
     'Loan Balance',
     'Amount Paid',
-    'Type',
-    'Closed Date'
+    'Closed Date',
+    'expand'
   ];
   /** Open Savings Accounts Columns */
   openSavingsColumns: string[] = [
     'Account No',
     'Saving Account',
+    'Associated Loan ID',
     'Last Active',
     'Balance',
     'Actions'
@@ -46,6 +71,7 @@ export class GeneralTabComponent {
   closedSavingsColumns: string[] = [
     'Account No',
     'Saving Account',
+    'Associated Loan ID',
     'Closed Date'
   ];
   /** Open Shares Accounts Columns */
@@ -111,6 +137,8 @@ export class GeneralTabComponent {
 
   /** Client Id */
   clientid: any;
+
+  expandedElement: any | null = null;
 
   /**
    * @param {ActivatedRoute} route Activated Route
@@ -228,5 +256,11 @@ export class GeneralTabComponent {
 
   trackById(index: number, item: any): any {
     return item.id || item.accountNo || item.collateralId || index;
+  }
+
+  // Add this method
+  toggleRow(element: any, event: Event): void {
+    event.stopPropagation();
+    this.expandedElement = this.expandedElement === element ? null : element;
   }
 }
