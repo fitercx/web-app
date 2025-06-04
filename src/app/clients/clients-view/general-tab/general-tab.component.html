@@ -24,7 +24,7 @@
   </div>
 
   <!-- Upcoming Charges -->
-  <div class="heading-content">
+  <div class="heading-content" *ngIf="upcomingCharges?.length > 0">
     <div fxLayout="column" fxFlex="50%">
       <div className="heading-name">
         <h3>{{ 'labels.heading.Upcoming Charges' | translate }}</h3>
@@ -45,7 +45,7 @@
     </div>
   </div>
 
-  <table mat-table [dataSource]="upcomingCharges">
+  <table *ngIf="upcomingCharges?.length > 0" mat-table [dataSource]="upcomingCharges">
     <ng-container matColumnDef="Name">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.name' | translate }}</th>
       <td mat-cell *matCellDef="let element">
@@ -123,7 +123,12 @@
     </div>
   </div>
 
-  <table *ngIf="!showClosedLoanAccounts" mat-table [dataSource]="loanAccounts | accountsFilter: 'loan'">
+  <table
+    *ngIf="!showClosedLoanAccounts && (loanAccounts | accountsFilter: 'loan')?.length > 0"
+    mat-table
+    [dataSource]="loanAccounts | accountsFilter: 'loan'"
+    multiTemplateDataRows
+  >
     <ng-container matColumnDef="Account No">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Account No' | translate }}</th>
       <td mat-cell *matCellDef="let element">
@@ -144,7 +149,7 @@
 
     <ng-container matColumnDef="Original Loan">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Original Loan' | translate }}</th>
-      <td mat-cell *matCellDef="let element">{{ element.originalLoan }}</td>
+      <td mat-cell *matCellDef="let element">{{ element.originalLoan | formatNumber }}</td>
     </ng-container>
     <ng-container matColumnDef="Loan Balance">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Loan Balance' | translate }}</th>
@@ -154,18 +159,6 @@
     <ng-container matColumnDef="Amount Paid">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Amount Paid' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let element">{{ element.amountPaid | formatNumber }}</td>
-    </ng-container>
-
-    <ng-container matColumnDef="Type">
-      <th mat-header-cell class="center" *matHeaderCellDef>{{ 'labels.inputs.Type' | translate }}</th>
-      <td mat-cell class="center" *matCellDef="let element">
-        <i
-          class="fa fa-large"
-          [ngClass]="element.loanType.value === 'Individual' ? 'fa-user' : 'fa-group'"
-          matTooltip="{{ element.loanType.value }}"
-          matTooltipPosition="above"
-        ></i>
-      </td>
     </ng-container>
 
     <ng-container matColumnDef="Actions">
@@ -227,17 +220,79 @@
       </td>
     </ng-container>
 
+    <ng-container matColumnDef="expand">
+      <th mat-header-cell *matHeaderCellDef></th>
+      <td mat-cell *matCellDef="let element" class="expand-cell">
+        <button mat-icon-button (click)="toggleRow(element, $event)" class="expand-button">
+          <mat-icon>{{ expandedElement === element ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="expandedDetail">
+      <td mat-cell *matCellDef="let element" [attr.colspan]="openLoansColumns.length">
+        <div class="detail-row-container" [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
+          <div class="loan-details-expand">
+            <div class="details-grid">
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.Associated Loan ID' | translate }}:</span>
+                <span class="detail-value">{{ element.externalId || '-' }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.DP Name' | translate }}:</span>
+                <span class="detail-value">{{ element.dpName || 'N/A' }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.Planned Closure Date' | translate }}:</span>
+                <span class="detail-value">{{
+                  element.timeline.expectedMaturityDate ? (element.timeline.expectedMaturityDate | dateFormat) : '-'
+                }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.Installment Amount' | translate }}:</span>
+                <span class="detail-value">{{
+                  element.additionalProperties?.effectiveInstallmentAmount
+                    ? (element.additionalProperties.effectiveInstallmentAmount | formatNumber)
+                    : '-'
+                }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.Loan Status' | translate }}:</span>
+                <span class="detail-value">{{ element.status?.value || element.status?.code || '-' }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.DPD' | translate }}:</span>
+                <span class="detail-value">{{ element.dpd || '-' }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.Late Fee' | translate }}:</span>
+                <span class="detail-value">{{
+                  element.additionalProperties?.lateFees ? (element.additionalProperties.lateFees | formatNumber) : '-'
+                }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </td>
+    </ng-container>
+
     <tr mat-header-row *matHeaderRowDef="openLoansColumns"></tr>
     <tr
       mat-row
       *matRowDef="let row; columns: openLoansColumns"
       [routerLink]="['../', 'loans-accounts', row.id, 'general']"
       class="select-row"
+      [class.expanded-row]="expandedElement === row"
     ></tr>
+    <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="detail-row"></tr>
   </table>
 
   <!-- Closed Loan Accounts -->
-  <table *ngIf="showClosedLoanAccounts" mat-table [dataSource]="loanAccounts | accountsFilter: 'loan' : 'closed'">
+  <table
+    *ngIf="showClosedLoanAccounts && (loanAccounts | accountsFilter: 'loan' : 'closed')?.length > 0"
+    mat-table
+    [dataSource]="loanAccounts | accountsFilter: 'loan' : 'closed'"
+  >
     <ng-container matColumnDef="Account No">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Account No' | translate }}</th>
       <td mat-cell *matCellDef="let element">
@@ -291,7 +346,7 @@
     <tr mat-header-row *matHeaderRowDef="closedLoansColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: closedLoansColumns"
+      *matRowDef="let row; columns: closedLoansColumns; trackBy: trackById"
       [routerLink]="['../', 'loans-accounts', row.id, 'general']"
       class="select-row"
     ></tr>
@@ -314,7 +369,7 @@
   </div>
 
   <table
-    *ngIf="!showClosedSavingAccounts"
+    *ngIf="!showClosedSavingAccounts && (savingAccounts | accountsFilter: 'saving' : 'open' : 'isSavings')?.length > 0"
     mat-table
     [dataSource]="savingAccounts | accountsFilter: 'saving' : 'open' : 'isSavings'"
   >
@@ -331,6 +386,11 @@
       <td mat-cell *matCellDef="let element">
         <mifosx-long-text textValue="{{ element.productName }}" chars="35"></mifosx-long-text>
       </td>
+    </ng-container>
+
+    <ng-container matColumnDef="Associated Loan ID">
+      <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Associated Loan ID' | translate }}</th>
+      <td mat-cell *matCellDef="let element">{{ element.additionalProperties?.linkedLoanAccountNumber || '-' }}</td>
     </ng-container>
 
     <ng-container matColumnDef="Last Active">
@@ -400,14 +460,14 @@
     <tr mat-header-row *matHeaderRowDef="openSavingsColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: openSavingsColumns"
+      *matRowDef="let row; columns: openSavingsColumns; trackBy: trackById"
       [routerLink]="['../', 'savings-accounts', row.id, 'general']"
     ></tr>
   </table>
 
   <!-- Closed Saving Accounts -->
   <table
-    *ngIf="showClosedSavingAccounts"
+    *ngIf="showClosedSavingAccounts && (savingAccounts | accountsFilter: 'saving' : 'closed' : 'isSavings')?.length > 0"
     mat-table
     [dataSource]="savingAccounts | accountsFilter: 'saving' : 'closed' : 'isSavings'"
   >
@@ -426,6 +486,11 @@
       </td>
     </ng-container>
 
+    <ng-container matColumnDef="Associated Loan ID">
+      <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Associated Loan ID' | translate }}</th>
+      <td mat-cell *matCellDef="let element">{{ element.additionalProperties?.linkedLoanAccountNumber || '-' }}</td>
+    </ng-container>
+
     <ng-container matColumnDef="Closed Date">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Closed Date' | translate }}</th>
       <td mat-cell *matCellDef="let element">{{ element.timeline.closedOnDate | dateFormat }}</td>
@@ -434,13 +499,19 @@
     <tr mat-header-row *matHeaderRowDef="closedSavingsColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: closedSavingsColumns"
+      *matRowDef="let row; columns: closedSavingsColumns; trackBy: trackById"
       [routerLink]="['../', 'savings-accounts', row.id, 'general']"
     ></tr>
   </table>
 
   <!-- Fixed Deposit Table -->
-  <div class="heading-content">
+  <div
+    class="heading-content"
+    *ngIf="
+      (savingAccounts | accountsFilter: 'saving' : 'open' : 'isFixed')?.length > 0 ||
+      (savingAccounts | accountsFilter: 'saving' : 'closed' : 'isFixed')?.length > 0
+    "
+  >
     <div fxLayout="column" fxFlex="50%">
       <div class="heading-name">
         <h3>{{ 'labels.heading.Fixed Deposit Accounts' | translate }}</h3>
@@ -456,7 +527,7 @@
   </div>
 
   <table
-    *ngIf="!showClosedFixedAccounts"
+    *ngIf="!showClosedFixedAccounts && (savingAccounts | accountsFilter: 'saving' : 'open' : 'isFixed')?.length > 0"
     mat-table
     [dataSource]="savingAccounts | accountsFilter: 'saving' : 'open' : 'isFixed'"
   >
@@ -471,6 +542,11 @@
     <ng-container matColumnDef="Saving Account">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Fixed Deposit Product' | translate }}</th>
       <td mat-cell *matCellDef="let element">{{ element.productName }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="Associated Loan ID">
+      <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Associated Loan ID' | translate }}</th>
+      <td mat-cell *matCellDef="let element">{{ element.additionalProperties?.linkedLoanAccountNumber || '-' }}</td>
     </ng-container>
 
     <ng-container matColumnDef="Last Active">
@@ -520,7 +596,7 @@
     <tr mat-header-row *matHeaderRowDef="openSavingsColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: openSavingsColumns"
+      *matRowDef="let row; columns: openSavingsColumns; trackBy: trackById"
       [routerLink]="['../', 'fixed-deposits-accounts', row.id, 'general']"
     ></tr>
   </table>
@@ -528,7 +604,7 @@
   <!-- Closed Fixed Deposit Accounts -->
 
   <table
-    *ngIf="showClosedFixedAccounts"
+    *ngIf="showClosedFixedAccounts && (savingAccounts | accountsFilter: 'saving' : 'closed' : 'isFixed')?.length > 0"
     mat-table
     [dataSource]="savingAccounts | accountsFilter: 'saving' : 'closed' : 'isFixed'"
   >
@@ -547,6 +623,11 @@
       </td>
     </ng-container>
 
+    <ng-container matColumnDef="Associated Loan ID">
+      <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Associated Loan ID' | translate }}</th>
+      <td mat-cell *matCellDef="let element">{{ element.additionalProperties?.linkedLoanAccountNumber || '-' }}</td>
+    </ng-container>
+
     <ng-container matColumnDef="Closed Date">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Closed Date' | translate }}</th>
       <td mat-cell *matCellDef="let element">{{ element.timeline.closedOnDate | dateFormat }}</td>
@@ -555,13 +636,19 @@
     <tr mat-header-row *matHeaderRowDef="closedSavingsColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: closedSavingsColumns"
+      *matRowDef="let row; columns: closedSavingsColumns; trackBy: trackById"
       [routerLink]="['../', 'fixed-deposits-accounts', row.id, 'general']"
     ></tr>
   </table>
 
   <!-- Recurring Deposit Table -->
-  <div class="heading-content">
+  <div
+    class="heading-content"
+    *ngIf="
+      (savingAccounts | accountsFilter: 'saving' : 'open' : 'isRecurring')?.length > 0 ||
+      (savingAccounts | accountsFilter: 'saving' : 'closed' : 'isRecurring')?.length > 0
+    "
+  >
     <div fxLayout="column" fxFlex="50%">
       <div class="heading-name">
         <h3>{{ 'labels.heading.Recurring Deposit Accounts' | translate }}</h3>
@@ -577,7 +664,9 @@
   </div>
 
   <table
-    *ngIf="!showClosedRecurringAccounts"
+    *ngIf="
+      !showClosedRecurringAccounts && (savingAccounts | accountsFilter: 'saving' : 'open' : 'isRecurring')?.length > 0
+    "
     mat-table
     [dataSource]="savingAccounts | accountsFilter: 'saving' : 'open' : 'isRecurring'"
   >
@@ -648,7 +737,7 @@
     <tr mat-header-row *matHeaderRowDef="openSavingsColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: openSavingsColumns"
+      *matRowDef="let row; columns: openSavingsColumns; trackBy: trackById"
       [routerLink]="['../', 'recurring-deposits-accounts', row.id, 'general']"
       class="select-row"
     ></tr>
@@ -656,7 +745,9 @@
 
   <!-- Closed Recurring Deposit Accounts -->
   <table
-    *ngIf="showClosedRecurringAccounts"
+    *ngIf="
+      showClosedRecurringAccounts && (savingAccounts | accountsFilter: 'saving' : 'closed' : 'isRecurring')?.length > 0
+    "
     mat-table
     [dataSource]="savingAccounts | accountsFilter: 'saving' : 'closed' : 'isRecurring'"
   >
@@ -683,14 +774,14 @@
     <tr mat-header-row *matHeaderRowDef="closedSavingsColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: closedSavingsColumns"
+      *matRowDef="let row; columns: closedSavingsColumns; trackBy: trackById"
       [routerLink]="['../', 'recurring-deposits-accounts', row.id, 'general']"
       class="select-row"
     ></tr>
   </table>
 
   <!-- Shares overview Table -->
-  <div class="heading-content">
+  <div class="heading-content" *ngIf="shareAccounts?.length > 0">
     <div fxLayout="column" fxFlex="50%">
       <div class="heading-name">
         <h3>{{ 'labels.inputs.Shares Accounts' | translate }}</h3>
@@ -705,7 +796,11 @@
     </div>
   </div>
 
-  <table *ngIf="!showClosedShareAccounts" mat-table [dataSource]="shareAccounts | accountsFilter: 'share'">
+  <table
+    *ngIf="!showClosedShareAccounts && (shareAccounts | accountsFilter: 'share')?.length > 0"
+    mat-table
+    [dataSource]="shareAccounts | accountsFilter: 'share'"
+  >
     <ng-container matColumnDef="Account No">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Account No' | translate }}</th>
       <td mat-cell *matCellDef="let element">
@@ -770,13 +865,17 @@
     <tr mat-header-row *matHeaderRowDef="openSharesColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: openSharesColumns"
+      *matRowDef="let row; columns: openSharesColumns; trackBy: trackById"
       [routerLink]="['../', 'shares-accounts', row.id, 'general']"
     ></tr>
   </table>
 
   <!-- Closed Share Accounts -->
-  <table *ngIf="showClosedShareAccounts" mat-table [dataSource]="shareAccounts | accountsFilter: 'share' : 'closed'">
+  <table
+    *ngIf="showClosedShareAccounts && (shareAccounts | accountsFilter: 'share' : 'closed')?.length > 0"
+    mat-table
+    [dataSource]="shareAccounts | accountsFilter: 'share' : 'closed'"
+  >
     <ng-container matColumnDef="Account No">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Account No' | translate }}</th>
       <td mat-cell *matCellDef="let element">
@@ -808,13 +907,13 @@
     <tr mat-header-row *matHeaderRowDef="closedSharesColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: closedSharesColumns"
+      *matRowDef="let row; columns: closedSharesColumns; trackBy: trackById"
       [routerLink]="['../', 'shares-accounts', row.id, 'general']"
     ></tr>
   </table>
 
   <!-- Collateral Data Table -->
-  <div class="heading-content">
+  <div class="heading-content" *ngIf="collaterals?.length > 0">
     <div fxLayout="column" fxFlex="50%">
       <div class="heading-name">
         <h3>{{ 'labels.heading.Collateral Data' | translate }}</h3>
@@ -829,7 +928,7 @@
     </div>
   </div>
 
-  <table mat-table [dataSource]="collaterals">
+  <table mat-table [dataSource]="collaterals" *ngIf="collaterals?.length > 0">
     <ng-container matColumnDef="ID">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.ID' | translate }}</th>
       <td mat-cell *matCellDef="let element">{{ element.collateralId }}</td>
@@ -864,7 +963,7 @@
     <tr mat-header-row *matHeaderRowDef="collateralsColumns"></tr>
     <tr
       mat-row
-      *matRowDef="let row; columns: collateralsColumns"
+      *matRowDef="let row; columns: collateralsColumns; trackBy: trackById"
       [routerLink]="['../', 'client-collateral', row.collateralId]"
     ></tr>
   </table>

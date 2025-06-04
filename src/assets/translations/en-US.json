@@ -1159,6 +1159,11 @@
       "Principal Amount": "Principal Amount"
     },
     "inputs": {
+      "Associated Loan ID": "Associated Loan ID",
+      "DP Name": "DP Name",
+      "Planned Closure Date": "Planned Closure Date",
+      "Late Fee": "Late Fee",
+      "DPD": "DPD",
       "accounting": {
         "ASSET": "ASSET",
         "LIABILITY": "LIABILITY",
