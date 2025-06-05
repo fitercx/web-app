@@ -19,6 +19,7 @@ export class LoanProductsComponent implements OnInit, AfterViewInit {
   displayedColumns: string[] = [
     'name',
     'shortName',
+    'externalId',
     'closeDate',
     'status'
   ];
