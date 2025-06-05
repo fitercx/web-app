@@ -15,6 +15,7 @@ export interface LoanProduct {
   id: number;
   name: string;
   shortName: string;
+  externalId?: string;
   includeInBorrowerCycle: boolean;
   useBorrowerCycle: boolean;
   status: string;
