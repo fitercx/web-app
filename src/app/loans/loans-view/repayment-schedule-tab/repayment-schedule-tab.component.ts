@@ -42,6 +42,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     'date',
     'paiddate',
     'check',
+    'status',
     'balanceOfLoan',
     'principalDue',
     'interest',

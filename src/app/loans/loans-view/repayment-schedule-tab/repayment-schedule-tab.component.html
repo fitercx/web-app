@@ -42,6 +42,14 @@
       <td mat-footer-cell *matFooterCellDef></td>
     </ng-container>
 
+    <ng-container matColumnDef="status">
+      <th mat-header-cell class="center" *matHeaderCellDef>{{ 'labels.inputs.Status' | translate }}</th>
+      <td mat-cell class="center" *matCellDef="let item" [ngClass]="installmentStyle(item)">
+        {{ item.status }}
+      </td>
+      <td mat-footer-cell *matFooterCellDef></td>
+    </ng-container>
+
     <ng-container matColumnDef="balanceOfLoan">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Balance Of Loan' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
