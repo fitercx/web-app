@@ -114,4 +114,5 @@ export interface RepaymentSchedulePeriod {
   totalWaivedForPeriod?: number;
   totalWrittenOffForPeriod?: number;
   totalInstallmentAmountForPeriod?: number;
+  status?: string;
 }
