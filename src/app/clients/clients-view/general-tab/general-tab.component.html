@@ -24,7 +24,7 @@
   </div>
 
   <!-- Upcoming Charges -->
-  <div class="heading-content" *ngIf="upcomingCharges?.length > 0">
+  <div class="heading-content">
     <div fxLayout="column" fxFlex="50%">
       <div className="heading-name">
         <h3>{{ 'labels.heading.Upcoming Charges' | translate }}</h3>
@@ -45,7 +45,7 @@
     </div>
   </div>
 
-  <table *ngIf="upcomingCharges?.length > 0" mat-table [dataSource]="upcomingCharges">
+  <table mat-table [dataSource]="upcomingCharges">
     <ng-container matColumnDef="Name">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.name' | translate }}</th>
       <td mat-cell *matCellDef="let element">
@@ -124,7 +124,7 @@
   </div>
 
   <table
-    *ngIf="!showClosedLoanAccounts && (loanAccounts | accountsFilter: 'loan')?.length > 0"
+    *ngIf="!showClosedLoanAccounts"
     mat-table
     [dataSource]="loanAccounts | accountsFilter: 'loan'"
     multiTemplateDataRows
@@ -147,12 +147,13 @@
       </td>
     </ng-container>
 
-    <ng-container matColumnDef="Original Loan">
-      <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Original Loan' | translate }}</th>
+    <ng-container matColumnDef="Loan Amount">
+      <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Loan Amount' | translate }}</th>
       <td mat-cell *matCellDef="let element">{{ element.originalLoan | formatNumber }}</td>
     </ng-container>
-    <ng-container matColumnDef="Loan Balance">
-      <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Loan Balance' | translate }}</th>
+
+    <ng-container matColumnDef="Outstanding Balance">
+      <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Outstanding Balance' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let element">{{ element.loanBalance | formatNumber }}</td>
     </ng-container>
 
@@ -289,9 +290,10 @@
 
   <!-- Closed Loan Accounts -->
   <table
-    *ngIf="showClosedLoanAccounts && (loanAccounts | accountsFilter: 'loan' : 'closed')?.length > 0"
+    *ngIf="showClosedLoanAccounts"
     mat-table
     [dataSource]="loanAccounts | accountsFilter: 'loan' : 'closed'"
+    multiTemplateDataRows
   >
     <ng-container matColumnDef="Account No">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Account No' | translate }}</th>
@@ -311,13 +313,13 @@
       </td>
     </ng-container>
 
-    <ng-container matColumnDef="Original Loan">
-      <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Original Loan' | translate }}</th>
+    <ng-container matColumnDef="Loan Amount">
+      <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Loan Amount' | translate }}</th>
       <td mat-cell *matCellDef="let element">{{ element.lastActiveTransactionDate | dateFormat }}</td>
     </ng-container>
 
-    <ng-container matColumnDef="Loan Balance">
-      <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Loan Balance' | translate }}</th>
+    <ng-container matColumnDef="Outstanding Balance">
+      <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Outstanding Balance' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let element">{{ element.loanBalance | formatNumber }}</td>
     </ng-container>
 
@@ -343,6 +345,62 @@
       <td mat-cell *matCellDef="let element">{{ element.timeline.closedOnDate | dateFormat }}</td>
     </ng-container>
 
+    <ng-container matColumnDef="expand">
+      <th mat-header-cell *matHeaderCellDef></th>
+      <td mat-cell *matCellDef="let element" class="expand-cell">
+        <button mat-icon-button (click)="toggleRow(element, $event)" class="expand-button">
+          <mat-icon>{{ expandedElement === element ? 'expand_less' : 'expand_more' }}</mat-icon>
+        </button>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="expandedDetail">
+      <td mat-cell *matCellDef="let element" [attr.colspan]="openLoansColumns.length">
+        <div class="detail-row-container" [@detailExpand]="element == expandedElement ? 'expanded' : 'collapsed'">
+          <div class="loan-details-expand">
+            <div class="details-grid">
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.Associated Loan ID' | translate }}:</span>
+                <span class="detail-value">{{ element.externalId || '-' }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.DP Name' | translate }}:</span>
+                <span class="detail-value">{{ element.dpName || 'N/A' }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.Planned Closure Date' | translate }}:</span>
+                <span class="detail-value">{{
+                  element.timeline.expectedMaturityDate ? (element.timeline.expectedMaturityDate | dateFormat) : '-'
+                }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.Installment Amount' | translate }}:</span>
+                <span class="detail-value">{{
+                  element.additionalProperties?.effectiveInstallmentAmount
+                    ? (element.additionalProperties.effectiveInstallmentAmount | formatNumber)
+                    : '-'
+                }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.Loan Status' | translate }}:</span>
+                <span class="detail-value">{{ element.status?.value || element.status?.code || '-' }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.DPD' | translate }}:</span>
+                <span class="detail-value">{{ element.dpd || '-' }}</span>
+              </div>
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.Late Fee' | translate }}:</span>
+                <span class="detail-value">{{
+                  element.additionalProperties?.lateFees ? (element.additionalProperties.lateFees | formatNumber) : '-'
+                }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </td>
+    </ng-container>
+
     <tr mat-header-row *matHeaderRowDef="closedLoansColumns"></tr>
     <tr
       mat-row
@@ -350,6 +408,7 @@
       [routerLink]="['../', 'loans-accounts', row.id, 'general']"
       class="select-row"
     ></tr>
+    <tr mat-row *matRowDef="let row; columns: ['expandedDetail']" class="detail-row"></tr>
   </table>
 
   <!-- Saving overview Table -->
@@ -369,7 +428,7 @@
   </div>
 
   <table
-    *ngIf="!showClosedSavingAccounts && (savingAccounts | accountsFilter: 'saving' : 'open' : 'isSavings')?.length > 0"
+    *ngIf="!showClosedSavingAccounts"
     mat-table
     [dataSource]="savingAccounts | accountsFilter: 'saving' : 'open' : 'isSavings'"
   >
@@ -467,7 +526,7 @@
 
   <!-- Closed Saving Accounts -->
   <table
-    *ngIf="showClosedSavingAccounts && (savingAccounts | accountsFilter: 'saving' : 'closed' : 'isSavings')?.length > 0"
+    *ngIf="showClosedSavingAccounts"
     mat-table
     [dataSource]="savingAccounts | accountsFilter: 'saving' : 'closed' : 'isSavings'"
   >
