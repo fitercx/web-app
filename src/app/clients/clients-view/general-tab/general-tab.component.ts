@@ -42,8 +42,8 @@ export class GeneralTabComponent {
   openLoansColumns: string[] = [
     'Account No',
     'Loan Account',
-    'Original Loan',
-    'Loan Balance',
+    'Loan Amount',
+    'Outstanding Balance',
     'Amount Paid',
     'Actions',
     'expand'
@@ -52,8 +52,8 @@ export class GeneralTabComponent {
   closedLoansColumns: string[] = [
     'Account No',
     'Loan Account',
-    'Original Loan',
-    'Loan Balance',
+    'Loan Amount',
+    'Outstanding Balance',
     'Amount Paid',
     'Closed Date',
     'expand'

@@ -1159,6 +1159,8 @@
       "Principal Amount": "Principal Amount"
     },
     "inputs": {
+      "Loan Amount": "Loan Amount",
+      "Outstanding Balance": "Outstanding Balance",
       "Associated Loan ID": "Associated Loan ID",
       "DP Name": "DP Name",
       "Planned Closure Date": "Planned Closure Date",
