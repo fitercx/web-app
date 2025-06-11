@@ -37,12 +37,14 @@ export class GeneralTabComponent implements OnInit {
   }[];
   loanDetailsTableData: {
     key: string;
-    value?: string;
+    value?: string | number;
   }[];
 
   /** Data source for loans summary table. */
   dataSource: MatTableDataSource<any>;
   detailsDataSource: MatTableDataSource<any>;
+
+  netDisbursedAmount: number = null;
 
   constructor(private route: ActivatedRoute) {
     this.route.parent.data.subscribe((data: { loanDetailsData: any }) => {
@@ -70,12 +72,32 @@ export class GeneralTabComponent implements OnInit {
 
   ngOnInit() {
     this.status = this.loanDetails.value;
+    this.calculateNetDisbursedAmount();
     if (this.loanDetails.summary) {
       this.setloanSummaryTableData();
       this.setloanDetailsTableData();
     } else {
       this.setloanNonDetailsTableData();
     }
+  }
+
+  /** Calculates the Net Disbursed Amount = Disbursed Amount - Processing Fee (if processing fee is not found, assumes zero.) */
+  calculateNetDisbursedAmount() {
+    const disbursedAmount = this.loanDetails?.principal || 0;
+    let processingFee = 0;
+
+    if (Array.isArray(this.loanDetails?.charges)) {
+      const processingCharge = this.loanDetails.charges.find(
+        (charge: any) =>
+          (charge.chargeType && charge.chargeType.toLowerCase().includes('processing')) ||
+          (charge.name && charge.name.toLowerCase().includes('processing'))
+      );
+      if (processingCharge && processingCharge.amount) {
+        processingFee = processingCharge.amount;
+      }
+    }
+
+    this.netDisbursedAmount = disbursedAmount - (processingFee || 0);
   }
 
   setloanSummaryTableData() {
@@ -162,6 +184,10 @@ export class GeneralTabComponent implements OnInit {
       {
         key: 'Disburse Amount',
         value: this.loanDetails.principal
+      },
+      {
+        key: 'Net Disbursed Amount',
+        value: this.netDisbursedAmount
       }
     ];
     this.detailsDataSource = new MatTableDataSource(this.loanDetailsTableData);
@@ -180,6 +206,10 @@ export class GeneralTabComponent implements OnInit {
       },
       {
         key: 'External Id'
+      },
+      {
+        key: 'Net Disbursed Amount',
+        value: this.netDisbursedAmount
       }
     ];
     this.detailsDataSource = new MatTableDataSource(this.loanDetailsTableData);
