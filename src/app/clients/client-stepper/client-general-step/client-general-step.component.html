@@ -24,7 +24,7 @@
 
     <mat-form-field fxFlex="23%">
       <mat-label>{{ 'labels.inputs.External Id' | translate }}</mat-label>
-      <input matInput formControlName="externalId" />
+      <input matInput required formControlName="externalId" />
     </mat-form-field>
 
     <mat-form-field *ngIf="createClientForm.contains('fullname')" fxFlex="48%">
