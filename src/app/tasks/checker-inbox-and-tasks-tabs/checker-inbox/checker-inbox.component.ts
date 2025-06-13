@@ -47,7 +47,10 @@ export class CheckerInboxComponent implements OnInit {
     'status',
     'user',
     'action',
-    'entity'
+    'entity',
+    'clientName',
+    'loanId',
+    'waiveOffAmount'
   ];
 
   /**
