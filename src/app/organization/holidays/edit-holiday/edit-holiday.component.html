@@ -12,7 +12,7 @@
             </mat-error>
           </mat-form-field>
 
-          <mat-form-field *ngIf="!isActiveHoliday" (click)="fromDatePicker.open()">
+          <mat-form-field (click)="fromDatePicker.open()">
             <mat-label>{{ 'labels.inputs.From Date' | translate }}</mat-label>
             <input
               matInput
@@ -30,7 +30,7 @@
             </mat-error>
           </mat-form-field>
 
-          <mat-form-field *ngIf="!isActiveHoliday" (click)="toDatePicker.open()">
+          <mat-form-field (click)="toDatePicker.open()">
             <mat-label>{{ 'labels.inputs.To Date' | translate }}</mat-label>
             <input
               matInput
@@ -48,7 +48,7 @@
             </mat-error>
           </mat-form-field>
 
-          <mat-form-field *ngIf="!isActiveHoliday">
+          <mat-form-field>
             <mat-label>{{ 'labels.inputs.Repayment Scheduling Type' | translate }}</mat-label>
             <mat-select required formControlName="reschedulingType">
               <mat-option *ngFor="let repayments of holidayData.repaymentSchedulingTypes" [value]="repayments.id">
@@ -61,7 +61,7 @@
             </mat-error>
           </mat-form-field>
 
-          <mat-form-field *ngIf="!isActiveHoliday && reSchedulingType === 2" (click)="repaymentDatePicker.open()">
+          <mat-form-field *ngIf="reSchedulingType === 2" (click)="repaymentDatePicker.open()">
             <mat-label>{{ 'labels.inputs.Repayment scheduled to' | translate }}</mat-label>
             <input
               matInput

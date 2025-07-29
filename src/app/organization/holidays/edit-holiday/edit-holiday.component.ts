@@ -59,11 +59,10 @@ export class EditHolidayComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.maxDate = this.settingsService.businessDate;
+    // Set maxDate to allow future dates for holidays
+    this.maxDate = new Date(2100, 0, 1); // Allow dates up to year 2100
     this.setEditForm();
-    if (!this.isActiveHoliday) {
-      this.getReschedulingType();
-    }
+    this.getReschedulingType();
   }
 
   /**
@@ -77,28 +76,26 @@ export class EditHolidayComponent implements OnInit {
       ],
       description: [this.holidayData.description]
     });
-    if (!this.isActiveHoliday) {
+
+    // Ensure dates are properly converted to Date objects
+    const fromDate = this.holidayData.fromDate ? new Date(this.holidayData.fromDate) : null;
+    const toDate = this.holidayData.toDate ? new Date(this.holidayData.toDate) : null;
+    const repaymentDate = this.holidayData.repaymentsRescheduledTo
+      ? new Date(this.holidayData.repaymentsRescheduledTo)
+      : null;
+
+    this.holidayForm.addControl('fromDate', new UntypedFormControl(fromDate, Validators.required));
+    this.holidayForm.addControl('toDate', new UntypedFormControl(toDate, Validators.required));
+    this.holidayForm.addControl(
+      'reschedulingType',
+      new UntypedFormControl(this.holidayData.reschedulingType, Validators.required)
+    );
+    // Always add the repaymentsRescheduledTo control if reschedulingType is 2
+    if (this.reSchedulingType === 2) {
       this.holidayForm.addControl(
-        'fromDate',
-        new UntypedFormControl(this.holidayData.fromDate && new Date(this.holidayData.fromDate), Validators.required)
+        'repaymentsRescheduledTo',
+        new UntypedFormControl(repaymentDate || new Date(), Validators.required)
       );
-      this.holidayForm.addControl(
-        'toDate',
-        new UntypedFormControl(this.holidayData.toDate && new Date(this.holidayData.toDate), Validators.required)
-      );
-      this.holidayForm.addControl(
-        'reschedulingType',
-        new UntypedFormControl(this.holidayData.reschedulingType, Validators.required)
-      );
-      if (this.reSchedulingType === 2) {
-        this.holidayForm.addControl(
-          'repaymentsRescheduledTo',
-          new UntypedFormControl(
-            this.holidayData.repaymentsRescheduledTo && new Date(this.holidayData.repaymentsRescheduledTo),
-            Validators.required
-          )
-        );
-      }
     }
   }
 
@@ -123,19 +120,17 @@ export class EditHolidayComponent implements OnInit {
     const holidayFormData = this.holidayForm.value;
     const locale = this.settingsService.language.code;
     const dateFormat = this.settingsService.dateFormat;
-    if (!this.isActiveHoliday) {
-      if (this.reSchedulingType === 2) {
-        const repaymentScheduledTo: Date = this.holidayForm.value.repaymentsRescheduledTo;
-        holidayFormData.repaymentsRescheduledTo = this.dateUtils.formatDate(repaymentScheduledTo, dateFormat);
-      }
-      const prevFromDate: Date = this.holidayForm.value.fromDate;
-      const prevToDate: Date = this.holidayForm.value.toDate;
-      if (holidayFormData.closureDate instanceof Date) {
-        holidayFormData.fromDate = this.dateUtils.formatDate(prevFromDate, dateFormat);
-      }
-      if (holidayFormData.closureDate instanceof Date) {
-        holidayFormData.toDate = this.dateUtils.formatDate(prevToDate, dateFormat);
-      }
+    if (this.reSchedulingType === 2) {
+      const repaymentScheduledTo: Date = this.holidayForm.value.repaymentsRescheduledTo;
+      holidayFormData.repaymentsRescheduledTo = this.dateUtils.formatDate(repaymentScheduledTo, dateFormat);
+    }
+    const prevFromDate: Date = this.holidayForm.value.fromDate;
+    const prevToDate: Date = this.holidayForm.value.toDate;
+    if (prevFromDate instanceof Date) {
+      holidayFormData.fromDate = this.dateUtils.formatDate(prevFromDate, dateFormat);
+    }
+    if (prevToDate instanceof Date) {
+      holidayFormData.toDate = this.dateUtils.formatDate(prevToDate, dateFormat);
     }
     const data = {
       ...holidayFormData,
