@@ -99,10 +99,33 @@ export class LoansAccountChargesStepComponent implements OnInit, OnChanges {
   }
 
   ngOnInit() {
+    const isEditMode = !!this.loanId;
+
     if (this.loansAccountTemplate && this.loansAccountTemplate.charges) {
-      this.chargesDataSource =
-        this.loansAccountTemplate.charges.map((charge: any) => ({ ...charge, id: charge.chargeId })) || [];
+      this.chargesDataSource = this.loansAccountTemplate.charges.map((charge: any) => {
+        const patchedCharge = { ...charge, id: charge.chargeId };
+
+        // All valid percentage-based chargeCalculationType IDs (Note that these ids are ChargeCalculationType enum from the backend, so they are constant and safe to use)
+        const percentageBasedTypeIds = [
+          2,
+          3,
+          4,
+          5
+        ];
+        const chargeCalcTypeId = patchedCharge.chargeCalculationType?.id;
+
+        if (
+          isEditMode &&
+          percentageBasedTypeIds.includes(chargeCalcTypeId) &&
+          patchedCharge.amountOrPercentage != null
+        ) {
+          patchedCharge.amount = patchedCharge.amountOrPercentage;
+        }
+
+        return patchedCharge;
+      });
     }
+
     this.dataSource = new MatTableDataSource<any>(this.activeClientMembers);
   }
 
