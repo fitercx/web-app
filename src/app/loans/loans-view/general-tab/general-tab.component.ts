@@ -83,9 +83,32 @@ export class GeneralTabComponent implements OnInit {
 
   /** Calculates the Net Disbursed Amount = Disbursed Amount - Processing Fee (if processing fee is not found, assumes zero.) */
   calculateNetDisbursedAmount() {
-    const disbursedAmount = this.loanDetails?.principal || 0;
-    let processingFee = this.loanDetails.summary.feeChargesCharged || 0;
+    // Only show disbursed amount if loan is active (status 300)
+    // For pending approval (100) and approved (200), show 0.00
+    const isActive = this.loanDetails?.status?.id === 300;
+    const disbursedAmount = isActive ? this.loanDetails?.principal || 0 : 0;
+    let processingFee = this.loanDetails.summary?.feeChargesCharged || 0;
     this.netDisbursedAmount = disbursedAmount - processingFee;
+  }
+
+  /** Returns the disbursed amount based on loan status */
+  getDisbursedAmount(): number {
+    // Only show disbursed amount if loan is active (status 300)
+    // For pending approval (100) and approved (200), show 0.00
+    const isActive = this.loanDetails?.status?.id === 300;
+    return isActive ? this.loanDetails?.principal || 0 : 0;
+  }
+
+  /** Returns the approved amount based on loan status */
+  getApprovedAmount(): number {
+    // Show approved amount for approved (200) and active (300) loans
+    // For pending approval (100), show 0.00
+    const statusId = this.loanDetails?.status?.id;
+    if (statusId === 100) {
+      // Submitted and pending approval
+      return 0;
+    }
+    return this.loanDetails?.approvedPrincipal || 0;
   }
 
   setloanSummaryTableData() {
@@ -167,11 +190,11 @@ export class GeneralTabComponent implements OnInit {
       },
       {
         key: 'Approved Amount',
-        value: this.loanDetails.approvedPrincipal
+        value: this.getApprovedAmount()
       },
       {
         key: 'Disburse Amount',
-        value: this.loanDetails.principal
+        value: this.getDisbursedAmount()
       },
       {
         key: 'Net Disbursed Amount',
@@ -204,23 +227,18 @@ export class GeneralTabComponent implements OnInit {
   }
 
   showApprovedAmountBasedOnStatus() {
-    if (
-      this.status === 'Submitted and pending approval' ||
-      this.status === 'Withdrawn by applicant' ||
-      this.status === 'Rejected'
-    ) {
+    // Always show approved amount, but it will be 0.00 for pending approval loans
+    // Only hide for withdrawn or rejected loans
+    if (this.status === 'Withdrawn by applicant' || this.status === 'Rejected') {
       return false;
     }
     return true;
   }
 
   showDisbursedAmountBasedOnStatus = function () {
-    if (
-      this.status === 'Submitted and pending approval' ||
-      this.status === 'Withdrawn by applicant' ||
-      this.status === 'Rejected' ||
-      this.status === 'Approved'
-    ) {
+    // Always show disbursed amount, but it will be 0.00 for pending approval and approved loans
+    // Only hide for withdrawn or rejected loans
+    if (this.status === 'Withdrawn by applicant' || this.status === 'Rejected') {
       return false;
     }
     return true;

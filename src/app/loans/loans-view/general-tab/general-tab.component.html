@@ -218,14 +218,12 @@
 
         <div fxFlexFill *ngIf="showApprovedAmountBasedOnStatus()">
           <span fxFlex="50%">{{ 'labels.inputs.Approved Amount' | translate }}:</span>
-          <span fxFlex="50%">{{
-            loanDetails.approvedPrincipal | currency: currencyCode : 'symbol-narrow' : '1.2-2'
-          }}</span>
+          <span fxFlex="50%">{{ getApprovedAmount() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}</span>
         </div>
 
         <div fxFlexFill *ngIf="showDisbursedAmountBasedOnStatus()">
           <span fxFlex="50%">{{ 'labels.inputs.Disburse Amount' | translate }}:</span>
-          <span fxFlex="50%">{{ loanDetails.principal | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}</span>
+          <span fxFlex="50%">{{ getDisbursedAmount() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}</span>
         </div>
 
         <div fxFlexFill *ngIf="loanDetails.balloonRepaymentAmount > 0">
