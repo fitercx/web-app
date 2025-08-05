@@ -124,6 +124,11 @@ export class LoansAccountChargesStepComponent implements OnInit, OnChanges {
 
         return patchedCharge;
       });
+
+      // If we're in edit mode and there are existing charges, the form is not pristine
+      if (isEditMode && this.chargesDataSource.length > 0) {
+        this.pristine = false;
+      }
     }
 
     this.dataSource = new MatTableDataSource<any>(this.activeClientMembers);
