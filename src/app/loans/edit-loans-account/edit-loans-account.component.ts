@@ -60,7 +60,6 @@ export class EditLoansAccountComponent {
    * @param {any} $event API response
    */
   setTemplate($event: any) {
-    console.log('setTemplate called with:', $event);
     this.loansAccountProductTemplate = $event;
     this.currencyCode = this.loansAccountProductTemplate.currency.code;
     if (this.loansAccountProductTemplate.loanProductId) {
