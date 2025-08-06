@@ -83,9 +83,20 @@ export class EditLoansAccountComponent {
 
   /** Checks wheter all the forms in different steps are valid and not pristine */
   get loansAccountFormValidAndNotPristine() {
+    // For edit mode, we only need the forms to be valid, not necessarily pristine
+    const isEditMode = !!this.loanId;
+
+    const detailsValid = this.loansAccountDetailsForm.valid;
+    const termsValid = this.loansAccountTermsForm.valid;
+
+    if (isEditMode) {
+      return detailsValid && termsValid;
+    }
+
+    // For create mode, check if forms are valid and not pristine
     return (
-      this.loansAccountDetailsForm.valid &&
-      this.loansAccountTermsForm.valid &&
+      detailsValid &&
+      termsValid &&
       (!this.loansAccountDetailsForm.pristine ||
         !this.loansAccountTermsForm.pristine ||
         !this.loansAccountTermsStep.pristine ||
