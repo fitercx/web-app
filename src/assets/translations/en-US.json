@@ -2358,6 +2358,7 @@
       "Transaction": "Transaction",
       "Transaction Amount": "Transaction Amount",
       "Transaction Date": "Transaction Date",
+      "Value Date": "Value Date",
       "Transaction Date From": "Transaction Date From",
       "Transaction Date To": "Transaction Date To",
       "Transaction ID": "Transaction ID",

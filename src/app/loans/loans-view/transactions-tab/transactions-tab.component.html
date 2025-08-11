@@ -58,6 +58,17 @@
       </td>
     </ng-container>
 
+    <ng-container matColumnDef="submittedOnDate">
+      <td
+        mat-cell
+        *matCellDef="let transaction"
+        [ngClass]="loanTransactionColor(transaction)"
+        (click)="showTransactions(transaction)"
+      >
+        {{ transaction.submittedOnDate | dateFormat }}
+      </td>
+    </ng-container>
+
     <ng-container matColumnDef="transactionType">
       <td
         mat-cell
@@ -226,6 +237,10 @@
     </ng-container>
 
     <ng-container matColumnDef="h1-transaction-date">
+      <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Value Date' | translate }}</th>
+    </ng-container>
+
+    <ng-container matColumnDef="h1-submitted-date">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Transaction Date' | translate }}</th>
     </ng-container>
 
@@ -253,7 +268,7 @@
 
     <!-- Sub header -->
     <ng-container matColumnDef="h2-space">
-      <th mat-header-cell *matHeaderCellDef [attr.colspan]="6"></th>
+      <th mat-header-cell *matHeaderCellDef [attr.colspan]="7"></th>
     </ng-container>
 
     <ng-container matColumnDef="h2-amount">
