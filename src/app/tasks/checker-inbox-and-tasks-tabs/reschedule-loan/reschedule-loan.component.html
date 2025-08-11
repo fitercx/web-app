@@ -85,9 +85,38 @@
       <td mat-cell *matCellDef="let loan">{{ loan.rescheduleFromDate | dateFormat }}</td>
     </ng-container>
 
+    <ng-container matColumnDef="rescheduleTo">
+      <th mat-header-cell *matHeaderCellDef>{{ 'Reschedule To' | translate }}</th>
+      <td mat-cell *matCellDef="let loan">{{ getRescheduleToDate(loan) }}</td>
+    </ng-container>
+
     <ng-container matColumnDef="rescheduleReason">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Reschedule Reason' | translate }}</th>
       <td mat-cell *matCellDef="let loan">{{ loan.rescheduleReasonCodeValue.name }}</td>
+    </ng-container>
+
+    <!-- Grace On Principal Column -->
+    <ng-container matColumnDef="graceOnPrincipal">
+      <th mat-header-cell *matHeaderCellDef>{{ 'Grace On Principal' | translate }}</th>
+      <td mat-cell *matCellDef="let loan">{{ getGraceOnPrincipal(loan) }}</td>
+    </ng-container>
+
+    <!-- Grace On Interest Column -->
+    <ng-container matColumnDef="graceOnInterest">
+      <th mat-header-cell *matHeaderCellDef>{{ 'Grace On Interest' | translate }}</th>
+      <td mat-cell *matCellDef="let loan">{{ getGraceOnInterest(loan) }}</td>
+    </ng-container>
+
+    <!-- Extend Repayment Period Column -->
+    <ng-container matColumnDef="extendRepaymentPeriod">
+      <th mat-header-cell *matHeaderCellDef>{{ 'Extend Repayment Period' | translate }}</th>
+      <td mat-cell *matCellDef="let loan">{{ getExtendRepaymentPeriod(loan) }}</td>
+    </ng-container>
+
+    <!-- Interest Rate For Installment Column -->
+    <ng-container matColumnDef="interestRateForInstallment">
+      <th mat-header-cell *matHeaderCellDef>{{ 'Interest Rate For Installment' | translate }}</th>
+      <td mat-cell *matCellDef="let loan">{{ getInterestRateForInstallment(loan) }}</td>
     </ng-container>
 
     <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>

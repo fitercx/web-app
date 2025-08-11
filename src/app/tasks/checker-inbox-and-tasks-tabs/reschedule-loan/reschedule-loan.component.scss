@@ -1,14 +1,119 @@
-.tab-container {
-  padding: 1%;
-  margin: 1%;
+table {
+  width: 100%;
+  table-layout: fixed; // Fixed layout to control column widths
 
-  .mat-raised-button.mat-success {
-    color: #fff;
-    background-color: #008000ab;
+  .action-button {
+    min-width: 26px;
+    padding: 0 0 3px;
+    margin: 0 2%;
+    line-height: 25px;
+  }
+}
+
+.tab-container {
+  overflow-x: auto; // Allow horizontal scroll if needed
+
+  .mat-table {
+    min-width: 1400px; // Minimum width to accommodate all columns
+  }
+}
+
+// Table styling improvements
+.mat-table {
+  .mat-header-cell {
+    font-weight: 600;
+    color: #1976d2;
+    padding: 12px 8px;
+    white-space: normal; // Allow text wrapping instead of nowrap
+    font-size: 0.9em;
+    overflow: visible; // Remove overflow hidden to show wrapped text
+    text-overflow: initial; // Remove ellipsis
+    line-height: 1.2; // Tighter line height for wrapped text
+    height: auto; // Allow height to expand for wrapped text
   }
 
-  .view-details {
-    cursor: pointer;
+  .mat-cell {
+    padding: 12px 8px;
+    vertical-align: top;
+    word-wrap: break-word;
+    white-space: normal;
+    line-height: 1.4;
+    min-height: 48px;
+  }
+
+  // Column width adjustments
+  .mat-column-select {
+    flex: 0 0 50px;
+    max-width: 50px;
+  }
+
+  .mat-column-client {
+    flex: 0 0 120px;
+    max-width: 120px;
+  }
+
+  .mat-column-rescheduleRequestNo {
+    flex: 0 0 100px;
+    max-width: 100px;
+  }
+
+  .mat-column-loanAccountNo {
+    flex: 0 0 120px;
+    max-width: 120px;
+  }
+
+  .mat-column-rescheduleForm {
+    flex: 0 0 130px;
+    max-width: 130px;
+  }
+
+  .mat-column-rescheduleTo {
+    flex: 0 0 130px;
+    max-width: 130px;
+  }
+
+  .mat-column-rescheduleReason {
+    flex: 0 0 150px;
+    max-width: 150px;
+  }
+
+  .mat-column-graceOnPrincipal {
+    flex: 0 0 130px;
+    max-width: 130px;
+    text-align: center;
+  }
+
+  .mat-column-graceOnInterest {
+    flex: 0 0 130px;
+    max-width: 130px;
+    text-align: center;
+  }
+
+  .mat-column-extendRepaymentPeriod {
+    flex: 0 0 160px;
+    max-width: 160px;
+    text-align: center;
+  }
+
+  .mat-column-interestRateForInstallment {
+    flex: 0 0 180px;
+    max-width: 180px;
+    text-align: center;
+  }
+
+  // Center align variation columns
+  .mat-column-graceOnPrincipal,
+  .mat-column-graceOnInterest,
+  .mat-column-extendRepaymentPeriod,
+  .mat-column-interestRateForInstallment {
+    .mat-cell {
+      text-align: center;
+      font-weight: 500;
+    }
+
+    .mat-header-cell {
+      text-align: center;
+    }
   }
 }
 

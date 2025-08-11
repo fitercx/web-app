@@ -1,5 +1,6 @@
 table {
   width: 100%;
+  table-layout: fixed; // Fixed layout to control column widths
 
   .action-button {
     min-width: 26px;
@@ -7,14 +8,114 @@ table {
     margin: 0 2%;
     line-height: 25px;
   }
+
+  // Column width adjustments
+  .mat-column-id {
+    flex: 0 0 60px;
+    max-width: 60px;
+  }
+
+  .mat-column-rescheduleFromDate {
+    flex: 0 0 130px;
+    max-width: 130px;
+  }
+
+  .mat-column-rescheduleTo {
+    flex: 0 0 130px;
+    max-width: 130px;
+  }
+
+  .mat-column-reason {
+    flex: 0 0 180px;
+    max-width: 180px;
+  }
+
+  .mat-column-status {
+    flex: 0 0 120px;
+    max-width: 120px;
+  }
+
+  .mat-column-graceOnPrincipal {
+    flex: 0 0 130px;
+    max-width: 130px;
+    text-align: center;
+  }
+
+  .mat-column-graceOnInterest {
+    flex: 0 0 130px;
+    max-width: 130px;
+    text-align: center;
+  }
+
+  .mat-column-extendRepaymentPeriod {
+    flex: 0 0 160px;
+    max-width: 160px;
+    text-align: center;
+  }
+
+  .mat-column-interestRateForInstallment {
+    flex: 0 0 180px;
+    max-width: 180px;
+    text-align: center;
+  }
+
+  .mat-column-actions {
+    flex: 0 0 100px;
+    max-width: 100px;
+  }
 }
 
 .container {
   padding-top: 1%;
   padding-bottom: 2%;
+  overflow-x: auto; // Allow horizontal scroll if needed
 
   .action-buttons {
     padding-bottom: 1rem;
     padding-top: 1rem;
+  }
+
+  // Ensure table container can handle wider content
+  .mat-table {
+    min-width: 1400px; // Increased minimum width for all variation columns
+  }
+}
+
+// Table styling improvements
+.mat-table {
+  .mat-header-cell {
+    font-weight: 600;
+    color: #1976d2;
+    padding: 12px 8px;
+    white-space: normal; // Allow text wrapping instead of nowrap
+    font-size: 0.9em; // Slightly smaller font for headers to fit better
+    overflow: visible; // Remove overflow hidden to show wrapped text
+    text-overflow: initial; // Remove ellipsis
+    line-height: 1.2; // Tighter line height for wrapped text
+    height: auto; // Allow height to expand for wrapped text
+  }
+
+  .mat-cell {
+    padding: 12px 8px;
+    vertical-align: top;
+    word-wrap: break-word;
+    white-space: normal;
+    line-height: 1.4;
+    min-height: 48px;
+  }
+
+  // Center align variation columns
+  .mat-column-graceOnPrincipal,
+  .mat-column-graceOnInterest,
+  .mat-column-extendRepaymentPeriod,
+  .mat-column-interestRateForInstallment {
+    .mat-cell {
+      text-align: center;
+      font-weight: 500;
+    }
+
+    .mat-header-cell {
+      text-align: center;
+    }
   }
 }
