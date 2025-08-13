@@ -87,6 +87,9 @@ export class ChargesTabComponent implements OnInit {
     this.status = this.loanDetails.status.value;
     let actionFlag;
     this.chargesData.forEach((element: any) => {
+      if (element.chargeTimeType.value === 'Disbursement') {
+        element.dueDate = this.loanDetails.timeline.actualDisbursementDate;
+      }
       element.dueDate = this.dateUtils.parseDate(element.dueDate);
       if (
         element.paid ||
