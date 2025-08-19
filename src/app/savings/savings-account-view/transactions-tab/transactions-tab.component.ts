@@ -36,6 +36,7 @@ export class TransactionsTabComponent implements OnInit {
     'row',
     'id',
     'date',
+    'submittedOnDate',
     'externalId',
     'transactionType',
     'debit',
