@@ -64,6 +64,18 @@
       </span>
     </div>
 
+    <ng-container *ngIf="loanDetails?.additionalProperties?.loanInterestVariations?.length">
+      <div fxFlexFill *ngFor="let variation of loanDetails.additionalProperties.loanInterestVariations">
+        <span fxFlex="50%">
+          Interest Rate from
+          <span style="font-weight: 500">{{ variation.fromDate | dateFormat }}</span>
+          to
+          <span style="font-weight: 500">{{ variation.toDate | dateFormat }}</span>
+        </span>
+        <span fxFlex="50%"> {{ variation.decimalValue }}% </span>
+      </div>
+    </ng-container>
+
     <div fxFlexFill>
       <span fxFlex="50%"> {{ 'labels.inputs.Interest Type' | translate }} </span>
       <span fxFlex="50%"> {{ 'labels.text.' + loanDetails.interestType.value | translate }} </span>
