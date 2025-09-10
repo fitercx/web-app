@@ -27,7 +27,7 @@
             </div>
 
             <div fxFlex="50%" class="r-amount right-label">
-              {{ dataObject.repaymentTemplate.principalPortion | formatNumber }}
+              {{ dataObject.penaltyTemplate.principalAmountDue | formatNumber }}
             </div>
 
             <div fxFlex="50%" class="mat-body-strong">
@@ -35,7 +35,7 @@
             </div>
 
             <div fxFlex="50%" class="r-amount right-label">
-              {{ dataObject.repaymentTemplate.interestPortion | formatNumber }}
+              {{ dataObject.penaltyTemplate.interestAmountDue | formatNumber }}
             </div>
 
             <div fxFlex="50%" class="mat-body-strong">
@@ -51,7 +51,7 @@
             </div>
 
             <div fxFlex="50%" class="r-amount right-label">
-              {{ dataObject.penaltyTemplate.penaltyAmount | formatNumber }}
+              {{ dataObject.penaltyTemplate.penaltyAmountDue | formatNumber }}
             </div>
           </div>
 
