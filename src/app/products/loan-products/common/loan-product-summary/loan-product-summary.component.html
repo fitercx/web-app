@@ -30,6 +30,11 @@
     <span fxFlex="53%">{{ loanProduct.includeInBorrowerCycle | yesNo }}</span>
   </div>
 
+  <div fxFlexFill>
+    <span fxFlex="47%">{{ 'labels.inputs.Is LOC product' | translate }}:</span>
+    <span fxFlex="53%">{{ loanProduct.additionalProperties?.isLocEnabled | yesNo }}</span>
+  </div>
+
   <div fxFlexFill *ngIf="loanProduct.startDate">
     <span fxFlex="47%">{{ 'labels.inputs.Start Date' | translate }}:</span>
     <span fxFlex="53%">{{ loanProduct.startDate | dateFormat }}</span>

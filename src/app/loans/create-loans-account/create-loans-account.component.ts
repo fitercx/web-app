@@ -44,6 +44,8 @@ export class CreateLoansAccountComponent {
   datatables: any = [];
   /** Currency Code */
   currencyCode: string;
+  /** Optional Line of Credit context (drawdown) */
+  lineOfCreditId?: string | null;
 
   /**
    * Sets loans account create form.
@@ -63,6 +65,8 @@ export class CreateLoansAccountComponent {
     this.route.data.subscribe((data: { loansAccountTemplate: any }) => {
       this.loansAccountTemplate = data.loansAccountTemplate;
     });
+    // capture LOC context (drawdown) if provided via query param from client LOC list
+    this.lineOfCreditId = this.route.snapshot.queryParamMap.get('lineOfCreditId');
   }
 
   /**
@@ -73,6 +77,7 @@ export class CreateLoansAccountComponent {
     this.loansAccountProductTemplate = $event;
     this.currencyCode = this.loansAccountProductTemplate.currency.code;
     const clientId = this.loansAccountTemplate.clientId;
+    // If creating as drawdown, optionally restrict products here (future enhancement)
     if (!!clientId) {
       this.clientService.getCollateralTemplate(clientId).subscribe((response: any) => {
         this.collateralOptions = response;
@@ -174,6 +179,13 @@ export class CreateLoansAccountComponent {
       locale,
       dateFormat
     );
+
+    // Attach line of credit context if present (both common field names for compatibility)
+    if (this.lineOfCreditId) {
+      payload.lineOfCreditId = this.lineOfCreditId;
+      // some backends may expect creditLineId
+      payload.creditLineId = this.lineOfCreditId;
+    }
 
     if (this.loansAccountProductTemplate.datatables && this.loansAccountProductTemplate.datatables.length > 0) {
       const datatables: any[] = [];

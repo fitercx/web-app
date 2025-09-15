@@ -103,8 +103,10 @@ export class EditChargeComponent implements OnInit {
         Validators.required
       ]
     });
-    switch (this.chargeData.chargeAppliesTo.value) {
-      case 'Loan': {
+    // Prefer ID based branching to avoid localization / capitalization mismatches
+    switch (this.chargeData.chargeAppliesTo.id) {
+      case 1: {
+        // Loan
         this.chargeTimeTypeOptions = this.chargeData.loanChargeTimeTypeOptions;
         this.chargeCalculationTypeOptions = this.chargeData.loanChargeCalculationTypeOptions;
         this.addFeeFrequency = true;
@@ -122,18 +124,32 @@ export class EditChargeComponent implements OnInit {
         }
         break;
       }
-      case 'Savings': {
+      case 2: {
+        // Savings
         this.chargeTimeTypeOptions = this.chargeData.savingsChargeTimeTypeOptions;
         this.chargeCalculationTypeOptions = this.chargeData.savingsChargeCalculationTypeOptions;
         this.addFeeFrequency = false;
         break;
       }
-      case 'Shares': {
+      case 4: {
+        // Shares
         this.chargeTimeTypeOptions = this.chargeData.shareChargeTimeTypeOptions;
         this.chargeCalculationTypeOptions = this.chargeData.shareChargeCalculationTypeOptions;
         this.addFeeFrequency = false;
         this.showGLAccount = false;
         this.showPenalty = false;
+        break;
+      }
+      case 5: {
+        // Line of Credit
+        const locTimeOpts = this.chargeData.lineOfCreditChargeTimeTypeOptions || [];
+        this.chargeTimeTypeOptions = locTimeOpts.length ? locTimeOpts : this.chargeData.loanChargeTimeTypeOptions || [];
+        // Ensure only id 17 present (activation) even if fallback supplied more.
+        this.chargeTimeTypeOptions = this.chargeTimeTypeOptions.filter((o: any) => o.id === 17);
+        this.chargeCalculationTypeOptions =
+          this.chargeData.lineOfCreditChargeCalculationTypeOptions || this.chargeData.loanChargeCalculationTypeOptions;
+        this.addFeeFrequency = false;
+        this.showGLAccount = false;
         break;
       }
       default: {

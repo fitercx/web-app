@@ -1,0 +1,323 @@
+<mat-card class="account-card" *ngIf="locDetails">
+  <mat-card-header fxLayout="column" class="header">
+    <mat-card-title-group class="header-title-group">
+      <div class="mat-typography account-card-title">
+        <mat-card-title fxLayout="row wrap" class="content">
+          <h3 fxFlex="95%">
+            <i
+              class="fa fa-stop"
+              [ngClass]="locDetails?.status?.code || locDetails?.status || '' | statusLookup"
+              matTooltip="{{ 'labels.status.' + (locDetails?.status?.value || locDetails?.status || '') | translate }}"
+            ></i>
+            <b>{{ 'labels.inputs.Line of Credit' | translate }} :</b>
+            <mifosx-entity-name entityName="{{ locDetails?.name }}"></mifosx-entity-name>
+          </h3>
+          <div fxFlex="5%" fxLayoutAlign="end center">
+            <button mat-icon-button [matMenuTriggerFor]="locMenu" aria-label="LOC actions" yPosition="below">
+              <mat-icon matListIcon class="actions-menu">
+                <fa-icon icon="bars" size="sm"></fa-icon>
+              </mat-icon>
+            </button>
+          </div>
+        </mat-card-title>
+
+        <mat-card-subtitle>
+          <div fxLayout="row" fxLayout.lt-md="column">
+            <div fxFlex="50%">
+              <table class="account-overview">
+                <tbody>
+                  <tr>
+                    <td>
+                      <b>{{ 'labels.inputs.ID' | translate }}</b>
+                    </td>
+                    <td>{{ locDetails?.id }}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <b>{{ 'labels.inputs.External Id' | translate }}</b>
+                    </td>
+                    <td>
+                      <mifosx-external-identifier
+                        externalId="{{ locDetails?.externalId }}"
+                        completed="true"
+                      ></mifosx-external-identifier>
+                    </td>
+                  </tr>
+                  <tr *ngIf="locDetails?.activationDate">
+                    <td>
+                      <b>{{ 'labels.inputs.Activation Date' | translate }}</b>
+                    </td>
+                    <td>{{ locDetails?.activationDate | dateFormat }}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <b>{{ 'labels.inputs.Type' | translate }}</b>
+                    </td>
+                    <td>
+                      <span
+                        class="type-badge"
+                        [ngClass]="locDetails?.type === 'LOC PAYABLE' ? 'loc-payable' : 'loc-receivable'"
+                      >
+                        {{ locDetails?.type }}
+                      </span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <b>{{ 'labels.inputs.Client' | translate }}</b>
+                    </td>
+                    <td>
+                      <a [routerLink]="['/clients', clientId]">{{ clientName }}</a>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div fxFlex="50%">
+              <table class="account-overview">
+                <tbody>
+                  <tr>
+                    <td>
+                      <b>{{ 'labels.inputs.Credit Limit' | translate }}</b>
+                    </td>
+                    <td>{{ locDetails?.creditLimit | currency: locDetails?.currency || '' }}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <b>{{ 'labels.inputs.Available Balance' | translate }}</b>
+                    </td>
+                    <td class="available">{{ locDetails?.availableBalance | currency: locDetails?.currency || '' }}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <b>{{ 'labels.inputs.Outstanding' | translate }}</b>
+                    </td>
+                    <td class="outstanding">{{ locDetails?.outstanding | currency: locDetails?.currency || '' }}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <b>{{ 'labels.inputs.Interest Rate' | translate }}</b>
+                    </td>
+                    <td>{{ locDetails?.interestRate }}% p.a.</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <b>{{ 'labels.inputs.Utilization' | translate }}</b>
+                    </td>
+                    <td>{{ locDetails?.utilization }}%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </mat-card-subtitle>
+      </div>
+
+      <mat-menu #locMenu="matMenu">
+        <button mat-menu-item [routerLink]="['edit']" *mifosxHasPermission="'UPDATE_CREDITLINE'">
+          <mat-icon matListIcon>
+            <fa-icon icon="edit" size="sm"></fa-icon>
+          </mat-icon>
+          <span>{{ 'labels.buttons.Edit' | translate }}</span>
+        </button>
+
+        <button mat-menu-item (click)="doAction('New Drawdown')" *ngIf="isActive()">
+          <mat-icon matListIcon>
+            <fa-icon icon="hand-holding-usd" size="sm"></fa-icon>
+          </mat-icon>
+          <span>{{ 'labels.buttons.New Drawdown' | translate }}</span>
+        </button>
+
+        <button mat-menu-item [matMenuTriggerFor]="Actions">
+          <mat-icon matListIcon>
+            <fa-icon icon="tasks" size="sm"></fa-icon>
+          </mat-icon>
+          <span>{{ 'labels.buttons.Actions' | translate }}</span>
+        </button>
+
+        <button mat-menu-item [matMenuTriggerFor]="More">
+          <span>{{ 'labels.buttons.More' | translate }}</span>
+        </button>
+      </mat-menu>
+
+      <mat-menu #Actions="matMenu">
+        <button
+          mat-menu-item
+          (click)="doAction('Deactivate')"
+          *ngIf="locDetails?.status?.code === 'locactivationstatus.active'"
+        >
+          {{ 'labels.buttons.Deactivate' | translate }}
+        </button>
+        <button
+          mat-menu-item
+          (click)="doAction('Reactivate')"
+          *ngIf="locDetails?.status?.code === 'locactivationstatus.inactive'"
+        >
+          {{ 'labels.buttons.Reactivate' | translate }}
+        </button>
+        <button
+          mat-menu-item
+          (click)="doAction('Close')"
+          *ngIf="locDetails?.status?.code !== 'locactivationstatus.closed'"
+        >
+          {{ 'labels.buttons.Close' | translate }}
+        </button>
+        <button mat-menu-item (click)="doAction('Increase Limit')">
+          {{ 'labels.buttons.Increase Limit' | translate }}
+        </button>
+        <button mat-menu-item (click)="doAction('Decrease Limit')">
+          {{ 'labels.buttons.Decrease Limit' | translate }}
+        </button>
+      </mat-menu>
+
+      <mat-menu #More="matMenu">
+        <button mat-menu-item (click)="doAction('Add Charge')">
+          {{ 'labels.buttons.Add Charge' | translate }}
+        </button>
+        <button mat-menu-item (click)="doAction('View Transactions')">
+          {{ 'labels.buttons.View Transactions' | translate }}
+        </button>
+        <button mat-menu-item (click)="doAction('Generate Statement')">
+          {{ 'labels.buttons.Generate Statement' | translate }}
+        </button>
+        <button mat-menu-item (click)="doAction('Upload Document')">
+          {{ 'labels.buttons.Upload Document' | translate }}
+        </button>
+      </mat-menu>
+    </mat-card-title-group>
+  </mat-card-header>
+
+  <mat-card-content>
+    <!-- Credit Details Section -->
+    <div class="details-section" fxLayout="row" fxLayoutGap="16px" fxLayout.lt-md="column">
+      <div fxFlex="60%" fxFlex.lt-md="100%">
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>{{ 'labels.inputs.Credit Utilization' | translate }}</mat-card-title>
+            <mat-card-subtitle
+              >{{ locDetails?.utilization }}% {{ 'labels.inputs.utilized' | translate }}</mat-card-subtitle
+            >
+          </mat-card-header>
+          <mat-card-content>
+            <div fxLayout="row" fxLayoutAlign="start center" fxLayoutGap="24px">
+              <mat-progress-spinner
+                [value]="locDetails?.utilization"
+                diameter="120"
+                strokeWidth="10"
+                [color]="locDetails?.type === 'LOC PAYABLE' ? 'warn' : 'accent'"
+                mode="determinate"
+              >
+              </mat-progress-spinner>
+              <div class="utilization-details">
+                <div class="detail-row">
+                  <span class="detail-label">{{ 'labels.inputs.Interest rate' | translate }}:</span>
+                  <span class="detail-value"
+                    ><strong>{{ locDetails?.interestRate }}% p.a.</strong></span
+                  >
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">{{ 'labels.inputs.Avg. utilization' | translate }}:</span>
+                  <span class="detail-value"
+                    ><strong>{{ locDetails?.avgUtilization | currency: locDetails?.currency || '' }}</strong></span
+                  >
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">{{ 'labels.inputs.Performance' | translate }}:</span>
+                  <span class="detail-value performance"
+                    ><strong>{{ locDetails?.performance || '-' }}</strong></span
+                  >
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">{{ 'labels.inputs.Total Repaid' | translate }}:</span>
+                  <span class="detail-value"
+                    ><strong>{{ locDetails?.totalRepaid | currency: locDetails?.currency || '' }}</strong></span
+                  >
+                </div>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+
+      <div fxFlex="40%" fxFlex.lt-md="100%">
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>{{ 'labels.inputs.Client Details' | translate }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="client-details">
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Company' | translate }}</span>
+                <span class="detail-value">{{ locDetails?.clientCompanyName || '-' }}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Contact' | translate }}</span>
+                <span class="detail-value">
+                  {{ locDetails?.clientContactPersonName || '-' }}
+                  <span *ngIf="locDetails?.clientContactPersonPhone">({{ locDetails?.clientContactPersonPhone }})</span>
+                </span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Email' | translate }}</span>
+                <span class="detail-value">{{ locDetails?.clientContactPersonEmail || '-' }}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Signatory' | translate }}</span>
+                <span class="detail-value">
+                  {{ locDetails?.authorizedSignatoryName || '-' }}
+                  <span *ngIf="locDetails?.authorizedSignatoryPhone">({{ locDetails?.authorizedSignatoryPhone }})</span>
+                </span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.VA' | translate }}</span>
+                <span class="detail-value">{{ locDetails?.va || '-' }}</span>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </div>
+
+    <!-- Tabs Section -->
+    <nav mat-tab-nav-bar class="navigation-tabs">
+      <a
+        mat-tab-link
+        [routerLink]="['./active-loans']"
+        routerLinkActive
+        #activeLoans="routerLinkActive"
+        [active]="activeLoans.isActive"
+      >
+        {{ 'labels.inputs.Active Loans' | translate }}
+      </a>
+      <a
+        mat-tab-link
+        [routerLink]="['./transactions']"
+        routerLinkActive
+        #transactions="routerLinkActive"
+        [active]="transactions.isActive"
+      >
+        {{ 'labels.inputs.Transaction History' | translate }}
+      </a>
+      <a
+        mat-tab-link
+        [routerLink]="['./documents']"
+        routerLinkActive
+        #documents="routerLinkActive"
+        [active]="documents.isActive"
+      >
+        {{ 'labels.inputs.Documents' | translate }}
+      </a>
+      <a
+        mat-tab-link
+        [routerLink]="['./settings']"
+        routerLinkActive
+        #settings="routerLinkActive"
+        [active]="settings.isActive"
+      >
+        {{ 'labels.inputs.Settings' | translate }}
+      </a>
+    </nav>
+
+    <router-outlet></router-outlet>
+  </mat-card-content>
+</mat-card>

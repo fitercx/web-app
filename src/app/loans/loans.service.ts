@@ -661,6 +661,11 @@ export class LoansService {
     // allowPartialPeriodInterestCalculation. Until that is fixed, we need to replace the field name in the payload.
     loansAccountData.allowPartialPeriodInterestCalcualtion = loansAccountData.allowPartialPeriodInterestCalculation;
     delete loansAccountData.allowPartialPeriodInterestCalculation;
+    // Pass through line of credit context if present
+    if (loansAccount.lineOfCreditId || loansAccount.creditLineId) {
+      loansAccountData.lineOfCreditId = loansAccount.lineOfCreditId || loansAccount.creditLineId;
+      loansAccountData.creditLineId = loansAccountData.lineOfCreditId; // backend synonyms
+    }
     return loansAccountData;
   }
 }

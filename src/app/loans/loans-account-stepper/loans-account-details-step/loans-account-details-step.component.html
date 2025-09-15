@@ -117,6 +117,26 @@
     </mat-checkbox>
   </div>
 
+  <!-- Line of Credit Linkage Section -->
+  <div fxLayout="row wrap" fxLayoutGap="2%" fxLayout.lt-md="column" *ngIf="showLineOfCreditDropdown">
+    <mat-divider fxFlex="98%"></mat-divider>
+
+    <h3 class="mat-h3" fxFlex="100%">{{ 'labels.heading.Loc Linkage' | translate }}</h3>
+
+    <mat-form-field fxFlex="48%">
+      <mat-label>{{ 'labels.inputs.Select Line of Credit' | translate }}</mat-label>
+      <mat-select formControlName="lineOfCreditId" [required]="isLocEnabled">
+        <mat-option *ngFor="let locOption of lineOfCreditOptions" [value]="locOption.id">
+          {{ locOption.name }}
+        </mat-option>
+      </mat-select>
+      <mat-error *ngIf="loansAccountDetailsForm.get('lineOfCreditId')?.hasError('required')">
+        {{ 'labels.inputs.Select Line of Credit' | translate }} {{ 'labels.commons.is' | translate }}
+        <strong>{{ 'labels.commons.required' | translate }}</strong>
+      </mat-error>
+    </mat-form-field>
+  </div>
+
   <div fxLayout="row" class="margin-t" fxLayout.xs="column" fxLayoutAlign="center" fxLayoutGap="2%">
     <button mat-raised-button matStepperPrevious disabled>
       <fa-icon icon="arrow-left" class="m-r-10"></fa-icon>
@@ -128,7 +148,8 @@
       [disabled]="
         !loansAccountDetailsForm.get('productId')?.value ||
         !loansAccountDetailsForm.get('expectedDisbursementDate')?.value ||
-        !loansAccountDetailsForm.get('submittedOnDate')?.value
+        !loansAccountDetailsForm.get('submittedOnDate')?.value ||
+        (isLocEnabled && showLineOfCreditDropdown && !loansAccountDetailsForm.get('lineOfCreditId')?.value)
       "
     >
       {{ 'labels.buttons.Next' | translate }}

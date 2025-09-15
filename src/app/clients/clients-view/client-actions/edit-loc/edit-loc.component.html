@@ -1,0 +1,473 @@
+<div class="container" fxLayout="column" fxLayoutGap="24px">
+  <!-- Main card wrapper following Fineract style -->
+  <mat-card class="create-card mat-elevation-z4">
+    <mat-card-header>
+      <mat-card-title>Edit Line of Credit</mat-card-title>
+      <mat-card-subtitle>Update the existing line of credit details</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <form [formGroup]="locForm" (ngSubmit)="submit()">
+        <mat-horizontal-stepper class="mat-elevation-z0" labelPosition="bottom" #locStepper>
+          <!-- Custom stepper icons -->
+          <ng-template matStepperIcon="number">
+            <fa-icon icon="pencil-alt" size="sm"></fa-icon>
+          </ng-template>
+
+          <ng-template matStepperIcon="edit">
+            <fa-icon icon="pencil-alt" size="sm"></fa-icon>
+          </ng-template>
+
+          <ng-template matStepperIcon="done">
+            <fa-icon icon="check" size="sm"></fa-icon>
+          </ng-template>
+
+          <ng-template matStepperIcon="error">
+            <fa-icon icon="exclamation-triangle" size="lg"></fa-icon>
+          </ng-template>
+
+          <ng-template matStepperIcon="preview">
+            <fa-icon icon="eye" size="sm"></fa-icon>
+          </ng-template>
+
+          <!-- Step 1: Basic Info -->
+          <mat-step [stepControl]="locForm.get('basicInfo')">
+            <ng-template matStepLabel>Basic Information</ng-template>
+
+            <div formGroupName="basicInfo" fxLayout="column" fxLayoutGap="16px" class="step-content">
+              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
+                <mat-form-field fxFlex>
+                  <mat-label>LOC Type</mat-label>
+                  <mat-select formControlName="productType">
+                    <mat-option
+                      *ngFor="let pt of productTypeOptions"
+                      [value]="pt.code === 'PAYABLE' ? 'payable' : 'receivable'"
+                    >
+                      {{ pt.value || pt.code }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field fxFlex>
+                  <mat-label>Currency</mat-label>
+                  <mat-select formControlName="currencyCode">
+                    <mat-option *ngFor="let c of currencyOptions" [value]="c.code">
+                      {{ c.code }} - {{ c.name }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
+                <mat-form-field fxFlex>
+                  <mat-label>Name</mat-label>
+                  <input matInput formControlName="name" placeholder="e.g., Working Capital Line" required />
+                  <mat-error *ngIf="locForm.get(['basicInfo', 'name'])?.hasError('required')"
+                    >This field is required.</mat-error
+                  >
+                </mat-form-field>
+
+                <mat-form-field fxFlex>
+                  <mat-label>External Id</mat-label>
+                  <input matInput formControlName="externalId" placeholder="Optional external identifier" />
+                  <mat-hint>Use this to track external systems (optional)</mat-hint>
+                </mat-form-field>
+              </div>
+
+              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
+                <mat-form-field fxFlex>
+                  <mat-label>Virtual Account</mat-label>
+                  <input matInput formControlName="va" placeholder="VA000001" required />
+                  <mat-error *ngIf="locForm.get(['basicInfo', 'va'])?.hasError('required')"
+                    >This field is required.</mat-error
+                  >
+                </mat-form-field>
+              </div>
+
+              <mat-expansion-panel>
+                <mat-expansion-panel-header>
+                  <mat-panel-title>Client Details</mat-panel-title>
+                  <mat-panel-description>Optional contact information for this client</mat-panel-description>
+                </mat-expansion-panel-header>
+
+                <div fxLayout="column" fxLayoutGap="12px" style="padding: 12px">
+                  <mat-form-field>
+                    <mat-label>Client Company Name</mat-label>
+                    <input matInput formControlName="clientCompanyName" placeholder="CredibleX Solutions Ltd" />
+                  </mat-form-field>
+
+                  <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="12px">
+                    <mat-form-field fxFlex>
+                      <mat-label>Contact Person Name</mat-label>
+                      <input matInput formControlName="clientContactPersonName" placeholder="John Smith" />
+                    </mat-form-field>
+                    <mat-form-field fxFlex>
+                      <mat-label>Contact Person Phone</mat-label>
+                      <input matInput formControlName="clientContactPersonPhone" placeholder="+1-555-0123" />
+                    </mat-form-field>
+                  </div>
+
+                  <mat-form-field>
+                    <mat-label>Contact Person Email</mat-label>
+                    <input matInput formControlName="clientContactPersonEmail" placeholder="john.smith@crediblex.com" />
+                  </mat-form-field>
+
+                  <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="12px">
+                    <mat-form-field fxFlex>
+                      <mat-label>Authorized Signatory Name</mat-label>
+                      <input matInput formControlName="authorizedSignatoryName" placeholder="Jane Doe" />
+                    </mat-form-field>
+                    <mat-form-field fxFlex>
+                      <mat-label>Authorized Signatory Phone</mat-label>
+                      <input matInput formControlName="authorizedSignatoryPhone" placeholder="+1-555-0456" />
+                    </mat-form-field>
+                  </div>
+
+                  <mat-form-field>
+                    <mat-label>Authorized Signatory Email</mat-label>
+                    <input matInput formControlName="authorizedSignatoryEmail" placeholder="jane.doe@crediblex.com" />
+                  </mat-form-field>
+                </div>
+              </mat-expansion-panel>
+
+              <mat-form-field>
+                <mat-label>Note</mat-label>
+                <textarea
+                  matInput
+                  formControlName="specialConditions"
+                  rows="3"
+                  placeholder="Provide any special conditions..."
+                ></textarea>
+              </mat-form-field>
+            </div>
+
+            <mifosx-stepper-buttons></mifosx-stepper-buttons>
+          </mat-step>
+
+          <!-- Step 2: Limits & Terms -->
+          <mat-step [stepControl]="locForm.get('limitsTerms')">
+            <ng-template matStepLabel>Limits & Terms</ng-template>
+
+            <div formGroupName="limitsTerms" fxLayout="column" fxLayoutGap="16px" class="step-content">
+              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
+                <mat-form-field fxFlex>
+                  <mat-label>Maximum Credit Limit</mat-label>
+                  <input matInput type="number" formControlName="maxCreditLimit" placeholder="0.00" required />
+                  <span matSuffix>{{ selectedCurrencyCode || '' }}</span>
+                  <mat-error *ngIf="locForm.get(['limitsTerms', 'maxCreditLimit'])?.hasError('required')"
+                    >This field is required.</mat-error
+                  >
+                </mat-form-field>
+
+                <mat-form-field fxFlex>
+                  <mat-label>Maximum Per Drawdown</mat-label>
+                  <input matInput type="number" formControlName="maxPerDrawdown" placeholder="0.00" />
+                  <span matSuffix>{{ selectedCurrencyCode || '' }}</span>
+                  <mat-error
+                    *ngIf="
+                      locForm.get('limitsTerms')?.hasError('perDrawdownExceedsLimit') ||
+                      locForm.get(['limitsTerms', 'maxPerDrawdown'])?.hasError('perDrawdownExceedsLimit')
+                    "
+                    >Maximum per drawdown cannot exceed Maximum Credit Limit.</mat-error
+                  >
+                </mat-form-field>
+              </div>
+
+              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px" class="approved-row">
+                <div fxFlex>
+                  <span class="mat-caption">Approved Credit Facility</span>
+                  <div class="approved-value">
+                    {{
+                      previewPayload.approvedCreditFacilityAmount || previewPayload.approvedCreditFacility || '\u2014'
+                    }}
+                  </div>
+                </div>
+
+                <mat-form-field fxFlex>
+                  <mat-label>Approved Credit Facility</mat-label>
+                  <input matInput type="number" formControlName="approvedCreditFacility" placeholder="0.00" />
+                  <span matSuffix>{{ selectedCurrencyCode || '' }}</span>
+                </mat-form-field>
+              </div>
+
+              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
+                <mat-form-field fxFlex>
+                  <mat-label>Start Date</mat-label>
+                  <input matInput [matDatepicker]="activationPicker" formControlName="startDate" required />
+                  <mat-datepicker-toggle matSuffix [for]="activationPicker"></mat-datepicker-toggle>
+                  <mat-datepicker #activationPicker></mat-datepicker>
+                  <mat-error *ngIf="locForm.get(['limitsTerms', 'startDate'])?.hasError('required')"
+                    >This field is required.</mat-error
+                  >
+                </mat-form-field>
+
+                <mat-form-field fxFlex>
+                  <mat-label>Expiry Date</mat-label>
+                  <input matInput [matDatepicker]="expiryPicker" formControlName="expiryDate" />
+                  <mat-datepicker-toggle matSuffix [for]="expiryPicker"></mat-datepicker-toggle>
+                  <mat-datepicker #expiryPicker></mat-datepicker>
+                </mat-form-field>
+              </div>
+
+              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
+                <mat-form-field fxFlex>
+                  <mat-label>Review Period</mat-label>
+                  <mat-select formControlName="reviewPeriod">
+                    <mat-option value="">No automatic review</mat-option>
+                    <mat-option *ngFor="let rp of reviewPeriodsOptions" [value]="rp.id">{{
+                      rp.value || rp.code
+                    }}</mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <mat-form-field fxFlex>
+                  <mat-label>Next Review Date (computed)</mat-label>
+                  <input matInput formControlName="interimReviewDate" placeholder="—" disabled />
+                </mat-form-field>
+              </div>
+
+              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
+                <mat-form-field fxFlex>
+                  <mat-label>Interest Rate Override</mat-label>
+                  <input matInput type="number" formControlName="interestRateOverride" placeholder="0.00" step="0.01" />
+                  <span matSuffix>%</span>
+                </mat-form-field>
+              </div>
+            </div>
+
+            <mifosx-stepper-buttons></mifosx-stepper-buttons>
+          </mat-step>
+
+          <!-- Step 3: Charges (compact selector + list) -->
+          <mat-step>
+            <ng-template matStepLabel>Charges</ng-template>
+
+            <div fxLayout="column" fxLayoutGap="24px" class="step-content">
+              <!-- Settlement Account Selector -->
+              <mat-form-field fxFlex>
+                <mat-label>Settlement Account</mat-label>
+                <mat-select formControlName="settlementSavingsAccountId">
+                  <mat-option [value]="">None (no settlement account)</mat-option>
+                  <mat-option *ngFor="let sa of filteredSavingsAccounts" [value]="sa.id">
+                    {{ sa.accountNo || sa.id }} - {{ sa.productName || sa.productId }}
+                  </mat-option>
+                </mat-select>
+                <mat-hint>Select a savings account to enable charges</mat-hint>
+              </mat-form-field>
+
+              <!-- Charges UI only visible if settlement account chosen -->
+              <div *ngIf="locForm.get('settlementSavingsAccountId')?.value">
+                <div fxLayout="row wrap" fxLayoutGap="2%" fxLayout.lt-md="column">
+                  <mat-form-field fxFlex="48%">
+                    <mat-label>Charge</mat-label>
+                    <mat-select #locCharge>
+                      <mat-option *ngFor="let c of chargeData" [value]="c">{{ c.name }}</mat-option>
+                    </mat-select>
+                  </mat-form-field>
+
+                  <div fxFlex="48%" fxFlexAlign="center">
+                    <button
+                      type="button"
+                      mat-raised-button
+                      color="primary"
+                      (click)="addCharge(locCharge)"
+                      [disabled]="!locCharge.value"
+                    >
+                      <fa-icon icon="plus" class="m-r-10"></fa-icon>
+                      Add
+                    </button>
+                  </div>
+
+                  <table
+                    fxFlex="98%"
+                    class="mat-elevation-z1"
+                    mat-table
+                    [dataSource]="chargesDataSource"
+                    [hidden]="chargesDataSource.length === 0"
+                  >
+                    <ng-container matColumnDef="name">
+                      <th mat-header-cell *matHeaderCellDef>Name</th>
+                      <td mat-cell *matCellDef="let charge">{{ charge.name }}</td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="amount">
+                      <th mat-header-cell *matHeaderCellDef>Amount</th>
+                      <td mat-cell *matCellDef="let charge">
+                        <div *ngIf="editingCharge !== charge">
+                          <span *ngIf="charge.chargeCalculationType === 'PERCENT'">{{ charge.amount || '—' }}%</span>
+                          <span *ngIf="charge.chargeCalculationType !== 'PERCENT'"
+                            >{{ charge.amount || '—' }} {{ selectedCurrencyCode || '' }}</span
+                          >
+                          <button mat-icon-button (click)="startEdit(charge)" aria-label="Edit amount">
+                            <fa-icon icon="edit"></fa-icon>
+                          </button>
+                        </div>
+                        <div
+                          *ngIf="editingCharge === charge"
+                          fxLayout="row"
+                          fxLayoutAlign="start center"
+                          fxLayoutGap="8px"
+                        >
+                          <input matInput type="number" [(ngModel)]="charge.editableAmount" style="width: 120px" />
+                          <button mat-icon-button color="primary" (click)="saveEdit(charge)">
+                            <fa-icon icon="save"></fa-icon>
+                          </button>
+                          <button mat-icon-button (click)="cancelEdit(charge)"><fa-icon icon="times"></fa-icon></button>
+                        </div>
+                      </td>
+                    </ng-container>
+
+                    <ng-container matColumnDef="action">
+                      <th mat-header-cell *matHeaderCellDef>Actions</th>
+                      <td mat-cell *matCellDef="let charge">
+                        <button mat-icon-button color="warn" (click)="deleteCharge(charge)">
+                          <fa-icon icon="trash"></fa-icon>
+                        </button>
+                      </td>
+                    </ng-container>
+
+                    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+                    <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+                  </table>
+                </div>
+              </div>
+              <div *ngIf="!locForm.get('settlementSavingsAccountId')?.value" class="mat-body-2" style="opacity: 0.75">
+                Select a settlement account to add charges (optional)
+              </div>
+            </div>
+
+            <mifosx-stepper-buttons></mifosx-stepper-buttons>
+          </mat-step>
+
+          <!-- Step 4: Preview -->
+          <mat-step *ngIf="locFormValidAndNotPristine" completed>
+            <ng-template matStepLabel>Preview</ng-template>
+
+            <div fxLayout="row wrap" fxLayout.lt-md="column">
+              <h3 class="mat-h3" fxFlexFill>Review Changes</h3>
+
+              <mat-divider fxFlexFill></mat-divider>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Type</span>
+                <span fxFlex="60%">{{
+                  previewPayload.productType === 'payable' ? 'LOC Payable' : 'LOC Receivable'
+                }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Name</span>
+                <span fxFlex="60%">{{ previewPayload.name }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">External Id</span>
+                <span fxFlex="60%">{{ previewPayload.externalId || '—' }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Note</span>
+                <span fxFlex="60%">{{ previewPayload.specialConditions || '—' }}</span>
+              </div>
+
+              <h3 class="mat-h3" fxFlexFill style="margin-top: 16px">Client Details</h3>
+              <mat-divider fxFlexFill></mat-divider>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Company</span>
+                <span fxFlex="60%">{{ previewPayload.clientCompanyName || '—' }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Contact Person</span>
+                <span fxFlex="60%">{{ previewPayload.clientContactPersonName || '—' }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Contact Phone</span>
+                <span fxFlex="60%">{{ previewPayload.clientContactPersonPhone || '—' }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Contact Email</span>
+                <span fxFlex="60%">{{ previewPayload.clientContactPersonEmail || '—' }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Authorized Signatory</span>
+                <span fxFlex="60%">{{ previewPayload.authorizedSignatoryName || '—' }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Signatory Phone</span>
+                <span fxFlex="60%">{{ previewPayload.authorizedSignatoryPhone || '—' }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Signatory Email</span>
+                <span fxFlex="60%">{{ previewPayload.authorizedSignatoryEmail || '—' }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Virtual Account</span>
+                <span fxFlex="60%">{{ previewPayload.va || '—' }}</span>
+              </div>
+
+              <h3 class="mat-h3" fxFlexFill style="margin-top: 16px">Limits & Terms</h3>
+              <mat-divider fxFlexFill></mat-divider>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Maximum Credit Limit</span>
+                <span fxFlex="60%">{{ previewPayload.maximumAmount || previewPayload.maxCreditLimit || '0.00' }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Maximum Per Drawdown</span>
+                <span fxFlex="60%">{{ previewPayload.maxPerDrawdown || '—' }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Start Date</span>
+                <span fxFlex="60%">{{ previewPayload.startDate || previewPayload.activationDate || '—' }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Expiry Date</span>
+                <span fxFlex="60%">{{ previewPayload.endDate || previewPayload.expiryDate || '—' }}</span>
+              </div>
+
+              <h3 class="mat-h3" fxFlexFill style="margin-top: 16px">Charges</h3>
+              <mat-divider fxFlexFill></mat-divider>
+              <div fxFlexFill *ngIf="chargesDataSource.length === 0">No charges added</div>
+              <div fxFlexFill *ngFor="let c of chargesDataSource">
+                <span fxFlex="40%">{{ c.name }}</span>
+                <span fxFlex="60%">{{
+                  c.chargeCalculationType === 'PERCENT'
+                    ? c.amount + '%'
+                    : c.amount
+                      ? c.amount + ' ' + (selectedCurrencyCode || '')
+                      : '—'
+                }}</span>
+              </div>
+            </div>
+
+            <div fxLayout="row" class="margin-t" fxLayout.xs="column" fxLayoutAlign="center" fxLayoutGap="2%">
+              <button type="button" mat-raised-button matStepperPrevious>
+                <fa-icon icon="arrow-left" class="m-r-10"></fa-icon>
+                Previous
+              </button>
+              <button type="button" mat-raised-button (click)="cancel()">Cancel</button>
+              <button type="button" mat-raised-button color="primary" (click)="confirm()" [disabled]="!locForm.valid">
+                Confirm & Update
+              </button>
+            </div>
+
+            <div *ngIf="updateError" class="error-message" style="margin-top: 12px">
+              <mat-icon color="warn">error</mat-icon>
+              <span class="mat-body-1">{{ updateError }}</span>
+            </div>
+          </mat-step>
+        </mat-horizontal-stepper>
+      </form>
+    </mat-card-content>
+  </mat-card>
+</div>

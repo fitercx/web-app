@@ -109,6 +109,18 @@ export class GeneralTabComponent {
     'Total Collateral Value'
   ];
 
+  /** Lines of Credit Columns */
+  locColumns: string[] = [
+    'LOC Name',
+    'Account No',
+    'Credit Limit',
+    'Available Balance',
+    'Type',
+    'Outstanding/Utilization',
+    'Actions',
+    'expand'
+  ];
+
   /** Client Account Data */
   clientAccountData: any;
   /** Loan Accounts Data */
@@ -123,6 +135,10 @@ export class GeneralTabComponent {
   clientSummary: any;
   /** Collaterals Data */
   collaterals: any;
+  /** Lines of Credit Data */
+  linesOfCredit: any[] = []; // displayed subset
+  private allLinesOfCredit: any[] = []; // full list including closed
+  showClosedLOCs = false; // toggle flag for viewing closed LOCs only
 
   /** Show Closed Loan Accounts */
   showClosedLoanAccounts = false;
@@ -139,6 +155,8 @@ export class GeneralTabComponent {
   clientid: any;
 
   expandedElement: any | null = null;
+  expandedLOCElement: any | null = null;
+  expandedLOCLoanElement: any | null = null; // expanded loan inside a LOC
 
   /**
    * @param {ActivatedRoute} route Activated Route
@@ -160,6 +178,15 @@ export class GeneralTabComponent {
         this.collaterals = data.clientCollateralData;
         this.clientSummary = data.clientSummary ? data.clientSummary[0] : [];
         this.clientid = this.route.parent.snapshot.params['clientId'];
+        // Lines of Credit list now resolved (may be undefined if resolver omitted)
+        const resolvedLocList = (data as any).clientLocList || [];
+        if (resolvedLocList && Array.isArray(resolvedLocList) && resolvedLocList.length) {
+          this.allLinesOfCredit = this.mapCreditLinesToTableFormat(resolvedLocList);
+          this.applyLOCFilter();
+        } else {
+          // fallback to runtime fetch if resolver returned empty
+          this.fetchLinesOfCredit();
+        }
       }
     );
   }
@@ -262,5 +289,212 @@ export class GeneralTabComponent {
   toggleRow(element: any, event: Event): void {
     event.stopPropagation();
     this.expandedElement = this.expandedElement === element ? null : element;
+  }
+
+  toggleLOCRow(element: any, event: Event): void {
+    event.stopPropagation();
+    this.expandedLOCElement = this.expandedLOCElement === element ? null : element;
+  }
+
+  fetchLinesOfCredit(): void {
+    this.clientService.getClientCreditLines(this.clientid).subscribe(
+      (creditLines: any[]) => {
+        this.allLinesOfCredit = this.mapCreditLinesToTableFormat(creditLines || []);
+        this.applyLOCFilter();
+      },
+      (error) => {
+        console.error('Error fetching lines of credit:', error);
+        this.allLinesOfCredit = [];
+        this.linesOfCredit = [];
+      }
+    );
+  }
+
+  mapCreditLinesToTableFormat(raw: any[]): any[] {
+    return raw
+      .map((item) => {
+        // Support both legacy shape (fields at root) and new shape { lineOfCredit, loans }
+        const loc = item?.lineOfCredit ? item.lineOfCredit : item;
+        const loansFromPayload = item?.loans; // already associated loans if provided
+        if (!loc) {
+          return null;
+        }
+        const maximumAmount = loc.maximumAmount || 0;
+        const consumedAmount = loc.consumedAmount || 0;
+        const utilization = maximumAmount > 0 ? Math.round((consumedAmount / maximumAmount) * 100) : 0;
+        // For legacy fallback when loans not provided, derive from loanAccounts
+        const associatedLoans =
+          Array.isArray(loansFromPayload) && loansFromPayload.length
+            ? loansFromPayload.map((l) => ({
+                id: l.id,
+                accountNo: l.accountNo,
+                productName: l.productName,
+                originalLoan: l.originalLoan || l.principal,
+                loanBalance: l.loanBalance,
+                amountPaid: l.amountPaid,
+                inArrears: l.inArrears,
+                status: l.status,
+                additionalProperties: l.additionalProperties,
+                timeline: l.timeline
+              }))
+            : this.getLoansForLOC(loc.id);
+
+        // Normalize status: backend supplies loc.status {id, code, value} where code expected as status.active|inactive|suspended|closed
+        const rawStatus = loc.status || loc.activationStatus || {};
+        const normalizedStatusCode = typeof rawStatus === 'string' ? rawStatus : (rawStatus.code || '').toLowerCase();
+        const normalizedValue =
+          typeof rawStatus === 'string' ? rawStatus : rawStatus.value || rawStatus.code || 'Inactive';
+        // fallback mapping if backend used legacy numeric ids
+        const legacyId = typeof rawStatus === 'object' ? rawStatus.id : undefined;
+        let inferredCode = normalizedStatusCode;
+        if (!inferredCode && legacyId) {
+          switch (legacyId) {
+            case 200:
+              inferredCode = 'status.active';
+              break;
+            case 300:
+              inferredCode = 'status.inactive';
+              break;
+            case 400:
+              inferredCode = 'status.suspended';
+              break;
+            case 500:
+              inferredCode = 'status.closed';
+              break;
+            default:
+              inferredCode = 'status.inactive';
+          }
+        }
+        if (!inferredCode) {
+          // try to infer from value text
+          const lowerVal = (normalizedValue || '').toLowerCase();
+          if (lowerVal.includes('active')) inferredCode = 'status.active';
+          else if (lowerVal.includes('suspend')) inferredCode = 'status.suspended';
+          else if (lowerVal.includes('close')) inferredCode = 'status.closed';
+          else inferredCode = 'status.inactive';
+        }
+        const displayValue = normalizedValue;
+
+        return {
+          id: loc.id,
+          name: loc.name,
+          accountNo: loc.accountNumber || loc.externalId || `LOC-${loc.id}`,
+          creditLimit: maximumAmount,
+          availableBalance: loc.availableBalance,
+          outstanding: consumedAmount,
+          type:
+            (loc.productType || '').toLowerCase() === 'payable' || loc.productType === 'PAYABLE'
+              ? 'Payable'
+              : 'Receivable',
+          utilization,
+          // status / activationStatus backward compatibility
+          status: displayValue,
+          statusCode: inferredCode,
+          currency: loc.currency,
+          clientCompanyName: loc.clientCompanyName,
+          clientContactPersonName: loc.clientContactPersonName,
+          clientContactPersonPhone: loc.clientContactPersonPhone,
+          clientContactPersonEmail: loc.clientContactPersonEmail,
+          authorizedSignatoryName: loc.authorizedSignatoryName,
+          authorizedSignatoryPhone: loc.authorizedSignatoryPhone,
+          authorizedSignatoryEmail: loc.authorizedSignatoryEmail,
+          va: loc.va,
+          specialConditions: loc.specialConditions,
+          loans: associatedLoans
+        };
+      })
+      .filter((x) => !!x);
+  }
+
+  getLoansForLOC(locId: number): any[] {
+    // Filter loan accounts that belong to this LOC
+    // This assumes loans have a creditLineId or similar field
+    // Adjust based on your actual data structure
+    if (!this.loanAccounts) {
+      return [];
+    }
+
+    return this.loanAccounts
+      .filter((loan: any) => loan.creditLineId === locId || loan.locId === locId)
+      .map((loan: any) => ({
+        id: loan.id,
+        accountNo: loan.accountNo,
+        productName: loan.productName,
+        originalLoan: loan.originalLoan || loan.principal,
+        loanBalance: loan.loanBalance,
+        amountPaid: loan.amountPaid,
+        inArrears: loan.inArrears,
+        status: loan.status,
+        additionalProperties: loan.additionalProperties,
+        timeline: loan.timeline
+      }));
+  }
+
+  navigateToLOC(locId: string, event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+    }
+    this.router.navigate(
+      [
+        '../',
+        'loc',
+        locId
+      ],
+      { relativeTo: this.route }
+    );
+  }
+
+  toggleLOCInnerLoanRow(loan: any, event: Event): void {
+    event.stopPropagation();
+    this.expandedLOCLoanElement = this.expandedLOCLoanElement === loan ? null : loan;
+  }
+
+  navigateToLoan(loanId: string, event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+    }
+    this.router.navigate(
+      [
+        '../',
+        'loans-accounts',
+        loanId,
+        'general'
+      ],
+      { relativeTo: this.route }
+    );
+  }
+
+  /**
+   * Starts a new drawdown by navigating to loan account creation, passing the LOC id.
+   * Adds query params so the loan creation form can pre-select and lock the credit line.
+   */
+  startNewDrawdown(loc: any, event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+    }
+    const queryParams: any = { lineOfCreditId: loc.id };
+    this.router.navigate(
+      [
+        '../',
+        'loans-accounts',
+        'create'
+      ],
+      { relativeTo: this.route, queryParams }
+    );
+  }
+
+  /** Toggle between active (non-closed) and closed LOCs */
+  toggleClosedLOCs(): void {
+    this.showClosedLOCs = !this.showClosedLOCs;
+    this.applyLOCFilter();
+  }
+
+  /** Apply current LOC filter based on showClosedLOCs flag */
+  private applyLOCFilter(): void {
+    if (this.showClosedLOCs) {
+      this.linesOfCredit = this.allLinesOfCredit.filter((loc) => loc.statusCode === 'status.closed');
+    } else {
+      this.linesOfCredit = this.allLinesOfCredit.filter((loc) => loc.statusCode !== 'status.closed');
+    }
   }
 }

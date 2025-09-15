@@ -143,6 +143,12 @@ export interface LoanProduct {
   enableAccrualActivityPosting?: boolean;
   supportedInterestRefundTypes?: StringEnumOptionData[];
   chargeOffBehaviour?: StringEnumOptionData;
+  additionalProperties?: LoanProductAdditionalProperties;
+}
+
+export interface LoanProductAdditionalProperties {
+  isLocEnabled?: boolean;
+  lineOfCreditOptions?: any[];
 }
 
 export interface AllowAttributeOverrides {

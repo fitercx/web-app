@@ -57,7 +57,9 @@ export class ClientActionsComponent {
     private router: Router
   ) {
     this.router.routeReuseStrategy.shouldReuseRoute = () => false;
-    const name = this.route.snapshot.params['name'];
-    this.actions[name] = true;
+    const name = this.route.snapshot.params['name'] as keyof typeof this.actions;
+    if (name && this.actions.hasOwnProperty(name)) {
+      this.actions[name] = true;
+    }
   }
 }

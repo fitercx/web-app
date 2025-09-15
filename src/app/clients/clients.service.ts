@@ -322,6 +322,48 @@ export class ClientsService {
     return this.http.get(`/clients/${clientId}/charges/template`);
   }
 
+  /**
+   * Returns LOC template for a client
+   * @param clientId Client Id
+   */
+  getClientLocTemplate(clientId: any): Observable<any> {
+    return this.http.get(`/clients/${clientId}/creditlines/template`);
+  }
+
+  /**
+   * Get all credit lines for a client
+   * @param clientId Client Id
+   */
+  getClientCreditLines(clientId: string): Observable<any> {
+    // Updated to use versioned endpoint returning objects with shape { lineOfCredit, loans }
+    return this.http.get(`/v1/clients/${clientId}/creditlines`);
+  }
+
+  /**
+   * Retrieve a single credit line (LOC) for a client
+   * @param clientId Client Id
+   * @param locId LOC Id
+   */
+  getClientCreditLine(clientId: string, locId: string) {
+    return this.http.get(`/v1/clients/${clientId}/creditlines/${locId}`);
+  }
+
+  /**
+   * Create a credit line for a client (LOC)
+   * Posts to v1/clients/{clientId}/creditlines
+   */
+  createClientCreditLine(clientId: string, creditLineData: any) {
+    return this.http.post(`/v1/clients/${clientId}/creditlines`, creditLineData);
+  }
+
+  /**
+   * Update a credit line for a client (LOC)
+   * PUT to v1/clients/{clientId}/creditlines/{locId}
+   */
+  updateClientCreditLine(clientId: string, locId: string, creditLineData: any) {
+    return this.http.put(`/v1/clients/${clientId}/creditlines/${locId}`, creditLineData);
+  }
+
   getChargeAndTemplate(chargeId: any): Observable<any> {
     const httpParams = new HttpParams().set('template', 'true');
     return this.http.get(`/charges/${chargeId}`, { params: httpParams });

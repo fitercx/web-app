@@ -1,0 +1,14 @@
+// Standardized spacing below form content before navigation buttons
+:host {
+  display: block;
+}
+
+div.margin-t {
+  margin-top: 32px; // align with spacing in first step (Basic Information)
+}
+
+@media (width <= 959px) {
+  div.margin-t {
+    margin-top: 24px; // slightly tighter on small screens
+  }
+}

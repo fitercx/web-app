@@ -8,6 +8,15 @@
   color: $status-inactive;
 }
 
+// Newly supported statuses for Lines of Credit
+.status-suspended {
+  color: $status-pending; // using pending amber as placeholder; adjust if specific colour provided
+}
+
+.status-closed {
+  color: $status-inactive; // closed maps to neutral/inactive grey
+}
+
 .status-deleted {
   color: $status-deleted;
 }
