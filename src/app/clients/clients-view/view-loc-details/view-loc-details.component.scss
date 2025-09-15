@@ -1,0 +1,360 @@
+@use '@angular/material' as mat;
+@use 'sass:map';
+
+// Generic selectors placed before more specific nested variants to satisfy stylelint specificity ordering
+mat-card-subtitle {
+  color: #666;
+}
+
+h3 {
+  font-weight: 400;
+  margin-bottom: 8px;
+}
+
+p {
+  color: #999;
+  margin-bottom: 0;
+}
+
+.outstanding {
+  color: #f57c00;
+  font-weight: 500;
+}
+
+// Main account card styling - consistent with clients-view
+.account-card {
+  margin: 0 auto;
+  max-width: 80rem;
+  width: 90%;
+  padding: 0;
+
+  // Header section with blue background - matching clients-view
+  .header {
+    background-color: #1976d2; // Primary blue color - fallback
+    padding: 1%;
+
+    .header-title-group {
+      .account-card-title {
+        color: white;
+        width: 90%;
+
+        h3 {
+          margin: 0;
+          font-weight: 400;
+          color: white;
+        }
+      }
+
+      // Account overview table - contains the summary figures in the blue ribbon
+      .account-overview {
+        color: white;
+        border: none;
+        max-width: 240px;
+        font-size: 14px;
+        margin-left: 10px;
+        min-width: 85%;
+
+        tr:nth-child(even) {
+          background-color: transparent;
+        }
+
+        td {
+          padding: 4px 8px;
+          color: white;
+        }
+
+        // Bold text inside cells
+        .account-overview-bold,
+        b,
+        strong {
+          color: white;
+        }
+
+        a {
+          color: white;
+          text-decoration: underline;
+
+          &:hover {
+            text-decoration: none;
+          }
+        }
+
+        // Status colors for values in the header
+        .available {
+          color: #69f0ae; // Bright green for available balance
+          font-weight: 600;
+        }
+
+        .outstanding {
+          color: #ffcc80; // Bright orange for outstanding
+          font-weight: 600;
+        }
+      }
+
+      p {
+        color: white;
+      }
+    }
+  }
+
+  // Type badges in header
+  .type-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+
+    &.loc-payable {
+      background: rgb(255 255 255 / 20%);
+      color: white;
+    }
+
+    &.loc-receivable {
+      background: rgb(255 255 255 / 20%);
+      color: white;
+    }
+  }
+
+  // Navigation tabs
+  .navigation-tabs {
+    background-color: #f2f2f2;
+    overflow: auto;
+    margin-top: 0; // Remove gap between header and tabs
+  }
+
+  // Actions menu icon
+  .actions-menu {
+    color: white;
+  }
+
+  // Content area
+  mat-card-content {
+    padding: 0;
+  }
+}
+
+// Override mat-card-subtitle color in header
+.account-card .header mat-card-subtitle {
+  color: white;
+}
+
+// Details section - moved up since summary is now in header
+.details-section {
+  padding: 16px;
+
+  mat-card {
+    height: 100%;
+
+    mat-card-title {
+      font-size: 18px;
+      font-weight: 500;
+    }
+  }
+
+  // Utilization details
+  .utilization-details {
+    flex: 1;
+  }
+
+  // Client details
+  .client-details {
+    .detail-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 14px;
+
+      &:last-child {
+        border-bottom: none;
+      }
+
+      .detail-label {
+        color: #666;
+        font-weight: 500;
+      }
+
+      .detail-value {
+        text-align: right;
+        color: #333;
+      }
+    }
+  }
+}
+
+// Progress spinner customization
+mat-progress-spinner {
+  margin: 0 auto;
+}
+
+// Status badge
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+
+  &.active {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+
+  &.pending {
+    background: #fff3cd;
+    color: #856404;
+  }
+
+  &.inactive {
+    background: #f5f5f5;
+    color: #666;
+  }
+}
+
+// Table styling for active loans
+.mat-table {
+  width: 100%;
+
+  .mat-header-cell {
+    font-weight: 600;
+    color: #666;
+  }
+
+  .mat-cell {
+    color: #333;
+  }
+}
+
+// Timeline styling for transaction history
+.timeline {
+  position: relative;
+  padding: 24px 24px 24px 40px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 39px;
+    top: 24px;
+    bottom: 24px;
+    width: 2px;
+    background: #e0e0e0;
+  }
+
+  .timeline-item {
+    position: relative;
+    padding-bottom: 24px;
+    padding-left: 40px;
+
+    &:last-child {
+      padding-bottom: 0;
+    }
+  }
+
+  .timeline-marker {
+    position: absolute;
+    left: -1px;
+    top: 4px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: white;
+    border: 2px solid #1976d2;
+  }
+
+  .timeline-content {
+    background: #f9f9f9;
+    padding: 16px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
+  }
+
+  .timeline-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .timeline-type {
+    font-weight: 500;
+    color: #333;
+  }
+
+  .timeline-date {
+    font-size: 13px;
+    color: #666;
+  }
+
+  .timeline-amount {
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 4px;
+
+    &.negative {
+      color: #d32f2f;
+    }
+
+    &.positive {
+      color: #388e3c;
+    }
+  }
+
+  .timeline-balance {
+    font-size: 13px;
+    color: #999;
+  }
+}
+
+// Empty state styling
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #666;
+
+  .empty-icon {
+    font-size: 64px;
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 16px;
+    opacity: 0.3;
+  }
+}
+
+// Settings container
+.settings-container {
+  max-width: 600px;
+  padding: 24px;
+
+  h4 {
+    margin-bottom: 20px;
+    font-weight: 500;
+  }
+}
+
+// Tab content padding
+.tab-content {
+  padding: 24px;
+}
+
+// Responsive adjustments
+@media (width <= 959px) {
+  .account-card {
+    width: 100%;
+  }
+
+  .details-section {
+    mat-card {
+      margin-bottom: 16px;
+    }
+  }
+
+  .header {
+    .header-title-group {
+      .account-overview {
+        max-width: 100%;
+        font-size: 13px;
+      }
+    }
+  }
+}
