@@ -54,7 +54,7 @@
       <span fxFlex="50%"> {{ loanDetails.isEqualAmortization | yesNo }} </span>
     </div>
 
-    <div fxFlexFill>
+    <!-- <div fxFlexFill>
       <span fxFlex="50%"> {{ 'labels.inputs.Interest' | translate }} </span>
       <span fxFlex="50%">
         {{ loanDetails.annualInterestRate | formatNumber }} % {{ 'labels.text.per annum' | translate }} ({{
@@ -62,7 +62,7 @@
         }}
         %&nbsp; {{ loanDetails.interestRateFrequencyType.value | translateKey: 'catalogs' }})
       </span>
-    </div>
+    </div> -->
 
     <ng-container *ngIf="loanDetails?.additionalProperties?.loanInterestVariations?.length">
       <div fxFlexFill *ngFor="let variation of loanDetails.additionalProperties.loanInterestVariations">
