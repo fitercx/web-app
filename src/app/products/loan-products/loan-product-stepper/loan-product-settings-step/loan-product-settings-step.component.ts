@@ -718,15 +718,6 @@ export class LoanProductSettingsStepComponent implements OnInit {
       productSettings['delinquencyBucketId'] = null;
     }
 
-    // Move isLocEnabled to additionalProperties
-    if (productSettings.isLocEnabled !== undefined) {
-      productSettings.additionalProperties = {
-        ...productSettings.additionalProperties,
-        isLocEnabled: productSettings.isLocEnabled
-      };
-      delete productSettings.isLocEnabled;
-    }
-
     return productSettings;
   }
 
