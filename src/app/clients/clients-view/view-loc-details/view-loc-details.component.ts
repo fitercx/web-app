@@ -189,7 +189,7 @@ export class ViewLocDetailsComponent implements OnInit {
       tenorDays: data.tenorDays,
       activeLoans: data.activeLoans,
       totalRepaid: data.totalRepaid,
-      utilization: data.utilization || this.calculateUtilization(data),
+      utilization: this.calculateUtilization(data),
       avgUtilization: data.avgUtilization,
       performance: data.performance,
       charges: Array.isArray(data.charges) ? data.charges : [],

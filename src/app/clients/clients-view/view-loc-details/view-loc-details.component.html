@@ -11,7 +11,6 @@
               matTooltip="{{ 'labels.status.' + (locDetails?.status?.value || locDetails?.status || '') | translate }}"
               style="margin-left: 8px; margin-right: 8px"
             ></i>
-            <mifosx-entity-name entityName="{{ locDetails?.name }}"></mifosx-entity-name>
           </h3>
           <div fxFlex="5%" fxLayoutAlign="end center">
             <button mat-icon-button [matMenuTriggerFor]="locMenu" aria-label="LOC actions" yPosition="below">
@@ -69,7 +68,7 @@
                     </td>
                     <td>
                       <a [routerLink]="['/clients', clientId]">{{ locDetails?.clientName || clientName }}</a>
-                      <span *ngIf="locDetails?.clientAccountNo" style="color: #666; font-size: 12px; margin-left: 4px">
+                      <span *ngIf="locDetails?.clientAccountNo" style="font-size: 12px; margin-left: 4px">
                         ({{ locDetails?.clientAccountNo }})
                       </span>
                     </td>

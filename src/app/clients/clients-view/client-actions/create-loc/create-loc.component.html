@@ -115,7 +115,7 @@
           <!-- Step 2: Limits & Terms -->
           <!-- Step 2: Vendors -->
           <mat-step [stepControl]="locForm.get('vendorsSection')">
-            <ng-template matStepLabel>Vendors</ng-template>
+            <ng-template matStepLabel>Business Info</ng-template>
             <div formGroupName="vendorsSection" fxLayout="column" fxLayoutGap="16px" class="step-content">
               <mat-form-field>
                 <mat-label>Distribution Partner</mat-label>
@@ -123,11 +123,11 @@
               </mat-form-field>
               <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="12px" fxLayoutAlign="start center">
                 <mat-form-field fxFlex>
-                  <mat-label>Add Vendor</mat-label>
+                  <mat-label>Add Approved Buyer</mat-label>
                   <input
                     matInput
                     formControlName="vendorName"
-                    placeholder="Type vendor name and click Add"
+                    placeholder="Type approved buyer name and click Add"
                     (keyup.enter)="addVendor()"
                   />
                   <mat-hint>Press Enter or click Add to append</mat-hint>
@@ -137,7 +137,9 @@
                   Add
                 </button>
               </div>
-              <div *ngIf="vendorsArray.length === 0" class="mat-body-2" style="opacity: 0.7">No vendors added yet.</div>
+              <div *ngIf="vendorsArray.length === 0" class="mat-body-2" style="opacity: 0.7">
+                No approved buyer added yet.
+              </div>
               <mat-chip-list *ngIf="vendorsArray.length > 0" aria-label="Vendors list">
                 <mat-chip
                   *ngFor="let v of vendorsArray.controls; let i = index"
@@ -145,11 +147,11 @@
                   (removed)="removeVendor(i)"
                 >
                   {{ v.value?.name }}
-                  <button matChipRemove aria-label="Remove vendor"><mat-icon>cancel</mat-icon></button>
+                  <button matChipRemove aria-label="Remove Approved Buyer"><mat-icon>cancel</mat-icon></button>
                 </mat-chip>
               </mat-chip-list>
               <div *ngIf="vendorsArray.length > 0" class="mat-caption" style="margin-top: 8px">
-                Total Vendors: {{ vendorsArray.length }}
+                Total Approved Buyers: {{ vendorsArray.length }}
               </div>
             </div>
             <mifosx-stepper-buttons></mifosx-stepper-buttons>
