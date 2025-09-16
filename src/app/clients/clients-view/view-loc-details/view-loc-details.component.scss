@@ -16,9 +16,273 @@ p {
   margin-bottom: 0;
 }
 
+strong {
+  font-weight: 600;
+  font-size: 18px;
+}
+
+h4 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+mat-icon {
+  margin-right: 8px;
+  vertical-align: middle;
+  color: #1976d2;
+
+  &.no-buyers {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+    margin-bottom: 16px;
+    opacity: 0.5;
+    margin-right: 0;
+  }
+
+  &.audit-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    margin-right: 0;
+  }
+}
+
+.buyer-chip {
+  margin: 4px;
+  background: #e3f2fd;
+  color: #1976d2;
+  font-size: 13px;
+}
+
+.business-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 100%));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.info-item {
+  padding: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #1976d2;
+}
+
+.info-label {
+  font-size: 12px;
+  color: #666;
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.info-value {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+.no-buyers {
+  text-align: center;
+  padding: 40px 20px;
+  color: #999;
+}
+
+.charges-grid {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.trail-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+  color: #555;
+}
+
 .outstanding {
   color: #f57c00;
   font-weight: 500;
+}
+
+.detail-label {
+  color: #666;
+  font-weight: 500;
+  font-size: 15px;
+  flex: 0 0 auto;
+  margin-right: 16px;
+  line-height: 1.4;
+}
+
+.detail-value {
+  text-align: right;
+  color: #333;
+  font-size: 16px;
+  line-height: 1.4;
+  flex: 1;
+
+  &.available-balance strong {
+    color: #4caf50;
+  }
+
+  &.outstanding-amount strong {
+    color: #f44336;
+  }
+
+  &.repaid-amount strong {
+    color: #2196f3;
+  }
+
+  &.performance strong {
+    color: #ff9800;
+  }
+
+  &.currency {
+    font-weight: 600;
+    color: #1976d2;
+  }
+
+  &.percentage {
+    font-weight: 600;
+    color: #388e3c;
+  }
+
+  &.positive {
+    color: #4caf50;
+    font-weight: 600;
+  }
+
+  &.negative {
+    color: #f44336;
+    font-weight: 600;
+  }
+
+  &.missing {
+    color: #999;
+    font-style: italic;
+  }
+}
+
+// Generic selectors (moved to top for specificity)
+i {
+  position: absolute;
+  left: 0;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  font-size: 16px;
+  color: #4caf50;
+
+  &.fa-edit {
+    color: #ff9800;
+  }
+
+  &.fa-plus-circle {
+    color: #4caf50;
+  }
+
+  &.fa-check-circle {
+    color: #2196f3;
+  }
+}
+
+span {
+  &.charges-count {
+    font-size: 11px;
+    color: #999;
+    font-weight: 400;
+  }
+
+  &.active-count {
+    background: #e3f2fd;
+    color: #1976d2;
+  }
+
+  &.pending-count {
+    background: #fff3e0;
+    color: #f57c00;
+  }
+}
+
+// Audit timeline styles (moved up for proper specificity)
+.audit-timeline .audit-item > div {
+  flex: 1;
+  line-height: 1.4;
+}
+
+.audit-timeline .audit-item strong {
+  font-weight: 600;
+  color: #333;
+  font-size: 14px;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.audit-timeline .audit-item span:first-of-type {
+  color: #666;
+  font-size: 13px;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.amount {
+  font-weight: 600;
+  font-size: 14px;
+
+  &.paid {
+    color: #4caf50;
+  }
+
+  &.waived {
+    color: #ff9800;
+  }
+
+  &.outstanding {
+    color: #f44336;
+  }
+}
+
+.progress-fill {
+  background: linear-gradient(90deg, #4caf50, #66bb6a);
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.detail-row {
+  display: flex;
+  gap: 24px;
+  margin-bottom: 24px;
+
+  &.client-details {
+    padding: 20px 24px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
+  }
+
+  &.terms-card {
+    padding: 20px 24px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgb(0 0 0 / 10%);
+  }
+}
+
+// Navigation tabs container
+.navigation-tabs-container {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid rgb(0 0 0 / 12%);
+}
+
+.navigation-tabs {
+  flex-grow: 1;
+  background-color: #f2f2f2;
+  overflow: auto;
+  margin-top: 0; // Remove gap between header and tabs
 }
 
 // Main account card styling - consistent with clients-view
@@ -117,13 +381,6 @@ p {
     }
   }
 
-  // Navigation tabs
-  .navigation-tabs {
-    background-color: #f2f2f2;
-    overflow: auto;
-    margin-top: 0; // Remove gap between header and tabs
-  }
-
   // Actions menu icon
   .actions-menu {
     color: white;
@@ -156,32 +413,67 @@ p {
   // Utilization details
   .utilization-details {
     flex: 1;
+    padding-left: 16px;
+
+    .detail-row:last-child {
+      border-bottom: none;
+    }
+  }
+
+  // Utilization Chart
+  .utilization-chart {
+    position: relative;
+    width: 160px;
+    height: 160px;
+    margin: 16px auto;
+    flex-shrink: 0;
+
+    svg {
+      transform: rotate(-90deg);
+      width: 100%;
+      height: 100%;
+    }
+
+    .chart-background {
+      fill: none;
+      stroke: #eee;
+    }
+
+    .chart-value {
+      fill: none;
+      stroke: #1976d2; // Primary color
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.3s ease;
+    }
+
+    .chart-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: #333;
+    }
+
+    .chart-percent {
+      font-size: 32px;
+      font-weight: 700;
+      display: block;
+      line-height: 1;
+      margin-bottom: 4px;
+      color: #1976d2;
+    }
+
+    .chart-label {
+      font-size: 14px;
+      color: #666;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
   }
 
   // Client details
-  .client-details {
-    .detail-row {
-      display: flex;
-      justify-content: space-between;
-      padding: 10px 0;
-      border-bottom: 1px solid #f0f0f0;
-      font-size: 14px;
-
-      &:last-child {
-        border-bottom: none;
-      }
-
-      .detail-label {
-        color: #666;
-        font-weight: 500;
-      }
-
-      .detail-value {
-        text-align: right;
-        color: #333;
-      }
-    }
-  }
 }
 
 // Progress spinner customization
@@ -337,6 +629,346 @@ mat-progress-spinner {
   padding: 24px;
 }
 
+.tab-actions {
+  padding: 0 16px;
+}
+
+// Additional Details Section Styling
+.additional-details-grid {
+  gap: 24px;
+  margin-top: 24px;
+
+  mat-card {
+    height: 100%;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+    border-radius: 12px;
+    overflow: hidden;
+
+    mat-card-title {
+      background: linear-gradient(135deg, #1976d2, #1565c0);
+      color: white;
+      padding: 16px 20px;
+      margin: -16px;
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    mat-card-content {
+      padding: 20px;
+    }
+  }
+
+  // Terms & Settlement Card
+
+  // Approved Buyers Card
+  .buyers-card {
+    .buyer-chip {
+      margin: 4px;
+      background: #e3f2fd;
+      color: #1976d2;
+      font-size: 13px;
+    }
+
+    .business-info-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 100%));
+      gap: 16px;
+      margin-top: 16px;
+
+      .info-item {
+        padding: 12px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #1976d2;
+
+        .info-label {
+          font-size: 12px;
+          color: #666;
+          text-transform: uppercase;
+          font-weight: 600;
+          letter-spacing: 0.5px;
+          margin-bottom: 4px;
+        }
+
+        .info-value {
+          font-size: 14px;
+          font-weight: 500;
+          color: #333;
+        }
+      }
+    }
+
+    .no-buyers {
+      text-align: center;
+      padding: 40px 20px;
+      color: #999;
+
+      mat-icon {
+        font-size: 48px;
+        width: 48px;
+        height: 48px;
+        margin-bottom: 16px;
+        opacity: 0.5;
+      }
+    }
+  }
+
+  // Charges & Audit Card
+  // Charges & Audit Card
+  .charges-card {
+    .audit-trail {
+      .trail-header {
+        mat-icon {
+          margin-right: 8px;
+          color: #1976d2;
+        }
+      }
+    }
+  }
+}
+
+// Approved Buyers Card
+
+// Charges & Audit Card
+.charges-card {
+  .charges-grid {
+    display: grid;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .audit-trail {
+    .trail-header {
+      display: flex;
+      align-items: center;
+      margin-bottom: 16px;
+      color: #555;
+
+      h4 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 500;
+      }
+    }
+  }
+}
+
+.charge-item {
+  padding: 16px;
+  background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+  border-radius: 12px;
+  border: 1px solid #dee2e6;
+  position: relative;
+  overflow: hidden;
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: #1976d2;
+  }
+}
+
+.charge-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.charge-name {
+  font-weight: 600;
+  color: #333;
+  font-size: 15px;
+}
+
+.charge-badge {
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+
+  &.active {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+
+  &.inactive {
+    background: #fafafa;
+    color: #666;
+  }
+}
+
+.charge-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 100%));
+  gap: 12px;
+}
+
+.charge-detail {
+  .detail-label {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 2px;
+  }
+
+  .detail-value {
+    font-size: 14px;
+    font-weight: 500;
+    color: #333;
+
+    &.amount {
+      color: #d32f2f;
+      font-weight: 600;
+    }
+  }
+}
+
+// Charges Section Styling - Simplified
+.charges-section {
+  margin-bottom: 20px;
+}
+
+.charges-summary {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.charges-summary .summary-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  &.outstanding {
+    padding-top: 12px;
+    border-top: 1px solid #e0e0e0;
+    font-weight: 600;
+  }
+}
+
+.charges-summary .summary-item .label {
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.charges-summary .summary-item .amount {
+  font-weight: 600;
+  font-size: 14px;
+  color: #333;
+}
+
+.charges-summary .summary-item.outstanding .amount {
+  color: #f44336;
+  font-size: 16px;
+}
+
+// Audit Trail Styling - Flattened
+.audit-section {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e0e0e0;
+}
+
+.audit-timeline .audit-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  padding-left: 32px;
+  position: relative;
+  min-height: 40px;
+
+  // Timeline line
+  &:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 8px;
+    top: 24px;
+    bottom: -16px;
+    width: 2px;
+    background: #e0e0e0;
+  }
+}
+
+.audit-timeline .audit-item span:last-of-type {
+  color: #1976d2;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+// Progress bar styling
+.utilization-progress {
+  height: 8px;
+  border-radius: 4px;
+  background: #e0e0e0;
+  overflow: hidden;
+  margin: 8px 0;
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #1976d2, #42a5f5);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+  }
+}
+
+// Chips styling
+.mat-chip {
+  &.buyer-chip {
+    background: #e3f2fd !important;
+    color: #1976d2 !important;
+  }
+
+  &.status-chip {
+    &.active {
+      background: #e8f5e9 !important;
+      color: #2e7d32 !important;
+    }
+
+    &.pending {
+      background: #fff3e0 !important;
+      color: #f57c00 !important;
+    }
+  }
+}
+
+// Charges badge styling
+.badge-paid {
+  background: #e8f5e9 !important;
+  color: #2e7d32 !important;
+}
+
+.badge-waived {
+  background: #fff3e0 !important;
+  color: #f57c00 !important;
+}
+
+.badge-active {
+  background: #e3f2fd !important;
+  color: #1976d2 !important;
+}
+
+.badge-inactive {
+  background: #fafafa !important;
+  color: #666 !important;
+}
+
+.penalty-badge {
+  background: #ffebee !important;
+  color: #d32f2f !important;
+}
+
 // Responsive adjustments
 @media (width <= 959px) {
   .account-card {
@@ -347,6 +979,46 @@ mat-progress-spinner {
     mat-card {
       margin-bottom: 16px;
     }
+
+    .utilization-chart {
+      width: 140px;
+      height: 140px;
+      margin: 12px auto;
+
+      .chart-percent {
+        font-size: 28px;
+      }
+
+      .chart-label {
+        font-size: 13px;
+      }
+    }
+
+    .utilization-details {
+      padding-left: 0;
+      margin-top: 16px;
+
+      .detail-row {
+        padding: 12px 0;
+        min-height: 40px;
+        flex-direction: column;
+        align-items: flex-start;
+
+        .detail-label {
+          margin-bottom: 4px;
+          font-size: 14px;
+        }
+
+        .detail-value {
+          text-align: left;
+          font-size: 15px;
+
+          strong {
+            font-size: 16px;
+          }
+        }
+      }
+    }
   }
 
   .header {
@@ -356,5 +1028,21 @@ mat-progress-spinner {
         font-size: 13px;
       }
     }
+  }
+
+  .additional-details-grid {
+    display: block !important;
+
+    mat-card {
+      margin-bottom: 24px;
+    }
+  }
+
+  .buyers-card .business-info-grid {
+    grid-template-columns: minmax(0, 100%);
+  }
+
+  .charges-card .charge-item .charge-details {
+    grid-template-columns: minmax(0, 100%);
   }
 }

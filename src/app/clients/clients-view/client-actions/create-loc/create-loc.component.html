@@ -38,25 +38,14 @@
 
               <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
                 <mat-form-field fxFlex>
-                  <mat-label>Name</mat-label>
-                  <input matInput formControlName="name" placeholder="e.g., Working Capital Line" required />
-                  <mat-error *ngIf="locForm.get(['basicInfo', 'name'])?.hasError('required')"
-                    >This field is required.</mat-error
-                  >
+                  <mat-label>Virtual Account</mat-label>
+                  <input matInput formControlName="va" placeholder="VA000001" />
                 </mat-form-field>
-
                 <mat-form-field fxFlex>
                   <mat-label>External Id</mat-label>
-                  <input matInput formControlName="externalId" placeholder="Optional external identifier" />
-                  <mat-hint>Use this to track external systems (optional)</mat-hint>
-                </mat-form-field>
-              </div>
-              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
-                <mat-form-field fxFlex>
-                  <mat-label>Virtual Account</mat-label>
-                  <input matInput formControlName="va" placeholder="VA000001" required />
-                  <mat-error *ngIf="locForm.get(['basicInfo', 'va'])?.hasError('required')"
-                    >This field is required.</mat-error
+                  <input matInput formControlName="externalId" placeholder="External identifier" required />
+                  <mat-error *ngIf="locForm.get(['basicInfo', 'externalId'])?.hasError('required')"
+                    >External Id is required.</mat-error
                   >
                 </mat-form-field>
               </div>
@@ -124,6 +113,49 @@
           </mat-step>
 
           <!-- Step 2: Limits & Terms -->
+          <!-- Step 2: Vendors -->
+          <mat-step [stepControl]="locForm.get('vendorsSection')">
+            <ng-template matStepLabel>Vendors</ng-template>
+            <div formGroupName="vendorsSection" fxLayout="column" fxLayoutGap="16px" class="step-content">
+              <mat-form-field>
+                <mat-label>Distribution Partner</mat-label>
+                <input matInput formControlName="distributionPartner" placeholder="Enter distribution partner" />
+              </mat-form-field>
+              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="12px" fxLayoutAlign="start center">
+                <mat-form-field fxFlex>
+                  <mat-label>Add Vendor</mat-label>
+                  <input
+                    matInput
+                    formControlName="vendorName"
+                    placeholder="Type vendor name and click Add"
+                    (keyup.enter)="addVendor()"
+                  />
+                  <mat-hint>Press Enter or click Add to append</mat-hint>
+                </mat-form-field>
+                <button type="button" mat-raised-button color="primary" (click)="addVendor()" fxFlex="none">
+                  <fa-icon icon="plus" class="m-r-10"></fa-icon>
+                  Add
+                </button>
+              </div>
+              <div *ngIf="vendorsArray.length === 0" class="mat-body-2" style="opacity: 0.7">No vendors added yet.</div>
+              <mat-chip-list *ngIf="vendorsArray.length > 0" aria-label="Vendors list">
+                <mat-chip
+                  *ngFor="let v of vendorsArray.controls; let i = index"
+                  removable="true"
+                  (removed)="removeVendor(i)"
+                >
+                  {{ v.value?.name }}
+                  <button matChipRemove aria-label="Remove vendor"><mat-icon>cancel</mat-icon></button>
+                </mat-chip>
+              </mat-chip-list>
+              <div *ngIf="vendorsArray.length > 0" class="mat-caption" style="margin-top: 8px">
+                Total Vendors: {{ vendorsArray.length }}
+              </div>
+            </div>
+            <mifosx-stepper-buttons></mifosx-stepper-buttons>
+          </mat-step>
+
+          <!-- Step 3 now becomes Limits & Terms (shifted) -->
           <mat-step [stepControl]="locForm.get('limitsTerms')">
             <ng-template matStepLabel>Limits & Terms</ng-template>
 
@@ -149,23 +181,6 @@
                     "
                     >Maximum per drawdown cannot exceed Maximum Credit Limit.</mat-error
                   >
-                </mat-form-field>
-              </div>
-
-              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px" class="approved-row">
-                <div fxFlex>
-                  <span class="mat-caption">Approved Credit Facility</span>
-                  <div class="approved-value">
-                    {{
-                      previewPayload.approvedCreditFacilityAmount || previewPayload.approvedCreditFacility || '\u2014'
-                    }}
-                  </div>
-                </div>
-
-                <mat-form-field fxFlex>
-                  <mat-label>Approved Credit Facility</mat-label>
-                  <input matInput type="number" formControlName="approvedCreditFacility" placeholder="0.00" />
-                  <span matSuffix>{{ selectedCurrencyCode || '' }}</span>
                 </mat-form-field>
               </div>
 
@@ -207,9 +222,13 @@
 
               <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
                 <mat-form-field fxFlex>
-                  <mat-label>Interest Rate Override</mat-label>
-                  <input matInput type="number" formControlName="interestRateOverride" placeholder="0.00" step="0.01" />
+                  <mat-label>Annual Interest Rate</mat-label>
+                  <input matInput type="number" formControlName="annualInterestRate" placeholder="0.00" step="0.01" />
                   <span matSuffix>%</span>
+                </mat-form-field>
+                <mat-form-field fxFlex>
+                  <mat-label>Tenor in Days</mat-label>
+                  <input matInput type="number" formControlName="tenorDays" placeholder="e.g. 365" />
                 </mat-form-field>
               </div>
             </div>
@@ -217,7 +236,7 @@
             <mifosx-stepper-buttons></mifosx-stepper-buttons>
           </mat-step>
 
-          <!-- Step 3: Charges (compact selector + list) -->
+          <!-- Step 4: Charges (compact selector + list) -->
           <mat-step>
             <ng-template matStepLabel>Charges</ng-template>
 
@@ -318,7 +337,7 @@
             <mifosx-stepper-buttons></mifosx-stepper-buttons>
           </mat-step>
 
-          <!-- Step 4: Preview -->
+          <!-- Step 5: Preview -->
           <mat-step>
             <ng-template matStepLabel>Preview</ng-template>
 
@@ -332,11 +351,6 @@
                 <span fxFlex="60%">{{
                   previewPayload.productType === 'payable' ? 'LOC Payable' : 'LOC Receivable'
                 }}</span>
-              </div>
-
-              <div fxFlexFill>
-                <span fxFlex="40%">Name</span>
-                <span fxFlex="60%">{{ previewPayload.name }}</span>
               </div>
 
               <div fxFlexFill>
@@ -394,6 +408,18 @@
               <h3 class="mat-h3" fxFlexFill style="margin-top: 16px">Limits & Terms</h3>
               <mat-divider fxFlexFill></mat-divider>
 
+              <h3 class="mat-h3" fxFlexFill style="margin-top: 16px">Distribution & Vendors</h3>
+              <mat-divider fxFlexFill></mat-divider>
+              <div fxFlexFill>
+                <span fxFlex="40%">Distribution Partner</span>
+                <span fxFlex="60%">{{ previewPayload.distributionPartner || '—' }}</span>
+              </div>
+              <div fxFlexFill *ngIf="!previewPayload.vendors || previewPayload.vendors.length === 0">No vendors</div>
+              <div fxFlexFill *ngFor="let v of previewPayload.vendors">
+                <span fxFlex="40%">Vendor</span>
+                <span fxFlex="60%">{{ v.name }}</span>
+              </div>
+
               <div fxFlexFill>
                 <span fxFlex="40%">Maximum Credit Limit</span>
                 <span fxFlex="60%">{{ previewPayload.maximumAmount || previewPayload.maxCreditLimit || '0.00' }}</span>
@@ -412,6 +438,19 @@
               <div fxFlexFill>
                 <span fxFlex="40%">Expiry Date</span>
                 <span fxFlex="60%">{{ previewPayload.endDate || previewPayload.expiryDate || '—' }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Annual Interest Rate</span>
+                <span fxFlex="60%"
+                  >{{ previewPayload.annualInterestRate || '—'
+                  }}<span *ngIf="previewPayload.annualInterestRate">%</span></span
+                >
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Tenor (Days)</span>
+                <span fxFlex="60%">{{ previewPayload.tenorDays || '—' }}</span>
               </div>
 
               <!-- Fees & Settings section removed as per requirement -->

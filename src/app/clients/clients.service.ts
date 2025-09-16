@@ -364,6 +364,85 @@ export class ClientsService {
     return this.http.put(`/v1/clients/${clientId}/creditlines/${locId}`, creditLineData);
   }
 
+  /**
+   * Retrieve transactions for a single credit line (LOC)
+   * @param clientId Client Id
+   * @param locId LOC Id
+   */
+  getCreditLineTransactions(clientId: string, locId: string, offset: number = 0, limit: number = 20) {
+    const httpParams = new HttpParams().set('offset', offset.toString()).set('limit', limit.toString());
+    return this.http.get(`/v1/clients/${clientId}/creditlines/${locId}/transactions`, { params: httpParams });
+  }
+
+  /**
+   * Perform action on a credit line (LOC)
+   * POST to v1/clients/{clientId}/creditlines/{locId}/{action}
+   * @param clientId Client Id
+   * @param locId LOC Id
+   * @param action Action to perform (approve, activate, deactivate, reactivate, suspend, close)
+   * @param actionData Optional data for the action
+   */
+  performLocAction(clientId: string, locId: string, action: string, actionData: any = {}) {
+    return this.http.post(`/v1/clients/${clientId}/creditlines/${locId}/${action}`, actionData);
+  }
+
+  /**
+   * GET /v1/lineofcredits/{locId}/charges
+   * Get all charges for a line of credit
+   */
+  getLocCharges(clientId: string, locId: string): Observable<any> {
+    return this.http.get(`/v1/lineofcredits/${locId}/charges`);
+  }
+
+  /**
+   * POST /v1/lineofcredits/{locId}/charges
+   * Create a new charge for a line of credit
+   */
+  createLocCharge(clientId: string, locId: string, chargeData: any): Observable<any> {
+    return this.http.post(`/v1/lineofcredits/${locId}/charges`, chargeData);
+  }
+
+  /**
+   * PUT /v1/lineofcredits/{locId}/charges/{chargeId}
+   * Update an existing charge for a line of credit
+   */
+  updateLocCharge(clientId: string, locId: string, chargeId: number, chargeData: any): Observable<any> {
+    return this.http.put(`/v1/lineofcredits/${locId}/charges/${chargeId}`, chargeData);
+  }
+
+  /**
+   * DELETE /v1/lineofcredits/{locId}/charges/{chargeId}
+   * Delete a charge from a line of credit (only allowed if LOC is not approved)
+   */
+  deleteLocCharge(clientId: string, locId: string, chargeId: number): Observable<any> {
+    return this.http.delete(`/v1/lineofcredits/${locId}/charges/${chargeId}`);
+  }
+
+  /**
+   * POST /v1/lineofcredits/{locId}/charges/{chargeId}/waive
+   * Waive a charge
+   */
+  waiveLocCharge(clientId: string, locId: string, chargeId: number, waiveData: any): Observable<any> {
+    return this.http.post(`/v1/lineofcredits/${locId}/charges/${chargeId}/waive`, waiveData);
+  }
+
+  /**
+   * POST /v1/lineofcredits/{locId}/charges/{chargeId}/pay
+   * Pay a charge
+   */
+  payLocCharge(clientId: string, locId: string, chargeId: number, paymentData: any): Observable<any> {
+    return this.http.post(`/v1/lineofcredits/${locId}/charges/${chargeId}/pay`, paymentData);
+  }
+
+  getLoans(clientId: string, locId: string, offset: number = 0, limit: number = 20): Observable<any> {
+    const httpParams = new HttpParams()
+      .set('clientId', clientId)
+      .set('locId', locId)
+      .set('offset', offset.toString())
+      .set('limit', limit.toString());
+    return this.http.get('/v1/loans', { params: httpParams });
+  }
+
   getChargeAndTemplate(chargeId: any): Observable<any> {
     const httpParams = new HttpParams().set('template', 'true');
     return this.http.get(`/charges/${chargeId}`, { params: httpParams });

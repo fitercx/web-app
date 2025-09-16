@@ -183,8 +183,6 @@ export class CreateLoansAccountComponent {
     // Attach line of credit context if present (both common field names for compatibility)
     if (this.lineOfCreditId) {
       payload.lineOfCreditId = this.lineOfCreditId;
-      // some backends may expect creditLineId
-      payload.creditLineId = this.lineOfCreditId;
     }
 
     if (this.loansAccountProductTemplate.datatables && this.loansAccountProductTemplate.datatables.length > 0) {

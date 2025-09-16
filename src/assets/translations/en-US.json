@@ -291,6 +291,9 @@
       "Home": "Home"
     },
     "buttons": {
+      "New Drawdown": "New Drawdown",
+      "Increase Limit": "Increase Limit",
+      "Decrease Limit": "Decrease Limit",
       "View Closed LOC": "View Closed LOC",
       "View Active LOC": "View Active LOC",
       "Create LOC": "Create LOC",
@@ -1165,6 +1168,18 @@
       "Principal Amount": "Principal Amount"
     },
     "inputs": {
+      "Special Conditions": "Special Conditions",
+      "Current Status": "Current Status",
+      "Tenor (Days)": "Tenor (Days)",
+      "utilized": "Utilization",
+      "Outstanding Amount": "Outstanding Amount",
+      "Charges & Audit Trail": "Charges & Audit Trail",
+      "Terms & Settlement": "Terms & Settlement",
+      "Business Information": "Business Information",
+      "Credit Utilization": "Credit Utilization",
+      "Signatory": "Signatory",
+      "Draw Downs": "Draw Downs",
+      "Transaction History": "Transaction History",
       "Loan Amount": "Loan Amount",
       "Outstanding Balance": "Outstanding Balance",
       "Associated Loan ID": "Associated Loan ID",

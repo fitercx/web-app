@@ -657,14 +657,11 @@ export class LoansService {
     delete loansAccountData.principalAmount;
     delete loansAccountData.multiDisburseLoan; // this was just added so that disbursement data can be send in the backend
 
-    // In Fineract, the POST and PUT endpoints for /v1/loans have a typo in the field
-    // allowPartialPeriodInterestCalculation. Until that is fixed, we need to replace the field name in the payload.
     loansAccountData.allowPartialPeriodInterestCalcualtion = loansAccountData.allowPartialPeriodInterestCalculation;
     delete loansAccountData.allowPartialPeriodInterestCalculation;
-    // Pass through line of credit context if present
-    if (loansAccount.lineOfCreditId || loansAccount.creditLineId) {
-      loansAccountData.lineOfCreditId = loansAccount.lineOfCreditId || loansAccount.creditLineId;
-      loansAccountData.creditLineId = loansAccountData.lineOfCreditId; // backend synonyms
+
+    if (loansAccount.lineOfCreditId) {
+      loansAccountData.lineOfCreditId = loansAccount.lineOfCreditId;
     }
     return loansAccountData;
   }

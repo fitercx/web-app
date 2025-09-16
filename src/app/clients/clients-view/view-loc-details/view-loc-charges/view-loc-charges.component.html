@@ -1,0 +1,89 @@
+<div class="mat-elevation-z8">
+  <table mat-table [dataSource]="dataSource">
+    <!-- Charge Definition ID Column -->
+    <ng-container matColumnDef="chargeDefinitionId">
+      <th mat-header-cell *matHeaderCellDef>Charge Type</th>
+      <td mat-cell *matCellDef="let charge">
+        Charge #{{ charge.chargeDefinitionId }}
+        <span *ngIf="charge.penalty" class="penalty-badge">PENALTY</span>
+      </td>
+    </ng-container>
+
+    <!-- Due Date Column -->
+    <ng-container matColumnDef="dueDate">
+      <th mat-header-cell *matHeaderCellDef>Due Date</th>
+      <td mat-cell *matCellDef="let charge">
+        {{ parseDate(charge.dueDate) | date: 'mediumDate' }}
+      </td>
+    </ng-container>
+
+    <!-- Amount Column -->
+    <ng-container matColumnDef="amount">
+      <th mat-header-cell *matHeaderCellDef>Amount</th>
+      <td mat-cell *matCellDef="let charge">
+        {{ charge.amount | currency }}
+      </td>
+    </ng-container>
+
+    <!-- Amount Paid Column -->
+    <ng-container matColumnDef="amountPaid">
+      <th mat-header-cell *matHeaderCellDef>Paid</th>
+      <td mat-cell *matCellDef="let charge" class="paid-amount">
+        {{ charge.amountPaid | currency }}
+      </td>
+    </ng-container>
+
+    <!-- Amount Waived Column -->
+    <ng-container matColumnDef="amountWaived">
+      <th mat-header-cell *matHeaderCellDef>Waived</th>
+      <td mat-cell *matCellDef="let charge" class="waived-amount">
+        {{ charge.amountWaived | currency }}
+      </td>
+    </ng-container>
+
+    <!-- Amount Outstanding Column -->
+    <ng-container matColumnDef="amountOutstanding">
+      <th mat-header-cell *matHeaderCellDef>Outstanding</th>
+      <td mat-cell *matCellDef="let charge" class="outstanding-amount">
+        {{ charge.amountOutstanding | currency }}
+      </td>
+    </ng-container>
+
+    <!-- Status Column -->
+    <ng-container matColumnDef="status">
+      <th mat-header-cell *matHeaderCellDef>Status</th>
+      <td mat-cell *matCellDef="let charge">
+        <span class="status-badge status-{{ getChargeStatus(charge).toLowerCase() }}">
+          {{ getChargeStatus(charge) }}
+        </span>
+      </td>
+    </ng-container>
+
+    <!-- Actions Column -->
+    <ng-container matColumnDef="actions">
+      <th mat-header-cell *matHeaderCellDef>Actions</th>
+      <td mat-cell *matCellDef="let charge">
+        <button
+          mat-icon-button
+          color="warn"
+          *ngIf="canDeleteCharge()"
+          (click)="deleteCharge(charge.id)"
+          matTooltip="Delete Charge"
+        >
+          <mat-icon>delete</mat-icon>
+        </button>
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+  </table>
+
+  <mat-paginator
+    [length]="totalRecords"
+    [pageSize]="pageSize"
+    [pageSizeOptions]="[5, 10, 20, 50]"
+    (page)="onPageChange($event)"
+  >
+  </mat-paginator>
+</div>

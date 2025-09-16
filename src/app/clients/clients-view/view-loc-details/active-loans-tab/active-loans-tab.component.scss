@@ -1,0 +1,36 @@
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 500;
+
+  &.active {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+
+  &.pending {
+    background: #fff3cd;
+    color: #856404;
+  }
+
+  &.inactive {
+    background: #f5f5f5;
+    color: #666;
+  }
+}
+
+// Actions column alignment
+.actions-header,
+.actions-cell {
+  text-align: right !important;
+  justify-content: flex-end !important;
+  padding-right: 16px !important;
+}
+
+.actions-cell {
+  .account-action-button {
+    margin-left: 8px;
+  }
+}

@@ -21,6 +21,8 @@ import { ViewChargeComponent } from './clients-view/charges/view-charge/view-cha
 import { ClientPayChargesComponent } from './clients-view/charges/client-pay-charges/client-pay-charges.component';
 import { EditClientComponent } from './edit-client/edit-client.component';
 import { CreateClientComponent } from './create-client/create-client.component';
+import { ActiveLoansTabComponent } from './clients-view/view-loc-details/active-loans-tab/active-loans-tab.component';
+import { TransactionHistoryTabComponent } from './clients-view/view-loc-details/transaction-history-tab/transaction-history-tab.component';
 
 /** Custom Resolvers */
 import { ClientViewResolver } from './common-resolvers/client-view.resolver';
@@ -50,6 +52,7 @@ import { ClientTransactionPayResolver } from './common-resolvers/client-transact
 import { ClientDataAndTemplateResolver } from './common-resolvers/client-and-template.resolver';
 import { ClientCollateralResolver } from './common-resolvers/client-collateral.resolver';
 import { ViewLocDetailsComponent } from './clients-view/view-loc-details/view-loc-details.component';
+import { ViewLocChargesComponent } from './clients-view/view-loc-details/view-loc-charges/view-loc-charges.component';
 import { CreateLocComponent } from './clients-view/client-actions/create-loc/create-loc.component';
 import { CurrenciesResolver } from '../accounting/common-resolvers/currencies.resolver';
 import { ChargesResolver } from 'app/products/charges/charges.resolver';
@@ -305,7 +308,26 @@ const routes: Routes = [
               data: { title: 'View LOC Details', breadcrumb: 'View LOC Details' },
               resolve: {
                 locData: ClientLocResolver
-              }
+              },
+              children: [
+                {
+                  path: '',
+                  redirectTo: 'active-loans',
+                  pathMatch: 'full'
+                },
+                {
+                  path: 'active-loans',
+                  component: ActiveLoansTabComponent
+                },
+                {
+                  path: 'transactions',
+                  component: TransactionHistoryTabComponent
+                },
+                {
+                  path: 'charges',
+                  component: ViewLocChargesComponent
+                }
+              ]
             },
             {
               path: 'loc/:locId/edit',

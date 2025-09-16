@@ -2,7 +2,7 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { FormBuilder, FormGroup, Validators, ValidatorFn, AbstractControl } from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, ValidatorFn, AbstractControl, FormArray } from '@angular/forms';
 import { of } from 'rxjs';
 import { delay } from 'rxjs/operators';
 import { MatStepper } from '@angular/material/stepper';
@@ -243,12 +243,17 @@ export class CreateLocComponent implements OnInit {
         authorizedSignatoryPhone: [''],
         authorizedSignatoryEmail: [''],
         va: [''],
-        name: [
+        externalId: [
           '',
           Validators.required
         ],
-        externalId: [''],
         specialConditions: ['']
+      }),
+      // Vendors step (list of vendor objects { name })
+      vendorsSection: this.formBuilder.group({
+        distributionPartner: [''],
+        vendorName: [''],
+        vendors: this.formBuilder.array([])
       }),
       limitsTerms: this.formBuilder.group(
         {
@@ -257,8 +262,6 @@ export class CreateLocComponent implements OnInit {
             Validators.required
           ],
           maxPerDrawdown: [''],
-          // Approved Credit Facility (UI) -> will map to approvedCreditFacilityAmount in payload
-          approvedCreditFacility: [''],
           startDate: [
             new Date().toISOString().slice(0, 10),
             Validators.required
@@ -266,7 +269,8 @@ export class CreateLocComponent implements OnInit {
           expiryDate: [''],
           reviewPeriod: [''],
           interimReviewDate: [{ value: '', disabled: true }],
-          interestRateOverride: ['']
+          annualInterestRate: [''],
+          tenorDays: ['']
         },
         { validators: this.maxPerDrawdownValidator }
       ),
@@ -366,6 +370,11 @@ export class CreateLocComponent implements OnInit {
         ...value.basicInfo,
         // include limits & terms but map maxCreditLimit -> maximumAmount
         ...value.limitsTerms,
+        // include vendors if any
+        ...(value.vendorsSection?.distributionPartner
+          ? { distributionPartner: value.vendorsSection.distributionPartner }
+          : {}),
+        ...(value.vendorsSection?.vendors?.length ? { vendors: value.vendorsSection.vendors } : {}),
         // include settlement account if selected
         ...(value.settlementSavingsAccountId ? { settlementSavingsAccountId: value.settlementSavingsAccountId } : {}),
         charges: this.chargesDataSource
@@ -445,11 +454,6 @@ export class CreateLocComponent implements OnInit {
         // swallow - settings unavailable in rare cases
       }
 
-      // Map approvedCreditFacility (form) -> approvedCreditFacilityAmount (payload)
-      if (payload.hasOwnProperty('approvedCreditFacility')) {
-        payload.approvedCreditFacilityAmount = payload.approvedCreditFacility;
-        delete payload.approvedCreditFacility;
-      }
       // Call backend API to create the credit line
       // clientsService will be injected lazily via route resolver in future; import here instead
       // For now, we'll obtain the ClientsService via the route injector
@@ -481,15 +485,18 @@ export class CreateLocComponent implements OnInit {
       ...v.basicInfo,
       ...v.limitsTerms
     };
+    if (v.vendorsSection?.distributionPartner) {
+      payload.distributionPartner = v.vendorsSection.distributionPartner;
+    }
+    if (v.vendorsSection?.vendors?.length) {
+      payload.vendors = v.vendorsSection.vendors;
+    }
     if (v.settlementSavingsAccountId) {
       payload.settlementSavingsAccountId = v.settlementSavingsAccountId;
     }
     // Map preview fields to backend names so preview matches the eventual payload
     if (payload.hasOwnProperty('maxCreditLimit')) {
       payload.maximumAmount = payload.maxCreditLimit;
-    }
-    if (payload.hasOwnProperty('approvedCreditFacility')) {
-      payload.approvedCreditFacilityAmount = payload.approvedCreditFacility;
     }
     if (payload.hasOwnProperty('expiryDate')) {
       payload.endDate = payload.expiryDate;
@@ -504,5 +511,38 @@ export class CreateLocComponent implements OnInit {
   confirm() {
     // reuse submit flow (uses locForm.valid check)
     this.submit();
+  }
+
+  // ---- Vendors helpers ----
+  get vendorsArray(): FormArray {
+    return this.locForm.get([
+      'vendorsSection',
+      'vendors'
+    ]) as FormArray;
+  }
+
+  addVendor() {
+    const nameControl = this.locForm.get([
+      'vendorsSection',
+      'vendorName'
+    ]);
+    const raw = (nameControl?.value || '').trim();
+    if (!raw) {
+      return;
+    }
+    // Prevent exact duplicates
+    const exists = this.vendorsArray.controls.some((c) => (c.value?.name || '').toLowerCase() === raw.toLowerCase());
+    if (exists) {
+      nameControl?.setValue('');
+      return;
+    }
+    this.vendorsArray.push(this.formBuilder.control({ name: raw }));
+    nameControl?.setValue('');
+  }
+
+  removeVendor(index: number) {
+    if (index > -1 && index < this.vendorsArray.length) {
+      this.vendorsArray.removeAt(index);
+    }
   }
 }

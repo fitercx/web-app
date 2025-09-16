@@ -111,7 +111,7 @@ export class GeneralTabComponent {
 
   /** Lines of Credit Columns */
   locColumns: string[] = [
-    'LOC Name',
+    'External Id',
     'Account No',
     'Credit Limit',
     'Available Balance',
@@ -377,6 +377,7 @@ export class GeneralTabComponent {
 
         return {
           id: loc.id,
+          externalId: loc.externalId || loc.name || loc.accountNumber || `LOC-${loc.id}`,
           name: loc.name,
           accountNo: loc.accountNumber || loc.externalId || `LOC-${loc.id}`,
           creditLimit: maximumAmount,

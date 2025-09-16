@@ -59,26 +59,14 @@
 
               <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
                 <mat-form-field fxFlex>
-                  <mat-label>Name</mat-label>
-                  <input matInput formControlName="name" placeholder="e.g., Working Capital Line" required />
-                  <mat-error *ngIf="locForm.get(['basicInfo', 'name'])?.hasError('required')"
-                    >This field is required.</mat-error
-                  >
+                  <mat-label>Virtual Account</mat-label>
+                  <input matInput formControlName="va" placeholder="VA000001" />
                 </mat-form-field>
-
                 <mat-form-field fxFlex>
                   <mat-label>External Id</mat-label>
-                  <input matInput formControlName="externalId" placeholder="Optional external identifier" />
-                  <mat-hint>Use this to track external systems (optional)</mat-hint>
-                </mat-form-field>
-              </div>
-
-              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
-                <mat-form-field fxFlex>
-                  <mat-label>Virtual Account</mat-label>
-                  <input matInput formControlName="va" placeholder="VA000001" required />
-                  <mat-error *ngIf="locForm.get(['basicInfo', 'va'])?.hasError('required')"
-                    >This field is required.</mat-error
+                  <input matInput formControlName="externalId" placeholder="External identifier" required />
+                  <mat-error *ngIf="locForm.get(['basicInfo', 'externalId'])?.hasError('required')"
+                    >External Id is required.</mat-error
                   >
                 </mat-form-field>
               </div>
@@ -172,23 +160,6 @@
                 </mat-form-field>
               </div>
 
-              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px" class="approved-row">
-                <div fxFlex>
-                  <span class="mat-caption">Approved Credit Facility</span>
-                  <div class="approved-value">
-                    {{
-                      previewPayload.approvedCreditFacilityAmount || previewPayload.approvedCreditFacility || '\u2014'
-                    }}
-                  </div>
-                </div>
-
-                <mat-form-field fxFlex>
-                  <mat-label>Approved Credit Facility</mat-label>
-                  <input matInput type="number" formControlName="approvedCreditFacility" placeholder="0.00" />
-                  <span matSuffix>{{ selectedCurrencyCode || '' }}</span>
-                </mat-form-field>
-              </div>
-
               <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
                 <mat-form-field fxFlex>
                   <mat-label>Start Date</mat-label>
@@ -227,9 +198,13 @@
 
               <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
                 <mat-form-field fxFlex>
-                  <mat-label>Interest Rate Override</mat-label>
-                  <input matInput type="number" formControlName="interestRateOverride" placeholder="0.00" step="0.01" />
+                  <mat-label>Annual Interest Rate</mat-label>
+                  <input matInput type="number" formControlName="annualInterestRate" placeholder="0.00" step="0.01" />
                   <span matSuffix>%</span>
+                </mat-form-field>
+                <mat-form-field fxFlex>
+                  <mat-label>Tenor in Days</mat-label>
+                  <input matInput type="number" formControlName="tenorDays" placeholder="e.g. 365" />
                 </mat-form-field>
               </div>
             </div>
@@ -355,11 +330,6 @@
               </div>
 
               <div fxFlexFill>
-                <span fxFlex="40%">Name</span>
-                <span fxFlex="60%">{{ previewPayload.name }}</span>
-              </div>
-
-              <div fxFlexFill>
                 <span fxFlex="40%">External Id</span>
                 <span fxFlex="60%">{{ previewPayload.externalId || '—' }}</span>
               </div>
@@ -433,6 +403,19 @@
               <div fxFlexFill>
                 <span fxFlex="40%">Expiry Date</span>
                 <span fxFlex="60%">{{ previewPayload.endDate || previewPayload.expiryDate || '—' }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Annual Interest Rate</span>
+                <span fxFlex="60%"
+                  >{{ previewPayload.annualInterestRate || '—'
+                  }}<span *ngIf="previewPayload.annualInterestRate">%</span></span
+                >
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Tenor (Days)</span>
+                <span fxFlex="60%">{{ previewPayload.tenorDays || '—' }}</span>
               </div>
 
               <h3 class="mat-h3" fxFlexFill style="margin-top: 16px">Charges</h3>

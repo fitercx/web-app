@@ -23,15 +23,6 @@
     <mat-step [stepControl]="loansAccountDetailsForm">
       <ng-template matStepLabel>{{ 'labels.inputs.DETAILS' | translate }}</ng-template>
 
-      <!-- Drawdown Context Banner -->
-      <div *ngIf="lineOfCreditId" class="loc-context-banner mat-elevation-z2">
-        <mat-icon>account_balance</mat-icon>
-        <div>
-          <strong>Drawdown under Line of Credit</strong>
-          <div>ID: {{ lineOfCreditId }}</div>
-        </div>
-      </div>
-
       <mifosx-loans-account-details-step
         [loansAccountTemplate]="loansAccountTemplate"
         (loansAccountProductTemplate)="setTemplate($event)"

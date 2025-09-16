@@ -59,6 +59,9 @@ import { ClientDatatableStepComponent } from './client-stepper/client-datatable-
 import { CreateLocComponent } from './clients-view/client-actions/create-loc/create-loc.component';
 import { ViewLocDetailsComponent } from './clients-view/view-loc-details/view-loc-details.component';
 import { EditLocComponent } from './clients-view/client-actions/edit-loc/edit-loc.component';
+import { ActiveLoansTabComponent } from './clients-view/view-loc-details/active-loans-tab/active-loans-tab.component';
+import { TransactionHistoryTabComponent } from './clients-view/view-loc-details/transaction-history-tab/transaction-history-tab.component';
+import { ViewLocChargesComponent } from './clients-view/view-loc-details/view-loc-charges/view-loc-charges.component';
 
 /**
  * Clients Module
@@ -123,7 +126,10 @@ import { EditLocComponent } from './clients-view/client-actions/edit-loc/edit-lo
     ClientDatatableStepComponent,
     CreateLocComponent,
     ViewLocDetailsComponent,
-    EditLocComponent
+    EditLocComponent,
+    ActiveLoansTabComponent,
+    TransactionHistoryTabComponent,
+    ViewLocChargesComponent
   ],
   providers: []
 })

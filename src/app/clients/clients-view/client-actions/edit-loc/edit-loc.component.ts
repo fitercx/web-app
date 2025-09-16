@@ -205,18 +205,17 @@ export class EditLocComponent implements OnInit {
         authorizedSignatoryPhone: loc.authorizedSignatoryPhone || '',
         authorizedSignatoryEmail: loc.authorizedSignatoryEmail || '',
         va: loc.va || '',
-        name: loc.name || '',
         externalId: loc.externalId || '',
         specialConditions: loc.specialConditions || ''
       },
       limitsTerms: {
         maxCreditLimit: loc.maximumAmount || loc.maxCreditLimit || '',
         maxPerDrawdown: loc.maxPerDrawdown || '',
-        approvedCreditFacility: loc.approvedCreditFacilityAmount || '',
         startDate: this.formatDateForInput(loc.startDate || loc.activationDate),
         expiryDate: this.formatDateForInput(loc.endDate || loc.expiryDate),
         reviewPeriod: loc.reviewPeriod || '',
-        interestRateOverride: loc.interestRateOverride || loc.interestRate || ''
+        annualInterestRate: loc.annualInterestRate || loc.interestRateOverride || loc.interestRate || '',
+        tenorDays: loc.tenorDays || loc.tenorInDays || ''
       },
       settlementSavingsAccountId: loc.settlementSavingsAccountId || ''
     });
@@ -322,11 +321,10 @@ export class EditLocComponent implements OnInit {
         authorizedSignatoryPhone: [''],
         authorizedSignatoryEmail: [''],
         va: [''],
-        name: [
+        externalId: [
           '',
           Validators.required
         ],
-        externalId: [''],
         specialConditions: ['']
       }),
       limitsTerms: this.formBuilder.group(
@@ -336,7 +334,6 @@ export class EditLocComponent implements OnInit {
             Validators.required
           ],
           maxPerDrawdown: [''],
-          approvedCreditFacility: [''],
           startDate: [
             new Date().toISOString().slice(0, 10),
             Validators.required
@@ -344,7 +341,8 @@ export class EditLocComponent implements OnInit {
           expiryDate: [''],
           reviewPeriod: [''],
           interimReviewDate: [{ value: '', disabled: true }],
-          interestRateOverride: ['']
+          annualInterestRate: [''],
+          tenorDays: ['']
         },
         { validators: this.maxPerDrawdownValidator }
       ),
@@ -519,12 +517,6 @@ export class EditLocComponent implements OnInit {
         // swallow - settings unavailable in rare cases
       }
 
-      // Map approvedCreditFacility (form) -> approvedCreditFacilityAmount (payload)
-      if (payload.hasOwnProperty('approvedCreditFacility')) {
-        payload.approvedCreditFacilityAmount = payload.approvedCreditFacility;
-        delete payload.approvedCreditFacility;
-      }
-
       // Call backend API to update the credit line
       this.updateError = null;
       this.clientsService.updateClientCreditLine(this.clientId, this.locId, payload).subscribe(
@@ -558,9 +550,6 @@ export class EditLocComponent implements OnInit {
     // Map preview fields to backend names so preview matches the eventual payload
     if (payload.hasOwnProperty('maxCreditLimit')) {
       payload.maximumAmount = payload.maxCreditLimit;
-    }
-    if (payload.hasOwnProperty('approvedCreditFacility')) {
-      payload.approvedCreditFacilityAmount = payload.approvedCreditFacility;
     }
     if (payload.hasOwnProperty('expiryDate')) {
       payload.endDate = payload.expiryDate;
