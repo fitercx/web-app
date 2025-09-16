@@ -301,6 +301,9 @@
         <button mat-menu-item (click)="doAction('Client Screen Reports')">
           {{ 'labels.buttons.Client Screen Reports' | translate }}
         </button>
+        <button mat-menu-item [routerLink]="['loc', 'create']">
+          {{ 'labels.buttons.Create LOC' | translate: {} : 'Create LOC' }}
+        </button>
         <button
           mat-menu-item
           (click)="doAction('Create Standing Instructions')"

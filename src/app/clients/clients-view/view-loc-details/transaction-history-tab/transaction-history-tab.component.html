@@ -1,0 +1,56 @@
+<div class="mat-elevation-z8">
+  <table mat-table [dataSource]="dataSource">
+    <!-- Transaction Date Column -->
+    <ng-container matColumnDef="transactionDate">
+      <th mat-header-cell *matHeaderCellDef>Date</th>
+      <td mat-cell *matCellDef="let transaction">{{ transaction.transactionDate | date: 'medium' }}</td>
+    </ng-container>
+
+    <!-- Transaction Type Column -->
+    <ng-container matColumnDef="transactionType">
+      <th mat-header-cell *matHeaderCellDef>Type</th>
+      <td mat-cell *matCellDef="let transaction">{{ transaction.transactionType }}</td>
+    </ng-container>
+
+    <!-- Description Column -->
+    <ng-container matColumnDef="description">
+      <th mat-header-cell *matHeaderCellDef>Description</th>
+      <td mat-cell *matCellDef="let transaction">{{ transaction.description }}</td>
+    </ng-container>
+
+    <!-- Amount Column -->
+    <ng-container matColumnDef="amount">
+      <th mat-header-cell *matHeaderCellDef>Amount</th>
+      <td
+        mat-cell
+        *matCellDef="let transaction"
+        [ngClass]="{ positive: transaction.amount > 0, negative: transaction.amount < 0 }"
+      >
+        {{ transaction.amount | currency }}
+      </td>
+    </ng-container>
+
+    <!-- Balance Before Column -->
+    <ng-container matColumnDef="balanceBefore">
+      <th mat-header-cell *matHeaderCellDef>Balance Before</th>
+      <td mat-cell *matCellDef="let transaction">{{ transaction.balanceBefore | currency }}</td>
+    </ng-container>
+
+    <!-- Balance After Column -->
+    <ng-container matColumnDef="balanceAfter">
+      <th mat-header-cell *matHeaderCellDef>Balance After</th>
+      <td mat-cell *matCellDef="let transaction">{{ transaction.balanceAfter | currency }}</td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+  </table>
+
+  <mat-paginator
+    [length]="totalRecords"
+    [pageSize]="pageSize"
+    [pageSizeOptions]="[5, 10, 20, 50]"
+    (page)="onPageChange($event)"
+  >
+  </mat-paginator>
+</div>

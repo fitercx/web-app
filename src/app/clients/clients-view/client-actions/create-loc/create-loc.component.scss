@@ -1,0 +1,158 @@
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  margin: 0;
+  font-weight: 400;
+}
+
+.container {
+  padding: 24px;
+}
+
+.page-header {
+  margin-bottom: 24px;
+}
+
+.page-title {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.breadcrumb {
+  font-size: 14px;
+  color: #666;
+
+  a {
+    color: #1976d2;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
+  span {
+    color: #333;
+  }
+}
+
+.form-container {
+  overflow: hidden;
+}
+
+.form-section {
+  margin-bottom: 24px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.required {
+  color: #d32f2f;
+}
+
+.type-card {
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border: 2px solid transparent;
+
+  &.selected {
+    border-color: #1976d2;
+    background: #e3f2fd;
+  }
+
+  &:hover {
+    background: #f5f5f5;
+  }
+}
+
+.type-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  font-size: 24px;
+
+  &.payable {
+    background: #ffebee;
+    color: #c62828;
+  }
+
+  &.receivable {
+    background: #e8f5e9;
+    color: #2e7d32;
+  }
+}
+
+.type-name {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.type-description {
+  font-size: 14px;
+  color: #666;
+  line-height: 1.5;
+}
+
+.form-actions {
+  padding: 16px 24px;
+  background: #fafafa;
+  border-top: 1px solid #e0e0e0;
+}
+
+.mat-caption {
+  color: #666;
+  margin-left: 16px; // Align with toggle text
+}
+
+/* Preview styling matching savings preview */
+.preview {
+  h3 {
+    margin: 0;
+    font-weight: 500;
+  }
+
+  mat-divider {
+    margin: 0 0 0.5em;
+  }
+
+  span {
+    margin: 0.5em 0;
+  }
+
+  .margin-t {
+    margin-top: 1em;
+  }
+
+  .preview-key {
+    font-weight: 500;
+    color: #444;
+  }
+
+  .preview-value {
+    color: #333;
+  }
+}
+
+// Ensure consistent spacing before global stepper button component across all steps
+.step-content + mifosx-stepper-buttons,
+.step-content + div > mifosx-stepper-buttons {
+  margin-top: 32px;
+  display: block;
+}
+
+// Specific overrides for Charges step container
+.step-content .mat-form-field:last-of-type {
+  margin-bottom: 8px;
+}
+
+@media (width <= 959px) {
+  .step-content + mifosx-stepper-buttons,
+  .step-content + div > mifosx-stepper-buttons {
+    margin-top: 24px;
+  }
+}

@@ -41,6 +41,10 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
   fundOptions: any;
   /** Account Linking Options */
   accountLinkingOptions: any;
+  /** Line of Credit Options */
+  lineOfCreditOptions: any;
+  /** Is LOC Enabled */
+  isLocEnabled = false;
   /** For edit loan accounts form */
   isFieldOfficerPatched = false;
   /** Loans Account Details Form */
@@ -84,6 +88,19 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
     if (this.loansAccountTemplate) {
       this.productList = this.loansAccountTemplate.productOptions.sort(this.commons.dynamicSort('name'));
       if (this.loansAccountTemplate.loanProductId) {
+        // Set LOC-related properties from existing loan if available
+        this.isLocEnabled = this.loansAccountTemplate.additionalProperties?.isLocEnabled || false;
+        this.lineOfCreditOptions = this.loansAccountTemplate.additionalProperties?.lineOfCreditOptions || [];
+
+        // Add conditional validation for line of credit in edit mode
+        const lineOfCreditControl = this.loansAccountDetailsForm.get('lineOfCreditId');
+        if (this.isLocEnabled && this.lineOfCreditOptions.length > 0) {
+          lineOfCreditControl?.setValidators([Validators.required]);
+        } else {
+          lineOfCreditControl?.clearValidators();
+        }
+        lineOfCreditControl?.updateValueAndValidity();
+
         this.loansAccountDetailsForm.patchValue({
           productId: this.loansAccountTemplate.loanProductId,
           submittedOnDate:
@@ -95,7 +112,10 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
           expectedDisbursementDate:
             this.loansAccountTemplate.timeline.expectedDisbursementDate &&
             new Date(this.loansAccountTemplate.timeline.expectedDisbursementDate),
-          externalId: this.loansAccountTemplate.externalId
+          externalId: this.loansAccountTemplate.externalId,
+          linkAccountId: this.loansAccountTemplate.linkAccountId,
+          createStandingInstructionAtDisbursement: this.loansAccountTemplate.createStandingInstructionAtDisbursement,
+          lineOfCreditId: this.loansAccountTemplate.lineOfCreditId
         });
       }
     }
@@ -148,7 +168,8 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
       ],
       externalId: [''],
       linkAccountId: [''],
-      createStandingInstructionAtDisbursement: ['']
+      createStandingInstructionAtDisbursement: [''],
+      lineOfCreditId: ['']
     });
   }
 
@@ -168,6 +189,20 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
         this.fundOptions = response.fundOptions;
         this.accountLinkingOptions = response.accountLinkingOptions;
         this.loanProductSelected = true;
+
+        // Handle Line of Credit options
+        this.isLocEnabled = response.additionalProperties?.isLocEnabled || false;
+        this.lineOfCreditOptions = response.additionalProperties?.lineOfCreditOptions || [];
+
+        // Add conditional validation for line of credit
+        const lineOfCreditControl = this.loansAccountDetailsForm.get('lineOfCreditId');
+        if (this.isLocEnabled && this.lineOfCreditOptions.length > 0) {
+          lineOfCreditControl?.setValidators([Validators.required]);
+        } else {
+          lineOfCreditControl?.clearValidators();
+        }
+        lineOfCreditControl?.updateValueAndValidity();
+
         if (response.createStandingInstructionAtDisbursement) {
           this.loansAccountDetailsForm
             .get('createStandingInstructionAtDisbursement')
@@ -182,5 +217,12 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
    */
   get loansAccountDetails() {
     return this.loansAccountDetailsForm.getRawValue();
+  }
+
+  /**
+   * Returns whether to show the Line of Credit dropdown
+   */
+  get showLineOfCreditDropdown() {
+    return this.isLocEnabled && this.lineOfCreditOptions && this.lineOfCreditOptions.length > 0;
   }
 }

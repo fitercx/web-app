@@ -1,0 +1,112 @@
+<div class="tab-container mat-typography">
+  <table mat-table [dataSource]="loanAccounts">
+    <ng-container matColumnDef="Account No">
+      <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Account No' | translate }}</th>
+      <td mat-cell *matCellDef="let element">
+        <i
+          class="fa fa-stop"
+          [ngClass]="element.inArrears ? 'status-active-overdue' : (element.status.code | statusLookup)"
+        ></i>
+        <mifosx-account-number accountNo="{{ element.accountNo }}"></mifosx-account-number>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="Loan Account">
+      <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Loan Product' | translate }}</th>
+      <td mat-cell *matCellDef="let element">
+        <mifosx-long-text textValue="{{ element.loanProductName }}" chars="35"></mifosx-long-text>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="Loan Amount">
+      <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Loan Amount' | translate }}</th>
+      <td mat-cell *matCellDef="let element">{{ element.principal | formatNumber }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="Outstanding Balance">
+      <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Outstanding Balance' | translate }}</th>
+      <td mat-cell class="r-amount" *matCellDef="let element">
+        {{ element.summary?.principalOutstanding | formatNumber }}
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="Amount Paid">
+      <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Amount Paid' | translate }}</th>
+      <td mat-cell class="r-amount" *matCellDef="let element">{{ element.summary?.totalRepayment | formatNumber }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="Actions">
+      <th mat-header-cell class="actions-header" *matHeaderCellDef>{{ 'labels.inputs.Actions' | translate }}</th>
+      <td mat-cell class="actions-cell" *matCellDef="let element">
+        <button
+          *ngIf="element.status.active"
+          class="account-action-button"
+          mat-raised-button
+          color="primary"
+          matTooltip="{{ 'tooltips.Make Repayment' | translate }}"
+          matTooltipPosition="above"
+          (click)="routeEdit($event)"
+          [routerLink]="['../../', 'loans-accounts', element.id, 'actions', 'Make Repayment']"
+        >
+          <i class="fa fa-dollar"></i>
+        </button>
+        <span *ngIf="element.status.pendingApproval">
+          <button
+            class="account-action-button"
+            mat-raised-button
+            color="primary"
+            matTooltip="{{ 'tooltips.Approve' | translate }}"
+            matTooltipPosition="above"
+            *mifosxHasPermission="'APPROVE_LOAN'"
+            (click)="routeEdit($event)"
+            [routerLink]="['../../', 'loans-accounts', element.id, 'actions', 'Approve']"
+          >
+            <i class="fa fa-check"></i>
+          </button>
+        </span>
+        <span *ngIf="!element.status.pendingApproval && !element.status.active && !element.status.overpaid">
+          <button
+            class="account-action-button"
+            mat-raised-button
+            color="primary"
+            matTooltip="{{ 'tooltips.Disburse' | translate }}"
+            matTooltipPosition="above"
+            *mifosxHasPermission="'DISBURSE_LOAN'"
+            (click)="routeEdit($event)"
+            [routerLink]="['../../', 'loans-accounts', element.id, 'actions', 'Disburse']"
+          >
+            <i class="fa fa-flag"></i>
+          </button>
+        </span>
+        <span *ngIf="!element.status.pendingApproval && !element.status.active && element.status.overpaid">
+          <button
+            class="account-action-button"
+            mat-raised-button
+            color="primary"
+            matTooltip="{{ 'tooltips.Transfer Funds' | translate }}"
+            matTooltipPosition="above"
+            *mifosxHasPermission="'DISBURSE_LOAN'"
+            (click)="routeEdit($event); routeTransferFund(element.id)"
+          >
+            <i class="fa fa-exchange"></i>
+          </button>
+        </span>
+      </td>
+    </ng-container>
+
+    <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+    <tr
+      mat-row
+      *matRowDef="let row; columns: displayedColumns"
+      [routerLink]="['../../', 'loans-accounts', row.id, 'general']"
+      class="select-row"
+    ></tr>
+  </table>
+
+  <mat-paginator
+    [length]="totalRecords"
+    [pageSizeOptions]="[10, 25, 50, 100]"
+    (page)="getLoans()"
+    showFirstLastButtons
+  ></mat-paginator>
+</div>

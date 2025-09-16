@@ -136,6 +136,26 @@ export class CreateChargeComponent implements OnInit {
           this.chargeCalculationTypeData = this.chargesTemplateData.shareChargeCalculationTypeOptions;
           this.chargeTimeTypeData = this.chargesTemplateData.shareChargeTimeTypeOptions;
           break;
+        case 5: // Line of Credit
+          // Use backend supplied line of credit specific arrays. Fallbacks remain defensive.
+          this.chargeCalculationTypeData =
+            this.chargesTemplateData.lineOfCreditChargeCalculationTypeOptions ||
+            this.chargesTemplateData.loanChargeCalculationTypeOptions;
+          this.chargeTimeTypeData = this.chargesTemplateData.lineOfCreditChargeTimeTypeOptions || [];
+          // Only time type 17 should be available (template already limits this). Auto-select if single option.
+          if (Array.isArray(this.chargeTimeTypeData) && this.chargeTimeTypeData.length === 1) {
+            const onlyTime = this.chargeTimeTypeData[0];
+            if (this.chargeForm.get('chargeTimeType').value !== onlyTime.id) {
+              this.chargeForm.get('chargeTimeType').setValue(onlyTime.id);
+            }
+          }
+          if (Array.isArray(this.chargeCalculationTypeData) && this.chargeCalculationTypeData.length === 1) {
+            const onlyCalc = this.chargeCalculationTypeData[0];
+            if (this.chargeForm.get('chargeCalculationType').value !== onlyCalc.id) {
+              this.chargeForm.get('chargeCalculationType').setValue(onlyCalc.id);
+            }
+          }
+          break;
       }
     });
   }
@@ -156,15 +176,16 @@ export class CreateChargeComponent implements OnInit {
       }
       if (this.chargeForm.get('chargeAppliesTo').value === 2) {
         if (
-          !(
-            this.chargeForm.get('chargeTimeType').value === 5 ||
-            this.chargeForm.get('chargeTimeType').value === 16 ||
-            this.chargeForm.get('chargeTimeType').value === 17
-          ) &&
+          !(this.chargeForm.get('chargeTimeType').value === 5 || this.chargeForm.get('chargeTimeType').value === 16) &&
           chargeCalculationType.id === 2
         ) {
           return false;
         }
+      }
+      // For LOC (id 5) we may disallow certain calculation types during activation (time type 17) similar to savings rule set, adjust if business rules differ
+      if (this.chargeForm.get('chargeAppliesTo').value === 5) {
+        // Example rule: if chargeTimeType 17 (activation) and calculation type is percentage-of-amount-only? Placeholder keeps all for now.
+        // Implement specific exclusions here when clarified.
       }
       return true;
     });
@@ -213,6 +234,10 @@ export class CreateChargeComponent implements OnInit {
           this.chargeForm.removeControl('chargePaymentMode');
           this.chargeForm.removeControl('incomeAccountId');
           this.chargeForm.get('penalty').setValue(false);
+          break;
+        case 5: // Line of Credit
+          this.chargeForm.removeControl('chargePaymentMode');
+          this.chargeForm.removeControl('incomeAccountId');
           break;
       }
       this.chargeForm.get('chargeCalculationType').reset();

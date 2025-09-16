@@ -10,6 +10,11 @@ export class StatusLookupPipe implements PipeTransform {
       false: 'status-deleted',
       Active: 'status-active',
       Block: 'status-block',
+      // Generic status codes used by Credit Lines (Lines of Credit)
+      'status.active': 'status-active',
+      'status.inactive': 'status-inactive',
+      'status.suspended': 'status-suspended',
+      'status.closed': 'status-closed',
       'charges.StatusType.active.true': 'status-active',
       'loanStatusType.submitted.and.pending.approval': 'status-pending',
       'loanStatusType.approved': 'status-approved',
@@ -46,6 +51,6 @@ export class StatusLookupPipe implements PipeTransform {
       'smsCampaignStatus.closed': 'status-closed',
       'purchasedSharesStatusType.applied': 'status-pending'
     };
-    return cssClassNameLookup[status];
+    return (cssClassNameLookup as Record<string, string>)[status];
   }
 }

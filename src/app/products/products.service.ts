@@ -32,6 +32,7 @@ export class ProductsService {
   }
 
   createLoanProduct(loanProduct: string): Observable<any> {
+    // LOC related fields (enableLineOfCredit, locProductType, maxDrawdownsPerDay) are passed through transparently.
     return this.http.post('/loanproducts', loanProduct);
   }
 

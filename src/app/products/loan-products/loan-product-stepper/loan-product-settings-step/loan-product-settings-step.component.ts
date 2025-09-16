@@ -118,6 +118,7 @@ export class LoanProductSettingsStepComponent implements OnInit {
       minimumGap: this.loanProductsTemplate.minimumGap,
       maximumGap: this.loanProductsTemplate.maximumGap,
       canUseForTopup: this.loanProductsTemplate.canUseForTopup,
+      isLocEnabled: this.loanProductsTemplate.additionalProperties?.isLocEnabled || false,
       isInterestRecalculationEnabled: this.loanProductsTemplate.isInterestRecalculationEnabled,
       holdGuaranteeFunds: this.loanProductsTemplate.holdGuaranteeFunds,
       multiDisburseLoan: this.loanProductsTemplate.multiDisburseLoan,
@@ -313,7 +314,8 @@ export class LoanProductSettingsStepComponent implements OnInit {
         LoanProducts.LOAN_SCHEDULE_TYPE_CUMULATIVE,
         Validators.required
       ],
-      allowAccrualPostingInArrears: [false]
+      allowAccrualPostingInArrears: [false],
+      isLocEnabled: [false]
     });
   }
 
@@ -715,6 +717,16 @@ export class LoanProductSettingsStepComponent implements OnInit {
     if (productSettings['delinquencyBucketId'] === '') {
       productSettings['delinquencyBucketId'] = null;
     }
+
+    // Move isLocEnabled to additionalProperties
+    if (productSettings.isLocEnabled !== undefined) {
+      productSettings.additionalProperties = {
+        ...productSettings.additionalProperties,
+        isLocEnabled: productSettings.isLocEnabled
+      };
+      delete productSettings.isLocEnabled;
+    }
+
     return productSettings;
   }
 

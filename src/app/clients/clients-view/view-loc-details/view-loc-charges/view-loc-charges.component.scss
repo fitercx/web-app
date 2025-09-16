@@ -1,0 +1,47 @@
+.charges-container {
+  padding: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.paid-amount {
+  color: #4caf50;
+  font-weight: 500;
+}
+
+.waived-amount {
+  color: #ff9800;
+  font-weight: 500;
+}
+
+.outstanding-amount {
+  color: #f44336;
+  font-weight: 500;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-paid {
+  background-color: #e8f5e8;
+  color: #4caf50;
+}
+
+.status-pending {
+  background-color: #fff3e0;
+  color: #f57c00;
+}
+
+.status-waived {
+  background-color: #fce4ec;
+  color: #e91e63;
+}
+
+.status-overdue {
+  background-color: #ffebee;
+  color: #f44336;
+}

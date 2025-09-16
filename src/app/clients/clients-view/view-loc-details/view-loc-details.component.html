@@ -1,0 +1,659 @@
+<mat-card class="account-card" *ngIf="locDetails">
+  <mat-card-header fxLayout="column" class="header">
+    <mat-card-title-group class="header-title-group">
+      <div class="mat-typography account-card-title">
+        <mat-card-title fxLayout="row wrap" class="content">
+          <h3 fxFlex="95%">
+            <b>{{ 'labels.inputs.Line of Credit' | translate }} :</b>
+            <i
+              class="fa fa-stop"
+              [ngClass]="locDetails?.status?.code || locDetails?.status || '' | statusLookup"
+              matTooltip="{{ 'labels.status.' + (locDetails?.status?.value || locDetails?.status || '') | translate }}"
+              style="margin-left: 8px; margin-right: 8px"
+            ></i>
+          </h3>
+          <div fxFlex="5%" fxLayoutAlign="end center">
+            <button mat-icon-button [matMenuTriggerFor]="locMenu" aria-label="LOC actions" yPosition="below">
+              <mat-icon matListIcon class="actions-menu">
+                <fa-icon icon="bars" size="sm"></fa-icon>
+              </mat-icon>
+            </button>
+          </div>
+        </mat-card-title>
+
+        <mat-card-subtitle>
+          <div fxLayout="row" fxLayout.lt-md="column">
+            <div fxFlex="50%">
+              <table class="account-overview">
+                <tbody>
+                  <tr>
+                    <td>
+                      <b>{{ 'labels.inputs.ID' | translate }}</b>
+                    </td>
+                    <td>{{ locDetails?.id }}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <b>{{ 'labels.inputs.External Id' | translate }}</b>
+                    </td>
+                    <td>
+                      <mifosx-external-identifier
+                        externalId="{{ locDetails?.externalId }}"
+                        completed="true"
+                      ></mifosx-external-identifier>
+                    </td>
+                  </tr>
+                  <tr *ngIf="locDetails?.activationDate">
+                    <td>
+                      <b>{{ 'labels.inputs.Activation Date' | translate }}</b>
+                    </td>
+                    <td>{{ locDetails?.activationDate | dateFormat }}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <b>{{ 'labels.inputs.Type' | translate }}</b>
+                    </td>
+                    <td>
+                      <span
+                        class="type-badge"
+                        [ngClass]="locDetails?.type === 'LOC PAYABLE' ? 'loc-payable' : 'loc-receivable'"
+                      >
+                        {{ locDetails?.type }}
+                      </span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <b>{{ 'labels.inputs.Client' | translate }}</b>
+                    </td>
+                    <td>
+                      <a [routerLink]="['/clients', clientId]">{{ locDetails?.clientName || clientName }}</a>
+                      <span *ngIf="locDetails?.clientAccountNo" style="font-size: 12px; margin-left: 4px">
+                        ({{ locDetails?.clientAccountNo }})
+                      </span>
+                    </td>
+                  </tr>
+                  <tr *ngIf="locDetails?.approvedCreditFacilityAmount">
+                    <td>
+                      <b>{{ 'labels.inputs.Approved Facility' | translate }}</b>
+                    </td>
+                    <td>{{ locDetails?.approvedCreditFacilityAmount | currency: locDetails?.currency || '' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div fxFlex="50%">
+              <table class="account-overview">
+                <tbody>
+                  <tr>
+                    <td>
+                      <b>{{ 'labels.inputs.Credit Limit' | translate }}</b>
+                    </td>
+                    <td>{{ locDetails?.creditLimit | currency: locDetails?.currency || '' }}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <b>{{ 'labels.inputs.Available Balance' | translate }}</b>
+                    </td>
+                    <td class="available">{{ locDetails?.availableBalance | currency: locDetails?.currency || '' }}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <b>{{ 'labels.inputs.Outstanding' | translate }}</b>
+                    </td>
+                    <td class="outstanding">{{ locDetails?.outstanding | currency: locDetails?.currency || '' }}</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <b>{{ 'labels.inputs.Interest Rate' | translate }}</b>
+                    </td>
+                    <td>{{ locDetails?.interestRate }}% p.a.</td>
+                  </tr>
+                  <tr>
+                    <td>
+                      <b>{{ 'labels.inputs.Utilization' | translate }}</b>
+                    </td>
+                    <td>{{ getUtilizationPercentage() }}%</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </mat-card-subtitle>
+      </div>
+
+      <mat-menu #locMenu="matMenu">
+        <button mat-menu-item [routerLink]="['edit']" *mifosxHasPermission="'UPDATE_CREDITLINE'">
+          <mat-icon matListIcon>
+            <fa-icon icon="edit" size="sm"></fa-icon>
+          </mat-icon>
+          <span>{{ 'labels.buttons.Edit' | translate }}</span>
+        </button>
+
+        <button mat-menu-item (click)="doAction('New Drawdown')" *ngIf="canCreateDrawdown()">
+          <mat-icon matListIcon>
+            <fa-icon icon="hand-holding-usd" size="sm"></fa-icon>
+          </mat-icon>
+          <span>{{ 'labels.buttons.New Drawdown' | translate }}</span>
+        </button>
+
+        <button mat-menu-item [matMenuTriggerFor]="Actions">
+          <mat-icon matListIcon>
+            <fa-icon icon="tasks" size="sm"></fa-icon>
+          </mat-icon>
+          <span>{{ 'labels.buttons.Actions' | translate }}</span>
+        </button>
+      </mat-menu>
+
+      <mat-menu #Actions="matMenu">
+        <!-- Actions for SUBMITTED state -->
+        <button mat-menu-item (click)="doAction('Approve')" *ngIf="locDetails?.status === 'SUBMITTED'">
+          <mat-icon matListIcon>
+            <fa-icon icon="check" size="sm"></fa-icon>
+          </mat-icon>
+          {{ 'labels.buttons.Approve' | translate }}
+        </button>
+        <button mat-menu-item (click)="doAction('Close')" *ngIf="locDetails?.status === 'SUBMITTED'">
+          <mat-icon matListIcon>
+            <fa-icon icon="times" size="sm"></fa-icon>
+          </mat-icon>
+          {{ 'labels.buttons.Close' | translate }}
+        </button>
+
+        <!-- Actions for APPROVED state -->
+        <button mat-menu-item (click)="doAction('Activate')" *ngIf="locDetails?.status === 'APPROVED'">
+          <mat-icon matListIcon>
+            <fa-icon icon="play" size="sm"></fa-icon>
+          </mat-icon>
+          {{ 'labels.buttons.Activate' | translate }}
+        </button>
+        <button mat-menu-item (click)="doAction('Close')" *ngIf="locDetails?.status === 'APPROVED'">
+          <mat-icon matListIcon>
+            <fa-icon icon="times" size="sm"></fa-icon>
+          </mat-icon>
+          {{ 'labels.buttons.Close' | translate }}
+        </button>
+
+        <!-- Actions for ACTIVE state -->
+        <button mat-menu-item (click)="doAction('Deactivate')" *ngIf="locDetails?.status === 'ACTIVE'">
+          <mat-icon matListIcon>
+            <fa-icon icon="pause" size="sm"></fa-icon>
+          </mat-icon>
+          {{ 'labels.buttons.Deactivate' | translate }}
+        </button>
+        <button mat-menu-item (click)="doAction('Suspend')" *ngIf="locDetails?.status === 'ACTIVE'">
+          <mat-icon matListIcon>
+            <fa-icon icon="ban" size="sm"></fa-icon>
+          </mat-icon>
+          {{ 'labels.buttons.Suspend' | translate }}
+        </button>
+
+        <!-- Actions for INACTIVE state -->
+        <button mat-menu-item (click)="doAction('Reactivate')" *ngIf="locDetails?.status === 'INACTIVE'">
+          <mat-icon matListIcon>
+            <fa-icon icon="play" size="sm"></fa-icon>
+          </mat-icon>
+          {{ 'labels.buttons.Reactivate' | translate }}
+        </button>
+
+        <!-- Actions for SUSPENDED state -->
+        <button mat-menu-item (click)="doAction('Reactivate')" *ngIf="locDetails?.status === 'SUSPENDED'">
+          <mat-icon matListIcon>
+            <fa-icon icon="play" size="sm"></fa-icon>
+          </mat-icon>
+          {{ 'labels.buttons.Reactivate' | translate }}
+        </button>
+
+        <!-- Common actions for limit changes (available for ACTIVE, INACTIVE, SUSPENDED) -->
+        <button
+          mat-menu-item
+          (click)="doAction('Increase Limit')"
+          *ngIf="
+            locDetails?.status === 'ACTIVE' || locDetails?.status === 'INACTIVE' || locDetails?.status === 'SUSPENDED'
+          "
+        >
+          <mat-icon matListIcon>
+            <fa-icon icon="arrow-up" size="sm"></fa-icon>
+          </mat-icon>
+          {{ 'labels.buttons.Increase Limit' | translate }}
+        </button>
+        <button
+          mat-menu-item
+          (click)="doAction('Decrease Limit')"
+          *ngIf="
+            locDetails?.status === 'ACTIVE' || locDetails?.status === 'INACTIVE' || locDetails?.status === 'SUSPENDED'
+          "
+        >
+          <mat-icon matListIcon>
+            <fa-icon icon="arrow-down" size="sm"></fa-icon>
+          </mat-icon>
+          {{ 'labels.buttons.Decrease Limit' | translate }}
+        </button>
+
+        <!-- Fallback action - always show View Details if no other actions are available -->
+        <button
+          mat-menu-item
+          (click)="doAction('View Details')"
+          *ngIf="locDetails?.status === 'CLOSED' || !locDetails?.status"
+        >
+          <mat-icon matListIcon>
+            <fa-icon icon="eye" size="sm"></fa-icon>
+          </mat-icon>
+          {{ 'labels.buttons.View Details' | translate }}
+        </button>
+      </mat-menu>
+    </mat-card-title-group>
+  </mat-card-header>
+
+  <mat-card-content>
+    <!-- Credit Details Section -->
+    <div class="details-section" fxLayout="row" fxLayoutGap="16px" fxLayout.lt-md="column">
+      <div fxFlex="60%" fxFlex.lt-md="100%">
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>{{ 'labels.inputs.Credit Utilization' | translate }}</mat-card-title>
+            <mat-card-subtitle
+              >{{ getUtilizationPercentage() }}% {{ 'labels.inputs.utilized' | translate }}</mat-card-subtitle
+            >
+          </mat-card-header>
+          <mat-card-content>
+            <div
+              fxLayout="row"
+              fxLayoutAlign="start center"
+              fxLayoutGap="32px"
+              fxLayout.lt-md="column"
+              fxLayoutGap.lt-md="24px"
+            >
+              <div class="utilization-chart" fxFlex="35">
+                <svg width="160" height="160" viewBox="0 0 40 40">
+                  <circle class="chart-background" cx="20" cy="20" r="15.9155" stroke-width="4"></circle>
+                  <circle
+                    class="chart-value"
+                    cx="20"
+                    cy="20"
+                    r="15.9155"
+                    stroke-width="4"
+                    [style.stroke-dasharray]="circumference"
+                    [style.stroke-dashoffset]="strokeDashoffset"
+                  ></circle>
+                </svg>
+                <div class="chart-text">
+                  <span class="chart-percent">{{ getUtilizationPercentage() }}%</span>
+                  <span class="chart-label">Utilized</span>
+                </div>
+              </div>
+              <div class="utilization-details" fxFlex="65">
+                <div class="detail-row">
+                  <span class="detail-label">{{ 'labels.inputs.Interest rate' | translate }}:</span>
+                  <span class="detail-value"
+                    ><strong>{{ locDetails?.annualInterestRate || locDetails?.interestRate }}% p.a.</strong></span
+                  >
+                </div>
+                <div class="detail-row" *ngIf="locDetails?.tenorDays">
+                  <span class="detail-label">{{ 'labels.inputs.Tenor (Days)' | translate }}:</span>
+                  <span class="detail-value"
+                    ><strong>{{ locDetails?.tenorDays }} days</strong></span
+                  >
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">{{ 'labels.inputs.Available Balance' | translate }}:</span>
+                  <span class="detail-value available-balance"
+                    ><strong>{{ locDetails?.availableBalance | currency: locDetails?.currency || '' }}</strong></span
+                  >
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">{{ 'labels.inputs.Outstanding Amount' | translate }}:</span>
+                  <span class="detail-value outstanding-amount"
+                    ><strong>{{ locDetails?.outstanding | currency: locDetails?.currency || '' }}</strong></span
+                  >
+                </div>
+                <div class="detail-row" *ngIf="locDetails?.avgUtilization">
+                  <span class="detail-label">{{ 'labels.inputs.Avg. utilization' | translate }}:</span>
+                  <span class="detail-value"
+                    ><strong>{{ locDetails?.avgUtilization | currency: locDetails?.currency || '' }}</strong></span
+                  >
+                </div>
+                <div class="detail-row" *ngIf="locDetails?.totalRepaid">
+                  <span class="detail-label">{{ 'labels.inputs.Total Repaid' | translate }}:</span>
+                  <span class="detail-value repaid-amount"
+                    ><strong>{{ locDetails?.totalRepaid | currency: locDetails?.currency || '' }}</strong></span
+                  >
+                </div>
+                <div class="detail-row" *ngIf="locDetails?.performance">
+                  <span class="detail-label">{{ 'labels.inputs.Performance' | translate }}:</span>
+                  <span class="detail-value performance"
+                    ><strong>{{ locDetails?.performance }}</strong></span
+                  >
+                </div>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+
+      <div fxFlex="40%" fxFlex.lt-md="100%">
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>{{ 'labels.inputs.Client Details' | translate }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="client-details">
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Company' | translate }}</span>
+                <span class="detail-value">{{ locDetails?.clientCompanyName || '-' }}</span>
+              </div>
+              <div class="detail-row" *ngIf="locDetails?.officeName">
+                <span class="detail-label">{{ 'labels.inputs.Office' | translate }}</span>
+                <span class="detail-value">{{ locDetails?.officeName }}</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Contact' | translate }}</span>
+                <span class="detail-value">
+                  {{ locDetails?.clientContactPersonName || '-' }}
+                  <span *ngIf="locDetails?.clientContactPersonPhone" style="color: #666; font-size: 12px">
+                    <br />({{ locDetails?.clientContactPersonPhone }})
+                  </span>
+                </span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Email' | translate }}</span>
+                <span class="detail-value">
+                  <a
+                    *ngIf="locDetails?.clientContactPersonEmail"
+                    [href]="'mailto:' + locDetails?.clientContactPersonEmail"
+                    style="color: #1976d2; text-decoration: none"
+                  >
+                    {{ locDetails?.clientContactPersonEmail }}
+                  </a>
+                  <span *ngIf="!locDetails?.clientContactPersonEmail" style="color: #999">-</span>
+                </span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Signatory' | translate }}</span>
+                <span class="detail-value">
+                  {{ locDetails?.authorizedSignatoryName || '-' }}
+                  <span *ngIf="locDetails?.authorizedSignatoryPhone" style="color: #666; font-size: 12px">
+                    <br />({{ locDetails?.authorizedSignatoryPhone }})
+                  </span>
+                </span>
+              </div>
+              <div class="detail-row" *ngIf="locDetails?.authorizedSignatoryEmail">
+                <span class="detail-label">{{ 'labels.inputs.Signatory Email' | translate }}</span>
+                <span class="detail-value">
+                  <a
+                    [href]="'mailto:' + locDetails?.authorizedSignatoryEmail"
+                    style="color: #1976d2; text-decoration: none"
+                  >
+                    {{ locDetails?.authorizedSignatoryEmail }}
+                  </a>
+                </span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.VA' | translate }}</span>
+                <span class="detail-value">{{ locDetails?.va || '-' }}</span>
+              </div>
+              <div class="detail-row" *ngIf="locDetails?.specialConditions">
+                <span class="detail-label">{{ 'labels.inputs.Special Conditions' | translate }}</span>
+                <span class="detail-value" style="font-style: italic; color: #555">
+                  "{{ locDetails?.specialConditions }}"
+                </span>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </div>
+
+    <!-- Additional Details Section -->
+    <div class="details-section" fxLayout="row" fxLayoutGap="16px" fxLayout.lt-md="column" style="margin-top: 16px">
+      <!-- Terms & Settlement Details -->
+      <div fxFlex="33%" fxFlex.lt-md="100%">
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>{{ 'labels.inputs.Terms & Settlement' | translate }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="detail-row" *ngIf="locDetails?.currency">
+              <span class="detail-label">{{ 'labels.inputs.Currency' | translate }}:</span>
+              <span class="detail-value currency"
+                ><strong>{{ locDetails?.currency }}</strong></span
+              >
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">{{ 'labels.inputs.Tenor (Days)' | translate }}:</span>
+              <span class="detail-value" [ngClass]="{ missing: !locDetails?.tenorDays }">
+                <strong *ngIf="locDetails?.tenorDays; else noTenor">{{ locDetails?.tenorDays }} days</strong>
+                <ng-template #noTenor>
+                  <em style="color: #999; font-size: 12px">Not specified</em>
+                </ng-template>
+              </span>
+            </div>
+            <div class="detail-row" *ngIf="locDetails?.nextReviewDate">
+              <span class="detail-label">{{ 'labels.inputs.Next Review Date' | translate }}:</span>
+              <span class="detail-value">{{ locDetails?.nextReviewDate | dateFormat }}</span>
+            </div>
+            <div class="settlement-section" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0">
+              <h4 style="margin: 0 0 12px 0; color: #666; font-size: 14px; font-weight: 500">
+                Settlement Account
+                <span *ngIf="locDetails?.settlementSavingsAccountId" style="font-size: 11px; color: #4caf50"
+                  >(ID: {{ locDetails.settlementSavingsAccountId }})</span
+                >
+              </h4>
+              <div
+                *ngIf="
+                  locDetails?.settlementSavingsAccountNo || locDetails?.settlementSavingsAccountBalance !== null;
+                  else noSettlementAccount
+                "
+              >
+                <div class="detail-row">
+                  <span class="detail-label">{{ 'labels.inputs.Account No' | translate }}:</span>
+                  <span class="detail-value">{{ locDetails?.settlementSavingsAccountNo || 'Not specified' }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">{{ 'labels.inputs.Balance' | translate }}:</span>
+                  <span
+                    class="detail-value"
+                    *ngIf="locDetails?.settlementSavingsAccountBalance !== null; else noBalance"
+                  >
+                    <strong
+                      [ngClass]="{
+                        positive: locDetails.settlementSavingsAccountBalance > 0,
+                        negative: locDetails.settlementSavingsAccountBalance < 0
+                      }"
+                    >
+                      {{ locDetails?.settlementSavingsAccountBalance | currency: locDetails?.currency || '' }}
+                    </strong>
+                  </span>
+                  <ng-template #noBalance>
+                    <span style="color: #999; font-style: italic; font-size: 12px">Balance not available</span>
+                  </ng-template>
+                </div>
+              </div>
+              <ng-template #noSettlementAccount>
+                <div
+                  style="
+                    text-align: center;
+                    padding: 16px;
+                    color: #999;
+                    background: #fafafa;
+                    border-radius: 8px;
+                    border: 1px dashed #ddd;
+                  "
+                >
+                  <span style="font-style: italic; font-size: 13px">No settlement account configured</span>
+                </div>
+              </ng-template>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+
+      <!-- Approved Buyers & Business Info -->
+      <div fxFlex="33%" fxFlex.lt-md="100%">
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>{{ 'labels.inputs.Business Information' | translate }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="approved-buyers-section">
+              <h4 style="margin: 0 0 12px 0; color: #666; font-size: 14px; font-weight: 500">
+                Approved Buyers List
+                <span style="font-size: 11px; color: #999"
+                  >({{ locDetails?.approvedBuyersList?.length || 0 }} buyers)</span
+                >
+              </h4>
+              <div *ngIf="locDetails?.approvedBuyersList?.length; else noBuyers">
+                <div
+                  class="buyers-grid"
+                  style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px"
+                >
+                  <div
+                    *ngFor="let buyer of locDetails?.approvedBuyersList"
+                    class="buyer-item"
+                    style="
+                      background: #e3f2fd;
+                      padding: 8px 12px;
+                      border-radius: 12px;
+                      font-size: 13px;
+                      text-align: center;
+                      color: #1976d2;
+                      border: 1px solid #bbdefb;
+                    "
+                  >
+                    {{ buyer }}
+                  </div>
+                </div>
+              </div>
+              <ng-template #noBuyers>
+                <div
+                  style="
+                    text-align: center;
+                    padding: 20px;
+                    color: #999;
+                    background: #fafafa;
+                    border-radius: 8px;
+                    border: 1px dashed #ddd;
+                  "
+                >
+                  <span style="font-style: italic; font-size: 13px">No approved buyers configured</span>
+                </div>
+              </ng-template>
+            </div>
+            <div
+              class="status-info"
+              style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0"
+              *ngIf="locDetails?.status"
+            >
+              <h4 style="margin: 0 0 12px 0; color: #666; font-size: 14px; font-weight: 500">Status Information</h4>
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Current Status' | translate }}:</span>
+                <span class="detail-value">
+                  <span class="status-badge" [ngClass]="'status-' + locDetails?.status?.toLowerCase()">
+                    {{ locDetails?.status }}
+                  </span>
+                </span>
+              </div>
+              <div class="detail-row" *ngIf="locDetails?.activationDate">
+                <span class="detail-label">{{ 'labels.inputs.Activation Date' | translate }}:</span>
+                <span class="detail-value">{{ locDetails?.activationDate | dateFormat }}</span>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+
+      <!-- Charges & Audit Trail -->
+      <div fxFlex="34%" fxFlex.lt-md="100%">
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>{{ 'labels.inputs.Charges & Audit Trail' | translate }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="charges-section" *ngIf="chargesSummary || locDetails?.charges?.length; else noCharges">
+              <div class="charges-summary">
+                <div class="summary-item">
+                  <span class="label">Total Charges:</span>
+                  <strong class="amount">{{ getTotalChargesAmount() | currency: locDetails?.currency || '' }}</strong>
+                </div>
+                <div class="summary-item">
+                  <span class="label">Amount Paid:</span>
+                  <strong class="amount">{{ getTotalPaidAmount() | currency: locDetails?.currency || '' }}</strong>
+                </div>
+                <div class="summary-item">
+                  <span class="label">Amount Waived:</span>
+                  <strong class="amount">{{ getTotalWaivedAmount() | currency: locDetails?.currency || '' }}</strong>
+                </div>
+                <div class="summary-item outstanding">
+                  <span class="label">Outstanding:</span>
+                  <strong class="amount">{{
+                    getTotalOutstandingAmount() | currency: locDetails?.currency || ''
+                  }}</strong>
+                </div>
+              </div>
+            </div>
+            <ng-template #noCharges>
+              <div style="text-align: center; padding: 20px; color: #999; font-style: italic">
+                No charges configured
+              </div>
+            </ng-template>
+
+            <div class="audit-section">
+              <h4>Audit Trail</h4>
+              <div class="audit-timeline">
+                <div class="audit-item" *ngIf="locDetails?.createdDate">
+                  <div>
+                    <strong>Created</strong>
+                    <span>{{ locDetails?.createdDate | dateFormat }}</span>
+                    <span *ngIf="locDetails?.createdByUsername"> by {{ locDetails?.createdByUsername }} </span>
+                  </div>
+                </div>
+                <div class="audit-item" *ngIf="locDetails?.lastModifiedDate">
+                  <div>
+                    <strong>Last Modified</strong>
+                    <span>{{ locDetails?.lastModifiedDate | dateFormat }}</span>
+                    <span *ngIf="locDetails?.lastModifiedByUsername">
+                      by {{ locDetails?.lastModifiedByUsername }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </div>
+
+    <!-- Tabs Section -->
+    <nav mat-tab-nav-bar class="navigation-tabs">
+      <a
+        mat-tab-link
+        [routerLink]="['./active-loans']"
+        routerLinkActive
+        #activeLoans="routerLinkActive"
+        [active]="activeLoans.isActive"
+      >
+        {{ 'labels.inputs.Draw Downs' | translate }}
+      </a>
+      <a
+        mat-tab-link
+        [routerLink]="['./transactions']"
+        routerLinkActive
+        #transactions="routerLinkActive"
+        [active]="transactions.isActive"
+      >
+        {{ 'labels.inputs.Transaction History' | translate }}
+      </a>
+      <a
+        mat-tab-link
+        [routerLink]="['./charges']"
+        routerLinkActive
+        #charges="routerLinkActive"
+        [active]="charges.isActive"
+      >
+        {{ 'labels.inputs.Charges' | translate }}
+      </a>
+    </nav>
+
+    <router-outlet></router-outlet>
+  </mat-card-content>
+</mat-card>
