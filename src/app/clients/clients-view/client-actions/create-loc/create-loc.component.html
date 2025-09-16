@@ -476,8 +476,14 @@
                 Previous
               </button>
               <button type="button" mat-raised-button (click)="cancel()">Cancel</button>
-              <button type="button" mat-raised-button color="primary" (click)="confirm()" [disabled]="!locForm.valid">
-                Confirm & Create
+              <button
+                type="button"
+                mat-raised-button
+                color="primary"
+                (click)="confirm()"
+                [disabled]="!locForm.valid || isSubmitting"
+              >
+                {{ isSubmitting ? 'Creating...' : 'Confirm & Create' }}
               </button>
             </div>
             <div *ngIf="creationError" class="error-message" style="margin-top: 12px">

@@ -1168,6 +1168,8 @@
       "Principal Amount": "Principal Amount"
     },
     "inputs": {
+      "Signatory Email": "Signatory Email",
+      "Select Line of Credit": "Select Line Of Credit",
       "Special Conditions": "Special Conditions",
       "Current Status": "Current Status",
       "Tenor (Days)": "Tenor (Days)",

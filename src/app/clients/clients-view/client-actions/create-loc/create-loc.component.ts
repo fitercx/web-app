@@ -39,6 +39,7 @@ export class CreateLocComponent implements OnInit {
   reviewPeriodsOptions: any[] = [];
   activationStatusOptions: any[] = [];
   creationError: string | null = null;
+  isSubmitting = false;
   // Settlement account options (client savings)
   savingsAccounts: any[] = [];
 
@@ -363,7 +364,13 @@ export class CreateLocComponent implements OnInit {
   }
 
   submit() {
+    // Prevent double submission
+    if (this.isSubmitting) {
+      return;
+    }
+
     if (this.locForm.valid) {
+      this.isSubmitting = true;
       // Flatten the nested groups into a single payload
       const value: any = this.locForm.value;
       const payload = {
@@ -460,6 +467,7 @@ export class CreateLocComponent implements OnInit {
       this.creationError = null;
       this.clientsService.createClientCreditLine(this.clientId, payload).subscribe(
         (response: any) => {
+          this.isSubmitting = false;
           const resourceId = response?.resourceId || response?.id || response?.creditLineId;
           // Navigate to the existing LOC view route (clients/:clientId/loc/:locId)
           this.router.navigate([
@@ -470,6 +478,7 @@ export class CreateLocComponent implements OnInit {
           ]);
         },
         (err: any) => {
+          this.isSubmitting = false;
           // Do not navigate on error. Surface error to UI via creationError.
           console.error('Create LOC failed', err);
           this.creationError = err?.error?.developerMessage || err?.message || 'Failed to create line of credit';
