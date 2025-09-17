@@ -127,7 +127,7 @@
       <mat-label>{{ 'labels.inputs.Select Line of Credit' | translate }}</mat-label>
       <mat-select formControlName="lineOfCreditId" [required]="isLocEnabled">
         <mat-option *ngFor="let locOption of lineOfCreditOptions" [value]="locOption.id">
-          {{ locOption.externalId }}
+          {{ locOption.externalId }} - {{ locOption.productType }}
         </mat-option>
       </mat-select>
       <mat-error *ngIf="loansAccountDetailsForm.get('lineOfCreditId')?.hasError('required')">
