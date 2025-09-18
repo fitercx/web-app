@@ -317,6 +317,14 @@
                   >
                 </mat-form-field>
               </div>
+
+              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
+                <mat-form-field fxFlex>
+                  <mat-label>Review Period</mat-label>
+                  <input matInput formControlName="review_period" placeholder="Enter review period" />
+                </mat-form-field>
+                <div fxFlex></div>
+              </div>
             </div>
 
             <mifosx-stepper-buttons></mifosx-stepper-buttons>
@@ -562,6 +570,11 @@
                         : ''
                   }}</span
                 >
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Review Period</span>
+                <span fxFlex="60%">{{ previewPayload.review_period || '—' }}</span>
               </div>
 
               <!-- Fees & Settings section removed as per requirement -->

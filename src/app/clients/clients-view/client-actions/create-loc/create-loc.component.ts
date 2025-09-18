@@ -307,6 +307,7 @@ export class CreateLocComponent implements OnInit {
           advancePercentage: ['100'],
           cashMarginType: ['FLAT'],
           cashMarginValue: [''],
+          review_period: [''],
           loanOfficer: [
             '',
             Validators.required
