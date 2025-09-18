@@ -72,6 +72,24 @@ export class CreateLocComponent implements OnInit {
     return '';
   }
 
+  // Return the appropriate label for buyers/suppliers based on product type
+  get buyerSupplierLabel(): string {
+    const productType = this.locForm?.get([
+      'basicInfo',
+      'productType'
+    ])?.value;
+    return productType === 'payable' ? 'Supplier' : 'Buyer';
+  }
+
+  // Return the appropriate label for approved buyers/suppliers based on product type
+  get approvedBuyerSupplierLabel(): string {
+    const productType = this.locForm?.get([
+      'basicInfo',
+      'productType'
+    ])?.value;
+    return productType === 'payable' ? 'Approved Supplier' : 'Approved Buyer';
+  }
+
   // Savings accounts filtered by the currently selected currency code
   get filteredSavingsAccounts(): any[] {
     const code = this.selectedCurrencyCode;
@@ -110,6 +128,7 @@ export class CreateLocComponent implements OnInit {
       ])
       ?.valueChanges.subscribe((val) => {
         this.computeInterimReviewDate();
+        this.computeExpiryDate();
       });
 
     // Resolve charges (fetched via resolver) and keep only LOC applicable (chargeAppliesTo.id === 5)
@@ -172,6 +191,16 @@ export class CreateLocComponent implements OnInit {
 
     // Watch settlement account changes
     this.locForm.get('settlementSavingsAccountId')?.valueChanges.subscribe(() => this.onSettlementAccountChanged());
+
+    // Watch product type changes to update advance percentage
+    this.locForm
+      .get([
+        'basicInfo',
+        'productType'
+      ])
+      ?.valueChanges.subscribe((productType) => {
+        this.updateAdvancePercentage(productType);
+      });
   }
 
   /** Safely extract array of charges from various backend response shapes */
@@ -270,8 +299,22 @@ export class CreateLocComponent implements OnInit {
           expiryDate: [''],
           reviewPeriod: [''],
           interimReviewDate: [{ value: '', disabled: true }],
+          rateType: ['FLAT'],
+          interestPaymentType: ['POST_DISBURSEMENT'],
           annualInterestRate: [''],
-          tenorDays: ['']
+          latePaymentFee: [''],
+          tenorDays: [''],
+          advancePercentage: ['100'],
+          cashMarginType: ['FLAT'],
+          cashMarginValue: [''],
+          loanOfficer: [
+            '',
+            Validators.required
+          ],
+          repaymentStrategy: [
+            '',
+            Validators.required
+          ]
         },
         { validators: this.maxPerDrawdownValidator }
       ),
@@ -279,6 +322,12 @@ export class CreateLocComponent implements OnInit {
       // Root-level control for settlement account selection (drives visibility of charges UI)
       settlementSavingsAccountId: ['']
     });
+
+    // Set initial expiry date based on default start date
+    this.computeExpiryDate();
+
+    // Set initial advance percentage based on default product type
+    this.updateAdvancePercentage('payable');
   }
 
   selectProductType(type: string) {
@@ -309,6 +358,41 @@ export class CreateLocComponent implements OnInit {
       control?.setValue(d.toISOString().slice(0, 10));
     } else {
       control?.setValue('');
+    }
+  }
+
+  // Compute expiry date as 1 year after start date to be default but editable
+  computeExpiryDate() {
+    const startDate = this.locForm.get([
+      'limitsTerms',
+      'startDate'
+    ])?.value;
+    const expiryControl = this.locForm.get([
+      'limitsTerms',
+      'expiryDate'
+    ]);
+
+    if (startDate) {
+      const start = new Date(startDate);
+      const expiry = new Date(start);
+      expiry.setFullYear(expiry.getFullYear() + 1);
+      expiryControl?.setValue(expiry.toISOString().slice(0, 10));
+    } else {
+      expiryControl?.setValue('');
+    }
+  }
+
+  // Update advance percentage based on product type
+  updateAdvancePercentage(productType: string) {
+    const advancePercentageControl = this.locForm.get([
+      'limitsTerms',
+      'advancePercentage'
+    ]);
+
+    if (productType === 'payable') {
+      advancePercentageControl?.setValue('100');
+    } else if (productType === 'receivable') {
+      advancePercentageControl?.setValue('90');
     }
   }
 

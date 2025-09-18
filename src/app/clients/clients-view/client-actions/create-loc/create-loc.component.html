@@ -123,11 +123,11 @@
               </mat-form-field>
               <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="12px" fxLayoutAlign="start center">
                 <mat-form-field fxFlex>
-                  <mat-label>Add Approved Buyer</mat-label>
+                  <mat-label>Add {{ approvedBuyerSupplierLabel }}</mat-label>
                   <input
                     matInput
                     formControlName="vendorName"
-                    placeholder="Type approved buyer name and click Add"
+                    [placeholder]="'Type approved ' + buyerSupplierLabel.toLowerCase() + ' name and click Add'"
                     (keyup.enter)="addVendor()"
                   />
                   <mat-hint>Press Enter or click Add to append</mat-hint>
@@ -138,7 +138,7 @@
                 </button>
               </div>
               <div *ngIf="vendorsArray.length === 0" class="mat-body-2" style="opacity: 0.7">
-                No approved buyer added yet.
+                No approved {{ buyerSupplierLabel.toLowerCase() }} added yet.
               </div>
               <mat-chip-list *ngIf="vendorsArray.length > 0" aria-label="Vendors list">
                 <mat-chip
@@ -147,11 +147,13 @@
                   (removed)="removeVendor(i)"
                 >
                   {{ v.value?.name }}
-                  <button matChipRemove aria-label="Remove Approved Buyer"><mat-icon>cancel</mat-icon></button>
+                  <button matChipRemove [attr.aria-label]="'Remove ' + approvedBuyerSupplierLabel">
+                    <mat-icon>cancel</mat-icon>
+                  </button>
                 </mat-chip>
               </mat-chip-list>
               <div *ngIf="vendorsArray.length > 0" class="mat-caption" style="margin-top: 8px">
-                Total Approved Buyers: {{ vendorsArray.length }}
+                Total Approved {{ buyerSupplierLabel }}s: {{ vendorsArray.length }}
               </div>
             </div>
             <mifosx-stepper-buttons></mifosx-stepper-buttons>
@@ -224,13 +226,95 @@
 
               <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
                 <mat-form-field fxFlex>
+                  <mat-label>Rate Type</mat-label>
+                  <mat-select formControlName="rateType">
+                    <mat-option value="FLAT">Flat</mat-option>
+                    <mat-option value="REDUCING">Reducing</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field fxFlex>
+                  <mat-label>Interest Payment Type</mat-label>
+                  <mat-select formControlName="interestPaymentType">
+                    <mat-option value="UPFRONT">Upfront</mat-option>
+                    <mat-option value="POST_DISBURSEMENT">Post Disbursement</mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
+                <mat-form-field fxFlex>
                   <mat-label>Annual Interest Rate</mat-label>
                   <input matInput type="number" formControlName="annualInterestRate" placeholder="0.00" step="0.01" />
                   <span matSuffix>%</span>
                 </mat-form-field>
                 <mat-form-field fxFlex>
+                  <mat-label>Late Payment Fee</mat-label>
+                  <input matInput type="number" formControlName="latePaymentFee" placeholder="0.00" step="0.01" />
+                  <span matSuffix>%</span>
+                </mat-form-field>
+              </div>
+
+              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
+                <mat-form-field fxFlex>
                   <mat-label>Tenor in Days</mat-label>
                   <input matInput type="number" formControlName="tenorDays" placeholder="e.g. 365" />
+                </mat-form-field>
+                <mat-form-field fxFlex>
+                  <mat-label>Advance Percentage</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    formControlName="advancePercentage"
+                    placeholder="0.00"
+                    step="0.01"
+                    min="0"
+                    max="100"
+                  />
+                  <span matSuffix>%</span>
+                </mat-form-field>
+              </div>
+
+              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
+                <mat-form-field fxFlex>
+                  <mat-label>Cash Margin Type</mat-label>
+                  <mat-select formControlName="cashMarginType">
+                    <mat-option value="FLAT">Flat</mat-option>
+                    <mat-option value="PERCENTAGE">Percentage</mat-option>
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field fxFlex>
+                  <mat-label>Cash Margin Value</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    formControlName="cashMarginValue"
+                    placeholder="0.00"
+                    step="0.01"
+                    min="0"
+                  />
+                  <span matSuffix *ngIf="locForm.get(['limitsTerms', 'cashMarginType'])?.value === 'PERCENTAGE'"
+                    >%</span
+                  >
+                  <span matSuffix *ngIf="locForm.get(['limitsTerms', 'cashMarginType'])?.value === 'FLAT'">{{
+                    selectedCurrencyCode || ''
+                  }}</span>
+                </mat-form-field>
+              </div>
+
+              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
+                <mat-form-field fxFlex>
+                  <mat-label>Loan Officer *</mat-label>
+                  <input matInput formControlName="loanOfficer" placeholder="Enter loan officer name" required />
+                  <mat-error *ngIf="locForm.get(['limitsTerms', 'loanOfficer'])?.hasError('required')"
+                    >Loan Officer is required.</mat-error
+                  >
+                </mat-form-field>
+                <mat-form-field fxFlex>
+                  <mat-label>Repayment Strategy *</mat-label>
+                  <input matInput formControlName="repaymentStrategy" placeholder="Enter repayment strategy" required />
+                  <mat-error *ngIf="locForm.get(['limitsTerms', 'repaymentStrategy'])?.hasError('required')"
+                    >Repayment Strategy is required.</mat-error
+                  >
                 </mat-form-field>
               </div>
             </div>
@@ -453,6 +537,31 @@
               <div fxFlexFill>
                 <span fxFlex="40%">Tenor (Days)</span>
                 <span fxFlex="60%">{{ previewPayload.tenorDays || '—' }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Cash Margin Type</span>
+                <span fxFlex="60%">{{
+                  previewPayload.cashMarginType === 'FLAT'
+                    ? 'Flat'
+                    : previewPayload.cashMarginType === 'PERCENTAGE'
+                      ? 'Percentage'
+                      : '—'
+                }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Cash Margin Value</span>
+                <span fxFlex="60%"
+                  >{{ previewPayload.cashMarginValue || '—'
+                  }}{{
+                    previewPayload.cashMarginType === 'PERCENTAGE' && previewPayload.cashMarginValue
+                      ? '%'
+                      : previewPayload.cashMarginType === 'FLAT' && previewPayload.cashMarginValue
+                        ? ' ' + (selectedCurrencyCode || '')
+                        : ''
+                  }}</span
+                >
               </div>
 
               <!-- Fees & Settings section removed as per requirement -->
