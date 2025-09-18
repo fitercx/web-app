@@ -120,6 +120,7 @@ export class EditLocComponent implements OnInit {
       ])
       ?.valueChanges.subscribe((val) => {
         this.computeInterimReviewDate();
+        this.computeExpiryDate();
       });
 
     // Update available charges when currency changes
@@ -132,6 +133,16 @@ export class EditLocComponent implements OnInit {
 
     // Watch settlement account changes
     this.locForm.get('settlementSavingsAccountId')?.valueChanges.subscribe(() => this.onSettlementAccountChanged());
+
+    // Watch product type changes to update advance percentage
+    this.locForm
+      .get([
+        'basicInfo',
+        'productType'
+      ])
+      ?.valueChanges.subscribe((productType) => {
+        this.updateAdvancePercentage(productType);
+      });
 
     // Mock fetching client data
     of({ id: this.clientId, displayName: 'John Doe' })
@@ -341,13 +352,28 @@ export class EditLocComponent implements OnInit {
           expiryDate: [''],
           reviewPeriod: [''],
           interimReviewDate: [{ value: '', disabled: true }],
+          rateType: ['FLAT'],
+          interestPaymentType: ['POST_DISBURSEMENT'],
           annualInterestRate: [''],
-          tenorDays: ['']
+          latePaymentFee: [''],
+          tenorDays: [''],
+          advancePercentage: ['100'],
+          loanOfficer: [
+            '',
+            Validators.required
+          ],
+          repaymentStrategy: [
+            '',
+            Validators.required
+          ]
         },
         { validators: this.maxPerDrawdownValidator }
       ),
       settlementSavingsAccountId: ['']
     });
+
+    // Set initial advance percentage based on default product type
+    this.updateAdvancePercentage('payable');
   }
 
   selectProductType(type: string) {
@@ -378,6 +404,41 @@ export class EditLocComponent implements OnInit {
       control?.setValue(d.toISOString().slice(0, 10));
     } else {
       control?.setValue('');
+    }
+  }
+
+  // Compute expiry date as 1 year after start date
+  computeExpiryDate() {
+    const startDate = this.locForm.get([
+      'limitsTerms',
+      'startDate'
+    ])?.value;
+    const expiryControl = this.locForm.get([
+      'limitsTerms',
+      'expiryDate'
+    ]);
+
+    if (startDate) {
+      const start = new Date(startDate);
+      const expiry = new Date(start);
+      expiry.setFullYear(expiry.getFullYear() + 1);
+      expiryControl?.setValue(expiry.toISOString().slice(0, 10));
+    } else {
+      expiryControl?.setValue('');
+    }
+  }
+
+  // Update advance percentage based on product type
+  updateAdvancePercentage(productType: string) {
+    const advancePercentageControl = this.locForm.get([
+      'limitsTerms',
+      'advancePercentage'
+    ]);
+
+    if (productType === 'payable') {
+      advancePercentageControl?.setValue('100');
+    } else if (productType === 'receivable') {
+      advancePercentageControl?.setValue('90');
     }
   }
 
