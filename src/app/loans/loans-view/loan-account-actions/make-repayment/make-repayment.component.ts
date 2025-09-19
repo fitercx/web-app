@@ -144,9 +144,9 @@ export class MakeRepaymentComponent implements OnInit {
     this.loanService.getLoanPenaltiesTemplate(this.loanId, transactionDate).subscribe((template) => {
       this.dataObject.penaltyTemplate = template;
 
-      // Calculate the total transaction amount
-      const principalAmount = template.principalAmountDue || 0;
-      const interestAmount = template.interestAmountDue || 0;
+      // Calculate the total transaction amount using the correct property names
+      const principalAmount = template.principalOutstanding || 0;
+      const interestAmount = template.interestOutstanding || 0;
       const feesAmount = this.dataObject.repaymentTemplate.feeChargesPortion || 0;
       const penaltyAmount = template.penaltyAmountDue || 0;
 
