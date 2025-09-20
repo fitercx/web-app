@@ -660,9 +660,59 @@ export class LoansService {
     loansAccountData.allowPartialPeriodInterestCalcualtion = loansAccountData.allowPartialPeriodInterestCalculation;
     delete loansAccountData.allowPartialPeriodInterestCalculation;
 
-    if (loansAccount.lineOfCreditId) {
+    if (loansAccount.lineOfCreditId && loansAccount.lineOfCreditId !== '') {
       loansAccountData.lineOfCreditId = loansAccount.lineOfCreditId;
+    } else {
+      delete loansAccountData.lineOfCreditId;
     }
+
+    // Handle LOC Details fields (they come flattened at root level)
+    if (loansAccount.invoiceNo) {
+      loansAccountData.invoiceNo = loansAccount.invoiceNo;
+    }
+    if (loansAccount.invoiceDate) {
+      loansAccountData.invoiceDate = this.dateUtils.formatDate(loansAccount.invoiceDate, dateFormat);
+    }
+    if (loansAccount.invoiceDueDate) {
+      loansAccountData.invoiceDueDate = this.dateUtils.formatDate(loansAccount.invoiceDueDate, dateFormat);
+    }
+    if (loansAccount.invoiceAmount !== undefined && loansAccount.invoiceAmount !== null) {
+      loansAccountData.invoiceAmount = loansAccount.invoiceAmount;
+    }
+    if (loansAccount.invoiceCurrency) {
+      loansAccountData.invoiceCurrency = loansAccount.invoiceCurrency;
+    }
+    if (loansAccount.disapprovedAmount !== undefined && loansAccount.disapprovedAmount !== null) {
+      loansAccountData.disapprovedAmount = loansAccount.disapprovedAmount;
+    }
+    if (loansAccount.approvedReceivableAmount !== undefined && loansAccount.approvedReceivableAmount !== null) {
+      loansAccountData.approvedReceivableAmount = loansAccount.approvedReceivableAmount;
+    }
+    if (loansAccount.advancePercentage !== undefined && loansAccount.advancePercentage !== null) {
+      loansAccountData.advancePercentage = loansAccount.advancePercentage;
+    }
+    if (loansAccount.amountAfterAdvance !== undefined && loansAccount.amountAfterAdvance !== null) {
+      loansAccountData.amountAfterAdvance = loansAccount.amountAfterAdvance;
+    }
+    if (loansAccount.buyerDetails) {
+      loansAccountData.buyerDetails = loansAccount.buyerDetails;
+    }
+    if (loansAccount.exchangeRate !== undefined && loansAccount.exchangeRate !== null) {
+      loansAccountData.exchangeRate = loansAccount.exchangeRate;
+    }
+    if (loansAccount.markup !== undefined && loansAccount.markup !== null) {
+      loansAccountData.markup = loansAccount.markup;
+    }
+    if (loansAccount.amountInFacilityCurrency !== undefined && loansAccount.amountInFacilityCurrency !== null) {
+      loansAccountData.amountInFacilityCurrency = loansAccount.amountInFacilityCurrency;
+    }
+    if (loansAccount.approvedPayableAmount !== undefined && loansAccount.approvedPayableAmount !== null) {
+      loansAccountData.approvedPayableAmount = loansAccount.approvedPayableAmount;
+    }
+    if (loansAccount.supplierDetails) {
+      loansAccountData.supplierDetails = loansAccount.supplierDetails;
+    }
+
     return loansAccountData;
   }
 }

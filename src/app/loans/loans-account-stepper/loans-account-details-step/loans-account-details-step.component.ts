@@ -115,7 +115,8 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
           externalId: this.loansAccountTemplate.externalId,
           linkAccountId: this.loansAccountTemplate.linkAccountId,
           createStandingInstructionAtDisbursement: this.loansAccountTemplate.createStandingInstructionAtDisbursement,
-          lineOfCreditId: this.loansAccountTemplate.lineOfCreditId
+          lineOfCreditId:
+            this.loansAccountTemplate.additionalProperties?.lineOfCreditId || this.loansAccountTemplate.lineOfCreditId
         });
       }
     }

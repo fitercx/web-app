@@ -38,6 +38,7 @@ import { LoansAccountDetailsStepComponent } from './loans-account-stepper/loans-
 import { LoansAccountTermsStepComponent } from './loans-account-stepper/loans-account-terms-step/loans-account-terms-step.component';
 import { LoansAccountChargesStepComponent } from './loans-account-stepper/loans-account-charges-step/loans-account-charges-step.component';
 import { LoansAccountPreviewStepComponent } from './loans-account-stepper/loans-account-preview-step/loans-account-preview-step.component';
+import { LoansAccountLocDetailsStepComponent } from './loans-account-stepper/loans-account-loc-details-step/loans-account-loc-details-step.component';
 import { RecoveryRepaymentComponent } from './loans-view/loan-account-actions/recovery-repayment/recovery-repayment.component';
 import { ViewGuarantorsComponent } from './loans-view/loan-account-actions/view-guarantors/view-guarantors.component';
 import { CreateGuarantorComponent } from './loans-view/loan-account-actions/create-guarantor/create-guarantor.component';
@@ -49,6 +50,7 @@ import { AddCollateralComponent } from './loans-view/loan-account-actions/add-co
 import { LoanDocumentsTabComponent } from './loans-view/loan-documents-tab/loan-documents-tab.component';
 import { ViewChargeComponent } from './loans-view/view-charge/view-charge.component';
 import { StandingInstructionsTabComponent } from './loans-view/standing-instructions-tab/standing-instructions-tab.component';
+import { LocDetailsTabComponent } from './loans-view/loc-details-tab/loc-details-tab.component';
 import { EditLoansAccountComponent } from './edit-loans-account/edit-loans-account.component';
 import { LoanScreenReportsComponent } from './loans-view/loan-account-actions/loan-screen-reports/loan-screen-reports.component';
 import { ApproveLoanComponent } from './loans-view/loan-account-actions/approve-loan/approve-loan.component';
@@ -126,6 +128,7 @@ import { LoansActiveClientMembersComponent } from './loans-account-stepper/loans
     LoansAccountTermsStepComponent,
     LoansAccountChargesStepComponent,
     LoansAccountPreviewStepComponent,
+    LoansAccountLocDetailsStepComponent,
     LoansAccountAddCollateralDialogComponent,
     RecoveryRepaymentComponent,
     ViewGuarantorsComponent,
@@ -138,6 +141,7 @@ import { LoansActiveClientMembersComponent } from './loans-account-stepper/loans
     UndoDisbursalComponent,
     LoanDocumentsTabComponent,
     StandingInstructionsTabComponent,
+    LocDetailsTabComponent,
     EditLoansAccountComponent,
     LoanScreenReportsComponent,
     ApproveLoanComponent,

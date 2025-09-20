@@ -20,6 +20,7 @@ import { LoanCollateralTabComponent } from './loans-view/loan-collateral-tab/loa
 import { CreateLoansAccountComponent } from './create-loans-account/create-loans-account.component';
 import { LoanDocumentsTabComponent } from './loans-view/loan-documents-tab/loan-documents-tab.component';
 import { StandingInstructionsTabComponent } from 'app/loans/loans-view/standing-instructions-tab/standing-instructions-tab.component';
+import { LocDetailsTabComponent } from './loans-view/loc-details-tab/loc-details-tab.component';
 import { EditLoansAccountComponent } from './edit-loans-account/edit-loans-account.component';
 import { ViewChargeComponent } from './loans-view/view-charge/view-charge.component';
 import { ViewTransactionComponent } from './loans-view/transactions/view-transaction/view-transaction.component';
@@ -62,6 +63,7 @@ import { LoanDelinquencyDataResolver } from './common-resolvers/loan-delinquency
 import { LoanDelinquencyActionsResolver } from './common-resolvers/loan-delinquency-actions.resolver';
 import { LoanTermVariationsTabComponent } from './loans-view/loan-term-variations-tab/loan-term-variations-tab.component';
 import { LoanTermVariationsResolver } from './common-resolvers/loan-term-variations.resolver';
+import { CurrenciesResolver } from 'app/organization/currencies/currencies.resolver';
 
 /** Loans Route. */
 const routes: Routes = [
@@ -74,7 +76,8 @@ const routes: Routes = [
         data: { title: 'Create Loans Account', breadcrumb: 'Create Loans Account' },
         component: CreateLoansAccountComponent,
         resolve: {
-          loansAccountTemplate: LoansAccountTemplateResolver
+          loansAccountTemplate: LoansAccountTemplateResolver,
+          currencies: CurrenciesResolver
         }
       },
       {
@@ -225,6 +228,11 @@ const routes: Routes = [
             data: { title: 'Standing Instructions', breadcrumb: 'Standing Instructions', routeParamBreadcrumb: false }
           },
           {
+            path: 'loc-details',
+            component: LocDetailsTabComponent,
+            data: { title: 'LOC Details', breadcrumb: 'LOC Details', routeParamBreadcrumb: false }
+          },
+          {
             path: 'external-asset-owner',
             component: ExternalAssetOwnerTabComponent,
             data: { title: 'External Asset Owner', breadcrumb: 'External Asset Owner', routeParamBreadcrumb: false },
@@ -286,7 +294,8 @@ const routes: Routes = [
         data: { title: 'Modify Loans Account', breadcrumb: 'Modify Loans Account', routeParamBreadcrumb: 'Edit' },
         component: EditLoansAccountComponent,
         resolve: {
-          loansAccountAndTemplate: LoansAccountAndTemplateResolver
+          loansAccountAndTemplate: LoansAccountAndTemplateResolver,
+          currencies: CurrenciesResolver
         }
       },
       {
@@ -336,7 +345,8 @@ const routes: Routes = [
         data: { title: 'Modify Loans Account', breadcrumb: 'Modify Loans Account', routeParamBreadcrumb: 'Edit' },
         component: EditLoansAccountComponent,
         resolve: {
-          loansAccountAndTemplate: LoansAccountAndTemplateResolver
+          loansAccountAndTemplate: LoansAccountAndTemplateResolver,
+          currencies: CurrenciesResolver
         }
       }
     ]
@@ -391,7 +401,8 @@ const routes: Routes = [
     GLIMLoanTemplateResolver,
     ExternalAssetOwnerResolver,
     LoanDelinquencyDataResolver,
-    LoanTermVariationsResolver
+    LoanTermVariationsResolver,
+    CurrenciesResolver
   ]
 })
 export class LoansRoutingModule {}

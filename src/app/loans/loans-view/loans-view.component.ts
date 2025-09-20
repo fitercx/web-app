@@ -335,6 +335,25 @@ export class LoansViewComponent implements OnInit {
   }
 
   /**
+   * Checks if the loan has LOC details in additionalProperties
+   */
+  hasLocDetails(): boolean {
+    const additionalProperties = this.loanDetailsData.additionalProperties;
+    if (!additionalProperties) {
+      return false;
+    }
+
+    // Check if any LOC-related fields exist in additionalProperties
+    return !!(
+      additionalProperties.invoiceNo ||
+      additionalProperties.invoiceAmount ||
+      additionalProperties.lineOfCreditId ||
+      additionalProperties.approvedReceivableAmount ||
+      additionalProperties.approvedPayableAmount
+    );
+  }
+
+  /**
    * Delete loan Account
    */
   private deleteLoanAccount() {

@@ -12,6 +12,7 @@ import { LoansAccountDetailsStepComponent } from '../loans-account-stepper/loans
 import { LoansAccountTermsStepComponent } from '../loans-account-stepper/loans-account-terms-step/loans-account-terms-step.component';
 import { LoansAccountChargesStepComponent } from '../loans-account-stepper/loans-account-charges-step/loans-account-charges-step.component';
 import { LoansAccountDatatableStepComponent } from '../loans-account-stepper/loans-account-datatable-step/loans-account-datatable-step.component';
+import { LoansAccountLocDetailsStepComponent } from '../loans-account-stepper/loans-account-loc-details-step/loans-account-loc-details-step.component';
 
 /**
  * Create loans account
@@ -28,6 +29,8 @@ export class CreateLoansAccountComponent {
   @ViewChild(LoansAccountTermsStepComponent, { static: true }) loansAccountTermsStep: LoansAccountTermsStepComponent;
   @ViewChild(LoansAccountChargesStepComponent, { static: true })
   loansAccountChargesStep: LoansAccountChargesStepComponent;
+  @ViewChild(LoansAccountLocDetailsStepComponent, { static: false })
+  loansAccountLocDetailsStep: LoansAccountLocDetailsStepComponent;
   /** Get handle on dtloan tags in the template */
   @ViewChildren('dtloan') loanDatatables: QueryList<LoansAccountDatatableStepComponent>;
 
@@ -44,6 +47,8 @@ export class CreateLoansAccountComponent {
   datatables: any = [];
   /** Currency Code */
   currencyCode: string;
+  /** Available Currencies */
+  currencies: any[] = [];
   /** Optional Line of Credit context (drawdown) */
   lineOfCreditId?: string | null;
 
@@ -62,8 +67,9 @@ export class CreateLoansAccountComponent {
     private settingsService: SettingsService,
     private clientService: ClientsService
   ) {
-    this.route.data.subscribe((data: { loansAccountTemplate: any }) => {
+    this.route.data.subscribe((data: { loansAccountTemplate: any; currencies: any }) => {
       this.loansAccountTemplate = data.loansAccountTemplate;
+      this.currencies = data.currencies ? data.currencies.selectedCurrencyOptions || [] : [];
     });
     // capture LOC context (drawdown) if provided via query param from client LOC list
     this.lineOfCreditId = this.route.snapshot.queryParamMap.get('lineOfCreditId');
@@ -141,9 +147,26 @@ export class CreateLoansAccountComponent {
     return this.loansAccountTermsStep.loansAccountTermsForm;
   }
 
+  /** Get LOC Details Form Data */
+  get locDetailsForm() {
+    return this.loansAccountLocDetailsStep?.locDetailsForm;
+  }
+
+  /** Check if LOC is enabled */
+  get isLocEnabled(): boolean {
+    return this.loansAccountDetailsStep?.isLocEnabled || false;
+  }
+
   /** Checks wheter all the forms in different steps are valid or not */
   get loansAccountFormValid() {
-    return this.loansAccountDetailsForm.valid && this.loansAccountTermsForm.valid;
+    const baseFormsValid = this.loansAccountDetailsForm.valid && this.loansAccountTermsForm.valid;
+
+    // If LOC is enabled, also check if the LOC details form is valid
+    if (this.isLocEnabled && this.locDetailsForm) {
+      return baseFormsValid && this.locDetailsForm.valid;
+    }
+
+    return baseFormsValid;
   }
 
   get loansSavingsAccountLinked() {
@@ -157,13 +180,58 @@ export class CreateLoansAccountComponent {
 
   /** Retrieves Data of all forms except Currency to submit the data */
   get loansAccount() {
-    return {
+    const baseData = {
       ...this.loansAccountDetailsStep.loansAccountDetails,
       ...this.loansAccountTermsStep.loansAccountTerms,
       ...this.loansAccountChargesStep.loansAccountCharges,
       ...this.loansAccountTermsStep.loanCollateral,
       ...this.loansAccountTermsStep.disbursementData
     };
+
+    // Include LOC details flattened at root level if LOC is enabled and has meaningful data
+    if (this.isLocEnabled && this.loansAccountLocDetailsStep) {
+      const locDetails = this.loansAccountLocDetailsStep.locDetails;
+
+      // Only include LOC fields that have meaningful (non-empty, non-null) values
+      const filteredLocDetails = this.filterEmptyValues(locDetails);
+
+      // Only flatten LOC details if there are actually meaningful values
+      if (Object.keys(filteredLocDetails).length > 0) {
+        Object.assign(baseData, filteredLocDetails);
+      }
+    }
+
+    return baseData;
+  }
+
+  /**
+   * Filters out empty, null, undefined values and empty strings from an object
+   */
+  private filterEmptyValues(obj: any): any {
+    const filtered: any = {};
+
+    for (const [
+      key,
+      value
+    ] of Object.entries(obj)) {
+      // Include the value if it's meaningful (not empty, null, or undefined)
+      if (value !== null && value !== undefined && value !== '') {
+        // For numbers, include even if 0
+        if (typeof value === 'number') {
+          filtered[key] = value;
+        }
+        // For strings, include only if not empty
+        else if (typeof value === 'string' && value.trim() !== '') {
+          filtered[key] = value;
+        }
+        // For other types (dates, booleans, objects), include as is
+        else if (typeof value !== 'string') {
+          filtered[key] = value;
+        }
+      }
+    }
+
+    return filtered;
   }
 
   /**
@@ -172,16 +240,18 @@ export class CreateLoansAccountComponent {
   submit() {
     const locale = this.settingsService.language.code;
     const dateFormat = this.settingsService.dateFormat;
+    const loanAccountData = this.loansAccount;
+
     const payload = this.loansService.buildLoanRequestPayload(
-      this.loansAccount,
+      loanAccountData,
       this.loansAccountTemplate,
       this.loansAccountProductTemplate.calendarOptions,
       locale,
       dateFormat
     );
 
-    // Attach line of credit context if present (both common field names for compatibility)
-    if (this.lineOfCreditId) {
+    // Attach line of credit context if present and meaningful (both common field names for compatibility)
+    if (this.lineOfCreditId && this.lineOfCreditId.trim() !== '') {
       payload.lineOfCreditId = this.lineOfCreditId;
     }
 
