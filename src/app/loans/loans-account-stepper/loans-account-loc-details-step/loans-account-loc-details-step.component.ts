@@ -69,10 +69,6 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       }
 
       if (locData) {
-        console.log('LOC Edit Debug - Raw locData:', locData);
-        console.log('LOC Edit Debug - lineOfCreditId:', locData.lineOfCreditId);
-        console.log('LOC Edit Debug - locOptions:', this.locOptions);
-
         // Parse dates if they exist as arrays [year, month, day] from backend
         const formData: any = { ...locData };
 
@@ -102,10 +98,6 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
         if (formData.lineOfCreditId && this.loansAccountTemplate.lineOfCreditId === undefined) {
           this.loansAccountTemplate.lineOfCreditId = formData.lineOfCreditId;
         }
-
-        console.log('LOC Edit Debug - Processed formData:', formData);
-        console.log('LOC Edit Debug - isReceivableType:', this.isReceivableType);
-        console.log('LOC Edit Debug - isPayableType:', this.isPayableType);
 
         this.locDetailsForm.patchValue(formData);
 
@@ -379,15 +371,10 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       locId = this.loansAccountTemplate.lineOfCreditId;
     }
 
-    console.log('LOC Type Debug - isReceivableType - locId:', locId);
-    console.log('LOC Type Debug - isReceivableType - locOptions:', this.locOptions);
-
     // Find the selected LOC from the available options
     if (this.locOptions && locId) {
       const selectedLoc = this.locOptions.find((loc: any) => loc.id === locId);
-      console.log('LOC Type Debug - isReceivableType - selectedLoc:', selectedLoc);
       const isReceivable = selectedLoc?.productType === 'RECEIVABLE';
-      console.log('LOC Type Debug - isReceivableType - result:', isReceivable);
       return isReceivable;
     }
 
