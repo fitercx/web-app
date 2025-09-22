@@ -302,7 +302,6 @@ export class CreateLocComponent implements OnInit {
           rateType: ['FLAT'],
           interestPaymentType: ['POST_DISBURSEMENT'],
           annualInterestRate: [''],
-          latePaymentFee: [''],
           tenorDays: [''],
           advancePercentage: ['100'],
           cashMarginType: ['FLAT'],

@@ -41,6 +41,21 @@
       </mifosx-loans-account-terms-step>
     </mat-step>
 
+    <mat-step [stepControl]="locDetailsForm" *ngIf="isLocEnabled">
+      <ng-template matStepLabel>{{ 'labels.inputs.LOC DETAILS' | translate }}</ng-template>
+
+      <mifosx-loans-account-loc-details-step
+        #loanAccountLocDetails
+        [loansAccountTemplate]="loansAccountAndTemplate"
+        [loansAccountProductTemplate]="loansAccountProductTemplate"
+        [locOptions]="loansAccountDetailsStep?.lineOfCreditOptions"
+        [currencies]="currencies"
+        [loanId]="loanId"
+        [selectedLocId]="loansAccountDetailsStep?.loansAccountDetailsForm?.get('lineOfCreditId')?.value"
+      >
+      </mifosx-loans-account-loc-details-step>
+    </mat-step>
+
     <mat-step>
       <ng-template matStepLabel>{{ 'labels.inputs.CHARGES' | translate }}</ng-template>
 

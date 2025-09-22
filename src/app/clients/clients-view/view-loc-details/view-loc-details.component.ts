@@ -158,16 +158,9 @@ export class ViewLocDetailsComponent implements OnInit {
    * Process LOC data from backend
    */
   private processLocData(data: any): void {
-    // Debug: Log the raw data to console
-    console.log('LOC Raw Data:', data);
-
     // Debug utilization calculation
     const backendUtilization = data.utilization;
     const calculatedUtilization = this.calculateUtilization(data);
-    console.log('Backend Utilization:', backendUtilization);
-    console.log('Calculated Utilization:', calculatedUtilization);
-    console.log('Credit Limit:', data.maximumAmount);
-    console.log('Outstanding:', data.outstanding);
 
     const rawStatus = (data && data.status && (data.status.code || data.status.value)) || data?.status;
     const normalizedStatus = this.normalizeStatus(rawStatus);
@@ -408,7 +401,16 @@ export class ViewLocDetailsComponent implements OnInit {
         this.router.navigate(['edit'], { relativeTo: this.route });
         break;
       case 'New Drawdown':
-        this.router.navigate(['new-drawdown'], { relativeTo: this.route });
+        // Navigate to loan creation page with LOC ID as query parameter
+        const queryParams: any = { lineOfCreditId: this.locId };
+        this.router.navigate(
+          [
+            '../../',
+            'loans-accounts',
+            'create'
+          ],
+          { relativeTo: this.route, queryParams }
+        );
         break;
       case 'Approve':
         this.openActionDialog('approve');
@@ -595,7 +597,6 @@ export class ViewLocDetailsComponent implements OnInit {
     if (this.clientsService && typeof (this.clientsService as any).performLocAction === 'function') {
       (this.clientsService as any).performLocAction(this.clientId, this.locId, action, payload).subscribe(
         (response: any) => {
-          console.log(`LOC ${action} successful:`, response);
           // Reload the page after successful action
           window.location.reload();
         },
@@ -603,9 +604,6 @@ export class ViewLocDetailsComponent implements OnInit {
           console.error(`LOC ${action} failed:`, error);
         }
       );
-    } else {
-      console.log(`LOC ${action} action would be performed with payload:`, payload);
-      console.log(`API endpoint: /clients/${this.clientId}/creditlines/${this.locId}/${action}`);
     }
   }
 
