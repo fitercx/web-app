@@ -354,13 +354,17 @@
   text-align: left !important;
 }
 
-// Force all header cells in this component to left align unless explicitly right-aligned
+// Force all header cells in this component to left align unless explicitly right-aligned or center-aligned
 :host ::ng-deep table.mat-table th.mat-header-cell {
   text-align: left !important;
 }
 
 :host ::ng-deep table.mat-table th.mat-header-cell.r-amount {
   text-align: right !important;
+}
+
+:host ::ng-deep table.mat-table th.mat-header-cell.c-align {
+  text-align: center !important;
 }
 
 /* Inner LOC loan table header alignment integrated above; duplicate selectors removed */

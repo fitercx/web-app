@@ -45,6 +45,7 @@ export class GeneralTabComponent {
     'Loan Amount',
     'Outstanding Balance',
     'Amount Paid',
+    'Next Instalment Date',
     'Actions',
     'expand'
   ];
