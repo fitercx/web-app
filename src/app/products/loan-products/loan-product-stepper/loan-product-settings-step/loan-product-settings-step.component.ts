@@ -98,6 +98,8 @@ export class LoanProductSettingsStepComponent implements OnInit {
       amortizationType: this.loanProductsTemplate.amortizationType.id,
       interestType: this.loanProductsTemplate.interestType.id,
       isEqualAmortization: this.loanProductsTemplate.isEqualAmortization,
+      factorRateProductEnabled: this.loanProductsTemplate?.factorRateProductEnabled,
+      factorRate: this.loanProductsTemplate?.factorRate,
       interestCalculationPeriodType: this.loanProductsTemplate.interestCalculationPeriodType.id,
       allowPartialPeriodInterestCalculation: this.loanProductsTemplate.allowPartialPeriodInterestCalculation,
       transactionProcessingStrategyCode: transactionProcessingStrategyCode,
@@ -248,10 +250,25 @@ export class LoanProductSettingsStepComponent implements OnInit {
         }
       });
     }
+    this.loanProductSettingsForm.get('factorRate').clearValidators();
+    this.loanProductSettingsForm.get('factorRate').addValidators([
+      Validators.required,
+      Validators.min(1.001),
+      Validators.max(this.loanProductsTemplate?.maximumProductFactorRate)]);
+    this.loanProductSettingsForm.get('factorRate').updateValueAndValidity();
   }
 
   createLoanProductSettingsForm() {
     this.loanProductSettingsForm = this.formBuilder.group({
+      factorRateProductEnabled: [false],
+      factorRate: [
+        { value: '', disabled: false },
+        [
+          Validators.min(1.001),
+          Validators.max(2),
+          Validators.required
+        ]
+      ],
       amortizationType: [
         '',
         Validators.required
@@ -649,6 +666,16 @@ export class LoanProductSettingsStepComponent implements OnInit {
       this.processingStrategyService.initialize(this.isAdvancedTransactionProcessingStrategy);
       this.enableFieldsWhenScheduleTypeIsProgressiveAndInterestRateRecalculationEnabled();
     });
+
+    this.loanProductSettingsForm
+      .get('factorRateProductEnabled')
+      .valueChanges.subscribe((factorRateProductEnabled: boolean) => {
+        if (factorRateProductEnabled) {
+          this.loanProductSettingsForm.get('factorRate').enable();
+        } else {
+          this.loanProductSettingsForm.get('factorRate').disable();
+        }
+      });
   }
 
   private enableFieldsWhenScheduleTypeIsProgressiveAndInterestRateRecalculationEnabled() {

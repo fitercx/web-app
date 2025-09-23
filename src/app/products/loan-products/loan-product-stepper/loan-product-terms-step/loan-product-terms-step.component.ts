@@ -18,6 +18,7 @@ import { TranslateService } from '@ngx-translate/core';
 })
 export class LoanProductTermsStepComponent implements OnInit, OnChanges {
   @Input() loanProductsTemplate: any;
+  @Input() loanProductSettingsForm: UntypedFormGroup;
 
   loanProductTermsForm: UntypedFormGroup;
 
@@ -135,6 +136,25 @@ export class LoanProductTermsStepComponent implements OnInit, OnChanges {
       this.isAdvancedTransactionProcessingStrategy = value;
     });
     this.validateAdvancedPaymentStrategyControls();
+
+    // Subscribe to factorRateProductEnabled changes
+    this.loanProductSettingsForm
+      ?.get('factorRateProductEnabled')
+      ?.valueChanges.subscribe((factorRateProductEnabled) => {
+        if (factorRateProductEnabled) {
+          this.loanProductTermsForm.get('interestRatePerPeriod').disable();
+          this.loanProductTermsForm.get('interestRatePerPeriod').patchValue(0);
+          this.loanProductTermsForm.get('repaymentFrequencyType').setValue(0);
+        } else {
+          this.loanProductTermsForm.get('interestRatePerPeriod').enable();
+          this.loanProductTermsForm
+            .get('interestRatePerPeriod')
+            .patchValue(this.loanProductsTemplate.interestRatePerPeriod);
+          this.loanProductTermsForm
+            .get('repaymentFrequencyType')
+            .setValue(this.loanProductsTemplate.repaymentFrequencyType.id);
+        }
+      });
   }
 
   createLoanProductTermsForm() {
