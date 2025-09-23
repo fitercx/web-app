@@ -73,11 +73,17 @@
                       </span>
                     </td>
                   </tr>
-                  <tr *ngIf="locDetails?.approvedCreditFacilityAmount">
+                  <tr>
                     <td>
                       <b>{{ 'labels.inputs.Approved Facility' | translate }}</b>
                     </td>
                     <td>{{ locDetails?.approvedCreditFacilityAmount | currency: locDetails?.currency || '' }}</td>
+                  </tr>
+                  <tr *ngIf="locDetails?.endDate">
+                    <td>
+                      <b>{{ 'labels.inputs.End Date' | translate }}</b>
+                    </td>
+                    <td>{{ locDetails?.endDate | dateFormat }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -102,6 +108,12 @@
                       <b>{{ 'labels.inputs.Outstanding' | translate }}</b>
                     </td>
                     <td class="outstanding">{{ locDetails?.outstanding | currency: locDetails?.currency || '' }}</td>
+                  </tr>
+                  <tr *ngIf="locDetails?.consumedAmount !== null && locDetails?.consumedAmount !== undefined">
+                    <td>
+                      <b>{{ 'labels.inputs.Consumed Amount' | translate }}</b>
+                    </td>
+                    <td class="consumed">{{ locDetails?.consumedAmount | currency: locDetails?.currency || '' }}</td>
                   </tr>
                   <tr>
                     <td>
@@ -251,81 +263,99 @@
       <div fxFlex="60%" fxFlex.lt-md="100%">
         <mat-card>
           <mat-card-header>
-            <mat-card-title>{{ 'labels.inputs.Credit Utilization' | translate }}</mat-card-title>
-            <mat-card-subtitle
-              >{{ getUtilizationPercentage() }}% {{ 'labels.inputs.utilized' | translate }}</mat-card-subtitle
-            >
+            <mat-card-title>{{ 'labels.inputs.Terms & Settlement' | translate }}</mat-card-title>
           </mat-card-header>
           <mat-card-content>
-            <div
-              fxLayout="row"
-              fxLayoutAlign="start center"
-              fxLayoutGap="32px"
-              fxLayout.lt-md="column"
-              fxLayoutGap.lt-md="24px"
-            >
-              <div class="utilization-chart" fxFlex="35">
-                <svg width="160" height="160" viewBox="0 0 40 40">
-                  <circle class="chart-background" cx="20" cy="20" r="15.9155" stroke-width="4"></circle>
-                  <circle
-                    class="chart-value"
-                    cx="20"
-                    cy="20"
-                    r="15.9155"
-                    stroke-width="4"
-                    [style.stroke-dasharray]="circumference"
-                    [style.stroke-dashoffset]="strokeDashoffset"
-                  ></circle>
-                </svg>
-                <div class="chart-text">
-                  <span class="chart-percent">{{ getUtilizationPercentage() }}%</span>
-                  <span class="chart-label">Utilized</span>
+            <div class="detail-row" *ngIf="locDetails?.currency">
+              <span class="detail-label">{{ 'labels.inputs.Currency' | translate }}:</span>
+              <span class="detail-value currency"
+                ><strong>{{ locDetails?.currency }}</strong></span
+              >
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">{{ 'labels.inputs.Tenor (Days)' | translate }}:</span>
+              <span class="detail-value" [ngClass]="{ missing: !locDetails?.tenorDays }">
+                <strong *ngIf="locDetails?.tenorDays; else noTenor">{{ locDetails?.tenorDays }} days</strong>
+                <ng-template #noTenor>
+                  <em style="color: #999; font-size: 12px">Not specified</em>
+                </ng-template>
+              </span>
+            </div>
+            <div class="detail-row" *ngIf="locDetails?.nextReviewDate">
+              <span class="detail-label">{{ 'labels.inputs.Next Review Date' | translate }}:</span>
+              <span class="detail-value">{{ locDetails?.nextReviewDate | dateFormat }}</span>
+            </div>
+            <div class="detail-row" *ngIf="locDetails?.advancePercentage">
+              <span class="detail-label">{{ 'labels.inputs.Advance Percentage' | translate }}:</span>
+              <span class="detail-value">{{ locDetails?.advancePercentage }}%</span>
+            </div>
+            <div class="detail-row" *ngIf="locDetails?.cashMarginType && locDetails?.cashMarginValue">
+              <span class="detail-label">{{ 'labels.inputs.Cash Margin' | translate }}:</span>
+              <span class="detail-value"
+                >{{ locDetails?.cashMarginValue }}{{ locDetails?.cashMarginType === 'PERCENTAGE' ? '%' : '' }} ({{
+                  locDetails?.cashMarginType
+                }})</span
+              >
+            </div>
+            <div class="detail-row" *ngIf="locDetails?.rateType">
+              <span class="detail-label">{{ 'labels.inputs.Rate Type' | translate }}:</span>
+              <span class="detail-value">{{ locDetails?.rateType }}</span>
+            </div>
+            <div class="detail-row" *ngIf="locDetails?.interestChargeTime">
+              <span class="detail-label">{{ 'labels.inputs.Interest Charge Time' | translate }}:</span>
+              <span class="detail-value">{{ locDetails?.interestChargeTime }}</span>
+            </div>
+            <div class="settlement-section" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0">
+              <h4 style="margin: 0 0 12px 0; color: #666; font-size: 14px; font-weight: 500">
+                Settlement Account
+                <span *ngIf="locDetails?.settlementSavingsAccountId" style="font-size: 11px; color: #4caf50"
+                  >(ID: {{ locDetails.settlementSavingsAccountId }})</span
+                >
+              </h4>
+              <div
+                *ngIf="
+                  locDetails?.settlementSavingsAccountNo || locDetails?.settlementSavingsAccountBalance !== null;
+                  else noSettlementAccount
+                "
+              >
+                <div class="detail-row">
+                  <span class="detail-label">{{ 'labels.inputs.Account No' | translate }}:</span>
+                  <span class="detail-value">{{ locDetails?.settlementSavingsAccountNo || 'Not specified' }}</span>
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">{{ 'labels.inputs.Balance' | translate }}:</span>
+                  <span
+                    class="detail-value"
+                    *ngIf="locDetails?.settlementSavingsAccountBalance !== null; else noBalance"
+                  >
+                    <strong
+                      [ngClass]="{
+                        positive: locDetails.settlementSavingsAccountBalance > 0,
+                        negative: locDetails.settlementSavingsAccountBalance < 0
+                      }"
+                    >
+                      {{ locDetails?.settlementSavingsAccountBalance | currency: locDetails?.currency || '' }}
+                    </strong>
+                  </span>
+                  <ng-template #noBalance>
+                    <span style="color: #999; font-style: italic; font-size: 12px">Balance not available</span>
+                  </ng-template>
                 </div>
               </div>
-              <div class="utilization-details" fxFlex="65">
-                <div class="detail-row">
-                  <span class="detail-label">{{ 'labels.inputs.Interest rate' | translate }}:</span>
-                  <span class="detail-value"
-                    ><strong>{{ locDetails?.annualInterestRate || locDetails?.interestRate }}% p.a.</strong></span
-                  >
+              <ng-template #noSettlementAccount>
+                <div
+                  style="
+                    text-align: center;
+                    padding: 16px;
+                    color: #999;
+                    background: #fafafa;
+                    border-radius: 8px;
+                    border: 1px dashed #ddd;
+                  "
+                >
+                  <span style="font-style: italic; font-size: 13px">No settlement account configured</span>
                 </div>
-                <div class="detail-row" *ngIf="locDetails?.tenorDays">
-                  <span class="detail-label">{{ 'labels.inputs.Tenor (Days)' | translate }}:</span>
-                  <span class="detail-value"
-                    ><strong>{{ locDetails?.tenorDays }} days</strong></span
-                  >
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">{{ 'labels.inputs.Available Balance' | translate }}:</span>
-                  <span class="detail-value available-balance"
-                    ><strong>{{ locDetails?.availableBalance | currency: locDetails?.currency || '' }}</strong></span
-                  >
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">{{ 'labels.inputs.Outstanding Amount' | translate }}:</span>
-                  <span class="detail-value outstanding-amount"
-                    ><strong>{{ locDetails?.outstanding | currency: locDetails?.currency || '' }}</strong></span
-                  >
-                </div>
-                <div class="detail-row" *ngIf="locDetails?.avgUtilization">
-                  <span class="detail-label">{{ 'labels.inputs.Avg. utilization' | translate }}:</span>
-                  <span class="detail-value"
-                    ><strong>{{ locDetails?.avgUtilization | currency: locDetails?.currency || '' }}</strong></span
-                  >
-                </div>
-                <div class="detail-row" *ngIf="locDetails?.totalRepaid">
-                  <span class="detail-label">{{ 'labels.inputs.Total Repaid' | translate }}:</span>
-                  <span class="detail-value repaid-amount"
-                    ><strong>{{ locDetails?.totalRepaid | currency: locDetails?.currency || '' }}</strong></span
-                  >
-                </div>
-                <div class="detail-row" *ngIf="locDetails?.performance">
-                  <span class="detail-label">{{ 'labels.inputs.Performance' | translate }}:</span>
-                  <span class="detail-value performance"
-                    ><strong>{{ locDetails?.performance }}</strong></span
-                  >
-                </div>
-              </div>
+              </ng-template>
             </div>
           </mat-card-content>
         </mat-card>
@@ -345,6 +375,10 @@
               <div class="detail-row" *ngIf="locDetails?.officeName">
                 <span class="detail-label">{{ 'labels.inputs.Office' | translate }}</span>
                 <span class="detail-value">{{ locDetails?.officeName }}</span>
+              </div>
+              <div class="detail-row" *ngIf="locDetails?.clientLegalForm">
+                <span class="detail-label">{{ 'labels.inputs.Legal Form' | translate }}</span>
+                <span class="detail-value">{{ locDetails?.clientLegalForm }}</span>
               </div>
               <div class="detail-row">
                 <span class="detail-label">{{ 'labels.inputs.Contact' | translate }}</span>
@@ -406,83 +440,70 @@
 
     <!-- Additional Details Section -->
     <div class="details-section" fxLayout="row" fxLayoutGap="16px" fxLayout.lt-md="column" style="margin-top: 16px">
-      <!-- Terms & Settlement Details -->
+      <!-- Credit Utilization -->
       <div fxFlex="33%" fxFlex.lt-md="100%">
         <mat-card>
           <mat-card-header>
-            <mat-card-title>{{ 'labels.inputs.Terms & Settlement' | translate }}</mat-card-title>
+            <mat-card-title>{{ 'labels.inputs.Credit Utilization' | translate }}</mat-card-title>
+            <mat-card-subtitle
+              >{{ getUtilizationPercentage() }}% {{ 'labels.inputs.utilized' | translate }}</mat-card-subtitle
+            >
           </mat-card-header>
           <mat-card-content>
-            <div class="detail-row" *ngIf="locDetails?.currency">
-              <span class="detail-label">{{ 'labels.inputs.Currency' | translate }}:</span>
-              <span class="detail-value currency"
-                ><strong>{{ locDetails?.currency }}</strong></span
-              >
-            </div>
-            <div class="detail-row">
-              <span class="detail-label">{{ 'labels.inputs.Tenor (Days)' | translate }}:</span>
-              <span class="detail-value" [ngClass]="{ missing: !locDetails?.tenorDays }">
-                <strong *ngIf="locDetails?.tenorDays; else noTenor">{{ locDetails?.tenorDays }} days</strong>
-                <ng-template #noTenor>
-                  <em style="color: #999; font-size: 12px">Not specified</em>
-                </ng-template>
-              </span>
-            </div>
-            <div class="detail-row" *ngIf="locDetails?.nextReviewDate">
-              <span class="detail-label">{{ 'labels.inputs.Next Review Date' | translate }}:</span>
-              <span class="detail-value">{{ locDetails?.nextReviewDate | dateFormat }}</span>
-            </div>
-            <div class="settlement-section" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0">
-              <h4 style="margin: 0 0 12px 0; color: #666; font-size: 14px; font-weight: 500">
-                Settlement Account
-                <span *ngIf="locDetails?.settlementSavingsAccountId" style="font-size: 11px; color: #4caf50"
-                  >(ID: {{ locDetails.settlementSavingsAccountId }})</span
-                >
-              </h4>
-              <div
-                *ngIf="
-                  locDetails?.settlementSavingsAccountNo || locDetails?.settlementSavingsAccountBalance !== null;
-                  else noSettlementAccount
-                "
-              >
-                <div class="detail-row">
-                  <span class="detail-label">{{ 'labels.inputs.Account No' | translate }}:</span>
-                  <span class="detail-value">{{ locDetails?.settlementSavingsAccountNo || 'Not specified' }}</span>
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">{{ 'labels.inputs.Balance' | translate }}:</span>
-                  <span
-                    class="detail-value"
-                    *ngIf="locDetails?.settlementSavingsAccountBalance !== null; else noBalance"
-                  >
-                    <strong
-                      [ngClass]="{
-                        positive: locDetails.settlementSavingsAccountBalance > 0,
-                        negative: locDetails.settlementSavingsAccountBalance < 0
-                      }"
-                    >
-                      {{ locDetails?.settlementSavingsAccountBalance | currency: locDetails?.currency || '' }}
-                    </strong>
-                  </span>
-                  <ng-template #noBalance>
-                    <span style="color: #999; font-style: italic; font-size: 12px">Balance not available</span>
-                  </ng-template>
+            <div fxLayout="column" fxLayoutAlign="start center" fxLayoutGap="16px">
+              <div class="utilization-chart">
+                <svg width="120" height="120" viewBox="0 0 40 40">
+                  <circle class="chart-background" cx="20" cy="20" r="15.9155" stroke-width="4"></circle>
+                  <circle
+                    class="chart-value"
+                    cx="20"
+                    cy="20"
+                    r="15.9155"
+                    stroke-width="4"
+                    [style.stroke-dasharray]="circumference"
+                    [style.stroke-dashoffset]="strokeDashoffset"
+                  ></circle>
+                </svg>
+                <div class="chart-text">
+                  <span class="chart-percent">{{ getUtilizationPercentage() }}%</span>
+                  <span class="chart-label">Utilized</span>
                 </div>
               </div>
-              <ng-template #noSettlementAccount>
-                <div
-                  style="
-                    text-align: center;
-                    padding: 16px;
-                    color: #999;
-                    background: #fafafa;
-                    border-radius: 8px;
-                    border: 1px dashed #ddd;
-                  "
-                >
-                  <span style="font-style: italic; font-size: 13px">No settlement account configured</span>
+              <div class="utilization-details" style="width: 100%">
+                <div class="detail-row">
+                  <span class="detail-label">{{ 'labels.inputs.Interest rate' | translate }}:</span>
+                  <span class="detail-value"
+                    ><strong>{{ locDetails?.annualInterestRate || locDetails?.interestRate }}% p.a.</strong></span
+                  >
                 </div>
-              </ng-template>
+                <div class="detail-row">
+                  <span class="detail-label">{{ 'labels.inputs.Available Balance' | translate }}:</span>
+                  <span class="detail-value available-balance"
+                    ><strong>{{ locDetails?.availableBalance | currency: locDetails?.currency || '' }}</strong></span
+                  >
+                </div>
+                <div
+                  class="detail-row"
+                  *ngIf="locDetails?.consumedAmount !== null && locDetails?.consumedAmount !== undefined"
+                >
+                  <span class="detail-label">{{ 'labels.inputs.Consumed Amount' | translate }}:</span>
+                  <span class="detail-value consumed-amount"
+                    ><strong>{{ locDetails?.consumedAmount | currency: locDetails?.currency || '' }}</strong></span
+                  >
+                </div>
+                <div class="detail-row" *ngIf="locDetails?.avgUtilization">
+                  <span class="detail-label">{{ 'labels.inputs.Avg. utilization' | translate }}:</span>
+                  <span class="detail-value"
+                    ><strong>{{ locDetails?.avgUtilization | currency: locDetails?.currency || '' }}</strong></span
+                  >
+                </div>
+                <div class="detail-row" *ngIf="locDetails?.totalRepaid">
+                  <span class="detail-label">{{ 'labels.inputs.Total Repaid' | translate }}:</span>
+                  <span class="detail-value repaid-amount"
+                    ><strong>{{ locDetails?.totalRepaid | currency: locDetails?.currency || '' }}</strong></span
+                  >
+                </div>
+              </div>
             </div>
           </mat-card-content>
         </mat-card>
@@ -558,66 +579,82 @@
                 <span class="detail-value">{{ locDetails?.activationDate | dateFormat }}</span>
               </div>
             </div>
+
+            <!-- Additional Business Information -->
+            <div
+              class="business-info"
+              style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0"
+              *ngIf="locDetails?.distributionPartner || locDetails?.reviewPeriod || locDetails?.loanOfficerName"
+            >
+              <h4 style="margin: 0 0 12px 0; color: #666; font-size: 14px; font-weight: 500">
+                Additional Business Information
+              </h4>
+              <div class="detail-row" *ngIf="locDetails?.distributionPartner">
+                <span class="detail-label">{{ 'labels.inputs.Distribution Partner' | translate }}:</span>
+                <span class="detail-value">{{ locDetails?.distributionPartner }}</span>
+              </div>
+              <div class="detail-row" *ngIf="locDetails?.reviewPeriod">
+                <span class="detail-label">{{ 'labels.inputs.Review Period' | translate }}:</span>
+                <span class="detail-value"
+                  >{{ locDetails?.reviewPeriod }} {{ locDetails?.reviewPeriod === 1 ? 'month' : 'months' }}</span
+                >
+              </div>
+              <div class="detail-row" *ngIf="locDetails?.loanOfficerName">
+                <span class="detail-label">{{ 'labels.inputs.Loan Officer' | translate }}:</span>
+                <span class="detail-value">{{ locDetails?.loanOfficerName }}</span>
+              </div>
+            </div>
           </mat-card-content>
         </mat-card>
       </div>
 
-      <!-- Charges & Audit Trail -->
+      <!-- Charges Summary -->
       <div fxFlex="34%" fxFlex.lt-md="100%">
         <mat-card>
           <mat-card-header>
-            <mat-card-title>{{ 'labels.inputs.Charges & Audit Trail' | translate }}</mat-card-title>
+            <mat-card-title>{{ 'labels.inputs.Charges Summary' | translate }}</mat-card-title>
           </mat-card-header>
           <mat-card-content>
             <div class="charges-section" *ngIf="chargesSummary || locDetails?.charges?.length; else noCharges">
-              <div class="charges-summary">
-                <div class="summary-item">
-                  <span class="label">Total Charges:</span>
-                  <strong class="amount">{{ getTotalChargesAmount() | currency: locDetails?.currency || '' }}</strong>
-                </div>
-                <div class="summary-item">
-                  <span class="label">Amount Paid:</span>
-                  <strong class="amount">{{ getTotalPaidAmount() | currency: locDetails?.currency || '' }}</strong>
-                </div>
-                <div class="summary-item">
-                  <span class="label">Amount Waived:</span>
-                  <strong class="amount">{{ getTotalWaivedAmount() | currency: locDetails?.currency || '' }}</strong>
-                </div>
-                <div class="summary-item outstanding">
-                  <span class="label">Outstanding:</span>
-                  <strong class="amount">{{
-                    getTotalOutstandingAmount() | currency: locDetails?.currency || ''
-                  }}</strong>
-                </div>
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Total Charges' | translate }}:</span>
+                <span class="detail-value">
+                  <strong>{{ getTotalChargesAmount() | currency: locDetails?.currency || '' }}</strong>
+                </span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Amount Paid' | translate }}:</span>
+                <span class="detail-value">
+                  <strong>{{ getTotalPaidAmount() | currency: locDetails?.currency || '' }}</strong>
+                </span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Amount Waived' | translate }}:</span>
+                <span class="detail-value">
+                  <strong>{{ getTotalWaivedAmount() | currency: locDetails?.currency || '' }}</strong>
+                </span>
+              </div>
+              <div class="detail-row outstanding">
+                <span class="detail-label">{{ 'labels.inputs.Outstanding' | translate }}:</span>
+                <span class="detail-value outstanding-amount">
+                  <strong>{{ getTotalOutstandingAmount() | currency: locDetails?.currency || '' }}</strong>
+                </span>
               </div>
             </div>
             <ng-template #noCharges>
-              <div style="text-align: center; padding: 20px; color: #999; font-style: italic">
-                No charges configured
+              <div
+                style="
+                  text-align: center;
+                  padding: 20px;
+                  color: #999;
+                  background: #fafafa;
+                  border-radius: 8px;
+                  border: 1px dashed #ddd;
+                "
+              >
+                <span style="font-style: italic; font-size: 13px">No charges configured</span>
               </div>
             </ng-template>
-
-            <div class="audit-section">
-              <h4>Audit Trail</h4>
-              <div class="audit-timeline">
-                <div class="audit-item" *ngIf="locDetails?.createdDate">
-                  <div>
-                    <strong>Created</strong>
-                    <span>{{ locDetails?.createdDate | dateFormat }}</span>
-                    <span *ngIf="locDetails?.createdByUsername"> by {{ locDetails?.createdByUsername }} </span>
-                  </div>
-                </div>
-                <div class="audit-item" *ngIf="locDetails?.lastModifiedDate">
-                  <div>
-                    <strong>Last Modified</strong>
-                    <span>{{ locDetails?.lastModifiedDate | dateFormat }}</span>
-                    <span *ngIf="locDetails?.lastModifiedByUsername">
-                      by {{ locDetails?.lastModifiedByUsername }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
           </mat-card-content>
         </mat-card>
       </div>
@@ -651,6 +688,15 @@
         [active]="charges.isActive"
       >
         {{ 'labels.inputs.Charges' | translate }}
+      </a>
+      <a
+        mat-tab-link
+        [routerLink]="['./audit-trail']"
+        routerLinkActive
+        #auditTrail="routerLinkActive"
+        [active]="auditTrail.isActive"
+      >
+        {{ 'labels.inputs.Audit Trail' | translate }}
       </a>
     </nav>
 

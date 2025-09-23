@@ -179,6 +179,7 @@ export class ViewLocDetailsComponent implements OnInit {
       approvedCreditFacilityAmount: data.approvedCreditFacilityAmount,
       availableBalance: data.availableBalance,
       outstanding: data.outstanding,
+      consumedAmount: data.consumedAmount,
       tenorDays: data.tenorDays,
       activeLoans: data.activeLoans,
       totalRepaid: data.totalRepaid,
@@ -187,6 +188,23 @@ export class ViewLocDetailsComponent implements OnInit {
       performance: data.performance,
       charges: Array.isArray(data.charges) ? data.charges : [],
       currency: data.currency,
+
+      // Date fields
+      startDate: this.parseDate(data.startDate),
+      endDate: this.parseDate(data.endDate),
+
+      // LOC specific fields
+      advancePercentage: data.advancePercentage,
+      cashMarginType: data.cashMarginType,
+      cashMarginValue: data.cashMarginValue,
+      rateType: data.rateType,
+      interestChargeTime: data.interestChargeTime,
+
+      // Business fields
+      distributionPartner: data.distributionPartner,
+      reviewPeriod: data.reviewPeriod,
+      loanOfficerId: data.loanOfficerId,
+      loanOfficerName: data.loanOfficerName,
 
       // Approved Buyers - handle multiple possible field names and structures
       approvedBuyersList: this.extractApprovedBuyers(data),
@@ -217,6 +235,7 @@ export class ViewLocDetailsComponent implements OnInit {
       clientAccountNo: data.client?.accountNo,
       clientExternalId: data.client?.externalId,
       clientStatus: data.client?.status?.value,
+      clientLegalForm: data.client?.legalForm?.value,
       officeName: data.client?.officeName,
 
       // Audit fields
@@ -254,23 +273,9 @@ export class ViewLocDetailsComponent implements OnInit {
    * Calculate utilization percentage
    */
   private calculateUtilization(data: any): number {
-    // Try various field names for credit limit
-    const maxAmount =
-      data.maximumAmount ||
-      data.maxCreditLimit ||
-      data.creditLimit ||
-      data.approvedCreditFacilityAmount ||
-      data.facilityAmount;
-
-    // Try various field names for utilized/outstanding amount
-    const consumedAmount =
-      data.outstanding ||
-      data.consumedAmount ||
-      data.consumed_amount ||
-      data.utilizedAmount ||
-      data.utilized_amount ||
-      data.drawn ||
-      data.drawnAmount;
+    // Use the specific field from the API response
+    const maxAmount = data.maximumAmount;
+    const consumedAmount = data.consumedAmount;
 
     if (maxAmount && maxAmount > 0 && consumedAmount !== null && consumedAmount !== undefined) {
       const percentage = (consumedAmount / maxAmount) * 100;
@@ -579,15 +584,7 @@ export class ViewLocDetailsComponent implements OnInit {
    * Get the appropriate date field name for the action
    */
   private getDateFieldName(action: string): string {
-    const fieldNames: { [key: string]: string } = {
-      approve: 'approvedOnDate',
-      activate: 'activatedOnDate',
-      deactivate: 'closedOnDate',
-      reactivate: 'reactivatedOnDate',
-      suspend: 'suspendedOnDate',
-      close: 'closedOnDate'
-    };
-    return fieldNames[action] || 'actionDate';
+    return 'actionDate';
   }
 
   /**

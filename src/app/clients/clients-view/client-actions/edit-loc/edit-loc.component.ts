@@ -44,6 +44,12 @@ export class EditLocComponent implements OnInit {
   updateError: string | null = null;
   // Settlement account options (client savings)
   savingsAccounts: any[] = [];
+  /** Loan Officer Data */
+  loanOfficerOptions: any[] = [];
+  /** Cash Margin Type Options */
+  cashMarginTypeOptions: any[] = [];
+  /** Interest Charge Time Options */
+  interestChargeTimeOptions: any[] = [];
   // Original LOC data for prepopulation
   originalLocData: any = null;
 
@@ -91,6 +97,18 @@ export class EditLocComponent implements OnInit {
       const acctCode = sa?.currency?.code || sa?.currencyCode || sa?.currency;
       return acctCode === code;
     });
+  }
+
+  // Get display name for cash margin type
+  getCashMarginTypeDisplay(typeCode: string): string {
+    const type = this.cashMarginTypeOptions.find((cmt) => cmt.code === typeCode);
+    return type?.value || typeCode || '';
+  }
+
+  // Get display name for interest charge time
+  getInterestChargeTimeDisplay(timeCode: string): string {
+    const time = this.interestChargeTimeOptions.find((ict) => ict.code === timeCode);
+    return time?.value || timeCode || '';
   }
 
   ngOnInit() {
@@ -174,6 +192,9 @@ export class EditLocComponent implements OnInit {
       this.productTypeOptions = locTemplate.productTypeOptions || [];
       this.reviewPeriodsOptions = locTemplate.reviewPeriodsOptions || [];
       this.activationStatusOptions = locTemplate.activationStatusOptions || [];
+      this.loanOfficerOptions = locTemplate.loanOfficers || [];
+      this.cashMarginTypeOptions = locTemplate.cashMarginTypeOptions || [];
+      this.interestChargeTimeOptions = locTemplate.interestChargeTimeOptions || [];
     }
 
     // read resolved currencies from route
@@ -226,7 +247,12 @@ export class EditLocComponent implements OnInit {
         expiryDate: this.formatDateForInput(loc.endDate || loc.expiryDate),
         reviewPeriod: loc.reviewPeriod || '',
         annualInterestRate: loc.annualInterestRate || loc.interestRateOverride || loc.interestRate || '',
-        tenorDays: loc.tenorDays || loc.tenorInDays || ''
+        tenorDays: loc.tenorDays || loc.tenorInDays || '',
+        advancePercentage: loc.advancePercentage || '100',
+        cashMarginType: loc.cashMarginType || 'locCashMarginType.flat',
+        cashMarginValue: loc.cashMarginValue || '',
+        interestChargeTime: loc.interestChargeTime || '',
+        loanOfficerId: loc.loanOfficerId || ''
       },
       settlementSavingsAccountId: loc.settlementSavingsAccountId || ''
     });
@@ -358,7 +384,10 @@ export class EditLocComponent implements OnInit {
           latePaymentFee: [''],
           tenorDays: [''],
           advancePercentage: ['100'],
-          loanOfficer: [
+          cashMarginType: ['locCashMarginType.flat'],
+          cashMarginValue: [''],
+          interestChargeTime: [''],
+          loanOfficerId: [
             '',
             Validators.required
           ],

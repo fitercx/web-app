@@ -1,0 +1,133 @@
+<div class="audit-trail-container">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>
+        <mat-icon>history</mat-icon>
+        {{ 'labels.inputs.Audit Trail' | translate }}
+      </mat-card-title>
+      <mat-card-subtitle> Complete timeline of Line of Credit activities </mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <!-- Audit Summary Cards -->
+      <div fxLayout="row" fxLayoutGap="16px" fxLayout.lt-md="column" class="audit-summary">
+        <div fxFlex="25%" fxFlex.lt-md="100%">
+          <mat-card class="summary-card created">
+            <mat-card-content>
+              <div class="summary-header">
+                <mat-icon>add_circle</mat-icon>
+                <span>Created</span>
+              </div>
+              <div class="summary-details" *ngIf="auditData.createdDate">
+                <div class="summary-date">{{ auditData.createdDate | dateFormat }}</div>
+                <div class="summary-user">{{ auditData.createdByUsername || 'System' }}</div>
+                <div class="summary-time">{{ getRelativeTime(auditData.createdDate) }}</div>
+              </div>
+              <div class="summary-details" *ngIf="!auditData.createdDate">
+                <span class="no-data">Not available</span>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        </div>
+
+        <div fxFlex="25%" fxFlex.lt-md="100%">
+          <mat-card class="summary-card approved">
+            <mat-card-content>
+              <div class="summary-header">
+                <mat-icon>check_circle</mat-icon>
+                <span>Approved</span>
+              </div>
+              <div class="summary-details" *ngIf="auditData.approvedDate">
+                <div class="summary-date">{{ auditData.approvedDate | dateFormat }}</div>
+                <div class="summary-user">{{ auditData.approvedByUsername || 'System' }}</div>
+                <div class="summary-time">{{ getRelativeTime(auditData.approvedDate) }}</div>
+              </div>
+              <div class="summary-details" *ngIf="!auditData.approvedDate">
+                <span class="no-data">Not approved yet</span>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        </div>
+
+        <div fxFlex="25%" fxFlex.lt-md="100%">
+          <mat-card class="summary-card activated">
+            <mat-card-content>
+              <div class="summary-header">
+                <mat-icon>play_circle</mat-icon>
+                <span>Activated</span>
+              </div>
+              <div class="summary-details" *ngIf="auditData.activatedDate">
+                <div class="summary-date">{{ auditData.activatedDate | dateFormat }}</div>
+                <div class="summary-user">{{ auditData.activatedByUsername || 'System' }}</div>
+                <div class="summary-time">{{ getRelativeTime(auditData.activatedDate) }}</div>
+              </div>
+              <div class="summary-details" *ngIf="!auditData.activatedDate">
+                <span class="no-data">Not activated yet</span>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        </div>
+
+        <div fxFlex="25%" fxFlex.lt-md="100%">
+          <mat-card class="summary-card modified">
+            <mat-card-content>
+              <div class="summary-header">
+                <mat-icon>edit</mat-icon>
+                <span>Last Modified</span>
+              </div>
+              <div class="summary-details" *ngIf="auditData.lastModifiedDate">
+                <div class="summary-date">{{ auditData.lastModifiedDate | dateFormat }}</div>
+                <div class="summary-user">{{ auditData.lastModifiedByUsername || 'System' }}</div>
+                <div class="summary-time">{{ getRelativeTime(auditData.lastModifiedDate) }}</div>
+              </div>
+              <div class="summary-details" *ngIf="!auditData.lastModifiedDate">
+                <span class="no-data">Never modified</span>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        </div>
+      </div>
+
+      <!-- Audit Timeline -->
+      <div class="audit-timeline-section">
+        <h3>Activity Timeline</h3>
+
+        <div class="audit-timeline" *ngIf="auditEntries.length > 0; else noAuditData">
+          <div class="timeline-item" *ngFor="let entry of auditEntries; let first = first; let last = last">
+            <div class="timeline-marker" [ngClass]="'marker-' + entry.color">
+              <mat-icon>{{ entry.icon }}</mat-icon>
+            </div>
+            <div class="timeline-content">
+              <mat-card class="timeline-card">
+                <mat-card-content>
+                  <div class="timeline-header">
+                    <h4 class="timeline-action">{{ entry.action }}</h4>
+                    <span class="timeline-date">{{ entry.date | dateFormat }}</span>
+                  </div>
+                  <div class="timeline-details">
+                    <p class="timeline-description">{{ entry.details }}</p>
+                    <div class="timeline-meta">
+                      <span class="timeline-user">
+                        <mat-icon class="user-icon">person</mat-icon>
+                        {{ entry.user }}
+                      </span>
+                      <span class="timeline-relative">{{ getRelativeTime(entry.date) }}</span>
+                    </div>
+                  </div>
+                </mat-card-content>
+              </mat-card>
+            </div>
+          </div>
+        </div>
+
+        <ng-template #noAuditData>
+          <div class="no-audit-data">
+            <mat-icon class="no-data-icon">history_toggle_off</mat-icon>
+            <h3>No Audit Trail Available</h3>
+            <p>No audit information is available for this Line of Credit.</p>
+          </div>
+        </ng-template>
+      </div>
+    </mat-card-content>
+  </mat-card>
+</div>

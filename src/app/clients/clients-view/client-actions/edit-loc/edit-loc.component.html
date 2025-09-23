@@ -228,10 +228,6 @@
 
               <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
                 <mat-form-field fxFlex>
-                  <mat-label>Tenor in Days</mat-label>
-                  <input matInput type="number" formControlName="tenorDays" placeholder="e.g. 365" />
-                </mat-form-field>
-                <mat-form-field fxFlex>
                   <mat-label>Advance Percentage</mat-label>
                   <input
                     matInput
@@ -244,13 +240,57 @@
                   />
                   <span matSuffix>%</span>
                 </mat-form-field>
+                <mat-form-field fxFlex>
+                  <mat-label>Cash Margin Type</mat-label>
+                  <mat-select formControlName="cashMarginType">
+                    <mat-option *ngFor="let cmt of cashMarginTypeOptions" [value]="cmt.code">
+                      {{ cmt.value }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
+              </div>
+
+              <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
+                <mat-form-field fxFlex>
+                  <mat-label>Cash Margin Value</mat-label>
+                  <input
+                    matInput
+                    type="number"
+                    formControlName="cashMarginValue"
+                    placeholder="0.00"
+                    step="0.01"
+                    min="0"
+                  />
+                  <span
+                    matSuffix
+                    *ngIf="locForm.get(['limitsTerms', 'cashMarginType'])?.value === 'locCashMarginType.percentage'"
+                    >%</span
+                  >
+                  <span
+                    matSuffix
+                    *ngIf="locForm.get(['limitsTerms', 'cashMarginType'])?.value === 'locCashMarginType.flat'"
+                    >{{ selectedCurrencyCode || '' }}</span
+                  >
+                </mat-form-field>
+                <mat-form-field fxFlex>
+                  <mat-label>Interest Charge Time</mat-label>
+                  <mat-select formControlName="interestChargeTime">
+                    <mat-option *ngFor="let ict of interestChargeTimeOptions" [value]="ict.code">
+                      {{ ict.value }}
+                    </mat-option>
+                  </mat-select>
+                </mat-form-field>
               </div>
 
               <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
                 <mat-form-field fxFlex>
                   <mat-label>Loan Officer *</mat-label>
-                  <input matInput formControlName="loanOfficer" placeholder="Enter loan officer name" required />
-                  <mat-error *ngIf="locForm.get(['limitsTerms', 'loanOfficer'])?.hasError('required')"
+                  <mat-select formControlName="loanOfficerId" required>
+                    <mat-option *ngFor="let loanOfficer of loanOfficerOptions" [value]="loanOfficer.id">
+                      {{ loanOfficer.displayName }}
+                    </mat-option>
+                  </mat-select>
+                  <mat-error *ngIf="locForm.get(['limitsTerms', 'loanOfficerId'])?.hasError('required')"
                     >Loan Officer is required.</mat-error
                   >
                 </mat-form-field>
@@ -471,6 +511,38 @@
               <div fxFlexFill>
                 <span fxFlex="40%">Tenor (Days)</span>
                 <span fxFlex="60%">{{ previewPayload.tenorDays || '—' }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Advance Percentage</span>
+                <span fxFlex="60%"
+                  >{{ previewPayload.advancePercentage || '—'
+                  }}<span *ngIf="previewPayload.advancePercentage">%</span></span
+                >
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Cash Margin Type</span>
+                <span fxFlex="60%">{{ getCashMarginTypeDisplay(previewPayload.cashMarginType) || '—' }}</span>
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Cash Margin Value</span>
+                <span fxFlex="60%"
+                  >{{ previewPayload.cashMarginValue || '—'
+                  }}{{
+                    previewPayload.cashMarginType === 'locCashMarginType.percentage' && previewPayload.cashMarginValue
+                      ? '%'
+                      : previewPayload.cashMarginType === 'locCashMarginType.flat' && previewPayload.cashMarginValue
+                        ? ' ' + (selectedCurrencyCode || '')
+                        : ''
+                  }}</span
+                >
+              </div>
+
+              <div fxFlexFill>
+                <span fxFlex="40%">Interest Charge Time</span>
+                <span fxFlex="60%">{{ getInterestChargeTimeDisplay(previewPayload.interestChargeTime) || '—' }}</span>
               </div>
 
               <h3 class="mat-h3" fxFlexFill style="margin-top: 16px">Charges</h3>
