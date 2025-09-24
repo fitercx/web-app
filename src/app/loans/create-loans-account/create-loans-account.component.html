@@ -41,6 +41,7 @@
         [collateralOptions]="collateralOptions"
         [loansAccountFormValid]="loansAccountFormValid"
         [loanPrincipal]="loanPrincipal"
+        [locSelected]="isLocEnabled && loansAccountDetailsStep?.loansAccountDetailsForm?.get('lineOfCreditId')?.value"
       >
       </mifosx-loans-account-terms-step>
     </mat-step>

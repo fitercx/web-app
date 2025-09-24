@@ -1,4 +1,4 @@
-import { Component, ViewChild } from '@angular/core';
+import { Component, ViewChild, AfterViewInit, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LoansService } from '../loans.service';
 import { LoansAccountDetailsStepComponent } from '../loans-account-stepper/loans-account-details-step/loans-account-details-step.component';
@@ -18,7 +18,7 @@ import { Dates } from 'app/core/utils/dates';
   templateUrl: './edit-loans-account.component.html',
   styleUrls: ['./edit-loans-account.component.scss']
 })
-export class EditLoansAccountComponent {
+export class EditLoansAccountComponent implements AfterViewInit, OnDestroy {
   @ViewChild(LoansAccountDetailsStepComponent, { static: true })
   loansAccountDetailsStep: LoansAccountDetailsStepComponent;
   @ViewChild(LoansAccountTermsStepComponent, { static: true }) loansAccountTermsStep: LoansAccountTermsStepComponent;
@@ -38,6 +38,10 @@ export class EditLoansAccountComponent {
   currencyCode: string;
   /** Available Currencies */
   currencies: any[] = [];
+  /** Subscriptions */
+  private principalSyncSub: any;
+  private locIdSub: any;
+  private invoiceSyncSub: any;
 
   /**
    * Sets loans account edit form.
@@ -59,6 +63,22 @@ export class EditLoansAccountComponent {
       this.currencies = data.currencies ? data.currencies.selectedCurrencyOptions || [] : [];
     });
     this.loanId = this.route.snapshot.params['loanId'];
+  }
+
+  ngAfterViewInit(): void {
+    setTimeout(() => this.setupPrincipalInvoiceSync(), 0);
+  }
+
+  ngOnDestroy(): void {
+    if (this.principalSyncSub) {
+      this.principalSyncSub.unsubscribe();
+    }
+    if (this.locIdSub) {
+      this.locIdSub.unsubscribe();
+    }
+    if (this.invoiceSyncSub) {
+      this.invoiceSyncSub.unsubscribe();
+    }
   }
 
   /**
@@ -95,6 +115,63 @@ export class EditLoansAccountComponent {
   /** Check if LOC is enabled */
   get isLocEnabled(): boolean {
     return this.loansAccountDetailsStep?.isLocEnabled || false;
+  }
+
+  /** Sets up subscription to keep invoiceAmount == principalAmount when LOC selected */
+  private setupPrincipalInvoiceSync(): void {
+    const principalControl = this.loansAccountTermsStep?.loansAccountTermsForm?.get('principalAmount');
+    if (principalControl && !this.principalSyncSub) {
+      this.principalSyncSub = principalControl.valueChanges.subscribe(() => this.syncInvoiceAmountWithPrincipal());
+      this.syncInvoiceAmountWithPrincipal();
+    }
+    const locControl = this.loansAccountDetailsStep?.loansAccountDetailsForm?.get('lineOfCreditId');
+    if (locControl && !this.locIdSub) {
+      this.locIdSub = locControl.valueChanges.subscribe(() => this.syncInvoiceAmountWithPrincipal());
+    }
+    const invoiceControl = this.loansAccountLocDetailsStep?.locDetailsForm?.get('invoiceAmount');
+    if (invoiceControl && !this.invoiceSyncSub) {
+      this.invoiceSyncSub = invoiceControl.valueChanges.subscribe(() => this.syncPrincipalAmountWithInvoice());
+    }
+  }
+
+  /** Performs the actual sync under required conditions */
+  private syncInvoiceAmountWithPrincipal(): void {
+    if (!this.isLocEnabled) {
+      return;
+    }
+    const locId = this.loansAccountDetailsStep?.loansAccountDetailsForm?.get('lineOfCreditId')?.value;
+    if (!locId) {
+      return;
+    }
+    const principalVal = this.loansAccountTermsStep?.loansAccountTermsForm?.get('principalAmount')?.value;
+    const invoiceControl = this.loansAccountLocDetailsStep?.locDetailsForm?.get('invoiceAmount');
+    if (invoiceControl == null || principalVal == null) {
+      return;
+    }
+    if (invoiceControl.value !== principalVal) {
+      invoiceControl.setValue(principalVal, { emitEvent: false });
+    }
+    if (!this.invoiceSyncSub && invoiceControl) {
+      this.invoiceSyncSub = invoiceControl.valueChanges.subscribe(() => this.syncPrincipalAmountWithInvoice());
+    }
+  }
+
+  private syncPrincipalAmountWithInvoice(): void {
+    if (!this.isLocEnabled) {
+      return;
+    }
+    const locId = this.loansAccountDetailsStep?.loansAccountDetailsForm?.get('lineOfCreditId')?.value;
+    if (!locId) {
+      return;
+    }
+    const invoiceVal = this.loansAccountLocDetailsStep?.locDetailsForm?.get('invoiceAmount')?.value;
+    const principalControl = this.loansAccountTermsStep?.loansAccountTermsForm?.get('principalAmount');
+    if (principalControl == null || invoiceVal == null) {
+      return;
+    }
+    if (principalControl.value !== invoiceVal) {
+      principalControl.setValue(invoiceVal, { emitEvent: false });
+    }
   }
 
   /** Checks wheter all the forms in different steps are valid and not pristine */
