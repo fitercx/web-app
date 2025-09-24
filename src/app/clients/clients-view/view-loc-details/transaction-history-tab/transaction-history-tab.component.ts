@@ -21,6 +21,7 @@ export class TransactionHistoryTabComponent implements OnInit {
   ];
   totalRecords = 0;
   pageSize = 20;
+  locCurrency: string = '';
 
   @ViewChild(MatPaginator) paginator: MatPaginator;
 
@@ -30,7 +31,18 @@ export class TransactionHistoryTabComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.loadLocCurrency();
     this.fetchTransactions(0, this.pageSize);
+  }
+
+  private loadLocCurrency(): void {
+    const locId = this.route.parent?.snapshot.paramMap.get('locId');
+    const clientId = this.route.parent?.parent?.snapshot.paramMap.get('clientId');
+    if (clientId && locId && (this.clientsService as any).getClientCreditLine) {
+      (this.clientsService as any).getClientCreditLine(clientId, locId).subscribe((loc: any) => {
+        this.locCurrency = loc?.currency || '';
+      });
+    }
   }
 
   fetchTransactions(offset: number, limit: number): void {

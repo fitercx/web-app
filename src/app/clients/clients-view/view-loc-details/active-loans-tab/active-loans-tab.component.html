@@ -20,19 +20,21 @@
 
     <ng-container matColumnDef="Loan Amount">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Loan Amount' | translate }}</th>
-      <td mat-cell *matCellDef="let element">{{ element.principal | formatNumber }}</td>
+      <td mat-cell *matCellDef="let element">{{ element.principal | currency: locCurrency }}</td>
     </ng-container>
 
     <ng-container matColumnDef="Outstanding Balance">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Outstanding Balance' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let element">
-        {{ element.summary?.principalOutstanding | formatNumber }}
+        {{ element.summary?.principalOutstanding | currency: locCurrency }}
       </td>
     </ng-container>
 
     <ng-container matColumnDef="Amount Paid">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Amount Paid' | translate }}</th>
-      <td mat-cell class="r-amount" *matCellDef="let element">{{ element.summary?.totalRepayment | formatNumber }}</td>
+      <td mat-cell class="r-amount" *matCellDef="let element">
+        {{ element.summary?.totalRepayment | currency: locCurrency }}
+      </td>
     </ng-container>
 
     <ng-container matColumnDef="Actions">

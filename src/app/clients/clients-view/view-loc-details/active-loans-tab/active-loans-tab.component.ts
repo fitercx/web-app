@@ -22,6 +22,7 @@ export class ActiveLoansTabComponent implements OnInit {
   ];
   loanAccounts: MatTableDataSource<any>;
   totalRecords = 0;
+  locCurrency: string = '';
 
   @ViewChild(MatPaginator) paginator: MatPaginator;
 
@@ -39,7 +40,18 @@ export class ActiveLoansTabComponent implements OnInit {
 
   ngOnInit(): void {
     this.loanAccounts = new MatTableDataSource([]);
+    this.loadLocCurrency();
     this.getLoans();
+  }
+
+  private loadLocCurrency(): void {
+    if (this.clientId && this.locId && this.clientsService && (this.clientsService as any).getClientCreditLine) {
+      (this.clientsService as any)
+        .getClientCreditLine(this.clientId.toString(), this.locId.toString())
+        .subscribe((loc: any) => {
+          this.locCurrency = loc?.currency || '';
+        });
+    }
   }
 
   getLoans() {

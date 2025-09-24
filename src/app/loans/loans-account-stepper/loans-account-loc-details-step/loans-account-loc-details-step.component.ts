@@ -124,6 +124,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
     // Update form validators when LOC selection changes
     if (changes['selectedLocId'] || changes['locOptions']) {
       this.updateFormValidators();
+      this.prefillAdvancePercentageFromSelectedLoc();
     }
   }
 
@@ -266,6 +267,44 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
     this.locDetailsForm.get('exchangeRate')?.updateValueAndValidity();
     this.locDetailsForm.get('markup')?.updateValueAndValidity();
     this.locDetailsForm.get('supplierDetails')?.updateValueAndValidity();
+
+    // Apply currency behavior (must happen after validators and possible option updates)
+    this.updateInvoiceCurrencyBehavior();
+  }
+
+  /**
+   * Sets default and editability for invoiceCurrency based on LOC type
+   * - RECEIVABLE: default to product currency (or first available) and disable editing
+   * - PAYABLE: enable editing
+   * - Other: enable editing
+   */
+  private updateInvoiceCurrencyBehavior(): void {
+    const invoiceCurrencyControl = this.locDetailsForm.get('invoiceCurrency');
+    if (!invoiceCurrencyControl) {
+      return;
+    }
+
+    if (this.isReceivableType) {
+      const productCurrencyCode =
+        this.loansAccountProductTemplate?.currency?.code || this.currencyOptions?.[0]?.code || '';
+      if (productCurrencyCode && invoiceCurrencyControl.value !== productCurrencyCode) {
+        invoiceCurrencyControl.setValue(productCurrencyCode, { emitEvent: false });
+      }
+      if (!invoiceCurrencyControl.disabled) {
+        invoiceCurrencyControl.disable({ emitEvent: false });
+      }
+    } else {
+      if (invoiceCurrencyControl.disabled) {
+        invoiceCurrencyControl.enable({ emitEvent: false });
+      }
+      // If no value yet, default to product currency for convenience
+      if (!invoiceCurrencyControl.value) {
+        const defaultCode = this.loansAccountProductTemplate?.currency?.code || this.currencyOptions?.[0]?.code || '';
+        if (defaultCode) {
+          invoiceCurrencyControl.setValue(defaultCode, { emitEvent: false });
+        }
+      }
+    }
   }
 
   /**
@@ -403,6 +442,35 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
     }
 
     return false;
+  }
+
+  /** Prefill advancePercentage control from selected LOC (advancePercentage field) if available and control empty */
+  private prefillAdvancePercentageFromSelectedLoc(): void {
+    if (!this.locOptions || this.locOptions.length === 0) return;
+
+    // Resolve selected LOC ID (same logic as status helpers)
+    let locId: number | null = null;
+    if (this.loansAccountTemplate?.additionalProperties?.lineOfCreditId) {
+      locId = this.loansAccountTemplate.additionalProperties.lineOfCreditId;
+    } else if (this.selectedLocId) {
+      locId = this.selectedLocId;
+    } else if (this.loansAccountTemplate?.lineOfCreditId) {
+      locId = this.loansAccountTemplate.lineOfCreditId;
+    }
+    if (!locId) return;
+
+    const selectedLoc = this.locOptions.find((loc: any) => loc.id === locId);
+    if (!selectedLoc) return;
+
+    const locAdvance = selectedLoc.advancePercentage; // expected field name from payload
+    const control = this.locDetailsForm.get('advancePercentage');
+    if (!control) return;
+
+    // Only set if control is pristine or empty/null
+    const currentVal = control.value;
+    if ((currentVal === null || currentVal === '' || currentVal === undefined) && (locAdvance || locAdvance === 0)) {
+      control.setValue(locAdvance, { emitEvent: true });
+    }
   }
 
   /**

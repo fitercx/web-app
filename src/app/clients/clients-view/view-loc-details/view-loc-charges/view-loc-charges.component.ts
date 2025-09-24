@@ -24,6 +24,7 @@ export class ViewLocChargesComponent implements OnInit {
   totalRecords = 0;
   pageSize = 20;
   locStatus: string = '';
+  locCurrency: string = '';
   currentPage = 0;
   charges: any[] = [];
 
@@ -59,6 +60,7 @@ export class ViewLocChargesComponent implements OnInit {
     if (clientId && locId) {
       this.clientsService.getClientCreditLine(clientId, locId).subscribe((locData: any) => {
         this.locStatus = locData.status;
+        this.locCurrency = locData?.currency || '';
       });
     }
   }

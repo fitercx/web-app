@@ -71,5 +71,38 @@ export class LoansAccountPreviewStepComponent implements OnChanges {
         .filter((member: any) => member.selected)
         .reduce((acc: number, member: any) => acc + (member.principal ?? 0), 0);
     }
+
+    // Ensure LOC amounts are synchronized in the preview data
+    if (this.loansAccount && this.isLocEnabled()) {
+      this.synchronizeLOCAmounts();
+    }
+  }
+
+  /**
+   * Checks if LOC is enabled based on loan account data
+   */
+  private isLocEnabled(): boolean {
+    return !!(this.loansAccount.lineOfCreditId || this.loansAccount.invoiceNo || this.loansAccount.invoiceAmount);
+  }
+
+  /**
+   * Ensures principal and invoice amounts are synchronized for LOC display
+   */
+  private synchronizeLOCAmounts(): void {
+    const principalAmount = this.loansAccount.principalAmount;
+    const invoiceAmount = this.loansAccount.invoiceAmount;
+
+    // If both exist and are different, prioritize principal amount
+    if (principalAmount != null && invoiceAmount != null && principalAmount !== invoiceAmount) {
+      this.loansAccount.invoiceAmount = principalAmount;
+    }
+    // If only principal exists, set invoice amount
+    else if (principalAmount != null && (invoiceAmount == null || invoiceAmount === '')) {
+      this.loansAccount.invoiceAmount = principalAmount;
+    }
+    // If only invoice exists, set principal amount (fallback case)
+    else if (invoiceAmount != null && (principalAmount == null || principalAmount === '')) {
+      this.loansAccount.principalAmount = invoiceAmount;
+    }
   }
 }

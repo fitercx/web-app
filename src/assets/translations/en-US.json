@@ -291,6 +291,8 @@
       "Home": "Home"
     },
     "buttons": {
+      "Activate LOC": "Activate LOC",
+      "Approve LOC": "Approve LOC",
       "New Drawdown": "New Drawdown",
       "Increase Limit": "Increase Limit",
       "Decrease Limit": "Decrease Limit",
@@ -1182,6 +1184,23 @@
       "Principal Amount": "Principal Amount"
     },
     "inputs": {
+      "Approved Facility": "Approved Facility",
+      "Principal/Invoice Amount": "Principal/Invoice Amount",
+      "LOC DETAILS": "LOC DETAILS",
+      "Reject Additional Shares": "Reject Additional Shares",
+      "Consumed Amount": "Consumed Amount",
+      "Advance Percentage": "Advance Percentage",
+      "Cash Margin": "Cash Margin",
+      "Rate Type": "Rate Type",
+      "Interest Charge Time": "Interest Charge Time",
+      "Distribution Partner": "Distribution Partner",
+      "Review Period": "Review Period",
+      "Next Review Date": "Next Review Date",
+      "THREE_MONTHS": "3 Months",
+      "SIX_MONTHS": "6 Months",
+      "TWELVE_MONTHS": "12 Months",
+      "Total Charges": "Total Charges",
+      "Amount Waived": "Amount Waived",
       "Line of Credit ID": "Line of Credit ID",
       "Line of External Id": "Line of External Id",
       "Invoice No": "Invoice No",
@@ -1208,7 +1227,8 @@
       "utilized": "Utilized",
       "Utilization": "Utilization",
       "Outstanding Amount": "Outstanding Amount",
-      "Charges & Audit Trail": "Charges & Audit Trail",
+      "Charges Summary": "Charges Summary",
+      "Audit Trail": "Audit Trail",
       "Terms & Settlement": "Terms & Settlement",
       "Business Information": "Business Information",
       "Credit Utilization": "Credit Utilization",
@@ -2705,7 +2725,10 @@
       "Transfer on hold": "Transfer on hold",
       "Withdrawn": "Withdrawn",
       "Forced Closure": "Forced Closure",
-      "Restructured": "Restructured"
+      "Restructured": "Restructured",
+      "Submitted": "Submitted",
+      "Inactive": "Inactive",
+      "Suspended": "Suspended"
     },
     "dialogContext": {
       "Are you sure you want Unassign Staff": "Are you sure you want Unassign Staff",
