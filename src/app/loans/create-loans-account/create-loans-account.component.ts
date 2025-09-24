@@ -310,6 +310,26 @@ export class CreateLoansAccountComponent implements AfterViewInit, OnDestroy {
       if (Object.keys(filteredLocDetails).length > 0) {
         Object.assign(baseData, filteredLocDetails);
       }
+
+      // Ensure synchronization of principal and invoice amounts for LOC
+      const locId = this.loansAccountDetailsStep?.loansAccountDetailsForm?.get('lineOfCreditId')?.value;
+      if (locId) {
+        const principalAmount = baseData.principalAmount;
+        const invoiceAmount = filteredLocDetails.invoiceAmount;
+
+        // If both exist and are different, use the principal amount as the source of truth
+        if (principalAmount != null && invoiceAmount != null && principalAmount !== invoiceAmount) {
+          baseData.invoiceAmount = principalAmount;
+        }
+        // If only principal exists, set invoice amount
+        else if (principalAmount != null && !invoiceAmount) {
+          baseData.invoiceAmount = principalAmount;
+        }
+        // If only invoice exists, set principal amount
+        else if (invoiceAmount != null && !principalAmount) {
+          baseData.principalAmount = invoiceAmount;
+        }
+      }
     }
 
     return baseData;

@@ -166,18 +166,3 @@ h6 {
   background: #ffebee;
   border-radius: 4px;
 }
-
-// Edit-specific styling
-.create-card .mat-card-header .mat-card-title {
-  color: #2e7d32; // Green for edit vs blue for create
-}
-
-// Approved credit facility display
-.approved-row {
-  .approved-value {
-    font-size: 1.1em;
-    font-weight: 500;
-    color: #333;
-    margin-top: 4px;
-  }
-}

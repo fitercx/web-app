@@ -1184,6 +1184,9 @@
       "Principal Amount": "Principal Amount"
     },
     "inputs": {
+      "Approved Facility": "Approved Facility",
+      "Principal/Invoice Amount": "Principal/Invoice Amount",
+      "LOC DETAILS": "LOC DETAILS",
       "Reject Additional Shares": "Reject Additional Shares",
       "Consumed Amount": "Consumed Amount",
       "Advance Percentage": "Advance Percentage",

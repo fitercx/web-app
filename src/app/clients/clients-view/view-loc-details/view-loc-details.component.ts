@@ -162,7 +162,8 @@ export class ViewLocDetailsComponent implements OnInit {
     const backendUtilization = data.utilization;
     const calculatedUtilization = this.calculateUtilization(data);
 
-    const rawStatus = (data && data.status && (data.status.code || data.status.value)) || data?.status;
+    const rawStatusObj = data?.status; // keep entire backend object {id, code, value}
+    const rawStatus = rawStatusObj?.code || rawStatusObj?.value || data?.status;
     const normalizedStatus = this.normalizeStatus(rawStatus);
 
     this.locDetails = {
@@ -170,7 +171,8 @@ export class ViewLocDetailsComponent implements OnInit {
       externalId: data.externalId,
       name: data.name,
       type: data.productType === 'PAYABLE' ? 'LOC PAYABLE' : 'LOC RECEIVABLE',
-      status: normalizedStatus,
+      status: rawStatusObj || rawStatus, // retain original object for pipe consumption (expects code)
+      normalizedStatus: normalizedStatus, // separate canonical upper-case for internal logic
       activationDate: this.parseDate(data.startDate),
       nextReviewDate: this.parseDate(data.interimReviewDate),
       interestRate: data.interestRateOverride,
@@ -178,7 +180,7 @@ export class ViewLocDetailsComponent implements OnInit {
       creditLimit: data.maximumAmount,
       approvedCreditFacilityAmount: data.approvedCreditFacilityAmount,
       availableBalance: data.availableBalance,
-      outstanding: data.outstanding,
+
       consumedAmount: data.consumedAmount,
       tenorDays: data.tenorDays,
       activeLoans: data.activeLoans,
@@ -289,21 +291,21 @@ export class ViewLocDetailsComponent implements OnInit {
    * Check if LOC is active
    */
   isActive(): boolean {
-    return this.locDetails?.status === 'ACTIVE';
+    return this.locDetails?.normalizedStatus === 'ACTIVE';
   }
 
   /**
    * Check if LOC is in a state that allows drawdowns
    */
   canCreateDrawdown(): boolean {
-    return this.locDetails?.status === 'ACTIVE';
+    return this.locDetails?.normalizedStatus === 'ACTIVE';
   }
 
   /**
    * Get available actions based on LOC status
    */
   getAvailableActions(): string[] {
-    const status = this.locDetails?.status;
+    const status = this.locDetails?.normalizedStatus;
     switch (status) {
       case 'SUBMITTED':
         return [

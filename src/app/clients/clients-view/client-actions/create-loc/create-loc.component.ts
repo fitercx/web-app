@@ -331,7 +331,10 @@ export class CreateLocComponent implements OnInit {
           reviewPeriod: [''],
           interimReviewDate: [{ value: '', disabled: true }],
           interestPaymentType: [''],
-          annualInterestRate: [''],
+          annualInterestRate: [
+            '',
+            Validators.required
+          ],
           tenorDays: [''],
           advancePercentage: ['100'],
           cashMarginType: [''],
