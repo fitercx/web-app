@@ -85,6 +85,9 @@ export class EditLoanProductComponent implements OnInit {
 
       this.itemsByDefault = loanProducts.setItemsByDefault(data.configurations);
       this.loanProductAndTemplate['itemsByDefault'] = this.itemsByDefault;
+      this.loanProductAndTemplate['maximumProductFactorRate'] = data?.configurations?.globalConfiguration?.find(
+        (config: { name: string }) => config.name === 'maximum-product-factor-rate'
+      )?.value;
     });
   }
 

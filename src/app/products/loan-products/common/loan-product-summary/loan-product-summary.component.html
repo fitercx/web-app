@@ -85,11 +85,21 @@
 
   <div fxFlexFill>
     <span fxFlex="47%">{{ 'labels.inputs.Principal' | translate }}:</span>
-    <span fxFlex="53%"
-      >{{ loanProduct.principal | formatNumber }} (Min
+    <span fxFlex="53%">
+      {{ loanProduct.principal | formatNumber }} (Min
       {{ (loanProduct.minPrincipal ? loanProduct.minPrincipal : loanProduct.principal) | formatNumber }} : Max
       {{ (loanProduct.maxPrincipal ? loanProduct.maxPrincipal : loanProduct.principal) | formatNumber }})
     </span>
+  </div>
+
+  <div fxFlexFill>
+    <span fxFlex="47%">{{ 'labels.inputs.Enable Factor Rate Product' | translate }}:</span>
+    <span fxFlex="53%">{{ loanProduct.factorRateProductEnabled | yesNo }}</span>
+  </div>
+
+  <div fxFlexFill *ngIf="loanProduct.factorRateProductEnabled">
+    <span fxFlex="47%">{{ 'labels.inputs.Factor Rate' | translate }}:</span>
+    <span fxFlex="53%">{{ loanProduct.factorRate | formatNumber: 0 }}</span>
   </div>
 
   <div fxFlexFill>

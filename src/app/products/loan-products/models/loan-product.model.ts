@@ -144,6 +144,8 @@ export interface LoanProduct {
   supportedInterestRefundTypes?: StringEnumOptionData[];
   chargeOffBehaviour?: StringEnumOptionData;
   additionalProperties?: LoanProductAdditionalProperties;
+  factorRateProductEnabled?: boolean;
+  factorRate?: number;
 }
 
 export interface LoanProductAdditionalProperties {
