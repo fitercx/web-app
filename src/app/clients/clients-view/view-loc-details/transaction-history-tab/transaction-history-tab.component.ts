@@ -31,17 +31,15 @@ export class TransactionHistoryTabComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.loadLocCurrency();
+    this.loadLocCurrencyFromResolver();
     this.fetchTransactions(0, this.pageSize);
   }
 
-  private loadLocCurrency(): void {
-    const locId = this.route.parent?.snapshot.paramMap.get('locId');
-    const clientId = this.route.parent?.parent?.snapshot.paramMap.get('clientId');
-    if (clientId && locId && (this.clientsService as any).getClientCreditLine) {
-      (this.clientsService as any).getClientCreditLine(clientId, locId).subscribe((loc: any) => {
-        this.locCurrency = loc?.currency || '';
-      });
+  private loadLocCurrencyFromResolver(): void {
+    // Get LOC data from parent component's resolver instead of making another API call
+    const locData = this.route.parent?.snapshot.data['locData'];
+    if (locData) {
+      this.locCurrency = locData.currency || '';
     }
   }
 

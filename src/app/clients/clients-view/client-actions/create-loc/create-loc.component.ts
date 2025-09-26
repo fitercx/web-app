@@ -328,15 +328,21 @@ export class CreateLocComponent implements OnInit {
             Validators.required
           ],
           expiryDate: [''],
-          reviewPeriod: [''],
+          reviewPeriod: ['6'], // Default to 6 months
           interimReviewDate: [{ value: '', disabled: true }],
           interestPaymentType: [''],
           annualInterestRate: [
             '',
             Validators.required
           ],
-          tenorDays: [''],
-          advancePercentage: ['100'],
+          tenorDays: [
+            '',
+            Validators.required
+          ],
+          advancePercentage: [
+            '100',
+            Validators.required
+          ],
           cashMarginType: [''],
           cashMarginValue: [''],
           interestChargeTime: [''],
@@ -356,6 +362,9 @@ export class CreateLocComponent implements OnInit {
 
     // Set initial advance percentage based on default product type
     this.updateAdvancePercentage('payable');
+
+    // Compute initial interim review date based on default review period
+    this.computeInterimReviewDate();
   }
 
   selectProductType(type: string) {

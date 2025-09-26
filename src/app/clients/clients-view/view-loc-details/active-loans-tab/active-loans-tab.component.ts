@@ -27,7 +27,7 @@ export class ActiveLoansTabComponent implements OnInit {
   @ViewChild(MatPaginator) paginator: MatPaginator;
 
   private locId: number;
-  private clientId: number;
+  clientId: number;
 
   constructor(
     private route: ActivatedRoute,
@@ -40,17 +40,15 @@ export class ActiveLoansTabComponent implements OnInit {
 
   ngOnInit(): void {
     this.loanAccounts = new MatTableDataSource([]);
-    this.loadLocCurrency();
+    this.loadLocCurrencyFromResolver();
     this.getLoans();
   }
 
-  private loadLocCurrency(): void {
-    if (this.clientId && this.locId && this.clientsService && (this.clientsService as any).getClientCreditLine) {
-      (this.clientsService as any)
-        .getClientCreditLine(this.clientId.toString(), this.locId.toString())
-        .subscribe((loc: any) => {
-          this.locCurrency = loc?.currency || '';
-        });
+  private loadLocCurrencyFromResolver(): void {
+    // Get LOC data from parent component's resolver instead of making another API call
+    const locData = this.route.parent.snapshot.data['locData'];
+    if (locData) {
+      this.locCurrency = locData.currency || '';
     }
   }
 

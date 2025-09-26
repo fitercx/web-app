@@ -39,10 +39,7 @@
                 <mat-form-field fxFlex>
                   <mat-label>LOC Type</mat-label>
                   <mat-select formControlName="productType">
-                    <mat-option
-                      *ngFor="let pt of productTypeOptions"
-                      [value]="pt.code === 'PAYABLE' ? 'payable' : 'receivable'"
-                    >
+                    <mat-option *ngFor="let pt of productTypeOptions" [value]="pt.id">
                       {{ pt.value || pt.code }}
                     </mat-option>
                   </mat-select>
@@ -284,13 +281,18 @@
               <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
                 <mat-form-field fxFlex>
                   <mat-label>Tenor in Days</mat-label>
-                  <input matInput type="number" formControlName="tenorDays" placeholder="e.g. 365" />
+                  <input matInput type="number" required formControlName="tenorDays" placeholder="e.g. 365" />
+                  <mat-error *ngIf="locForm.get(['limitsTerms', 'tenorDays'])?.hasError('required')">
+                    {{ 'labels.inputs.Tenor in Days' | translate }} {{ 'labels.commons.is' | translate }}
+                    <strong>{{ 'labels.commons.required' | translate }}</strong>
+                  </mat-error>
                 </mat-form-field>
                 <mat-form-field fxFlex>
                   <mat-label>Advance Percentage</mat-label>
                   <input
                     matInput
                     type="number"
+                    required
                     formControlName="advancePercentage"
                     placeholder="0.00"
                     step="0.01"
@@ -298,6 +300,10 @@
                     max="100"
                   />
                   <span matSuffix>%</span>
+                  <mat-error *ngIf="locForm.get(['limitsTerms', 'advancePercentage'])?.hasError('required')">
+                    {{ 'labels.inputs.Advance Percentage' | translate }} {{ 'labels.commons.is' | translate }}
+                    <strong>{{ 'labels.commons.required' | translate }}</strong>
+                  </mat-error>
                 </mat-form-field>
               </div>
 
@@ -320,16 +326,8 @@
                     step="0.01"
                     min="0"
                   />
-                  <span
-                    matSuffix
-                    *ngIf="locForm.get(['limitsTerms', 'cashMarginType'])?.value === 'locCashMarginType.percentage'"
-                    >%</span
-                  >
-                  <span
-                    matSuffix
-                    *ngIf="locForm.get(['limitsTerms', 'cashMarginType'])?.value === 'locCashMarginType.flat'"
-                    >{{ selectedCurrencyCode || '' }}</span
-                  >
+                  <span matSuffix *ngIf="isCashMarginTypeSelected('PERCENTAGE')">%</span>
+                  <span matSuffix *ngIf="isCashMarginTypeSelected('FLAT')">{{ selectedCurrencyCode || '' }}</span>
                 </mat-form-field>
               </div>
             </div>
@@ -393,9 +391,12 @@
                       <th mat-header-cell *matHeaderCellDef>Amount</th>
                       <td mat-cell *matCellDef="let charge">
                         <div *ngIf="editingCharge !== charge">
-                          <span *ngIf="charge.chargeCalculationType === 'PERCENT'">{{ charge.amount || '—' }}%</span>
+                          <span *ngIf="charge.chargeCalculationType === 'PERCENT'"
+                            >{{ charge.amount !== undefined ? charge.amount : '—' }}%</span
+                          >
                           <span *ngIf="charge.chargeCalculationType !== 'PERCENT'"
-                            >{{ charge.amount || '—' }} {{ selectedCurrencyCode || '' }}</span
+                            >{{ charge.amount !== undefined ? charge.amount : '—' }}
+                            {{ selectedCurrencyCode || '' }}</span
                           >
                           <button mat-icon-button (click)="startEdit(charge)" aria-label="Edit amount">
                             <fa-icon icon="edit"></fa-icon>
@@ -449,9 +450,7 @@
 
               <div fxFlexFill>
                 <span fxFlex="40%">Type</span>
-                <span fxFlex="60%">{{
-                  previewPayload.productType === 'payable' ? 'LOC Payable' : 'LOC Receivable'
-                }}</span>
+                <span fxFlex="60%">{{ getProductTypeLabel(previewPayload.productType) }}</span>
               </div>
 
               <div fxFlexFill>
@@ -569,13 +568,7 @@
                 <span fxFlex="40%">Cash Margin Value</span>
                 <span fxFlex="60%"
                   >{{ previewPayload.cashMarginValue || '—'
-                  }}{{
-                    previewPayload.cashMarginType === 'locCashMarginType.percentage' && previewPayload.cashMarginValue
-                      ? '%'
-                      : previewPayload.cashMarginType === 'locCashMarginType.flat' && previewPayload.cashMarginValue
-                        ? ' ' + (selectedCurrencyCode || '')
-                        : ''
-                  }}</span
+                  }}{{ getCashMarginValueSuffix(previewPayload.cashMarginType, previewPayload.cashMarginValue) }}</span
                 >
               </div>
 

@@ -132,7 +132,7 @@ export class ViewLocDetailsComponent implements OnInit {
   }
 
   ngOnInit() {
-    // Prefer fetching real LOC details from backend; fallback to mock if service not available
+    // Prefer fetching real LOC details from resolver; fallback to API call if resolver data not available
     try {
       this.dateFormat = this.settingsService.dateFormat || this.dateFormat;
       this.locale = this.settingsService.language?.code || this.settingsService.languageCode || this.locale;
@@ -140,17 +140,22 @@ export class ViewLocDetailsComponent implements OnInit {
       // ignore
     }
 
+    // Check resolver data first (this is the preferred and efficient approach)
     const resolved = this.route.snapshot.data['locData'] || this.route.parent?.snapshot.data['locData'];
     if (resolved) {
       this.processLocData(resolved);
     } else if (this.clientsService && this.locId) {
+      // Fallback: Only make API call if resolver data is not available
       this.clientsService.getClientCreditLine(this.clientId, this.locId).subscribe(
         (data: any) => {
           this.processLocData(data);
         },
-        (err) => {}
+        (err) => {
+          console.error('Failed to load LOC details:', err);
+        }
       );
     } else {
+      console.warn('No LOC data available from resolver or service');
     }
   }
 
@@ -173,7 +178,7 @@ export class ViewLocDetailsComponent implements OnInit {
       type: data.productType === 'PAYABLE' ? 'LOC PAYABLE' : 'LOC RECEIVABLE',
       status: rawStatusObj || rawStatus, // retain original object for pipe consumption (expects code)
       normalizedStatus: normalizedStatus, // separate canonical upper-case for internal logic
-      activationDate: this.parseDate(data.startDate),
+      activationDate: data.activatedOnDate,
       nextReviewDate: this.parseDate(data.interimReviewDate),
       interestRate: data.interestRateOverride,
       annualInterestRate: data.annualInterestRate,
