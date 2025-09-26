@@ -171,7 +171,6 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
 
       this.setAdvancedPaymentStrategyControls();
 
-      console.log('loan schedule type', this.loansAccountTermsData.loanScheduleType);
       if (
         this.loansAccountTermsData.loanScheduleType.code == LoanProducts.LOAN_SCHEDULE_TYPE_CUMULATIVE ||
         this.loansAccountTermsData.loanScheduleType.code == LoanProducts.LINE_OF_CREDIT

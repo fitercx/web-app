@@ -401,18 +401,6 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
     this.locDetailsForm.get('markup')?.valueChanges.subscribe((value) => {
       this.updateAmountInFacilityCurrency();
     });
-
-    // Buyer details and supplier details should NEVER trigger any calculations or resets
-    // These fields are purely informational and should preserve their values
-    this.locDetailsForm.get('buyerDetails')?.valueChanges.subscribe(() => {
-      // Only validate the buyer details field itself, don't trigger any other calculations
-      // This prevents unwanted synchronization triggers that could reset invoice amounts
-    });
-
-    this.locDetailsForm.get('supplierDetails')?.valueChanges.subscribe(() => {
-      // Only validate the supplier details field itself, don't trigger any other calculations
-      // This prevents unwanted synchronization triggers that could reset invoice amounts
-    });
   }
 
   /**
