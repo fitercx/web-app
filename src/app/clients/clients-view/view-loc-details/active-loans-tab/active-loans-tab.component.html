@@ -48,7 +48,7 @@
           matTooltip="{{ 'tooltips.Make Repayment' | translate }}"
           matTooltipPosition="above"
           (click)="routeEdit($event)"
-          [routerLink]="['../../', 'loans-accounts', element.id, 'actions', 'Make Repayment']"
+          [routerLink]="['/clients', clientId, 'loans-accounts', element.id, 'actions', 'Make Repayment']"
         >
           <i class="fa fa-dollar"></i>
         </button>
@@ -61,7 +61,7 @@
             matTooltipPosition="above"
             *mifosxHasPermission="'APPROVE_LOAN'"
             (click)="routeEdit($event)"
-            [routerLink]="['../../', 'loans-accounts', element.id, 'actions', 'Approve']"
+            [routerLink]="['/clients', clientId, 'loans-accounts', element.id, 'actions', 'Approve']"
           >
             <i class="fa fa-check"></i>
           </button>
@@ -75,7 +75,7 @@
             matTooltipPosition="above"
             *mifosxHasPermission="'DISBURSE_LOAN'"
             (click)="routeEdit($event)"
-            [routerLink]="['../../', 'loans-accounts', element.id, 'actions', 'Disburse']"
+            [routerLink]="['/clients', clientId, 'loans-accounts', element.id, 'actions', 'Disburse']"
           >
             <i class="fa fa-flag"></i>
           </button>
@@ -100,7 +100,7 @@
     <tr
       mat-row
       *matRowDef="let row; columns: displayedColumns"
-      [routerLink]="['../../', 'loans-accounts', row.id, 'general']"
+      [routerLink]="['/clients', clientId, 'loans-accounts', row.id, 'general']"
       class="select-row"
     ></tr>
   </table>

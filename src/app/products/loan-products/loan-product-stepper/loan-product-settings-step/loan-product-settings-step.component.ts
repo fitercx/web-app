@@ -625,7 +625,10 @@ export class LoanProductSettingsStepComponent implements OnInit {
 
     this.loanProductSettingsForm.get('loanScheduleType').valueChanges.subscribe((loanScheduleType: string) => {
       this.transactionProcessingStrategyData = [];
-      if (loanScheduleType === LoanProducts.LOAN_SCHEDULE_TYPE_CUMULATIVE) {
+      if (
+        loanScheduleType === LoanProducts.LOAN_SCHEDULE_TYPE_CUMULATIVE ||
+        loanScheduleType === LoanProducts.LINE_OF_CREDIT
+      ) {
         // Filter Advanced Payment Allocation Strategy
         this.transactionProcessingStrategyData = this.transactionProcessingStrategyDataBase.filter(
           (cn: CodeName) => !LoanProducts.isAdvancedPaymentAllocationStrategy(cn.code)

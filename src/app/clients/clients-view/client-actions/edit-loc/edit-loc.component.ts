@@ -1,5 +1,5 @@
 /** Angular Imports */
-import { Component, OnInit, ViewChild } from '@angular/core';
+import { Component, OnInit, ViewChild, ChangeDetectorRef } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormBuilder, FormGroup, Validators, ValidatorFn, AbstractControl, FormArray } from '@angular/forms';
@@ -58,7 +58,8 @@ export class EditLocComponent implements OnInit {
     private router: Router,
     private formBuilder: FormBuilder,
     private clientsService: ClientsService,
-    private settingsService: SettingsService
+    private settingsService: SettingsService,
+    private cdr: ChangeDetectorRef
   ) {
     this.clientId =
       this.route.parent?.parent?.snapshot.paramMap.get('clientId') ||
@@ -106,9 +107,20 @@ export class EditLocComponent implements OnInit {
   }
 
   // Get display name for interest charge time
-  getInterestChargeTimeDisplay(timeCode: string): string {
-    const time = this.interestChargeTimeOptions.find((ict) => ict.code === timeCode);
-    return time?.value || timeCode || '';
+  getInterestChargeTimeDisplay(timeIdOrCode: any): string {
+    if (!this.interestChargeTimeOptions || timeIdOrCode === undefined) {
+      return '';
+    }
+
+    // Try to find by ID first (for new integer-based values)
+    let time = this.interestChargeTimeOptions.find((ict) => ict.id == timeIdOrCode);
+
+    // Fallback to find by code (for legacy string-based values)
+    if (!time) {
+      time = this.interestChargeTimeOptions.find((ict) => ict.code === timeIdOrCode);
+    }
+
+    return time?.value || timeIdOrCode || '';
   }
 
   // Return the appropriate label for buyers/suppliers based on product type
@@ -271,8 +283,8 @@ export class EditLocComponent implements OnInit {
     // Prepopulate basic info
     this.locForm.patchValue({
       basicInfo: {
-        productType: loc.productType === 'payable' ? 'payable' : 'receivable',
-        currencyCode: loc.currency?.code || loc.currencyCode,
+        productType: this.getProductTypeId(loc.productType),
+        currencyCode: loc.currency || loc.currency?.code || loc.currencyCode || '',
         clientCompanyName: loc.clientCompanyName || '',
         clientContactPersonName: loc.clientContactPersonName || '',
         clientContactPersonPhone: loc.clientContactPersonPhone || '',
@@ -286,21 +298,20 @@ export class EditLocComponent implements OnInit {
       },
       approvedBuyersSection: {
         distributionPartner: loc.distributionPartner || '',
-        approvedBuyersName: '',
-        approvedBuyers: this.formBuilder.array([])
+        approvedBuyersName: ''
       },
+
       limitsTerms: {
         maxCreditLimit: loc.maximumAmount || loc.maxCreditLimit || '',
-        maxPerDrawdown: loc.maxPerDrawdown || '',
         startDate: this.formatDateForInput(loc.startDate || loc.activationDate),
         expiryDate: this.formatDateForInput(loc.endDate || loc.expiryDate),
-        reviewPeriod: loc.reviewPeriod || '',
-        annualInterestRate: loc.annualInterestRate || loc.interestRateOverride || loc.interestRate || '',
-        tenorDays: loc.tenorDays || loc.tenorInDays || '',
-        advancePercentage: loc.advancePercentage || '100',
-        cashMarginType: loc.cashMarginType || 'locCashMarginType.flat',
+        reviewPeriod: loc.reviewPeriod || '6', // Default to 6 months if not set
+        annualInterestRate: loc.annualInterestRate || undefined,
+        tenorDays: loc.tenorDays || undefined,
+        advancePercentage: loc.advancePercentage || undefined,
+        cashMarginType: this.getCashMarginTypeId(loc.cashMarginType),
         cashMarginValue: loc.cashMarginValue || '',
-        interestChargeTime: loc.interestChargeTime || '',
+        interestChargeTime: this.getInterestChargeTimeId(loc.interestChargeTime),
         loanOfficerId: loc.loanOfficerId || ''
       },
       settlementSavingsAccountId: loc.settlementSavingsAccountId || ''
@@ -308,19 +319,112 @@ export class EditLocComponent implements OnInit {
 
     // Prepopulate charges if any
     if (loc.charges && Array.isArray(loc.charges)) {
-      this.chargesDataSource = loc.charges.map((charge: any) => ({
-        ...charge,
-        editableAmount: charge.amount
-      }));
+      this.chargesDataSource = loc.charges.map((charge: any) => {
+        // Find the charge definition in allLocCharges to get name and other properties
+        const chargeDefinition = this.allLocCharges.find((c) => c.id === charge.chargeDefinitionId);
+
+        return {
+          ...charge,
+          // Include name and other properties from charge definition
+          name: chargeDefinition?.name || 'Unknown Charge',
+          chargeCalculationType: chargeDefinition?.chargeCalculationType || charge.chargeCalculationType,
+          editableAmount: charge.amount
+        };
+      });
     }
 
     // Prepopulate approved buyers if any
-    if (loc.approvedBuyers && Array.isArray(loc.approvedBuyers)) {
+    const approvedBuyersData = loc.approvedBuyers || loc.approvedBuyersList;
+    if (approvedBuyersData && Array.isArray(approvedBuyersData)) {
       const approvedBuyersArray = this.approvedBuyersArray;
-      loc.approvedBuyers.forEach((buyer: any) => {
+      approvedBuyersData.forEach((buyer: any) => {
         approvedBuyersArray.push(this.formBuilder.control({ name: buyer.name || buyer }));
       });
     }
+
+    // Trigger change detection to ensure UI updates with prepopulated data
+    this.cdr.detectChanges();
+
+    // Compute interim review date after patching values
+    this.computeInterimReviewDate();
+  }
+
+  getProductTypeLabel(productTypeId: any): string {
+    if (!this.productTypeOptions || productTypeId === undefined) {
+      return '';
+    }
+
+    const option = this.productTypeOptions.find((pt) => pt.id == productTypeId);
+    return option ? option.value || option.code : '';
+  }
+
+  getCashMarginValueSuffix(cashMarginTypeId: any, cashMarginValue: any): string {
+    if (!cashMarginValue || !this.cashMarginTypeOptions || cashMarginTypeId === undefined) {
+      return '';
+    }
+
+    const option = this.cashMarginTypeOptions.find((cmt) => cmt.id == cashMarginTypeId);
+    if (!option) return '';
+
+    if (option.code === 'PERCENTAGE') {
+      return '%';
+    } else if (option.code === 'FLAT') {
+      return ' ' + (this.selectedCurrencyCode || '');
+    }
+
+    return '';
+  }
+
+  isCashMarginTypeSelected(code: string): boolean {
+    const selectedId = this.locForm.get([
+      'limitsTerms',
+      'cashMarginType'
+    ])?.value;
+    if (!this.cashMarginTypeOptions || selectedId === undefined) {
+      return false;
+    }
+
+    const option = this.cashMarginTypeOptions.find((cmt) => cmt.id == selectedId);
+    return option && option.code === code;
+  }
+
+  private getInterestChargeTimeId(interestChargeTime: string): any {
+    if (!this.interestChargeTimeOptions || !interestChargeTime) {
+      return '';
+    }
+
+    const option = this.interestChargeTimeOptions.find(
+      (ict) =>
+        ict.code === interestChargeTime ||
+        ict.code === interestChargeTime.toUpperCase() ||
+        ict.value === interestChargeTime
+    );
+
+    return option ? option.id : '';
+  }
+
+  private getCashMarginTypeId(cashMarginType: string): any {
+    if (!this.cashMarginTypeOptions || !cashMarginType) {
+      return '';
+    }
+
+    const option = this.cashMarginTypeOptions.find(
+      (cmt) => cmt.code === cashMarginType || cmt.code === cashMarginType.toUpperCase() || cmt.value === cashMarginType
+    );
+
+    return option ? option.id : '';
+  }
+
+  private getProductTypeId(productType: string): any {
+    if (!this.productTypeOptions || !productType) {
+      return '';
+    }
+
+    const option = this.productTypeOptions.find(
+      (pt) => pt.code === productType || pt.code === productType.toUpperCase() || pt.value === productType
+    );
+
+    return option ? option.id : '';
   }
 
   private formatDateForInput(dateValue: any): string {
@@ -437,15 +541,21 @@ export class EditLocComponent implements OnInit {
           Validators.required
         ],
         expiryDate: [''],
-        reviewPeriod: [''],
+        reviewPeriod: ['6'], // Default to 6 months
         interimReviewDate: [{ value: '', disabled: true }],
         interestPaymentType: [''],
         annualInterestRate: [
           '',
           Validators.required
         ],
-        tenorDays: [''],
-        advancePercentage: ['100'],
+        tenorDays: [
+          '',
+          Validators.required
+        ],
+        advancePercentage: [
+          '100',
+          Validators.required
+        ],
         cashMarginType: [''],
         cashMarginValue: [''],
         interestChargeTime: [''],
@@ -458,6 +568,9 @@ export class EditLocComponent implements OnInit {
 
     // Set initial advance percentage based on default product type
     this.updateAdvancePercentage('payable');
+
+    // Compute initial interim review date based on default review period
+    this.computeInterimReviewDate();
   }
 
   selectProductType(type: string) {

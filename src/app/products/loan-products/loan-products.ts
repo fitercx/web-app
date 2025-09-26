@@ -8,6 +8,7 @@ import { GlobalConfiguration } from 'app/system/configurations/global-configurat
 export class LoanProducts {
   public static LOAN_SCHEDULE_TYPE_CUMULATIVE = 'CUMULATIVE';
   public static LOAN_SCHEDULE_TYPE_PROGRESSIVE = 'PROGRESSIVE';
+  public static LINE_OF_CREDIT = 'LINE_OF_CREDIT';
 
   public static LOAN_SCHEDULE_PROCESSING_TYPE_HORIZONTAL = 'HORIZONTAL';
   public static LOAN_SCHEDULE_PROCESSING_TYPE_VERTICAL = 'VERTICAL';

@@ -171,7 +171,10 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
 
       this.setAdvancedPaymentStrategyControls();
 
-      if (this.loansAccountTermsData.loanScheduleType.code == LoanProducts.LOAN_SCHEDULE_TYPE_CUMULATIVE) {
+      if (
+        this.loansAccountTermsData.loanScheduleType.code == LoanProducts.LOAN_SCHEDULE_TYPE_CUMULATIVE ||
+        this.loansAccountTermsData.loanScheduleType.code == LoanProducts.LINE_OF_CREDIT
+      ) {
         this.loansAccountTermsForm.removeControl('interestRecognitionOnDisbursementDate');
       }
 
@@ -585,7 +588,10 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
     this.clientActiveLoanData = this.loansAccountProductTemplate.clientActiveLoanOptions;
     this.loanScheduleType = this.loansAccountProductTemplate.loanScheduleType;
     this.transactionProcessingStrategyOptions = [];
-    if (this.loanScheduleType.code === LoanProducts.LOAN_SCHEDULE_TYPE_CUMULATIVE) {
+    if (
+      this.loanScheduleType.code === LoanProducts.LOAN_SCHEDULE_TYPE_CUMULATIVE ||
+      this.loanScheduleType.code === LoanProducts.LINE_OF_CREDIT
+    ) {
       // Filter Advanced Payment Allocation Strategy
       this.transactionProcessingStrategyOptions =
         this.loansAccountProductTemplate.transactionProcessingStrategyOptions.filter(

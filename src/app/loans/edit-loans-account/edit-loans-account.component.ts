@@ -148,8 +148,12 @@ export class EditLoansAccountComponent implements AfterViewInit, OnDestroy {
     if (invoiceControl == null || principalVal == null) {
       return;
     }
-    if (invoiceControl.value !== principalVal) {
+    // Only sync if values are actually different and both are meaningful values
+    if (invoiceControl.value !== principalVal && principalVal > 0) {
       invoiceControl.setValue(principalVal, { emitEvent: false });
+
+      // Manually trigger approved amount recalculations after setting invoice amount
+      this.triggerApprovedAmountCalculations();
     }
     if (!this.invoiceSyncSub && invoiceControl) {
       this.invoiceSyncSub = invoiceControl.valueChanges.subscribe(() => this.syncPrincipalAmountWithInvoice());
@@ -169,8 +173,24 @@ export class EditLoansAccountComponent implements AfterViewInit, OnDestroy {
     if (principalControl == null || invoiceVal == null) {
       return;
     }
-    if (principalControl.value !== invoiceVal) {
+    // Only sync if values are actually different and both are meaningful values
+    if (principalControl.value !== invoiceVal && invoiceVal > 0) {
       principalControl.setValue(invoiceVal, { emitEvent: false });
+      this.triggerApprovedAmountCalculations();
+    }
+  }
+
+  /** Manually triggers approved amount calculations in the LOC details component */
+  private triggerApprovedAmountCalculations(): void {
+    if (this.loansAccountLocDetailsStep) {
+      // Only trigger calculations if the LOC details form is properly initialized
+      // and has meaningful invoice amount value
+      const invoiceAmount = this.loansAccountLocDetailsStep.locDetailsForm?.get('invoiceAmount')?.value;
+      if (invoiceAmount != null && invoiceAmount > 0) {
+        // Call the public calculation methods directly
+        this.loansAccountLocDetailsStep.updateApprovedReceivableAmount();
+        this.loansAccountLocDetailsStep.updateApprovedPayableAmount();
+      }
     }
   }
 

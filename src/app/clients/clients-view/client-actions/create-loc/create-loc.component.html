@@ -263,13 +263,18 @@
               <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
                 <mat-form-field fxFlex>
                   <mat-label>Tenor in Days</mat-label>
-                  <input matInput type="number" formControlName="tenorDays" placeholder="e.g. 365" />
+                  <input matInput type="number" required formControlName="tenorDays" placeholder="e.g. 365" />
+                  <mat-error *ngIf="locForm.get(['limitsTerms', 'tenorDays'])?.hasError('required')">
+                    {{ 'labels.inputs.Tenor in Days' | translate }} {{ 'labels.commons.is' | translate }}
+                    <strong>{{ 'labels.commons.required' | translate }}</strong>
+                  </mat-error>
                 </mat-form-field>
                 <mat-form-field fxFlex>
                   <mat-label>Advance Percentage</mat-label>
                   <input
                     matInput
                     type="number"
+                    required
                     formControlName="advancePercentage"
                     placeholder="0.00"
                     step="0.01"
@@ -277,6 +282,10 @@
                     max="100"
                   />
                   <span matSuffix>%</span>
+                  <mat-error *ngIf="locForm.get(['limitsTerms', 'advancePercentage'])?.hasError('required')">
+                    {{ 'labels.inputs.Advance Percentage' | translate }} {{ 'labels.commons.is' | translate }}
+                    <strong>{{ 'labels.commons.required' | translate }}</strong>
+                  </mat-error>
                 </mat-form-field>
               </div>
 
