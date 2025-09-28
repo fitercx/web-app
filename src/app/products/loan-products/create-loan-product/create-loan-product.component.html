@@ -77,7 +77,11 @@
     <mat-step [stepControl]="loanProductTermsForm">
       <ng-template matStepLabel>{{ 'labels.inputs.TERMS' | translate }}</ng-template>
 
-      <mifosx-loan-product-terms-step [loanProductsTemplate]="loanProductsTemplate"></mifosx-loan-product-terms-step>
+      <mifosx-loan-product-terms-step
+        [loanProductsTemplate]="loanProductsTemplate"
+        [loanProductSettingsForm]="loanProductSettingsForm"
+      >
+      </mifosx-loan-product-terms-step>
     </mat-step>
 
     <mat-step>

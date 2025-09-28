@@ -77,7 +77,9 @@ export class CreateLoanProductComponent implements OnInit {
       const liabilityAccountData = this.loanProductsTemplate.accountingMappingOptions.liabilityAccountOptions || [];
       this.loanProductsTemplate.accountingMappingOptions.assetAndLiabilityAccountOptions =
         assetAccountData.concat(liabilityAccountData);
-
+      this.loanProductsTemplate['maximumProductFactorRate'] = data?.configurations?.globalConfiguration?.find(
+        (config: { name: string }) => config.name === 'maximum-product-factor-rate'
+      )?.value;
       this.itemsByDefault = loanProducts.setItemsByDefault(data.configurations);
       this.loanProductsTemplate['itemsByDefault'] = this.itemsByDefault;
       this.loanProductsTemplate = loanProducts.updateLoanProductDefaults(this.loanProductsTemplate, false);

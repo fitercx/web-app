@@ -21,7 +21,7 @@
     <ng-container matColumnDef="amount">
       <th mat-header-cell *matHeaderCellDef>Amount</th>
       <td mat-cell *matCellDef="let charge">
-        {{ charge.amount | currency }}
+        {{ charge.amount | currency: locCurrency }}
       </td>
     </ng-container>
 
@@ -29,7 +29,7 @@
     <ng-container matColumnDef="amountPaid">
       <th mat-header-cell *matHeaderCellDef>Paid</th>
       <td mat-cell *matCellDef="let charge" class="paid-amount">
-        {{ charge.amountPaid | currency }}
+        {{ charge.amountPaid | currency: locCurrency }}
       </td>
     </ng-container>
 
@@ -37,7 +37,7 @@
     <ng-container matColumnDef="amountWaived">
       <th mat-header-cell *matHeaderCellDef>Waived</th>
       <td mat-cell *matCellDef="let charge" class="waived-amount">
-        {{ charge.amountWaived | currency }}
+        {{ charge.amountWaived | currency: locCurrency }}
       </td>
     </ng-container>
 
@@ -45,7 +45,7 @@
     <ng-container matColumnDef="amountOutstanding">
       <th mat-header-cell *matHeaderCellDef>Outstanding</th>
       <td mat-cell *matCellDef="let charge" class="outstanding-amount">
-        {{ charge.amountOutstanding | currency }}
+        {{ charge.amountOutstanding | currency: locCurrency }}
       </td>
     </ng-container>
 

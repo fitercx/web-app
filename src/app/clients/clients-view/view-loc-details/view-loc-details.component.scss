@@ -18,7 +18,7 @@ p {
 
 strong {
   font-weight: 600;
-  font-size: 18px;
+  font-size: 14px; // Reduced from 18px to match label size
 }
 
 h4 {
@@ -112,7 +112,7 @@ mat-icon {
 .detail-label {
   color: #666;
   font-weight: 500;
-  font-size: 15px;
+  font-size: 14px; // Consistent size
   flex: 0 0 auto;
   margin-right: 16px;
   line-height: 1.4;
@@ -121,12 +121,12 @@ mat-icon {
 .detail-value {
   text-align: right;
   color: #333;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.4;
   flex: 1;
 
   &.available-balance strong {
-    color: #4caf50;
+    color: #333;
   }
 
   &.outstanding-amount strong {
@@ -134,25 +134,25 @@ mat-icon {
   }
 
   &.repaid-amount strong {
-    color: #2196f3;
+    color: #333; // Removed blue color
   }
 
   &.performance strong {
-    color: #ff9800;
+    color: #333; // Removed orange color
   }
 
   &.currency {
     font-weight: 600;
-    color: #1976d2;
+    color: #333; // Removed blue color
   }
 
   &.percentage {
     font-weight: 600;
-    color: #388e3c;
+    color: #333;
   }
 
   &.positive {
-    color: #4caf50;
+    color: #333;
     font-weight: 600;
   }
 
@@ -168,20 +168,16 @@ mat-icon {
 }
 
 // Generic selectors (moved to top for specificity)
+// Generic icon styling without forcing a color so status-* classes can apply
 i {
   left: 0;
   top: 3px;
   width: 16px;
   height: 16px;
   font-size: 16px;
-  color: #4caf50;
 
   &.fa-edit {
     color: #ff9800;
-  }
-
-  &.fa-plus-circle {
-    color: #4caf50;
   }
 
   &.fa-check-circle {
@@ -233,7 +229,7 @@ span {
   font-size: 14px;
 
   &.paid {
-    color: #4caf50;
+    color: #333;
   }
 
   &.waived {
@@ -246,7 +242,7 @@ span {
 }
 
 .progress-fill {
-  background: linear-gradient(90deg, #4caf50, #66bb6a);
+  background: linear-gradient(90deg, #1976d2, #42a5f5); // Changed from green to blue
   height: 100%;
   border-radius: 3px;
   transition: width 0.3s ease;
@@ -299,7 +295,7 @@ span {
     .header-title-group {
       .account-card-title {
         color: white;
-        width: 90%;
+        width: 95%;
 
         h3 {
           margin: 0;
@@ -315,14 +311,14 @@ span {
         max-width: 240px;
         font-size: 14px;
         margin-left: 10px;
-        min-width: 85%;
+        min-width: 95%;
 
         tr:nth-child(even) {
           background-color: transparent;
         }
 
         td {
-          padding: 4px 8px;
+          padding: 4px;
           color: white;
         }
 
@@ -344,7 +340,7 @@ span {
 
         // Status colors for values in the header
         .available {
-          color: #69f0ae; // Bright green for available balance
+          color: #ffcc80; // Changed from bright green to orange
           font-weight: 600;
         }
 
@@ -481,27 +477,16 @@ mat-progress-spinner {
 }
 
 // Status badge
+// Base status badge style; specific color classes now provided globally via statusLookup pipe.
 .status-badge {
   display: inline-block;
   padding: 4px 12px;
   border-radius: 12px;
   font-size: 12px;
   font-weight: 500;
-
-  &.active {
-    background: #e8f5e9;
-    color: #2e7d32;
-  }
-
-  &.pending {
-    background: #fff3cd;
-    color: #856404;
-  }
-
-  &.inactive {
-    background: #f5f5f5;
-    color: #666;
-  }
+  background: #f5f5f5;
+  // Remove hard-coded color so global .status-* classes applied via statusLookup pipe control the text color
+  // color: #555;
 }
 
 // Table styling for active loans
@@ -587,7 +572,7 @@ mat-progress-spinner {
     }
 
     &.positive {
-      color: #388e3c;
+      color: #333;
     }
   }
 
@@ -1010,10 +995,10 @@ mat-progress-spinner {
 
         .detail-value {
           text-align: left;
-          font-size: 15px;
+          font-size: 14px;
 
           strong {
-            font-size: 16px;
+            font-size: 14px;
           }
         }
       }

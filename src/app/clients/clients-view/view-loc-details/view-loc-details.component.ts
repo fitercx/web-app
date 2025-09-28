@@ -132,7 +132,7 @@ export class ViewLocDetailsComponent implements OnInit {
   }
 
   ngOnInit() {
-    // Prefer fetching real LOC details from backend; fallback to mock if service not available
+    // Prefer fetching real LOC details from resolver; fallback to API call if resolver data not available
     try {
       this.dateFormat = this.settingsService.dateFormat || this.dateFormat;
       this.locale = this.settingsService.language?.code || this.settingsService.languageCode || this.locale;
@@ -140,17 +140,22 @@ export class ViewLocDetailsComponent implements OnInit {
       // ignore
     }
 
+    // Check resolver data first (this is the preferred and efficient approach)
     const resolved = this.route.snapshot.data['locData'] || this.route.parent?.snapshot.data['locData'];
     if (resolved) {
       this.processLocData(resolved);
     } else if (this.clientsService && this.locId) {
+      // Fallback: Only make API call if resolver data is not available
       this.clientsService.getClientCreditLine(this.clientId, this.locId).subscribe(
         (data: any) => {
           this.processLocData(data);
         },
-        (err) => {}
+        (err) => {
+          console.error('Failed to load LOC details:', err);
+        }
       );
     } else {
+      console.warn('No LOC data available from resolver or service');
     }
   }
 
@@ -158,18 +163,12 @@ export class ViewLocDetailsComponent implements OnInit {
    * Process LOC data from backend
    */
   private processLocData(data: any): void {
-    // Debug: Log the raw data to console
-    console.log('LOC Raw Data:', data);
-
     // Debug utilization calculation
     const backendUtilization = data.utilization;
     const calculatedUtilization = this.calculateUtilization(data);
-    console.log('Backend Utilization:', backendUtilization);
-    console.log('Calculated Utilization:', calculatedUtilization);
-    console.log('Credit Limit:', data.maximumAmount);
-    console.log('Outstanding:', data.outstanding);
 
-    const rawStatus = (data && data.status && (data.status.code || data.status.value)) || data?.status;
+    const rawStatusObj = data?.status; // keep entire backend object {id, code, value}
+    const rawStatus = rawStatusObj?.code || rawStatusObj?.value || data?.status;
     const normalizedStatus = this.normalizeStatus(rawStatus);
 
     this.locDetails = {
@@ -177,15 +176,17 @@ export class ViewLocDetailsComponent implements OnInit {
       externalId: data.externalId,
       name: data.name,
       type: data.productType === 'PAYABLE' ? 'LOC PAYABLE' : 'LOC RECEIVABLE',
-      status: normalizedStatus,
-      activationDate: this.parseDate(data.startDate),
+      status: rawStatusObj || rawStatus, // retain original object for pipe consumption (expects code)
+      normalizedStatus: normalizedStatus, // separate canonical upper-case for internal logic
+      activationDate: data.activatedOnDate,
       nextReviewDate: this.parseDate(data.interimReviewDate),
       interestRate: data.interestRateOverride,
       annualInterestRate: data.annualInterestRate,
       creditLimit: data.maximumAmount,
       approvedCreditFacilityAmount: data.approvedCreditFacilityAmount,
       availableBalance: data.availableBalance,
-      outstanding: data.outstanding,
+
+      consumedAmount: data.consumedAmount,
       tenorDays: data.tenorDays,
       activeLoans: data.activeLoans,
       totalRepaid: data.totalRepaid,
@@ -194,6 +195,23 @@ export class ViewLocDetailsComponent implements OnInit {
       performance: data.performance,
       charges: Array.isArray(data.charges) ? data.charges : [],
       currency: data.currency,
+
+      // Date fields
+      startDate: this.parseDate(data.startDate),
+      endDate: this.parseDate(data.endDate),
+
+      // LOC specific fields
+      advancePercentage: data.advancePercentage,
+      cashMarginType: data.cashMarginType,
+      cashMarginValue: data.cashMarginValue,
+      rateType: data.rateType,
+      interestChargeTime: data.interestChargeTime,
+
+      // Business fields
+      distributionPartner: data.distributionPartner,
+      reviewPeriod: data.reviewPeriod,
+      loanOfficerId: data.loanOfficerId,
+      loanOfficerName: data.loanOfficerName,
 
       // Approved Buyers - handle multiple possible field names and structures
       approvedBuyersList: this.extractApprovedBuyers(data),
@@ -224,6 +242,7 @@ export class ViewLocDetailsComponent implements OnInit {
       clientAccountNo: data.client?.accountNo,
       clientExternalId: data.client?.externalId,
       clientStatus: data.client?.status?.value,
+      clientLegalForm: data.client?.legalForm?.value,
       officeName: data.client?.officeName,
 
       // Audit fields
@@ -261,23 +280,9 @@ export class ViewLocDetailsComponent implements OnInit {
    * Calculate utilization percentage
    */
   private calculateUtilization(data: any): number {
-    // Try various field names for credit limit
-    const maxAmount =
-      data.maximumAmount ||
-      data.maxCreditLimit ||
-      data.creditLimit ||
-      data.approvedCreditFacilityAmount ||
-      data.facilityAmount;
-
-    // Try various field names for utilized/outstanding amount
-    const consumedAmount =
-      data.outstanding ||
-      data.consumedAmount ||
-      data.consumed_amount ||
-      data.utilizedAmount ||
-      data.utilized_amount ||
-      data.drawn ||
-      data.drawnAmount;
+    // Use the specific field from the API response
+    const maxAmount = data.maximumAmount;
+    const consumedAmount = data.consumedAmount;
 
     if (maxAmount && maxAmount > 0 && consumedAmount !== null && consumedAmount !== undefined) {
       const percentage = (consumedAmount / maxAmount) * 100;
@@ -291,21 +296,21 @@ export class ViewLocDetailsComponent implements OnInit {
    * Check if LOC is active
    */
   isActive(): boolean {
-    return this.locDetails?.status === 'ACTIVE';
+    return this.locDetails?.normalizedStatus === 'ACTIVE';
   }
 
   /**
    * Check if LOC is in a state that allows drawdowns
    */
   canCreateDrawdown(): boolean {
-    return this.locDetails?.status === 'ACTIVE';
+    return this.locDetails?.normalizedStatus === 'ACTIVE';
   }
 
   /**
    * Get available actions based on LOC status
    */
   getAvailableActions(): string[] {
-    const status = this.locDetails?.status;
+    const status = this.locDetails?.normalizedStatus;
     switch (status) {
       case 'SUBMITTED':
         return [
@@ -408,7 +413,16 @@ export class ViewLocDetailsComponent implements OnInit {
         this.router.navigate(['edit'], { relativeTo: this.route });
         break;
       case 'New Drawdown':
-        this.router.navigate(['new-drawdown'], { relativeTo: this.route });
+        // Navigate to loan creation page with LOC ID as query parameter
+        const queryParams: any = { lineOfCreditId: this.locId };
+        this.router.navigate(
+          [
+            '../../',
+            'loans-accounts',
+            'create'
+          ],
+          { relativeTo: this.route, queryParams }
+        );
         break;
       case 'Approve':
         this.openActionDialog('approve');
@@ -577,15 +591,7 @@ export class ViewLocDetailsComponent implements OnInit {
    * Get the appropriate date field name for the action
    */
   private getDateFieldName(action: string): string {
-    const fieldNames: { [key: string]: string } = {
-      approve: 'approvedOnDate',
-      activate: 'activatedOnDate',
-      deactivate: 'closedOnDate',
-      reactivate: 'reactivatedOnDate',
-      suspend: 'suspendedOnDate',
-      close: 'closedOnDate'
-    };
-    return fieldNames[action] || 'actionDate';
+    return 'actionDate';
   }
 
   /**
@@ -595,7 +601,6 @@ export class ViewLocDetailsComponent implements OnInit {
     if (this.clientsService && typeof (this.clientsService as any).performLocAction === 'function') {
       (this.clientsService as any).performLocAction(this.clientId, this.locId, action, payload).subscribe(
         (response: any) => {
-          console.log(`LOC ${action} successful:`, response);
           // Reload the page after successful action
           window.location.reload();
         },
@@ -603,9 +608,6 @@ export class ViewLocDetailsComponent implements OnInit {
           console.error(`LOC ${action} failed:`, error);
         }
       );
-    } else {
-      console.log(`LOC ${action} action would be performed with payload:`, payload);
-      console.log(`API endpoint: /clients/${this.clientId}/creditlines/${this.locId}/${action}`);
     }
   }
 

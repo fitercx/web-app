@@ -40,6 +40,8 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
   @Input() collateralOptions: any;
   // @Input loanPrincipal: Loan Principle
   @Input() loanPrincipal: any;
+  /** Whether a LOC is selected (for dynamic principal label) */
+  @Input() locSelected: boolean = false;
 
   /** Minimum date allowed. */
   minDate = new Date(2000, 0, 1);
@@ -169,7 +171,10 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
 
       this.setAdvancedPaymentStrategyControls();
 
-      if (this.loansAccountTermsData.loanScheduleType.code == LoanProducts.LOAN_SCHEDULE_TYPE_CUMULATIVE) {
+      if (
+        this.loansAccountTermsData.loanScheduleType.code == LoanProducts.LOAN_SCHEDULE_TYPE_CUMULATIVE ||
+        this.loansAccountTermsData.loanScheduleType.code == LoanProducts.LINE_OF_CREDIT
+      ) {
         this.loansAccountTermsForm.removeControl('interestRecognitionOnDisbursementDate');
       }
 
@@ -509,7 +514,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
     });
     dialogRef.afterClosed().subscribe((response: any) => {
       if (response.delete) {
-        const principal = this.disbursementDataSource[index]['principal'] * 1;
+        const principal = (this.disbursementDataSource[index] as any)['principal'] * 1;
         this.disbursementDataSource.splice(index, 1);
         this.disbursementDataSource = this.disbursementDataSource.concat([]);
         this.totalMultiDisbursed -= principal;
@@ -583,7 +588,10 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
     this.clientActiveLoanData = this.loansAccountProductTemplate.clientActiveLoanOptions;
     this.loanScheduleType = this.loansAccountProductTemplate.loanScheduleType;
     this.transactionProcessingStrategyOptions = [];
-    if (this.loanScheduleType.code === LoanProducts.LOAN_SCHEDULE_TYPE_CUMULATIVE) {
+    if (
+      this.loanScheduleType.code === LoanProducts.LOAN_SCHEDULE_TYPE_CUMULATIVE ||
+      this.loanScheduleType.code === LoanProducts.LINE_OF_CREDIT
+    ) {
       // Filter Advanced Payment Allocation Strategy
       this.transactionProcessingStrategyOptions =
         this.loansAccountProductTemplate.transactionProcessingStrategyOptions.filter(
@@ -616,5 +624,10 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
     return {
       collateral: this.collateralDataSource
     };
+  }
+
+  /** Dynamic label for principal field */
+  get principalLabel(): string {
+    return this.locSelected ? 'Principal/Invoice Amount' : 'Principal';
   }
 }

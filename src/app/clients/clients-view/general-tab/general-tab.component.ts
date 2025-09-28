@@ -112,7 +112,6 @@ export class GeneralTabComponent {
   /** Lines of Credit Columns */
   locColumns: string[] = [
     'External Id',
-    'Account No',
     'Credit Limit',
     'Available Balance',
     'Type',

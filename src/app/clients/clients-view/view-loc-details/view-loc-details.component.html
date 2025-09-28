@@ -7,7 +7,7 @@
             <b>{{ 'labels.inputs.Line of Credit' | translate }} :</b>
             <i
               class="fa fa-stop"
-              [ngClass]="locDetails?.status?.code || locDetails?.status || '' | statusLookup"
+              [ngClass]="locDetails?.status?.code || '' | statusLookup"
               matTooltip="{{ 'labels.status.' + (locDetails?.status?.value || locDetails?.status || '') | translate }}"
               style="margin-left: 8px; margin-right: 8px"
             ></i>
@@ -43,11 +43,16 @@
                       ></mifosx-external-identifier>
                     </td>
                   </tr>
-                  <tr *ngIf="locDetails?.activationDate">
+                  <tr>
                     <td>
                       <b>{{ 'labels.inputs.Activation Date' | translate }}</b>
                     </td>
-                    <td>{{ locDetails?.activationDate | dateFormat }}</td>
+                    <td>
+                      <ng-container *ngIf="locDetails?.activationDate; else noActivationDate">
+                        {{ locDetails?.activationDate | dateFormat }}
+                      </ng-container>
+                      <ng-template #noActivationDate>-</ng-template>
+                    </td>
                   </tr>
                   <tr>
                     <td>
@@ -73,11 +78,12 @@
                       </span>
                     </td>
                   </tr>
-                  <tr *ngIf="locDetails?.approvedCreditFacilityAmount">
+                  <!-- Removed separate Approved Facility row; Credit Limit label below will be renamed to Approved Facility -->
+                  <tr *ngIf="locDetails?.endDate">
                     <td>
-                      <b>{{ 'labels.inputs.Approved Facility' | translate }}</b>
+                      <b>{{ 'labels.inputs.End Date' | translate }}</b>
                     </td>
-                    <td>{{ locDetails?.approvedCreditFacilityAmount | currency: locDetails?.currency || '' }}</td>
+                    <td>{{ locDetails?.endDate | dateFormat }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -87,7 +93,7 @@
                 <tbody>
                   <tr>
                     <td>
-                      <b>{{ 'labels.inputs.Credit Limit' | translate }}</b>
+                      <b>{{ 'labels.inputs.Approved Facility' | translate }}</b>
                     </td>
                     <td>{{ locDetails?.creditLimit | currency: locDetails?.currency || '' }}</td>
                   </tr>
@@ -97,17 +103,17 @@
                     </td>
                     <td class="available">{{ locDetails?.availableBalance | currency: locDetails?.currency || '' }}</td>
                   </tr>
-                  <tr>
+                  <tr *ngIf="locDetails?.consumedAmount !== null && locDetails?.consumedAmount !== undefined">
                     <td>
-                      <b>{{ 'labels.inputs.Outstanding' | translate }}</b>
+                      <b>{{ 'labels.inputs.Consumed Amount' | translate }}</b>
                     </td>
-                    <td class="outstanding">{{ locDetails?.outstanding | currency: locDetails?.currency || '' }}</td>
+                    <td class="consumed">{{ locDetails?.consumedAmount | currency: locDetails?.currency || '' }}</td>
                   </tr>
                   <tr>
                     <td>
                       <b>{{ 'labels.inputs.Interest Rate' | translate }}</b>
                     </td>
-                    <td>{{ locDetails?.interestRate }}% p.a.</td>
+                    <td>{{ locDetails?.annualInterestRate || locDetails?.interestRate }}% p.a.</td>
                   </tr>
                   <tr>
                     <td>
@@ -147,13 +153,13 @@
 
       <mat-menu #Actions="matMenu">
         <!-- Actions for SUBMITTED state -->
-        <button mat-menu-item (click)="doAction('Approve')" *ngIf="locDetails?.status === 'SUBMITTED'">
+        <button mat-menu-item (click)="doAction('Approve')" *ngIf="locDetails?.normalizedStatus === 'SUBMITTED'">
           <mat-icon matListIcon>
             <fa-icon icon="check" size="sm"></fa-icon>
           </mat-icon>
           {{ 'labels.buttons.Approve' | translate }}
         </button>
-        <button mat-menu-item (click)="doAction('Close')" *ngIf="locDetails?.status === 'SUBMITTED'">
+        <button mat-menu-item (click)="doAction('Close')" *ngIf="locDetails?.normalizedStatus === 'SUBMITTED'">
           <mat-icon matListIcon>
             <fa-icon icon="times" size="sm"></fa-icon>
           </mat-icon>
@@ -161,13 +167,13 @@
         </button>
 
         <!-- Actions for APPROVED state -->
-        <button mat-menu-item (click)="doAction('Activate')" *ngIf="locDetails?.status === 'APPROVED'">
+        <button mat-menu-item (click)="doAction('Activate')" *ngIf="locDetails?.normalizedStatus === 'APPROVED'">
           <mat-icon matListIcon>
             <fa-icon icon="play" size="sm"></fa-icon>
           </mat-icon>
           {{ 'labels.buttons.Activate' | translate }}
         </button>
-        <button mat-menu-item (click)="doAction('Close')" *ngIf="locDetails?.status === 'APPROVED'">
+        <button mat-menu-item (click)="doAction('Close')" *ngIf="locDetails?.normalizedStatus === 'APPROVED'">
           <mat-icon matListIcon>
             <fa-icon icon="times" size="sm"></fa-icon>
           </mat-icon>
@@ -175,13 +181,13 @@
         </button>
 
         <!-- Actions for ACTIVE state -->
-        <button mat-menu-item (click)="doAction('Deactivate')" *ngIf="locDetails?.status === 'ACTIVE'">
+        <button mat-menu-item (click)="doAction('Deactivate')" *ngIf="locDetails?.normalizedStatus === 'ACTIVE'">
           <mat-icon matListIcon>
             <fa-icon icon="pause" size="sm"></fa-icon>
           </mat-icon>
           {{ 'labels.buttons.Deactivate' | translate }}
         </button>
-        <button mat-menu-item (click)="doAction('Suspend')" *ngIf="locDetails?.status === 'ACTIVE'">
+        <button mat-menu-item (click)="doAction('Suspend')" *ngIf="locDetails?.normalizedStatus === 'ACTIVE'">
           <mat-icon matListIcon>
             <fa-icon icon="ban" size="sm"></fa-icon>
           </mat-icon>
@@ -189,7 +195,7 @@
         </button>
 
         <!-- Actions for INACTIVE state -->
-        <button mat-menu-item (click)="doAction('Reactivate')" *ngIf="locDetails?.status === 'INACTIVE'">
+        <button mat-menu-item (click)="doAction('Reactivate')" *ngIf="locDetails?.normalizedStatus === 'INACTIVE'">
           <mat-icon matListIcon>
             <fa-icon icon="play" size="sm"></fa-icon>
           </mat-icon>
@@ -197,7 +203,7 @@
         </button>
 
         <!-- Actions for SUSPENDED state -->
-        <button mat-menu-item (click)="doAction('Reactivate')" *ngIf="locDetails?.status === 'SUSPENDED'">
+        <button mat-menu-item (click)="doAction('Reactivate')" *ngIf="locDetails?.normalizedStatus === 'SUSPENDED'">
           <mat-icon matListIcon>
             <fa-icon icon="play" size="sm"></fa-icon>
           </mat-icon>
@@ -209,7 +215,9 @@
           mat-menu-item
           (click)="doAction('Increase Limit')"
           *ngIf="
-            locDetails?.status === 'ACTIVE' || locDetails?.status === 'INACTIVE' || locDetails?.status === 'SUSPENDED'
+            locDetails?.normalizedStatus === 'ACTIVE' ||
+            locDetails?.normalizedStatus === 'INACTIVE' ||
+            locDetails?.normalizedStatus === 'SUSPENDED'
           "
         >
           <mat-icon matListIcon>
@@ -221,7 +229,9 @@
           mat-menu-item
           (click)="doAction('Decrease Limit')"
           *ngIf="
-            locDetails?.status === 'ACTIVE' || locDetails?.status === 'INACTIVE' || locDetails?.status === 'SUSPENDED'
+            locDetails?.normalizedStatus === 'ACTIVE' ||
+            locDetails?.normalizedStatus === 'INACTIVE' ||
+            locDetails?.normalizedStatus === 'SUSPENDED'
           "
         >
           <mat-icon matListIcon>
@@ -234,7 +244,7 @@
         <button
           mat-menu-item
           (click)="doAction('View Details')"
-          *ngIf="locDetails?.status === 'CLOSED' || !locDetails?.status"
+          *ngIf="locDetails?.normalizedStatus === 'CLOSED' || !locDetails?.normalizedStatus"
         >
           <mat-icon matListIcon>
             <fa-icon icon="eye" size="sm"></fa-icon>
@@ -249,165 +259,6 @@
     <!-- Credit Details Section -->
     <div class="details-section" fxLayout="row" fxLayoutGap="16px" fxLayout.lt-md="column">
       <div fxFlex="60%" fxFlex.lt-md="100%">
-        <mat-card>
-          <mat-card-header>
-            <mat-card-title>{{ 'labels.inputs.Credit Utilization' | translate }}</mat-card-title>
-            <mat-card-subtitle
-              >{{ getUtilizationPercentage() }}% {{ 'labels.inputs.utilized' | translate }}</mat-card-subtitle
-            >
-          </mat-card-header>
-          <mat-card-content>
-            <div
-              fxLayout="row"
-              fxLayoutAlign="start center"
-              fxLayoutGap="32px"
-              fxLayout.lt-md="column"
-              fxLayoutGap.lt-md="24px"
-            >
-              <div class="utilization-chart" fxFlex="35">
-                <svg width="160" height="160" viewBox="0 0 40 40">
-                  <circle class="chart-background" cx="20" cy="20" r="15.9155" stroke-width="4"></circle>
-                  <circle
-                    class="chart-value"
-                    cx="20"
-                    cy="20"
-                    r="15.9155"
-                    stroke-width="4"
-                    [style.stroke-dasharray]="circumference"
-                    [style.stroke-dashoffset]="strokeDashoffset"
-                  ></circle>
-                </svg>
-                <div class="chart-text">
-                  <span class="chart-percent">{{ getUtilizationPercentage() }}%</span>
-                  <span class="chart-label">Utilized</span>
-                </div>
-              </div>
-              <div class="utilization-details" fxFlex="65">
-                <div class="detail-row">
-                  <span class="detail-label">{{ 'labels.inputs.Interest rate' | translate }}:</span>
-                  <span class="detail-value"
-                    ><strong>{{ locDetails?.annualInterestRate || locDetails?.interestRate }}% p.a.</strong></span
-                  >
-                </div>
-                <div class="detail-row" *ngIf="locDetails?.tenorDays">
-                  <span class="detail-label">{{ 'labels.inputs.Tenor (Days)' | translate }}:</span>
-                  <span class="detail-value"
-                    ><strong>{{ locDetails?.tenorDays }} days</strong></span
-                  >
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">{{ 'labels.inputs.Available Balance' | translate }}:</span>
-                  <span class="detail-value available-balance"
-                    ><strong>{{ locDetails?.availableBalance | currency: locDetails?.currency || '' }}</strong></span
-                  >
-                </div>
-                <div class="detail-row">
-                  <span class="detail-label">{{ 'labels.inputs.Outstanding Amount' | translate }}:</span>
-                  <span class="detail-value outstanding-amount"
-                    ><strong>{{ locDetails?.outstanding | currency: locDetails?.currency || '' }}</strong></span
-                  >
-                </div>
-                <div class="detail-row" *ngIf="locDetails?.avgUtilization">
-                  <span class="detail-label">{{ 'labels.inputs.Avg. utilization' | translate }}:</span>
-                  <span class="detail-value"
-                    ><strong>{{ locDetails?.avgUtilization | currency: locDetails?.currency || '' }}</strong></span
-                  >
-                </div>
-                <div class="detail-row" *ngIf="locDetails?.totalRepaid">
-                  <span class="detail-label">{{ 'labels.inputs.Total Repaid' | translate }}:</span>
-                  <span class="detail-value repaid-amount"
-                    ><strong>{{ locDetails?.totalRepaid | currency: locDetails?.currency || '' }}</strong></span
-                  >
-                </div>
-                <div class="detail-row" *ngIf="locDetails?.performance">
-                  <span class="detail-label">{{ 'labels.inputs.Performance' | translate }}:</span>
-                  <span class="detail-value performance"
-                    ><strong>{{ locDetails?.performance }}</strong></span
-                  >
-                </div>
-              </div>
-            </div>
-          </mat-card-content>
-        </mat-card>
-      </div>
-
-      <div fxFlex="40%" fxFlex.lt-md="100%">
-        <mat-card>
-          <mat-card-header>
-            <mat-card-title>{{ 'labels.inputs.Client Details' | translate }}</mat-card-title>
-          </mat-card-header>
-          <mat-card-content>
-            <div class="client-details">
-              <div class="detail-row">
-                <span class="detail-label">{{ 'labels.inputs.Company' | translate }}</span>
-                <span class="detail-value">{{ locDetails?.clientCompanyName || '-' }}</span>
-              </div>
-              <div class="detail-row" *ngIf="locDetails?.officeName">
-                <span class="detail-label">{{ 'labels.inputs.Office' | translate }}</span>
-                <span class="detail-value">{{ locDetails?.officeName }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">{{ 'labels.inputs.Contact' | translate }}</span>
-                <span class="detail-value">
-                  {{ locDetails?.clientContactPersonName || '-' }}
-                  <span *ngIf="locDetails?.clientContactPersonPhone" style="color: #666; font-size: 12px">
-                    <br />({{ locDetails?.clientContactPersonPhone }})
-                  </span>
-                </span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">{{ 'labels.inputs.Email' | translate }}</span>
-                <span class="detail-value">
-                  <a
-                    *ngIf="locDetails?.clientContactPersonEmail"
-                    [href]="'mailto:' + locDetails?.clientContactPersonEmail"
-                    style="color: #1976d2; text-decoration: none"
-                  >
-                    {{ locDetails?.clientContactPersonEmail }}
-                  </a>
-                  <span *ngIf="!locDetails?.clientContactPersonEmail" style="color: #999">-</span>
-                </span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">{{ 'labels.inputs.Signatory' | translate }}</span>
-                <span class="detail-value">
-                  {{ locDetails?.authorizedSignatoryName || '-' }}
-                  <span *ngIf="locDetails?.authorizedSignatoryPhone" style="color: #666; font-size: 12px">
-                    <br />({{ locDetails?.authorizedSignatoryPhone }})
-                  </span>
-                </span>
-              </div>
-              <div class="detail-row" *ngIf="locDetails?.authorizedSignatoryEmail">
-                <span class="detail-label">{{ 'labels.inputs.Signatory Email' | translate }}</span>
-                <span class="detail-value">
-                  <a
-                    [href]="'mailto:' + locDetails?.authorizedSignatoryEmail"
-                    style="color: #1976d2; text-decoration: none"
-                  >
-                    {{ locDetails?.authorizedSignatoryEmail }}
-                  </a>
-                </span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">{{ 'labels.inputs.VA' | translate }}</span>
-                <span class="detail-value">{{ locDetails?.va || '-' }}</span>
-              </div>
-              <div class="detail-row" *ngIf="locDetails?.specialConditions">
-                <span class="detail-label">{{ 'labels.inputs.Special Conditions' | translate }}</span>
-                <span class="detail-value" style="font-style: italic; color: #555">
-                  "{{ locDetails?.specialConditions }}"
-                </span>
-              </div>
-            </div>
-          </mat-card-content>
-        </mat-card>
-      </div>
-    </div>
-
-    <!-- Additional Details Section -->
-    <div class="details-section" fxLayout="row" fxLayoutGap="16px" fxLayout.lt-md="column" style="margin-top: 16px">
-      <!-- Terms & Settlement Details -->
-      <div fxFlex="33%" fxFlex.lt-md="100%">
         <mat-card>
           <mat-card-header>
             <mat-card-title>{{ 'labels.inputs.Terms & Settlement' | translate }}</mat-card-title>
@@ -428,9 +279,50 @@
                 </ng-template>
               </span>
             </div>
-            <div class="detail-row" *ngIf="locDetails?.nextReviewDate">
+            <div class="detail-row">
               <span class="detail-label">{{ 'labels.inputs.Next Review Date' | translate }}:</span>
-              <span class="detail-value">{{ locDetails?.nextReviewDate | dateFormat }}</span>
+              <span class="detail-value">
+                <ng-container *ngIf="locDetails?.nextReviewDate; else noNextReview">
+                  {{ locDetails?.nextReviewDate | dateFormat }}
+                </ng-container>
+                <ng-template #noNextReview>-</ng-template>
+              </span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">{{ 'labels.inputs.Advance Percentage' | translate }}:</span>
+              <span class="detail-value">
+                <ng-container
+                  *ngIf="
+                    locDetails?.advancePercentage !== null && locDetails?.advancePercentage !== undefined;
+                    else noAdvance
+                  "
+                >
+                  {{ locDetails?.advancePercentage }}%
+                </ng-container>
+                <ng-template #noAdvance>-</ng-template>
+              </span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">{{ 'labels.inputs.Cash Margin' | translate }}:</span>
+              <span class="detail-value">
+                <ng-container
+                  *ngIf="
+                    locDetails?.cashMarginType &&
+                      locDetails?.cashMarginValue !== null &&
+                      locDetails?.cashMarginValue !== undefined;
+                    else noCashMargin
+                  "
+                >
+                  {{ locDetails?.cashMarginValue }}{{ locDetails?.cashMarginType === 'PERCENTAGE' ? '%' : '' }} ({{
+                    locDetails?.cashMarginType
+                  }})
+                </ng-container>
+                <ng-template #noCashMargin>-</ng-template>
+              </span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">{{ 'labels.inputs.Rate Type' | translate }}:</span>
+              <span class="detail-value">{{ locDetails?.rateType || '-' }}</span>
             </div>
             <div class="settlement-section" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0">
               <h4 style="margin: 0 0 12px 0; color: #666; font-size: 14px; font-weight: 500">
@@ -469,6 +361,19 @@
                   </ng-template>
                 </div>
               </div>
+              <!-- Special Conditions Note placed after Balance field -->
+              <div class="detail-row" style="margin-top: 8px">
+                <span class="detail-label">{{ 'labels.inputs.Special Conditions' | translate }}:</span>
+                <span
+                  class="detail-value"
+                  [ngStyle]="{ 'font-style': locDetails?.specialConditions ? 'italic' : 'normal', color: '#555' }"
+                >
+                  <ng-container *ngIf="locDetails?.specialConditions; else noSpecialCond"
+                    >"{{ locDetails?.specialConditions }}"</ng-container
+                  >
+                  <ng-template #noSpecialCond>-</ng-template>
+                </span>
+              </div>
               <ng-template #noSettlementAccount>
                 <div
                   style="
@@ -483,6 +388,144 @@
                   <span style="font-style: italic; font-size: 13px">No settlement account configured</span>
                 </div>
               </ng-template>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+
+      <div fxFlex="40%" fxFlex.lt-md="100%">
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>{{ 'labels.inputs.Client Details' | translate }}</mat-card-title>
+          </mat-card-header>
+          <mat-card-content>
+            <div class="client-details">
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Company' | translate }}</span>
+                <span class="detail-value">{{ locDetails?.clientCompanyName || '-' }}</span>
+              </div>
+              <!-- Contact Person Name -->
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Contact' | translate }}</span>
+                <span class="detail-value">{{ locDetails?.clientContactPersonName || '-' }}</span>
+              </div>
+              <!-- Contact Person Phone -->
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Phone Number' | translate }}</span>
+                <span class="detail-value">{{ locDetails?.clientContactPersonPhone || '-' }}</span>
+              </div>
+              <!-- Contact Person Email -->
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Email' | translate }}</span>
+                <span class="detail-value">
+                  <ng-container *ngIf="locDetails?.clientContactPersonEmail; else noContactEmail">
+                    <a
+                      [href]="'mailto:' + locDetails?.clientContactPersonEmail"
+                      style="color: #1976d2; text-decoration: none"
+                    >
+                      {{ locDetails?.clientContactPersonEmail }}
+                    </a>
+                  </ng-container>
+                  <ng-template #noContactEmail>-</ng-template>
+                </span>
+              </div>
+              <!-- Authorized Signatory Name -->
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Signatory' | translate }}</span>
+                <span class="detail-value">{{ locDetails?.authorizedSignatoryName || '-' }}</span>
+              </div>
+              <!-- Authorized Signatory Phone -->
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Phone Number' | translate }}</span>
+                <span class="detail-value">{{ locDetails?.authorizedSignatoryPhone || '-' }}</span>
+              </div>
+              <!-- Authorized Signatory Email -->
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Signatory Email' | translate }}</span>
+                <span class="detail-value">
+                  <ng-container *ngIf="locDetails?.authorizedSignatoryEmail; else noSignatoryEmail">
+                    <a
+                      [href]="'mailto:' + locDetails?.authorizedSignatoryEmail"
+                      style="color: #1976d2; text-decoration: none"
+                    >
+                      {{ locDetails?.authorizedSignatoryEmail }}
+                    </a>
+                  </ng-container>
+                  <ng-template #noSignatoryEmail>-</ng-template>
+                </span>
+              </div>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </div>
+
+    <!-- Additional Details Section -->
+    <div class="details-section" fxLayout="row" fxLayoutGap="16px" fxLayout.lt-md="column" style="margin-top: 16px">
+      <!-- Credit Utilization -->
+      <div fxFlex="33%" fxFlex.lt-md="100%">
+        <mat-card>
+          <mat-card-header>
+            <mat-card-title>{{ 'labels.inputs.Credit Utilization' | translate }}</mat-card-title>
+            <mat-card-subtitle
+              >{{ getUtilizationPercentage() }}% {{ 'labels.inputs.utilized' | translate }}</mat-card-subtitle
+            >
+          </mat-card-header>
+          <mat-card-content>
+            <div fxLayout="column" fxLayoutAlign="start center" fxLayoutGap="16px">
+              <div class="utilization-chart">
+                <svg width="120" height="120" viewBox="0 0 40 40">
+                  <circle class="chart-background" cx="20" cy="20" r="15.9155" stroke-width="4"></circle>
+                  <circle
+                    class="chart-value"
+                    cx="20"
+                    cy="20"
+                    r="15.9155"
+                    stroke-width="4"
+                    [style.stroke-dasharray]="circumference"
+                    [style.stroke-dashoffset]="strokeDashoffset"
+                  ></circle>
+                </svg>
+                <div class="chart-text">
+                  <span class="chart-percent">{{ getUtilizationPercentage() }}%</span>
+                  <span class="chart-label">Utilized</span>
+                </div>
+              </div>
+              <div class="utilization-details" style="width: 100%">
+                <div class="detail-row">
+                  <span class="detail-label">{{ 'labels.inputs.Interest rate' | translate }}:</span>
+                  <span class="detail-value"
+                    ><strong>{{ locDetails?.annualInterestRate || locDetails?.interestRate }}% p.a.</strong></span
+                  >
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">{{ 'labels.inputs.Available Balance' | translate }}:</span>
+                  <span class="detail-value available-balance"
+                    ><strong>{{ locDetails?.availableBalance | currency: locDetails?.currency || '' }}</strong></span
+                  >
+                </div>
+                <div
+                  class="detail-row"
+                  *ngIf="locDetails?.consumedAmount !== null && locDetails?.consumedAmount !== undefined"
+                >
+                  <span class="detail-label">{{ 'labels.inputs.Consumed Amount' | translate }}:</span>
+                  <span class="detail-value consumed-amount"
+                    ><strong>{{ locDetails?.consumedAmount | currency: locDetails?.currency || '' }}</strong></span
+                  >
+                </div>
+                <div class="detail-row" *ngIf="locDetails?.avgUtilization">
+                  <span class="detail-label">{{ 'labels.inputs.Avg. utilization' | translate }}:</span>
+                  <span class="detail-value"
+                    ><strong>{{ locDetails?.avgUtilization | currency: locDetails?.currency || '' }}</strong></span
+                  >
+                </div>
+                <div class="detail-row" *ngIf="locDetails?.totalRepaid">
+                  <span class="detail-label">{{ 'labels.inputs.Total Repaid' | translate }}:</span>
+                  <span class="detail-value repaid-amount"
+                    ><strong>{{ locDetails?.totalRepaid | currency: locDetails?.currency || '' }}</strong></span
+                  >
+                </div>
+              </div>
             </div>
           </mat-card-content>
         </mat-card>
@@ -542,82 +585,103 @@
             <div
               class="status-info"
               style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0"
-              *ngIf="locDetails?.status"
+              *ngIf="locDetails?.normalizedStatus"
             >
               <h4 style="margin: 0 0 12px 0; color: #666; font-size: 14px; font-weight: 500">Status Information</h4>
               <div class="detail-row">
                 <span class="detail-label">{{ 'labels.inputs.Current Status' | translate }}:</span>
                 <span class="detail-value">
-                  <span class="status-badge" [ngClass]="'status-' + locDetails?.status?.toLowerCase()">
-                    {{ locDetails?.status }}
+                  <span class="status-badge" [ngClass]="locDetails?.status?.code || '' | statusLookup">
+                    {{ locDetails?.status?.value || '-' }}
                   </span>
                 </span>
               </div>
-              <div class="detail-row" *ngIf="locDetails?.activationDate">
+              <div class="detail-row">
                 <span class="detail-label">{{ 'labels.inputs.Activation Date' | translate }}:</span>
-                <span class="detail-value">{{ locDetails?.activationDate | dateFormat }}</span>
+                <span class="detail-value">
+                  <ng-container *ngIf="locDetails?.activationDate; else noActivationDateBusiness">
+                    {{ locDetails?.activationDate | dateFormat }}
+                  </ng-container>
+                  <ng-template #noActivationDateBusiness>-</ng-template>
+                </span>
+              </div>
+            </div>
+
+            <!-- Additional Business Information -->
+            <div
+              class="business-info"
+              style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0"
+              *ngIf="locDetails?.distributionPartner || locDetails?.reviewPeriod || locDetails?.loanOfficerName"
+            >
+              <h4 style="margin: 0 0 12px 0; color: #666; font-size: 14px; font-weight: 500">
+                Additional Business Information
+              </h4>
+              <div class="detail-row" *ngIf="locDetails?.distributionPartner">
+                <span class="detail-label">{{ 'labels.inputs.Distribution Partner' | translate }}:</span>
+                <span class="detail-value">{{ locDetails?.distributionPartner }}</span>
+              </div>
+              <div class="detail-row" *ngIf="locDetails?.reviewPeriod">
+                <span class="detail-label">{{ 'labels.inputs.Review Period' | translate }}:</span>
+                <span class="detail-value"
+                  >{{ locDetails?.reviewPeriod }} {{ locDetails?.reviewPeriod === 1 ? 'month' : 'months' }}</span
+                >
+              </div>
+              <div class="detail-row" *ngIf="locDetails?.loanOfficerName">
+                <span class="detail-label">{{ 'labels.inputs.Loan Officer' | translate }}:</span>
+                <span class="detail-value">{{ locDetails?.loanOfficerName }}</span>
               </div>
             </div>
           </mat-card-content>
         </mat-card>
       </div>
 
-      <!-- Charges & Audit Trail -->
+      <!-- Charges Summary -->
       <div fxFlex="34%" fxFlex.lt-md="100%">
         <mat-card>
           <mat-card-header>
-            <mat-card-title>{{ 'labels.inputs.Charges & Audit Trail' | translate }}</mat-card-title>
+            <mat-card-title>{{ 'labels.inputs.Charges Summary' | translate }}</mat-card-title>
           </mat-card-header>
           <mat-card-content>
             <div class="charges-section" *ngIf="chargesSummary || locDetails?.charges?.length; else noCharges">
-              <div class="charges-summary">
-                <div class="summary-item">
-                  <span class="label">Total Charges:</span>
-                  <strong class="amount">{{ getTotalChargesAmount() | currency: locDetails?.currency || '' }}</strong>
-                </div>
-                <div class="summary-item">
-                  <span class="label">Amount Paid:</span>
-                  <strong class="amount">{{ getTotalPaidAmount() | currency: locDetails?.currency || '' }}</strong>
-                </div>
-                <div class="summary-item">
-                  <span class="label">Amount Waived:</span>
-                  <strong class="amount">{{ getTotalWaivedAmount() | currency: locDetails?.currency || '' }}</strong>
-                </div>
-                <div class="summary-item outstanding">
-                  <span class="label">Outstanding:</span>
-                  <strong class="amount">{{
-                    getTotalOutstandingAmount() | currency: locDetails?.currency || ''
-                  }}</strong>
-                </div>
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Total Charges' | translate }}:</span>
+                <span class="detail-value">
+                  <strong>{{ getTotalChargesAmount() | currency: locDetails?.currency || '' }}</strong>
+                </span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Amount Paid' | translate }}:</span>
+                <span class="detail-value">
+                  <strong>{{ getTotalPaidAmount() | currency: locDetails?.currency || '' }}</strong>
+                </span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">{{ 'labels.inputs.Amount Waived' | translate }}:</span>
+                <span class="detail-value">
+                  <strong>{{ getTotalWaivedAmount() | currency: locDetails?.currency || '' }}</strong>
+                </span>
+              </div>
+              <div class="detail-row outstanding">
+                <span class="detail-label">{{ 'labels.inputs.Outstanding' | translate }}:</span>
+                <span class="detail-value outstanding-amount">
+                  <strong>{{ getTotalOutstandingAmount() | currency: locDetails?.currency || '' }}</strong>
+                </span>
               </div>
             </div>
             <ng-template #noCharges>
-              <div style="text-align: center; padding: 20px; color: #999; font-style: italic">
-                No charges configured
+              <div
+                style="
+                  text-align: center;
+                  padding: 20px;
+                  color: #999;
+                  background: #fafafa;
+                  border-radius: 8px;
+                  border: 1px dashed #ddd;
+                "
+              >
+                <span style="font-style: italic; font-size: 13px">No charges configured</span>
               </div>
             </ng-template>
-
-            <div class="audit-section">
-              <h4>Audit Trail</h4>
-              <div class="audit-timeline">
-                <div class="audit-item" *ngIf="locDetails?.createdDate">
-                  <div>
-                    <strong>Created</strong>
-                    <span>{{ locDetails?.createdDate | dateFormat }}</span>
-                    <span *ngIf="locDetails?.createdByUsername"> by {{ locDetails?.createdByUsername }} </span>
-                  </div>
-                </div>
-                <div class="audit-item" *ngIf="locDetails?.lastModifiedDate">
-                  <div>
-                    <strong>Last Modified</strong>
-                    <span>{{ locDetails?.lastModifiedDate | dateFormat }}</span>
-                    <span *ngIf="locDetails?.lastModifiedByUsername">
-                      by {{ locDetails?.lastModifiedByUsername }}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
           </mat-card-content>
         </mat-card>
       </div>
@@ -651,6 +715,15 @@
         [active]="charges.isActive"
       >
         {{ 'labels.inputs.Charges' | translate }}
+      </a>
+      <a
+        mat-tab-link
+        [routerLink]="['./audit-trail']"
+        routerLinkActive
+        #auditTrail="routerLinkActive"
+        [active]="auditTrail.isActive"
+      >
+        {{ 'labels.inputs.Audit Trail' | translate }}
       </a>
     </nav>
 
