@@ -239,6 +239,24 @@ export class EditLoansAccountComponent implements AfterViewInit, OnDestroy {
       const locDetails = this.loansAccountLocDetailsStep.locDetails;
       // Flatten all LOC fields to root level
       Object.assign(baseData, locDetails);
+
+      // For LOC products, include tenorDays from loan term frequency if it's in days
+      const locId = this.loansAccountDetailsStep?.loansAccountDetailsForm?.get('lineOfCreditId')?.value;
+      if (locId && this.isLocProductEnabled()) {
+        const loanTerm = baseData.loanTermFrequency;
+        const termFrequencyType = baseData.loanTermFrequencyType;
+
+        // Check if frequency type is days
+        const isTermInDays = this.isDaysFrequencyType(termFrequencyType);
+
+        if (loanTerm && isTermInDays) {
+          // Ensure additionalProperties exists
+          if (!baseData.additionalProperties) {
+            baseData.additionalProperties = {};
+          }
+          baseData.additionalProperties.tenorDays = loanTerm;
+        }
+      }
     }
 
     return baseData;
@@ -318,5 +336,31 @@ export class EditLoansAccountComponent implements AfterViewInit, OnDestroy {
     this.loansService.updateLoansAccount(this.loanId, loansAccountData).subscribe((response: any) => {
       this.router.navigate(['../'], { relativeTo: this.route });
     });
+  }
+
+  /**
+   * Checks if LOC product is enabled
+   */
+  private isLocProductEnabled(): boolean {
+    return !!(
+      this.loansAccountProductTemplate?.additionalProperties?.isLocEnabled ||
+      this.loansAccountAndTemplate?.additionalProperties?.isLocEnabled ||
+      this.isLocEnabled
+    );
+  }
+
+  /**
+   * Checks if the given frequency type ID corresponds to days
+   */
+  private isDaysFrequencyType(frequencyTypeId: number): boolean {
+    if (!this.loansAccountProductTemplate?.termFrequencyTypeOptions) {
+      return false;
+    }
+
+    const frequencyType = this.loansAccountProductTemplate.termFrequencyTypeOptions.find(
+      (option: any) => option.id === frequencyTypeId
+    );
+
+    return !!(frequencyType && (frequencyType.code === 'DAYS' || frequencyType.value === 'Days'));
   }
 }

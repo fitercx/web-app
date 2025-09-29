@@ -17,7 +17,7 @@
 
     <mat-form-field fxFlex="23%">
       <mat-label>{{ 'labels.inputs.Loan Term' | translate }}</mat-label>
-      <input type="number" matInput required disabled formControlName="loanTermFrequency" />
+      <input type="number" matInput required formControlName="loanTermFrequency" />
       <mat-error *ngIf="loansAccountTermsForm.controls.loanTermFrequency.hasError('required')">
         {{ 'labels.inputs.Loan Term' | translate }} {{ 'labels.commons.is' | translate }}
         <strong>{{ 'labels.commons.required' | translate }}</strong>

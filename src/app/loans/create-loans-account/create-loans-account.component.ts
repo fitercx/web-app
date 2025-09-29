@@ -349,6 +349,23 @@ export class CreateLoansAccountComponent implements AfterViewInit, OnDestroy {
         else if (invoiceAmount != null && !principalAmount) {
           baseData.principalAmount = invoiceAmount;
         }
+
+        // For LOC products, include tenorDays from loan term frequency if it's in days
+        if (this.isLocProductEnabled()) {
+          const loanTerm = baseData.loanTermFrequency;
+          const termFrequencyType = baseData.loanTermFrequencyType;
+
+          // Check if frequency type is days (need to verify this with the actual frequency type options)
+          const isTermInDays = this.isDaysFrequencyType(termFrequencyType);
+
+          if (loanTerm && isTermInDays) {
+            // Ensure additionalProperties exists
+            if (!baseData.additionalProperties) {
+              baseData.additionalProperties = {};
+            }
+            baseData.additionalProperties.tenorDays = loanTerm;
+          }
+        }
       }
     }
 
@@ -383,6 +400,32 @@ export class CreateLoansAccountComponent implements AfterViewInit, OnDestroy {
     }
 
     return filtered;
+  }
+
+  /**
+   * Checks if LOC product is enabled
+   */
+  private isLocProductEnabled(): boolean {
+    return !!(
+      this.loansAccountProductTemplate?.additionalProperties?.isLocEnabled ||
+      this.loansAccountTemplate?.additionalProperties?.isLocEnabled ||
+      this.isLocEnabled
+    );
+  }
+
+  /**
+   * Checks if the given frequency type ID corresponds to days
+   */
+  private isDaysFrequencyType(frequencyTypeId: number): boolean {
+    if (!this.loansAccountProductTemplate?.termFrequencyTypeOptions) {
+      return false;
+    }
+
+    const frequencyType = this.loansAccountProductTemplate.termFrequencyTypeOptions.find(
+      (option: any) => option.id === frequencyTypeId
+    );
+
+    return !!(frequencyType && (frequencyType.code === 'DAYS' || frequencyType.value === 'Days'));
   }
 
   /**
