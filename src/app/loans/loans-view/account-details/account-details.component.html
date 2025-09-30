@@ -2,6 +2,11 @@
   <h3>{{ 'labels.heading.Loan Details' | translate }}</h3>
 
   <div fxLayout="row wrap" fxLayout.lt-md="column">
+    <div fxFlexFill *ngIf="loanDetails.factorRateEnabled">
+      <span fxFlex="50%"> {{ 'labels.inputs.Factor Rate' | translate }} </span>
+      <span fxFlex="50%"> {{ loanDetails.factorRate | formatNumber }}</span>
+    </div>
+
     <div fxFlexFill>
       <span fxFlex="50%">{{ 'labels.inputs.Repayment Strategy' | translate }}</span>
       <span fxFlex="50%">{{ loanDetails.transactionProcessingStrategyName | translateKey: 'catalogs' }}</span>
