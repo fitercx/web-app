@@ -136,7 +136,7 @@
     <span fxFlex="60%">{{ loansAccount.repaymentsStartingFromDate | dateFormat }}</span>
   </div>
 
-  <div fxFlexFill *ngIf="loansAccount.interestChargedFromDate">
+  <div fxFlexFill *ngIf="loansAccount.interestChargedFromDate && !loansAccount.factoRateEnabled">
     <span fxFlex="40%">{{ 'labels.inputs.Interest charged from' | translate }}:</span>
     <span fxFlex="60%">{{ loansAccount.interestChargedFromDate | dateFormat }}</span>
   </div>
@@ -167,7 +167,7 @@
     }}</span>
   </div>
 
-  <div fxFlexFill>
+  <div fxFlexFill *ngIf="!loansAccount.factorRateEnabled">
     <span fxFlex="40%">{{ 'labels.inputs.Interest calculation period' | translate }}: </span>
     <span fxFlex="60%">{{
       loansAccount.interestCalculationPeriodType
@@ -198,7 +198,7 @@
     }}</span>
   </div>
 
-  <div fxFlexFill>
+  <div fxFlexFill *ngIf="!loansAccount.factorRateEnabled">
     <span fxFlex="40%"> {{ 'labels.inputs.Installment Amount' | translate }} </span>
     <span fxFlex="60%"> {{ loansAccount.fixedEmiAmount | formatNumber }} </span>
   </div>
@@ -237,7 +237,7 @@
     <span fxFlex="60%">{{ loansAccount.isTopup }}</span>
   </div>
 
-  <div fxFlexFill>
+  <div fxFlexFill *ngIf="!loansAccount.factorRateEnabled">
     <span fxFlex="40%">{{ 'labels.inputs.Recalculate Interest' | translate }}: </span>
     <span fxFlex="60%">{{ loansAccountProductTemplate?.isInterestRecalculationEnabled | yesNo }}</span>
   </div>
