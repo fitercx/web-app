@@ -84,6 +84,11 @@
               {{ 'labels.inputs.Disapproved Amount' | translate }}
               {{ 'labels.commons.must be greater than or equal to' | translate }} 0
             </mat-error>
+            <mat-error *ngIf="locDetailsForm.get('disapprovedAmount')?.hasError('disapprovedAmountExceeded')">
+              {{ 'labels.inputs.Disapproved Amount' | translate }}
+              {{ 'labels.commons.cannot be greater than' | translate }}
+              {{ 'labels.inputs.Invoice Amount' | translate }}
+            </mat-error>
           </mat-form-field>
         </div>
       </div>
@@ -167,11 +172,11 @@
             </mat-error>
           </mat-form-field>
 
-          <!-- Amount in Facility Currency (computed) -->
+          <!-- Amount in Facility Currency (computed) - This becomes the Principal -->
           <mat-form-field fxFlex="48%">
-            <mat-label>{{ 'labels.inputs.Amount in Facility Currency' | translate }}</mat-label>
+            <mat-label>{{ 'labels.inputs.Facility Amount (Principal)' | translate }}</mat-label>
             <input matInput formControlName="amountInFacilityCurrency" type="number" readonly />
-            <mat-hint>{{ 'labels.heading.Amount In Facility Currency Hint' | translate }}</mat-hint>
+            <mat-hint>Calculated as: (Markup + Exchange Rate) × Approved Amount</mat-hint>
           </mat-form-field>
 
           <!-- Approved Payable Amount (computed) -->

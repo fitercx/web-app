@@ -201,6 +201,19 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
     return null;
   }
 
+  /**
+   * Custom validator for disapproved amount - cannot be greater than invoice amount
+   */
+  disapprovedAmountValidator(control: AbstractControl): { [key: string]: any } | null {
+    const disapprovedAmount = control.value;
+    const invoiceAmount = this.locDetailsForm?.get('invoiceAmount')?.value || 0;
+
+    if (disapprovedAmount && invoiceAmount && disapprovedAmount > invoiceAmount) {
+      return { disapprovedAmountExceeded: true };
+    }
+    return null;
+  }
+
   trackByOptionId(index: number, option: any): any {
     return option.id;
   }
@@ -236,8 +249,10 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
 
       // Shared fields
       disapprovedAmount: [
-        '',
-        [Validators.min(0)]
+        0,
+        [
+          Validators.min(0),
+          this.disapprovedAmountValidator.bind(this)]
       ],
 
       // Receivable-specific fields
@@ -257,7 +272,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
         [Validators.min(0.01)]
       ],
       markup: [
-        '',
+        0,
         [Validators.min(0)]
       ],
       amountInFacilityCurrency: [{ value: '', disabled: true }], // Computed field
@@ -280,7 +295,8 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       // Make shared and receivable fields required for RECEIVABLE type LOCs
       this.locDetailsForm.get('disapprovedAmount')?.setValidators([
         Validators.required,
-        Validators.min(0)]);
+        Validators.min(0),
+        this.disapprovedAmountValidator.bind(this)]);
       this.locDetailsForm.get('advancePercentage')?.setValidators([
         Validators.required,
         Validators.min(0),
@@ -295,7 +311,8 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       // Make shared and payable fields required for PAYABLE type LOCs
       this.locDetailsForm.get('disapprovedAmount')?.setValidators([
         Validators.required,
-        Validators.min(0)]);
+        Validators.min(0),
+        this.disapprovedAmountValidator.bind(this)]);
       this.locDetailsForm.get('exchangeRate')?.setValidators([
         Validators.required,
         Validators.min(0.01)]);
@@ -311,7 +328,9 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       this.locDetailsForm.get('buyerDetails')?.setValidators([]);
     } else {
       // Remove all required validators for other LOC types
-      this.locDetailsForm.get('disapprovedAmount')?.setValidators([Validators.min(0)]);
+      this.locDetailsForm.get('disapprovedAmount')?.setValidators([
+        Validators.min(0),
+        this.disapprovedAmountValidator.bind(this)]);
       this.locDetailsForm.get('advancePercentage')?.setValidators([
         Validators.min(0),
         Validators.max(100)]);
@@ -397,6 +416,8 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       if (value !== null && value !== undefined && value !== '') {
         this.updateApprovedReceivableAmount();
         this.updateApprovedPayableAmount();
+        // Re-validate disapproved amount when invoice amount changes
+        this.locDetailsForm.get('disapprovedAmount')?.updateValueAndValidity({ emitEvent: false });
       }
     });
 
@@ -432,19 +453,21 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
    * Updates the approved receivable amount (Invoice Amount - Disapproved Amount)
    */
   updateApprovedReceivableAmount() {
-    const invoiceAmount = this.locDetailsForm.get('invoiceAmount')?.value || 0;
-    const disapprovedAmount = this.locDetailsForm.get('disapprovedAmount')?.value || 0;
-    const approvedAmount = invoiceAmount - disapprovedAmount;
+    if (this.isReceivableType) {
+      const invoiceAmount = Math.max(0, this.locDetailsForm.get('invoiceAmount')?.value || 0);
+      const disapprovedAmount = Math.max(0, this.locDetailsForm.get('disapprovedAmount')?.value || 0);
+      const approvedAmount = Math.max(0, invoiceAmount - disapprovedAmount);
 
-    // Only update if the approved amount is actually different from current value
-    const currentApprovedAmount = this.locDetailsForm.get('approvedReceivableAmount')?.value;
-    if (currentApprovedAmount !== approvedAmount) {
-      this.locDetailsForm
-        .get('approvedReceivableAmount')
-        ?.setValue(approvedAmount >= 0 ? approvedAmount : 0, { emitEvent: false });
+      // Only update if the approved amount is actually different from current value
+      const currentApprovedAmount = this.locDetailsForm.get('approvedReceivableAmount')?.value;
+      if (currentApprovedAmount !== approvedAmount) {
+        this.locDetailsForm.get('approvedReceivableAmount')?.setValue(approvedAmount, { emitEvent: false });
 
-      // Also update amount after advance when approved amount changes
-      this.updateAmountAfterAdvance();
+        // Also update amount after advance when approved amount changes
+        this.updateAmountAfterAdvance();
+      }
+    } else {
+      this.locDetailsForm.get('approvedReceivableAmount')?.setValue(undefined, { emitEvent: false });
     }
   }
 
@@ -452,16 +475,21 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
    * Updates the approved payable amount (Invoice Amount - Disapproved Amount)
    */
   updateApprovedPayableAmount() {
-    const invoiceAmount = this.locDetailsForm.get('invoiceAmount')?.value || 0;
-    const disapprovedAmount = this.locDetailsForm.get('disapprovedAmount')?.value || 0;
-    const approvedAmount = invoiceAmount - disapprovedAmount;
+    if (this.isPayableType) {
+      const invoiceAmount = Math.max(0, this.locDetailsForm.get('invoiceAmount')?.value || 0);
+      const disapprovedAmount = Math.max(0, this.locDetailsForm.get('disapprovedAmount')?.value || 0);
+      const approvedAmount = Math.max(0, invoiceAmount - disapprovedAmount);
 
-    // Only update if the approved amount is actually different from current value
-    const currentApprovedAmount = this.locDetailsForm.get('approvedPayableAmount')?.value;
-    if (currentApprovedAmount !== approvedAmount) {
-      this.locDetailsForm
-        .get('approvedPayableAmount')
-        ?.setValue(approvedAmount >= 0 ? approvedAmount : 0, { emitEvent: false });
+      // Only update if the approved amount is actually different from current value
+      const currentApprovedAmount = this.locDetailsForm.get('approvedPayableAmount')?.value;
+      if (currentApprovedAmount !== approvedAmount) {
+        this.locDetailsForm.get('approvedPayableAmount')?.setValue(approvedAmount, { emitEvent: false });
+
+        // Update facility amount when approved payable amount changes
+        this.updateAmountInFacilityCurrency();
+      }
+    } else {
+      this.locDetailsForm.get('approvedPayableAmount')?.setValue(undefined, { emitEvent: false });
     }
   }
 
@@ -481,18 +509,21 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
   }
 
   /**
-   * Updates the amount in facility currency (Invoice Amount * (Exchange Rate + Markup))
+   * Updates the amount in facility currency (Approved Amount * (Exchange Rate + Markup))
+   * This becomes the facility amount (principal) for payable LOCs
    */
   updateAmountInFacilityCurrency() {
-    const invoiceAmount = this.locDetailsForm.get('invoiceAmount')?.value || 0;
-    const exchangeRate = this.locDetailsForm.get('exchangeRate')?.value || 0;
-    const markup = this.locDetailsForm.get('markup')?.value || 0;
-    const amountInFacilityCurrency = invoiceAmount * (exchangeRate + markup);
+    const approvedAmount = this.locDetailsForm.get('approvedPayableAmount')?.value || 0;
+    const exchangeRate = Math.max(0, this.locDetailsForm.get('exchangeRate')?.value || 0);
+    const markup = Math.max(0, this.locDetailsForm.get('markup')?.value || 0);
 
-    // Only update if the amount in facility currency is actually different from current value
+    // Facility amount calculation: (markup + exchange rate) * approved amount
+    const facilityAmount = (markup + exchangeRate) * Math.max(0, approvedAmount);
+
+    // Only update if the facility amount is actually different from current value
     const currentAmountInFacilityCurrency = this.locDetailsForm.get('amountInFacilityCurrency')?.value;
-    if (currentAmountInFacilityCurrency !== amountInFacilityCurrency) {
-      this.locDetailsForm.get('amountInFacilityCurrency')?.setValue(amountInFacilityCurrency, { emitEvent: false });
+    if (currentAmountInFacilityCurrency !== facilityAmount) {
+      this.locDetailsForm.get('amountInFacilityCurrency')?.setValue(facilityAmount, { emitEvent: false });
     }
   }
 
@@ -724,6 +755,13 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
    * Returns the form value for LOC Details
    */
   get locDetails() {
-    return this.locDetailsForm.getRawValue();
+    const formData = this.locDetailsForm.getRawValue();
+
+    // Add LOC type information for proper preview display
+    return {
+      ...formData,
+      locType: this.isReceivableType ? 'RECEIVABLE' : this.isPayableType ? 'PAYABLE' : null,
+      buyerSupplierOptions: this.buyerSupplierOptions
+    };
   }
 }

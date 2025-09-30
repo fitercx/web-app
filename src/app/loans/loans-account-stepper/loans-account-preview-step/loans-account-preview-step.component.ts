@@ -71,38 +71,45 @@ export class LoansAccountPreviewStepComponent implements OnChanges {
         .filter((member: any) => member.selected)
         .reduce((acc: number, member: any) => acc + (member.principal ?? 0), 0);
     }
-
-    // Ensure LOC amounts are synchronized in the preview data
-    if (this.loansAccount && this.isLocEnabled()) {
-      this.synchronizeLOCAmounts();
-    }
   }
 
   /**
-   * Checks if LOC is enabled based on loan account data
+   * Checks if the LOC type is receivable based on the locType flag
    */
-  private isLocEnabled(): boolean {
-    return !!(this.loansAccount.lineOfCreditId || this.loansAccount.invoiceNo || this.loansAccount.invoiceAmount);
+  get isReceivableType(): boolean {
+    return (
+      this.loansAccount?.locType === 'RECEIVABLE' || this.loansAccount?.additionalProperties?.locType === 'RECEIVABLE'
+    );
   }
 
   /**
-   * Ensures principal and invoice amounts are synchronized for LOC display
+   * Checks if the LOC type is payable based on the locType flag
    */
-  private synchronizeLOCAmounts(): void {
-    const principalAmount = this.loansAccount.principalAmount;
-    const invoiceAmount = this.loansAccount.invoiceAmount;
+  get isPayableType(): boolean {
+    return this.loansAccount?.locType === 'PAYABLE' || this.loansAccount?.additionalProperties?.locType === 'PAYABLE';
+  }
 
-    // If both exist and are different, prioritize principal amount
-    if (principalAmount != null && invoiceAmount != null && principalAmount !== invoiceAmount) {
-      this.loansAccount.invoiceAmount = principalAmount;
-    }
-    // If only principal exists, set invoice amount
-    else if (principalAmount != null && (invoiceAmount == null || invoiceAmount === '')) {
-      this.loansAccount.invoiceAmount = principalAmount;
-    }
-    // If only invoice exists, set principal amount (fallback case)
-    else if (invoiceAmount != null && (principalAmount == null || principalAmount === '')) {
-      this.loansAccount.principalAmount = invoiceAmount;
-    }
+  /**
+   * Converts supplier/buyer detail IDs to their corresponding names
+   */
+  getSupplierBuyerNames(detailIds: any): string {
+    if (!detailIds) return '';
+
+    // Handle both array and single values
+    const ids = Array.isArray(detailIds) ? detailIds : [detailIds];
+
+    // Get the buyer/supplier options from the loan account data
+    const options =
+      this.loansAccount?.buyerSupplierOptions || this.loansAccount?.additionalProperties?.buyerSupplierOptions || [];
+
+    // Map IDs to names
+    const names = ids
+      .map((id: any) => {
+        const option = options.find((opt: any) => opt.id === id);
+        return option ? option.name : id; // Fallback to ID if name not found
+      })
+      .filter((name: any) => name); // Remove empty values
+
+    return names.join(', ');
   }
 }
