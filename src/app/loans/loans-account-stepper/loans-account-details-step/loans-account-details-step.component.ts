@@ -115,9 +115,17 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
           externalId: this.loansAccountTemplate.externalId,
           linkAccountId: this.loansAccountTemplate.linkAccountId,
           createStandingInstructionAtDisbursement: this.loansAccountTemplate.createStandingInstructionAtDisbursement,
-          lineOfCreditId:
-            this.loansAccountTemplate.additionalProperties?.lineOfCreditId || this.loansAccountTemplate.lineOfCreditId
+          lineOfCreditId: this.selectedLocId
         });
+
+        // Default loan officer from LOC if not already set and LOC has loanOfficerId
+        const currentLocId = this.selectedLocId;
+        if (currentLocId && !this.loansAccountTemplate.loanOfficerId && this.lineOfCreditOptions) {
+          const selectedLoc = this.lineOfCreditOptions.find((loc: any) => loc.id === currentLocId);
+          if (selectedLoc?.loanOfficerId) {
+            this.loansAccountDetailsForm.get('loanOfficerId')?.setValue(selectedLoc.loanOfficerId);
+          }
+        }
       }
     }
     this.filterFormCtrl.valueChanges.pipe(takeUntil(this._onDestroy)).subscribe(() => {
@@ -201,8 +209,25 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
           lineOfCreditControl?.setValidators([Validators.required]);
         } else {
           lineOfCreditControl?.clearValidators();
+          // Clear LOC selection and reset loan officer if LOC is not enabled for this product
+          lineOfCreditControl?.setValue(null);
+          this.loansAccountDetailsForm.get('loanOfficerId')?.setValue(null);
         }
         lineOfCreditControl?.updateValueAndValidity();
+
+        // After loading loan officer options, default loan officer from LOC if a LOC is already selected
+        const currentLocId = this.selectedLocId;
+        if (currentLocId) {
+          const selectedLoc = this.lineOfCreditOptions.find((loc: any) => loc.id === currentLocId);
+          if (selectedLoc?.loanOfficerId) {
+            const locLoanOfficer = this.loanOfficerOptions.find(
+              (officer: any) => officer.id === selectedLoc.loanOfficerId
+            );
+            if (locLoanOfficer) {
+              this.loansAccountDetailsForm.get('loanOfficerId')?.setValue(selectedLoc.loanOfficerId);
+            }
+          }
+        }
 
         if (response.createStandingInstructionAtDisbursement) {
           this.loansAccountDetailsForm
@@ -210,6 +235,31 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
             .patchValue(response.createStandingInstructionAtDisbursement);
         }
       });
+    });
+
+    // Watch for Line of Credit selection changes to default loan officer
+    this.loansAccountDetailsForm.get('lineOfCreditId')?.valueChanges.subscribe((locId: number | null) => {
+      const loanOfficerControl = this.loansAccountDetailsForm.get('loanOfficerId');
+      if (!loanOfficerControl) return;
+
+      if (locId && this.lineOfCreditOptions) {
+        const selectedLoc = this.lineOfCreditOptions.find((loc: any) => loc.id === locId);
+        if (selectedLoc?.loanOfficerId && this.loanOfficerOptions) {
+          const locLoanOfficer = this.loanOfficerOptions.find(
+            (officer: any) => officer.id === selectedLoc.loanOfficerId
+          );
+          if (locLoanOfficer) {
+            loanOfficerControl.setValue(selectedLoc.loanOfficerId);
+          } else {
+            loanOfficerControl.setValue(null);
+          }
+        } else {
+          loanOfficerControl.setValue(null);
+        }
+      } else {
+        // No LOC selected, reset loan officer
+        loanOfficerControl.setValue(null);
+      }
     });
   }
 
@@ -225,5 +275,27 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
    */
   get showLineOfCreditDropdown() {
     return this.isLocEnabled && this.lineOfCreditOptions && this.lineOfCreditOptions.length > 0;
+  }
+
+  /**
+   * Gets the currently selected Line of Credit ID from various sources
+   */
+  get selectedLocId(): number | null {
+    // First check form control value (for runtime changes)
+    const formValue = this.loansAccountDetailsForm?.get('lineOfCreditId')?.value;
+    if (formValue) {
+      return formValue;
+    }
+
+    // Then check template data (for initialization/edit mode)
+    if (this.loansAccountTemplate) {
+      return (
+        this.loansAccountTemplate.additionalProperties?.lineOfCreditId ||
+        this.loansAccountTemplate.lineOfCreditId ||
+        null
+      );
+    }
+
+    return null;
   }
 }

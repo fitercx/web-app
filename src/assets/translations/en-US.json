@@ -1091,7 +1091,7 @@
       "Savings Accounts": "Savings Accounts",
       "Savings Details": "Savings Details",
       "Savings Linkage": "Savings Linkage",
-      "Loc Linkage": "Loc Linkage",
+      "Line of Credit Linkage": "Line of Credit Linkage",
       "Lines of Credit": "Lines of Credit",
       "Savings Products": "Savings Products",
       "Savings Transactions": "Savings Transactions",
@@ -1188,7 +1188,7 @@
     "inputs": {
       "Approved Facility": "Approved Facility",
       "Principal/Invoice Amount": "Principal/Invoice Amount",
-      "LOC DETAILS": "LOC DETAILS",
+      "INVOICE DETAILS": "INVOICE DETAILS",
       "Reject Additional Shares": "Reject Additional Shares",
       "Consumed Amount": "Consumed Amount",
       "Advance Percentage": "Advance Percentage",

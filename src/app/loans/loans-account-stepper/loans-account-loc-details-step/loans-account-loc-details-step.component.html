@@ -1,235 +1,218 @@
-<div class="container m-0 p-0">
-  <form [formGroup]="locDetailsForm">
-    <div class="row">
-      <div fxFlex="100%" class="step-container">
-        <h3 class="mat-h3">{{ 'labels.heading.LOC Details' | translate }}</h3>
+<form [formGroup]="locDetailsForm">
+  <div class="row">
+    <div fxFlex="100%" class="step-container">
+      <!-- Invoice Details Section -->
+      <div>
+        <div fxLayout="row wrap" fxLayoutGap="2%" fxLayout.lt-md="column" class="form-fields">
+          <!-- Invoice No -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Invoice No' | translate }}</mat-label>
+            <input matInput formControlName="invoiceNo" required />
+            <mat-error *ngIf="locDetailsForm.get('invoiceNo')?.hasError('required')">
+              {{ 'labels.inputs.Invoice No' | translate }} {{ 'labels.commons.is required' | translate }}
+            </mat-error>
+          </mat-form-field>
 
-        <!-- Invoice Details Section -->
-        <div>
-          <h4 class="mat-h4">{{ 'labels.heading.Invoice Detail' | translate }}</h4>
+          <!-- Invoice Date -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Invoice Date' | translate }}</mat-label>
+            <input
+              matInput
+              [matDatepicker]="invoiceDatePicker"
+              formControlName="invoiceDate"
+              [min]="minDate"
+              [max]="maxDate"
+              required
+            />
+            <mat-datepicker-toggle matSuffix [for]="invoiceDatePicker"></mat-datepicker-toggle>
+            <mat-datepicker #invoiceDatePicker></mat-datepicker>
+            <mat-error *ngIf="locDetailsForm.get('invoiceDate')?.hasError('required')">
+              {{ 'labels.inputs.Invoice Date' | translate }} {{ 'labels.commons.is required' | translate }}
+            </mat-error>
+          </mat-form-field>
 
-          <div fxLayout="row wrap" fxLayoutGap="2%" fxLayout.lt-md="column" class="form-fields">
-            <!-- Invoice No -->
-            <mat-form-field fxFlex="48%">
-              <mat-label>{{ 'labels.inputs.Invoice No' | translate }}</mat-label>
-              <input matInput formControlName="invoiceNo" required />
-              <mat-error *ngIf="locDetailsForm.get('invoiceNo')?.hasError('required')">
-                {{ 'labels.inputs.Invoice No' | translate }} {{ 'labels.commons.is required' | translate }}
-              </mat-error>
-            </mat-form-field>
+          <!-- Invoice Due Date -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Invoice Due Date' | translate }}</mat-label>
+            <input
+              matInput
+              [matDatepicker]="invoiceDueDatePicker"
+              formControlName="invoiceDueDate"
+              [min]="minDate"
+              [max]="maxDate"
+              required
+            />
+            <mat-datepicker-toggle matSuffix [for]="invoiceDueDatePicker"></mat-datepicker-toggle>
+            <mat-datepicker #invoiceDueDatePicker></mat-datepicker>
+            <mat-error *ngIf="locDetailsForm.get('invoiceDueDate')?.hasError('required')">
+              {{ 'labels.inputs.Invoice Due Date' | translate }} {{ 'labels.commons.is required' | translate }}
+            </mat-error>
+          </mat-form-field>
 
-            <!-- Invoice Date -->
-            <mat-form-field fxFlex="48%">
-              <mat-label>{{ 'labels.inputs.Invoice Date' | translate }}</mat-label>
-              <input
-                matInput
-                [matDatepicker]="invoiceDatePicker"
-                formControlName="invoiceDate"
-                [min]="minDate"
-                [max]="maxDate"
-                required
-              />
-              <mat-datepicker-toggle matSuffix [for]="invoiceDatePicker"></mat-datepicker-toggle>
-              <mat-datepicker #invoiceDatePicker></mat-datepicker>
-              <mat-error *ngIf="locDetailsForm.get('invoiceDate')?.hasError('required')">
-                {{ 'labels.inputs.Invoice Date' | translate }} {{ 'labels.commons.is required' | translate }}
-              </mat-error>
-            </mat-form-field>
+          <!-- Invoice Currency -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Invoice Currency' | translate }}</mat-label>
+            <mat-select formControlName="invoiceCurrency" required>
+              <mat-option *ngFor="let currency of currencyOptions" [value]="currency.code">
+                {{ currency.code }} - {{ currency.name }}
+              </mat-option>
+            </mat-select>
+            <mat-error *ngIf="locDetailsForm.get('invoiceCurrency')?.hasError('required')">
+              {{ 'labels.inputs.Invoice Currency' | translate }} {{ 'labels.commons.is required' | translate }}
+            </mat-error>
+          </mat-form-field>
 
-            <!-- Invoice Due Date -->
-            <mat-form-field fxFlex="48%">
-              <mat-label>{{ 'labels.inputs.Invoice Due Date' | translate }}</mat-label>
-              <input
-                matInput
-                [matDatepicker]="invoiceDueDatePicker"
-                formControlName="invoiceDueDate"
-                [min]="minDate"
-                [max]="maxDate"
-                required
-              />
-              <mat-datepicker-toggle matSuffix [for]="invoiceDueDatePicker"></mat-datepicker-toggle>
-              <mat-datepicker #invoiceDueDatePicker></mat-datepicker>
-              <mat-error *ngIf="locDetailsForm.get('invoiceDueDate')?.hasError('required')">
-                {{ 'labels.inputs.Invoice Due Date' | translate }} {{ 'labels.commons.is required' | translate }}
-              </mat-error>
-            </mat-form-field>
-
-            <!-- Invoice Amount -->
-            <mat-form-field fxFlex="48%">
-              <mat-label>{{ 'labels.inputs.Invoice Amount' | translate }}</mat-label>
-              <input matInput formControlName="invoiceAmount" type="number" step="0.01" min="0" required />
-              <mat-error *ngIf="locDetailsForm.get('invoiceAmount')?.hasError('required')">
-                {{ 'labels.inputs.Invoice Amount' | translate }} {{ 'labels.commons.is required' | translate }}
-              </mat-error>
-              <mat-error *ngIf="locDetailsForm.get('invoiceAmount')?.hasError('min')">
-                {{ 'labels.inputs.Invoice Amount' | translate }}
-                {{ 'labels.commons.must be greater than' | translate }} 0
-              </mat-error>
-            </mat-form-field>
-
-            <!-- Invoice Currency -->
-            <mat-form-field fxFlex="48%">
-              <mat-label>{{ 'labels.inputs.Invoice Currency' | translate }}</mat-label>
-              <mat-select formControlName="invoiceCurrency" required>
-                <mat-option *ngFor="let currency of currencyOptions" [value]="currency.code">
-                  {{ currency.code }} - {{ currency.name }}
-                </mat-option>
-              </mat-select>
-              <mat-error *ngIf="locDetailsForm.get('invoiceCurrency')?.hasError('required')">
-                {{ 'labels.inputs.Invoice Currency' | translate }} {{ 'labels.commons.is required' | translate }}
-              </mat-error>
-            </mat-form-field>
-          </div>
+          <!-- Invoice Amount -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Invoice Amount' | translate }}</mat-label>
+            <input matInput formControlName="invoiceAmount" type="number" step="0.01" min="0" required />
+            <mat-error *ngIf="locDetailsForm.get('invoiceAmount')?.hasError('required')">
+              {{ 'labels.inputs.Invoice Amount' | translate }} {{ 'labels.commons.is required' | translate }}
+            </mat-error>
+            <mat-error *ngIf="locDetailsForm.get('invoiceAmount')?.hasError('min')">
+              {{ 'labels.inputs.Invoice Amount' | translate }}
+              {{ 'labels.commons.must be greater than' | translate }} 0
+            </mat-error>
+          </mat-form-field>
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Disapproved Amount' | translate }}</mat-label>
+            <input matInput formControlName="disapprovedAmount" type="number" step="0.01" min="0" required />
+            <mat-error *ngIf="locDetailsForm.get('disapprovedAmount')?.hasError('required')">
+              {{ 'labels.inputs.Disapproved Amount' | translate }} {{ 'labels.commons.is required' | translate }}
+            </mat-error>
+            <mat-error *ngIf="locDetailsForm.get('disapprovedAmount')?.hasError('min')">
+              {{ 'labels.inputs.Disapproved Amount' | translate }}
+              {{ 'labels.commons.must be greater than or equal to' | translate }} 0
+            </mat-error>
+          </mat-form-field>
         </div>
+      </div>
 
-        <!-- Shared Details Section (show for both receivable and payable) -->
-        <div *ngIf="isReceivableType || isPayableType">
-          <h4 class="mat-h4">{{ 'labels.heading.General Details' | translate }}</h4>
+      <!-- Receivable Details Section (only show if LOC type is receivable) -->
+      <div *ngIf="isReceivableType">
+        <div fxLayout="row wrap" fxLayoutGap="2%" fxLayout.lt-md="column" class="form-fields">
+          <!-- Advance % -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Advance %' | translate }}</mat-label>
+            <input matInput formControlName="advancePercentage" type="number" step="0.01" min="0" max="100" required />
+            <mat-error *ngIf="locDetailsForm.get('advancePercentage')?.hasError('required')">
+              {{ 'labels.inputs.Advance %' | translate }} {{ 'labels.commons.is required' | translate }}
+            </mat-error>
+            <mat-error *ngIf="locDetailsForm.get('advancePercentage')?.hasError('min')">
+              {{ 'labels.inputs.Advance %' | translate }}
+              {{ 'labels.commons.must be greater than or equal to' | translate }} 0
+            </mat-error>
+            <mat-error *ngIf="locDetailsForm.get('advancePercentage')?.hasError('max')">
+              {{ 'labels.inputs.Advance %' | translate }}
+              {{ 'labels.commons.must be less than or equal to' | translate }} 100
+            </mat-error>
+          </mat-form-field>
 
-          <div fxLayout="row wrap" fxLayoutGap="2%" fxLayout.lt-md="column" class="form-fields">
-            <!-- Disapproved Amount -->
-            <mat-form-field fxFlex="48%">
-              <mat-label>{{ 'labels.inputs.Disapproved Amount' | translate }}</mat-label>
-              <input matInput formControlName="disapprovedAmount" type="number" step="0.01" min="0" required />
-              <mat-error *ngIf="locDetailsForm.get('disapprovedAmount')?.hasError('required')">
-                {{ 'labels.inputs.Disapproved Amount' | translate }} {{ 'labels.commons.is required' | translate }}
-              </mat-error>
-              <mat-error *ngIf="locDetailsForm.get('disapprovedAmount')?.hasError('min')">
-                {{ 'labels.inputs.Disapproved Amount' | translate }}
-                {{ 'labels.commons.must be greater than or equal to' | translate }} 0
-              </mat-error>
-            </mat-form-field>
-          </div>
+          <!-- Amount after Advance (computed) -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Amount after Advance' | translate }}</mat-label>
+            <input matInput formControlName="amountAfterAdvance" type="number" readonly />
+            <mat-hint>{{ 'labels.heading.Amount After Advance Hint' | translate }}</mat-hint>
+          </mat-form-field>
+
+          <!-- Approved Receivable Amount (computed) -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Approved Receivable Amount' | translate }}</mat-label>
+            <input matInput formControlName="approvedReceivableAmount" type="number" readonly />
+            <mat-hint>{{ 'labels.heading.Approved Receivable Amount Hint' | translate }}</mat-hint>
+          </mat-form-field>
+
+          <!-- Buyer Details -->
+          <mat-form-field fxFlex="100%">
+            <mat-label>{{ 'labels.inputs.Buyer Details' | translate }}</mat-label>
+            <mat-select formControlName="buyerDetails" multiple required>
+              <mat-option *ngFor="let option of buyerSupplierOptions; trackBy: trackByOptionId" [value]="option.id">
+                {{ option.name }}
+              </mat-option>
+            </mat-select>
+            <mat-hint>Available options: {{ buyerSupplierOptions.length }}</mat-hint>
+            <mat-error *ngIf="locDetailsForm.get('buyerDetails')?.hasError('required')">
+              {{ 'labels.inputs.Buyer Details' | translate }} {{ 'labels.commons.is required' | translate }}
+            </mat-error>
+          </mat-form-field>
         </div>
+      </div>
 
-        <!-- Receivable Details Section (only show if LOC type is receivable) -->
-        <div *ngIf="isReceivableType">
-          <h4 class="mat-h4">{{ 'labels.heading.Receivable Details' | translate }}</h4>
+      <!-- Payable Details Section (only show if LOC type is payable) -->
+      <div *ngIf="isPayableType">
+        <div fxLayout="row wrap" fxLayoutGap="2%" fxLayout.lt-md="column" class="form-fields">
+          <!-- Exchange Rate -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Exchange Rate' | translate }}</mat-label>
+            <input matInput formControlName="exchangeRate" type="number" step="0.0001" min="0.01" required />
+            <mat-error *ngIf="locDetailsForm.get('exchangeRate')?.hasError('required')">
+              {{ 'labels.inputs.Exchange Rate' | translate }} {{ 'labels.commons.is required' | translate }}
+            </mat-error>
+            <mat-error *ngIf="locDetailsForm.get('exchangeRate')?.hasError('min')">
+              {{ 'labels.inputs.Exchange Rate' | translate }}
+              {{ 'labels.commons.must be greater than' | translate }} 0.01
+            </mat-error>
+          </mat-form-field>
 
-          <div fxLayout="row wrap" fxLayoutGap="2%" fxLayout.lt-md="column" class="form-fields">
-            <!-- Approved Receivable Amount (computed) -->
-            <mat-form-field fxFlex="48%">
-              <mat-label>{{ 'labels.inputs.Approved Receivable Amount' | translate }}</mat-label>
-              <input matInput formControlName="approvedReceivableAmount" type="number" readonly />
-              <mat-hint>{{ 'labels.heading.Approved Receivable Amount Hint' | translate }}</mat-hint>
-            </mat-form-field>
+          <!-- Markup -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Markup' | translate }}</mat-label>
+            <input matInput formControlName="markup" type="number" step="0.0001" min="0" required />
+            <mat-error *ngIf="locDetailsForm.get('markup')?.hasError('required')">
+              {{ 'labels.inputs.Markup' | translate }} {{ 'labels.commons.is required' | translate }}
+            </mat-error>
+            <mat-error *ngIf="locDetailsForm.get('markup')?.hasError('min')">
+              {{ 'labels.inputs.Markup' | translate }}
+              {{ 'labels.commons.must be greater than or equal to' | translate }} 0
+            </mat-error>
+          </mat-form-field>
 
-            <!-- Advance % -->
-            <mat-form-field fxFlex="48%">
-              <mat-label>{{ 'labels.inputs.Advance %' | translate }}</mat-label>
-              <input
-                matInput
-                formControlName="advancePercentage"
-                type="number"
-                step="0.01"
-                min="0"
-                max="100"
-                required
-              />
-              <mat-error *ngIf="locDetailsForm.get('advancePercentage')?.hasError('required')">
-                {{ 'labels.inputs.Advance %' | translate }} {{ 'labels.commons.is required' | translate }}
-              </mat-error>
-              <mat-error *ngIf="locDetailsForm.get('advancePercentage')?.hasError('min')">
-                {{ 'labels.inputs.Advance %' | translate }}
-                {{ 'labels.commons.must be greater than or equal to' | translate }} 0
-              </mat-error>
-              <mat-error *ngIf="locDetailsForm.get('advancePercentage')?.hasError('max')">
-                {{ 'labels.inputs.Advance %' | translate }}
-                {{ 'labels.commons.must be less than or equal to' | translate }} 100
-              </mat-error>
-            </mat-form-field>
+          <!-- Amount in Facility Currency (computed) -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Amount in Facility Currency' | translate }}</mat-label>
+            <input matInput formControlName="amountInFacilityCurrency" type="number" readonly />
+            <mat-hint>{{ 'labels.heading.Amount In Facility Currency Hint' | translate }}</mat-hint>
+          </mat-form-field>
 
-            <!-- Amount after Advance (computed) -->
-            <mat-form-field fxFlex="48%">
-              <mat-label>{{ 'labels.inputs.Amount after Advance' | translate }}</mat-label>
-              <input matInput formControlName="amountAfterAdvance" type="number" readonly />
-              <mat-hint>{{ 'labels.heading.Amount After Advance Hint' | translate }}</mat-hint>
-            </mat-form-field>
+          <!-- Approved Payable Amount (computed) -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Approved Payable Amount' | translate }}</mat-label>
+            <input matInput formControlName="approvedPayableAmount" type="number" readonly />
+            <mat-hint>{{ 'labels.heading.Approved Payable Amount Hint' | translate }}</mat-hint>
+          </mat-form-field>
 
-            <!-- Buyer Details -->
-            <mat-form-field fxFlex="100%">
-              <mat-label>{{ 'labels.inputs.Buyer Details' | translate }}</mat-label>
-              <textarea matInput formControlName="buyerDetails" rows="3" required></textarea>
-              <mat-error *ngIf="locDetailsForm.get('buyerDetails')?.hasError('required')">
-                {{ 'labels.inputs.Buyer Details' | translate }} {{ 'labels.commons.is required' | translate }}
-              </mat-error>
-            </mat-form-field>
-          </div>
-        </div>
-
-        <!-- Payable Details Section (only show if LOC type is payable) -->
-        <div *ngIf="isPayableType">
-          <h4 class="mat-h4">{{ 'labels.heading.Payable Details' | translate }}</h4>
-
-          <div fxLayout="row wrap" fxLayoutGap="2%" fxLayout.lt-md="column" class="form-fields">
-            <!-- Exchange Rate -->
-            <mat-form-field fxFlex="48%">
-              <mat-label>{{ 'labels.inputs.Exchange Rate' | translate }}</mat-label>
-              <input matInput formControlName="exchangeRate" type="number" step="0.0001" min="0.01" required />
-              <mat-error *ngIf="locDetailsForm.get('exchangeRate')?.hasError('required')">
-                {{ 'labels.inputs.Exchange Rate' | translate }} {{ 'labels.commons.is required' | translate }}
-              </mat-error>
-              <mat-error *ngIf="locDetailsForm.get('exchangeRate')?.hasError('min')">
-                {{ 'labels.inputs.Exchange Rate' | translate }}
-                {{ 'labels.commons.must be greater than' | translate }} 0.01
-              </mat-error>
-            </mat-form-field>
-
-            <!-- Markup -->
-            <mat-form-field fxFlex="48%">
-              <mat-label>{{ 'labels.inputs.Markup' | translate }}</mat-label>
-              <input matInput formControlName="markup" type="number" step="0.0001" min="0" required />
-              <mat-error *ngIf="locDetailsForm.get('markup')?.hasError('required')">
-                {{ 'labels.inputs.Markup' | translate }} {{ 'labels.commons.is required' | translate }}
-              </mat-error>
-              <mat-error *ngIf="locDetailsForm.get('markup')?.hasError('min')">
-                {{ 'labels.inputs.Markup' | translate }}
-                {{ 'labels.commons.must be greater than or equal to' | translate }} 0
-              </mat-error>
-            </mat-form-field>
-
-            <!-- Amount in Facility Currency (computed) -->
-            <mat-form-field fxFlex="48%">
-              <mat-label>{{ 'labels.inputs.Amount in Facility Currency' | translate }}</mat-label>
-              <input matInput formControlName="amountInFacilityCurrency" type="number" readonly />
-              <mat-hint>{{ 'labels.heading.Amount In Facility Currency Hint' | translate }}</mat-hint>
-            </mat-form-field>
-
-            <!-- Approved Payable Amount (computed) -->
-            <mat-form-field fxFlex="48%">
-              <mat-label>{{ 'labels.inputs.Approved Payable Amount' | translate }}</mat-label>
-              <input matInput formControlName="approvedPayableAmount" type="number" readonly />
-              <mat-hint>{{ 'labels.heading.Approved Payable Amount Hint' | translate }}</mat-hint>
-            </mat-form-field>
-
-            <!-- Supplier Details -->
-            <mat-form-field fxFlex="100%">
-              <mat-label>{{ 'labels.inputs.Supplier Details' | translate }}</mat-label>
-              <textarea matInput formControlName="supplierDetails" rows="3" required></textarea>
-              <mat-error *ngIf="locDetailsForm.get('supplierDetails')?.hasError('required')">
-                {{ 'labels.inputs.Supplier Details' | translate }} {{ 'labels.commons.is required' | translate }}
-              </mat-error>
-            </mat-form-field>
-          </div>
+          <!-- Supplier Details -->
+          <mat-form-field fxFlex="100%">
+            <mat-label>{{ 'labels.inputs.Supplier Details' | translate }}</mat-label>
+            <mat-select formControlName="supplierDetails" multiple required>
+              <mat-option *ngFor="let option of buyerSupplierOptions; trackBy: trackByOptionId" [value]="option.id">
+                {{ option.name }}
+              </mat-option>
+            </mat-select>
+            <mat-hint>Available options: {{ buyerSupplierOptions.length }}</mat-hint>
+            <mat-error *ngIf="locDetailsForm.get('supplierDetails')?.hasError('required')">
+              {{ 'labels.inputs.Supplier Details' | translate }} {{ 'labels.commons.is required' | translate }}
+            </mat-error>
+          </mat-form-field>
         </div>
       </div>
     </div>
-  </form>
-
-  <div fxLayout="row" class="margin-t" fxLayout.xs="column" fxLayoutAlign="center" fxLayoutGap="2%">
-    <button mat-raised-button matStepperPrevious>
-      <fa-icon icon="arrow-left" class="m-r-10"></fa-icon>
-      {{ 'labels.buttons.Previous' | translate }}
-    </button>
-    <button mat-raised-button matStepperNext [disabled]="!locDetailsForm.valid">
-      {{ 'labels.buttons.Next' | translate }}
-      <fa-icon icon="arrow-right" class="m-l-10"></fa-icon>
-    </button>
-    <button mat-raised-button *ngIf="loanId" [routerLink]="['../', 'general']">
-      {{ 'labels.buttons.Cancel' | translate }}
-    </button>
-    <button mat-raised-button *ngIf="!loanId" [routerLink]="['../..']">
-      {{ 'labels.buttons.Cancel' | translate }}
-    </button>
   </div>
+</form>
+
+<div fxLayout="row" class="margin-t" fxLayout.xs="column" fxLayoutAlign="center" fxLayoutGap="2%">
+  <button mat-raised-button matStepperPrevious>
+    <fa-icon icon="arrow-left" class="m-r-10"></fa-icon>
+    {{ 'labels.buttons.Previous' | translate }}
+  </button>
+  <button mat-raised-button matStepperNext [disabled]="!locDetailsForm.valid">
+    {{ 'labels.buttons.Next' | translate }}
+    <fa-icon icon="arrow-right" class="m-l-10"></fa-icon>
+  </button>
+  <button mat-raised-button *ngIf="loanId" [routerLink]="['../', 'general']">
+    {{ 'labels.buttons.Cancel' | translate }}
+  </button>
+  <button mat-raised-button *ngIf="!loanId" [routerLink]="['../..']">
+    {{ 'labels.buttons.Cancel' | translate }}
+  </button>
 </div>

@@ -1,6 +1,6 @@
 /** Angular Imports */
 import { Component, OnInit, Input, OnChanges, SimpleChanges } from '@angular/core';
-import { UntypedFormGroup, UntypedFormBuilder, Validators } from '@angular/forms';
+import { UntypedFormGroup, UntypedFormBuilder, Validators, AbstractControl } from '@angular/forms';
 
 /** Custom Services */
 import { SettingsService } from 'app/settings/settings.service';
@@ -33,6 +33,9 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
   /** Currency Options */
   currencyOptions: any[] = [];
 
+  /** Buyer/Supplier Options from selected LOC */
+  buyerSupplierOptions: any[] = [];
+
   /** Minimum date allowed. */
   minDate = new Date(2000, 0, 1);
   /** Maximum date allowed. */
@@ -54,6 +57,9 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
 
     // Set currency options from the loan product template or loan account template
     this.setCurrencyOptions();
+
+    // Update buyer/supplier options from selected LOC
+    this.updateBuyerSupplierOptions();
 
     // For edit mode, populate form with existing LOC data from additionalProperties
     if (this.loansAccountTemplate) {
@@ -137,6 +143,9 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
         // Update form validators based on LOC type after patching
         this.updateFormValidators();
 
+        // For dropdown fields, ensure the values match the available options
+        this.matchDropdownValuesWithOptions();
+
         // Trigger computed field calculations after patching values
         this.calculateComputedFields();
       }
@@ -156,6 +165,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
 
     // Update form validators when LOC selection changes
     if (changes['selectedLocId'] || changes['locOptions']) {
+      this.updateBuyerSupplierOptions();
       this.updateFormValidators();
       this.prefillAdvancePercentageFromSelectedLoc();
     }
@@ -178,6 +188,21 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       // Empty array if no currency options are available
       this.currencyOptions = [];
     }
+  }
+
+  /**
+   * Custom validator for array fields (buyer/supplier details)
+   */
+  arrayRequiredValidator(control: AbstractControl): { [key: string]: any } | null {
+    const value = control.value;
+    if (!value || !Array.isArray(value) || value.length === 0) {
+      return { required: true };
+    }
+    return null;
+  }
+
+  trackByOptionId(index: number, option: any): any {
+    return option.id;
   }
 
   /**
@@ -224,7 +249,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
           Validators.max(100)]
       ],
       amountAfterAdvance: [{ value: '', disabled: true }], // Computed field
-      buyerDetails: [''],
+      buyerDetails: [[]],
 
       // Payable-specific fields
       exchangeRate: [
@@ -237,7 +262,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       ],
       amountInFacilityCurrency: [{ value: '', disabled: true }], // Computed field
       approvedPayableAmount: [{ value: '', disabled: true }], // Computed field
-      supplierDetails: ['']
+      supplierDetails: [[]]
     });
 
     // Set up value change listeners for computed fields
@@ -260,7 +285,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
         Validators.required,
         Validators.min(0),
         Validators.max(100)]);
-      this.locDetailsForm.get('buyerDetails')?.setValidators([Validators.required]);
+      this.locDetailsForm.get('buyerDetails')?.setValidators([this.arrayRequiredValidator]);
 
       // Remove payable validators but DON'T clear payable field values
       this.locDetailsForm.get('exchangeRate')?.setValidators([Validators.min(0.01)]);
@@ -277,7 +302,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       this.locDetailsForm.get('markup')?.setValidators([
         Validators.required,
         Validators.min(0)]);
-      this.locDetailsForm.get('supplierDetails')?.setValidators([Validators.required]);
+      this.locDetailsForm.get('supplierDetails')?.setValidators([this.arrayRequiredValidator]);
 
       // Remove receivable validators but DON'T clear receivable field values
       this.locDetailsForm.get('advancePercentage')?.setValidators([
@@ -485,16 +510,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
    * Checks if the selected LOC type is receivable
    */
   get isReceivableType(): boolean {
-    // In edit mode, get LOC ID from additionalProperties, then from selectedLocId input, then from template
-    let locId: number | null = null;
-
-    if (this.loansAccountTemplate?.additionalProperties?.lineOfCreditId) {
-      locId = this.loansAccountTemplate.additionalProperties.lineOfCreditId;
-    } else if (this.selectedLocId) {
-      locId = this.selectedLocId;
-    } else if (this.loansAccountTemplate?.lineOfCreditId) {
-      locId = this.loansAccountTemplate.lineOfCreditId;
-    }
+    const locId = this.resolvedSelectedLocId;
 
     // Find the selected LOC from the available options
     if (this.locOptions && locId) {
@@ -523,16 +539,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
    * Checks if the selected LOC type is payable
    */
   get isPayableType(): boolean {
-    // In edit mode, get LOC ID from additionalProperties, then from selectedLocId input, then from template
-    let locId: number | null = null;
-
-    if (this.loansAccountTemplate?.additionalProperties?.lineOfCreditId) {
-      locId = this.loansAccountTemplate.additionalProperties.lineOfCreditId;
-    } else if (this.selectedLocId) {
-      locId = this.selectedLocId;
-    } else if (this.loansAccountTemplate?.lineOfCreditId) {
-      locId = this.loansAccountTemplate.lineOfCreditId;
-    }
+    const locId = this.resolvedSelectedLocId;
 
     // Find the selected LOC from the available options
     if (this.locOptions && locId) {
@@ -562,15 +569,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
   private prefillAdvancePercentageFromSelectedLoc(): void {
     if (!this.locOptions || this.locOptions.length === 0) return;
 
-    // Resolve selected LOC ID (same logic as status helpers)
-    let locId: number | null = null;
-    if (this.loansAccountTemplate?.additionalProperties?.lineOfCreditId) {
-      locId = this.loansAccountTemplate.additionalProperties.lineOfCreditId;
-    } else if (this.selectedLocId) {
-      locId = this.selectedLocId;
-    } else if (this.loansAccountTemplate?.lineOfCreditId) {
-      locId = this.loansAccountTemplate.lineOfCreditId;
-    }
+    const locId = this.resolvedSelectedLocId;
     if (!locId) return;
 
     const selectedLoc = this.locOptions.find((loc: any) => loc.id === locId);
@@ -585,6 +584,140 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
     if ((currentVal === null || currentVal === '' || currentVal === undefined) && (locAdvance || locAdvance === 0)) {
       control.setValue(locAdvance, { emitEvent: true });
     }
+  }
+
+  /**
+   * Updates buyer/supplier options from selected LOC's approvedBuyersOrSellers
+   */
+  private updateBuyerSupplierOptions(): void {
+    if (!this.locOptions || this.locOptions.length === 0) {
+      this.buyerSupplierOptions = [];
+      return;
+    }
+
+    const locId = this.resolvedSelectedLocId;
+    if (!locId) {
+      this.buyerSupplierOptions = [];
+      return;
+    }
+
+    const selectedLoc = this.locOptions.find((loc: any) => loc.id === locId);
+    if (!selectedLoc) {
+      this.buyerSupplierOptions = [];
+      return;
+    }
+
+    // Get approved buyers/sellers from the selected LOC
+    this.buyerSupplierOptions = selectedLoc.approvedBuyersOrSellers || [];
+
+    // If current form values are not in the new options, filter out invalid selections
+    const buyerDetailsControl = this.locDetailsForm.get('buyerDetails');
+    const supplierDetailsControl = this.locDetailsForm.get('supplierDetails');
+
+    if (buyerDetailsControl && Array.isArray(buyerDetailsControl.value)) {
+      const currentBuyerValues = buyerDetailsControl.value;
+      const validBuyerValues = currentBuyerValues.filter((value: any) =>
+        this.buyerSupplierOptions.some((option: any) => option.id === value || option.name === value)
+      );
+      if (validBuyerValues.length !== currentBuyerValues.length) {
+        buyerDetailsControl.setValue(validBuyerValues, { emitEvent: false });
+      }
+    }
+
+    if (supplierDetailsControl && Array.isArray(supplierDetailsControl.value)) {
+      const currentSupplierValues = supplierDetailsControl.value;
+      const validSupplierValues = currentSupplierValues.filter((value: any) =>
+        this.buyerSupplierOptions.some((option: any) => option.id === value || option.name === value)
+      );
+      if (validSupplierValues.length !== currentSupplierValues.length) {
+        supplierDetailsControl.setValue(validSupplierValues, { emitEvent: false });
+      }
+    }
+  }
+
+  /**
+   * Matches dropdown values with available options for edit mode
+   */
+  private matchDropdownValuesWithOptions(): void {
+    if (this.buyerSupplierOptions.length === 0) {
+      return;
+    }
+
+    const buyerDetailsControl = this.locDetailsForm.get('buyerDetails');
+    const supplierDetailsControl = this.locDetailsForm.get('supplierDetails');
+
+    // Match buyer details - handle both array and single values from legacy data
+    if (buyerDetailsControl?.value) {
+      let currentValues = buyerDetailsControl.value;
+
+      // Convert single value to array for consistent processing
+      if (!Array.isArray(currentValues)) {
+        currentValues = [currentValues];
+      }
+
+      const matchedValues = currentValues
+        .map((currentValue: any) => {
+          let matchedOption = this.buyerSupplierOptions.find(
+            (option: any) => option.id === currentValue || option.name === currentValue
+          );
+
+          // If exact match not found, try to find by name comparison
+          if (!matchedOption && typeof currentValue === 'string') {
+            matchedOption = this.buyerSupplierOptions.find(
+              (option: any) => option.name?.toLowerCase() === currentValue.toLowerCase()
+            );
+          }
+
+          return matchedOption ? matchedOption.id : null;
+        })
+        .filter((value: any) => value !== null);
+
+      buyerDetailsControl.setValue(matchedValues, { emitEvent: false });
+    }
+
+    // Match supplier details - handle both array and single values from legacy data
+    if (supplierDetailsControl?.value) {
+      let currentValues = supplierDetailsControl.value;
+
+      // Convert single value to array for consistent processing
+      if (!Array.isArray(currentValues)) {
+        currentValues = [currentValues];
+      }
+
+      const matchedValues = currentValues
+        .map((currentValue: any) => {
+          let matchedOption = this.buyerSupplierOptions.find(
+            (option: any) => option.id === currentValue || option.name === currentValue
+          );
+
+          // If exact match not found, try to find by name comparison
+          if (!matchedOption && typeof currentValue === 'string') {
+            matchedOption = this.buyerSupplierOptions.find(
+              (option: any) => option.name?.toLowerCase() === currentValue.toLowerCase()
+            );
+          }
+
+          return matchedOption ? matchedOption.id : null;
+        })
+        .filter((value: any) => value !== null);
+
+      supplierDetailsControl.setValue(matchedValues, { emitEvent: false });
+    }
+  }
+
+  /**
+   * Gets the currently selected Line of Credit ID from various sources
+   */
+  get resolvedSelectedLocId(): number | null {
+    // Priority: additionalProperties > selectedLocId input > template lineOfCreditId
+    if (this.loansAccountTemplate?.additionalProperties?.lineOfCreditId) {
+      return this.loansAccountTemplate.additionalProperties.lineOfCreditId;
+    } else if (this.selectedLocId) {
+      return this.selectedLocId;
+    } else if (this.loansAccountTemplate?.lineOfCreditId) {
+      return this.loansAccountTemplate.lineOfCreditId;
+    }
+    return null;
   }
 
   /**
