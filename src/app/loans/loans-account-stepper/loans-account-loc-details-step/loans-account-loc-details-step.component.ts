@@ -697,6 +697,12 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
 
       const matchedValues = currentValues
         .map((currentValue: any) => {
+          // Handle object format from API: {id: X, name: "Y"}
+          if (currentValue && typeof currentValue === 'object' && currentValue.id) {
+            return currentValue.id;
+          }
+
+          // Handle direct ID/name values
           let matchedOption = this.buyerSupplierOptions.find(
             (option: any) => option.id === currentValue || option.name === currentValue
           );
@@ -708,9 +714,9 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
             );
           }
 
-          return matchedOption ? matchedOption.id : null;
+          return matchedOption ? matchedOption.id : currentValue;
         })
-        .filter((value: any) => value !== null);
+        .filter((value: any) => value !== null && value !== undefined);
 
       buyerDetailsControl.setValue(matchedValues, { emitEvent: false });
     }
@@ -726,6 +732,12 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
 
       const matchedValues = currentValues
         .map((currentValue: any) => {
+          // Handle object format from API: {id: X, name: "Y"}
+          if (currentValue && typeof currentValue === 'object' && currentValue.id) {
+            return currentValue.id;
+          }
+
+          // Handle direct ID/name values
           let matchedOption = this.buyerSupplierOptions.find(
             (option: any) => option.id === currentValue || option.name === currentValue
           );
@@ -737,9 +749,9 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
             );
           }
 
-          return matchedOption ? matchedOption.id : null;
+          return matchedOption ? matchedOption.id : currentValue;
         })
-        .filter((value: any) => value !== null);
+        .filter((value: any) => value !== null && value !== undefined);
 
       supplierDetailsControl.setValue(matchedValues, { emitEvent: false });
     }
