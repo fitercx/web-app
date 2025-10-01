@@ -381,8 +381,8 @@
                       <th mat-header-cell *matHeaderCellDef>Amount</th>
                       <td mat-cell *matCellDef="let charge">
                         <div *ngIf="editingCharge !== charge">
-                          <span *ngIf="charge.chargeCalculationType === 'PERCENT'">{{ charge.amount || '—' }}%</span>
-                          <span *ngIf="charge.chargeCalculationType !== 'PERCENT'"
+                          <span *ngIf="charge.chargeCalculationType?.id === 2">{{ charge.amount || '—' }}%</span>
+                          <span *ngIf="charge.chargeCalculationType?.id !== 2"
                             >{{ charge.amount || '—' }} {{ selectedCurrencyCode || '' }}</span
                           >
                           <button mat-icon-button (click)="startEdit(charge)" aria-label="Edit amount">
@@ -395,7 +395,20 @@
                           fxLayoutAlign="start center"
                           fxLayoutGap="8px"
                         >
-                          <input matInput type="number" [(ngModel)]="charge.editableAmount" style="width: 120px" />
+                          <div style="display: flex; align-items: center; gap: 4px">
+                            <input
+                              type="number"
+                              [(ngModel)]="charge.editableAmount"
+                              style="width: 80px; padding: 8px; border: 1px solid #ccc; border-radius: 4px"
+                              step="0.01"
+                              min="0.01"
+                              (input)="onAmountChange(charge, $event)"
+                            />
+                            <span *ngIf="charge.chargeCalculationType?.id === 2" style="font-weight: 500">%</span>
+                            <span *ngIf="charge.chargeCalculationType?.id !== 2" style="font-weight: 500">{{
+                              selectedCurrencyCode || ''
+                            }}</span>
+                          </div>
                           <button mat-icon-button color="primary" (click)="saveEdit(charge)">
                             <fa-icon icon="save"></fa-icon>
                           </button>
