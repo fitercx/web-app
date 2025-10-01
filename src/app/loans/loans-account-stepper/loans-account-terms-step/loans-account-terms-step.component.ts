@@ -108,11 +108,14 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
   productEnableDownPayment = false;
   enableIncomeCapitalization = false;
   isProgressive = false;
+  factorRateEnabled = false;
 
   /**
    * Create Loans Account Terms Form
    * @param formBuilder FormBuilder
    * @param {SettingsService} settingsService SettingsService
+   * @param route
+   * @param dialog
    */
   constructor(
     private formBuilder: UntypedFormBuilder,
@@ -129,19 +132,21 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
   ngOnChanges(changes: SimpleChanges) {
     if (this.loansAccountProductTemplate) {
       this.currency = this.loansAccountProductTemplate.currency;
-
       this.loansAccountTermsData = this.loansAccountProductTemplate;
+      let factorRate = this.loansAccountProductTemplate?.product?.factorRate;
       if (this.loanId != null && this.loansAccountTemplate.accountNo) {
         this.loansAccountTermsData = this.loansAccountTemplate;
+        factorRate = this.loansAccountTemplate.factorRate;
       }
       this.productEnableDownPayment = this.loansAccountTermsData.product.enableDownPayment;
       this.enableIncomeCapitalization = this.loansAccountTermsData.product.enableIncomeCapitalization;
+
       this.isProgressive =
         this.loansAccountTermsData.loanScheduleType.code == LoanProducts.LOAN_SCHEDULE_TYPE_PROGRESSIVE;
       if (this.loansAccountTermsData.product) {
         this.loanProduct = this.loansAccountTermsData.product;
       }
-
+      this.factorRateEnabled = this.loansAccountProductTemplate?.product?.factorRateProductEnabled;
       this.interestRateFrequencyTypeData = this.loansAccountTermsData.interestRateFrequencyTypeOptions;
 
       // Handle LOC products: use tenorDays from additionalProperties if available
@@ -163,6 +168,8 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
       }
 
       this.loansAccountTermsForm.patchValue({
+        factorRate: factorRate,
+        factorRateEnabled: this.factorRateEnabled,
         principalAmount: this.loansAccountTermsData.principal,
         loanTermFrequency: loanTermFrequency,
         loanTermFrequencyType: loanTermFrequencyType,
@@ -226,7 +233,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
       }
       this.collateralDataSource = this.loansAccountTermsData.collateral || [];
       if (this.productEnableDownPayment) {
-        const enableDownPayment = this.loansAccountTermsData['enableDownPayment'] === false ? false : true;
+        const enableDownPayment = this.loansAccountTermsData['enableDownPayment'] !== false;
         this.loansAccountTermsForm.addControl('enableDownPayment', new UntypedFormControl(enableDownPayment));
       }
 
@@ -272,8 +279,10 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
   ngOnInit() {
     this.maxDate = this.settingsService.maxFutureDate;
     this.loansAccountTermsData = this.loansAccountProductTemplate;
+    let factorRate = this.loansAccountProductTemplate?.product?.factorRate;
     if (this.loanId != null && this.loansAccountTemplate.accountNo) {
       this.loansAccountTermsData = this.loansAccountTemplate;
+      factorRate = this.loansAccountTemplate.factorRate;
     }
 
     if (this.loansAccountTermsData) {
@@ -306,7 +315,10 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
         }
       }
 
+      this.factorRateEnabled = this.loansAccountProductTemplate?.product?.factorRateProductEnabled;
       this.loansAccountTermsForm.patchValue({
+        factorRate: factorRate,
+        factorRateEnabled: this.factorRateEnabled,
         principalAmount: this.loansAccountTermsData.principal,
         loanTermFrequency: loanTermFrequency,
         loanTermFrequencyType: loanTermFrequencyType,
@@ -441,6 +453,8 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
   /** Create Loans Account Terms Form */
   createloansAccountTermsForm() {
     this.loansAccountTermsForm = this.formBuilder.group({
+      factorRate: [''],
+      factorRateEnabled: [false],
       principalAmount: [
         '',
         Validators.required

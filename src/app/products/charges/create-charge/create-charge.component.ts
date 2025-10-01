@@ -207,6 +207,9 @@ export class CreateChargeComponent implements OnInit {
       return (chargeTimeType === 16 || chargeTimeType === 5) && chargeCalculationType === 2;
     } else if (chargeAppliesTo === 4) {
       return (chargeTimeType === 14 || chargeTimeType === 15) && chargeCalculationType === 2;
+    } else if (chargeAppliesTo === 5) {
+      // Line of Credit - show min/max cap for percentage-based calculations
+      return chargeCalculationType === 2;
     }
     return false;
   }
