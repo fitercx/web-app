@@ -91,7 +91,7 @@
 
       <div fxLayout="row" fxLayout.lt-md="column" class="loc-field-row" *ngIf="locDetails.buyerDetails">
         <span fxFlex="40%" class="loc-field-label">{{ 'labels.inputs.Buyer Details' | translate }}:</span>
-        <span fxFlex="60%" class="loc-field-value">{{ locDetails.buyerDetails }}</span>
+        <span fxFlex="60%" class="loc-field-value">{{ getBuyerDetailsNames() }}</span>
       </div>
     </div>
   </div>
@@ -147,19 +147,19 @@
 
       <div fxLayout="row" fxLayout.lt-md="column" class="loc-field-row" *ngIf="locDetails.supplierDetails">
         <span fxFlex="40%" class="loc-field-label">{{ 'labels.inputs.Supplier Details' | translate }}:</span>
-        <span fxFlex="60%" class="loc-field-value">{{ locDetails.supplierDetails }}</span>
+        <span fxFlex="60%" class="loc-field-value">{{ getSupplierDetailsNames() }}</span>
       </div>
     </div>
   </div>
 
   <!-- Line of Credit Information -->
-  <div class="loc-section" *ngIf="locDetails.lineOfCreditId">
+  <div class="loc-section" *ngIf="locDetails.locExternalId || locDetails.lineOfCreditId">
     <div class="mat-h3 loc-section-title">{{ 'labels.heading.Line of Credit Information' | translate }}</div>
     <mat-divider></mat-divider>
     <div class="margin-t">
       <div fxLayout="row" fxLayout.lt-md="column" class="loc-field-row">
         <span fxFlex="40%" class="loc-field-label">{{ 'labels.inputs.Line of Credit ID' | translate }}:</span>
-        <span fxFlex="60%" class="loc-field-value">{{ locDetails.lineOfCreditId }}</span>
+        <span fxFlex="60%" class="loc-field-value">{{ locDetails.locExternalId || locDetails.lineOfCreditId }}</span>
       </div>
     </div>
   </div>
@@ -167,7 +167,7 @@
 
 <ng-template #noLocData>
   <div class="loc-no-data">
-    <div class="mat-h4">{{ 'labels.text.No LOC Details Available' | translate }}</div>
-    <p>{{ 'labels.text.This loan does not have any associated LOC details.' | translate }}</p>
+    <div class="mat-h4">{{ 'labels.text.No Invoice Details Available' | translate }}</div>
+    <p>{{ 'labels.text.This loan does not have any associated invoice details.' | translate }}</p>
   </div>
 </ng-template>

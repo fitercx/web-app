@@ -1,4 +1,4 @@
-import { Component, ViewChild, AfterViewInit, OnDestroy } from '@angular/core';
+import { Component, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { LoansService } from '../loans.service';
 import { LoansAccountDetailsStepComponent } from '../loans-account-stepper/loans-account-details-step/loans-account-details-step.component';
@@ -18,7 +18,7 @@ import { Dates } from 'app/core/utils/dates';
   templateUrl: './edit-loans-account.component.html',
   styleUrls: ['./edit-loans-account.component.scss']
 })
-export class EditLoansAccountComponent implements AfterViewInit, OnDestroy {
+export class EditLoansAccountComponent {
   @ViewChild(LoansAccountDetailsStepComponent, { static: true })
   loansAccountDetailsStep: LoansAccountDetailsStepComponent;
   @ViewChild(LoansAccountTermsStepComponent, { static: true }) loansAccountTermsStep: LoansAccountTermsStepComponent;
@@ -39,9 +39,6 @@ export class EditLoansAccountComponent implements AfterViewInit, OnDestroy {
   /** Available Currencies */
   currencies: any[] = [];
   /** Subscriptions */
-  private principalSyncSub: any;
-  private locIdSub: any;
-  private invoiceSyncSub: any;
 
   /**
    * Sets loans account edit form.
@@ -63,22 +60,6 @@ export class EditLoansAccountComponent implements AfterViewInit, OnDestroy {
       this.currencies = data.currencies ? data.currencies.selectedCurrencyOptions || [] : [];
     });
     this.loanId = this.route.snapshot.params['loanId'];
-  }
-
-  ngAfterViewInit(): void {
-    setTimeout(() => this.setupPrincipalInvoiceSync(), 0);
-  }
-
-  ngOnDestroy(): void {
-    if (this.principalSyncSub) {
-      this.principalSyncSub.unsubscribe();
-    }
-    if (this.locIdSub) {
-      this.locIdSub.unsubscribe();
-    }
-    if (this.invoiceSyncSub) {
-      this.invoiceSyncSub.unsubscribe();
-    }
   }
 
   /**
@@ -115,83 +96,6 @@ export class EditLoansAccountComponent implements AfterViewInit, OnDestroy {
   /** Check if LOC is enabled */
   get isLocEnabled(): boolean {
     return this.loansAccountDetailsStep?.isLocEnabled || false;
-  }
-
-  /** Sets up subscription to keep invoiceAmount == principalAmount when LOC selected */
-  private setupPrincipalInvoiceSync(): void {
-    const principalControl = this.loansAccountTermsStep?.loansAccountTermsForm?.get('principalAmount');
-    if (principalControl && !this.principalSyncSub) {
-      this.principalSyncSub = principalControl.valueChanges.subscribe(() => this.syncInvoiceAmountWithPrincipal());
-      this.syncInvoiceAmountWithPrincipal();
-    }
-    const locControl = this.loansAccountDetailsStep?.loansAccountDetailsForm?.get('lineOfCreditId');
-    if (locControl && !this.locIdSub) {
-      this.locIdSub = locControl.valueChanges.subscribe(() => this.syncInvoiceAmountWithPrincipal());
-    }
-    const invoiceControl = this.loansAccountLocDetailsStep?.locDetailsForm?.get('invoiceAmount');
-    if (invoiceControl && !this.invoiceSyncSub) {
-      this.invoiceSyncSub = invoiceControl.valueChanges.subscribe(() => this.syncPrincipalAmountWithInvoice());
-    }
-  }
-
-  /** Performs the actual sync under required conditions */
-  private syncInvoiceAmountWithPrincipal(): void {
-    if (!this.isLocEnabled) {
-      return;
-    }
-    const locId = this.loansAccountDetailsStep?.loansAccountDetailsForm?.get('lineOfCreditId')?.value;
-    if (!locId) {
-      return;
-    }
-    const principalVal = this.loansAccountTermsStep?.loansAccountTermsForm?.get('principalAmount')?.value;
-    const invoiceControl = this.loansAccountLocDetailsStep?.locDetailsForm?.get('invoiceAmount');
-    if (invoiceControl == null || principalVal == null) {
-      return;
-    }
-    // Only sync if values are actually different and both are meaningful values
-    if (invoiceControl.value !== principalVal && principalVal > 0) {
-      invoiceControl.setValue(principalVal, { emitEvent: false });
-
-      // Manually trigger approved amount recalculations after setting invoice amount
-      this.triggerApprovedAmountCalculations();
-    }
-    if (!this.invoiceSyncSub && invoiceControl) {
-      this.invoiceSyncSub = invoiceControl.valueChanges.subscribe(() => this.syncPrincipalAmountWithInvoice());
-    }
-  }
-
-  private syncPrincipalAmountWithInvoice(): void {
-    if (!this.isLocEnabled) {
-      return;
-    }
-    const locId = this.loansAccountDetailsStep?.loansAccountDetailsForm?.get('lineOfCreditId')?.value;
-    if (!locId) {
-      return;
-    }
-    const invoiceVal = this.loansAccountLocDetailsStep?.locDetailsForm?.get('invoiceAmount')?.value;
-    const principalControl = this.loansAccountTermsStep?.loansAccountTermsForm?.get('principalAmount');
-    if (principalControl == null || invoiceVal == null) {
-      return;
-    }
-    // Only sync if values are actually different and both are meaningful values
-    if (principalControl.value !== invoiceVal && invoiceVal > 0) {
-      principalControl.setValue(invoiceVal, { emitEvent: false });
-      this.triggerApprovedAmountCalculations();
-    }
-  }
-
-  /** Manually triggers approved amount calculations in the LOC details component */
-  private triggerApprovedAmountCalculations(): void {
-    if (this.loansAccountLocDetailsStep) {
-      // Only trigger calculations if the LOC details form is properly initialized
-      // and has meaningful invoice amount value
-      const invoiceAmount = this.loansAccountLocDetailsStep.locDetailsForm?.get('invoiceAmount')?.value;
-      if (invoiceAmount != null && invoiceAmount > 0) {
-        // Call the public calculation methods directly
-        this.loansAccountLocDetailsStep.updateApprovedReceivableAmount();
-        this.loansAccountLocDetailsStep.updateApprovedPayableAmount();
-      }
-    }
   }
 
   /** Checks wheter all the forms in different steps are valid and not pristine */
@@ -234,14 +138,66 @@ export class EditLoansAccountComponent implements AfterViewInit, OnDestroy {
       ...this.loansAccountTermsStep.disbursementData
     };
 
-    // Include LOC details flattened at root level if LOC is enabled
+    // Include LOC details flattened at root level if LOC is enabled and has meaningful data
     if (this.isLocEnabled && this.loansAccountLocDetailsStep) {
       const locDetails = this.loansAccountLocDetailsStep.locDetails;
-      // Flatten all LOC fields to root level
-      Object.assign(baseData, locDetails);
+
+      // Include all LOC details for preview display (locType will be filtered out later for API submission)
+      const filteredLocDetails = this.filterEmptyValues(locDetails);
+
+      // Only flatten LOC details if there are actually meaningful values
+      if (Object.keys(filteredLocDetails).length > 0) {
+        Object.assign(baseData, filteredLocDetails);
+      }
+
+      // For LOC loans, use the approved facility amount as principal
+      const locId = this.loansAccountDetailsStep?.loansAccountDetailsForm?.get('lineOfCreditId')?.value;
+      if (locId) {
+        // Determine which approved amount to use based on LOC type
+        const approvedReceivableAmount = filteredLocDetails.approvedReceivableAmount;
+        const approvedPayableAmount = filteredLocDetails.amountInFacilityCurrency;
+        const isReceivableType = filteredLocDetails.locType === 'RECEIVABLE';
+
+        // Use the appropriate approved facility amount as principal
+        if (approvedReceivableAmount != null && approvedReceivableAmount > 0 && isReceivableType) {
+          baseData.principalAmount = approvedReceivableAmount;
+        } else if (approvedPayableAmount != null && approvedPayableAmount > 0 && !isReceivableType) {
+          baseData.principalAmount = approvedPayableAmount;
+        }
+      }
     }
 
     return baseData;
+  }
+
+  /**
+   * Filters out empty, null, undefined values and empty strings from an object
+   */
+  private filterEmptyValues(obj: any): any {
+    const filtered: any = {};
+
+    for (const [
+      key,
+      value
+    ] of Object.entries(obj)) {
+      // Include the value if it's meaningful (not empty, null, or undefined)
+      if (value !== null && value !== undefined && value !== '') {
+        // For numbers, include even if 0
+        if (typeof value === 'number') {
+          filtered[key] = value;
+        }
+        // For strings, include only if not empty
+        else if (typeof value === 'string' && value.trim() !== '') {
+          filtered[key] = value;
+        }
+        // For other types (dates, booleans, objects), include as is
+        else if (typeof value !== 'string') {
+          filtered[key] = value;
+        }
+      }
+    }
+
+    return filtered;
   }
 
   /**
@@ -251,8 +207,12 @@ export class EditLoansAccountComponent implements AfterViewInit, OnDestroy {
     const locale = this.settingsService.language.code;
     const dateFormat = this.settingsService.dateFormat;
     const loanType = 'individual';
+
+    // Remove preview-specific fields that shouldn't be submitted to API
+    const { locType, buyerSupplierOptions, ...loansAccountForSubmission } = this.loansAccount;
+
     const loansAccountData = {
-      ...this.loansAccount,
+      ...loansAccountForSubmission,
       clientId: this.loansAccountAndTemplate.clientId,
       charges: this.loansAccount.charges.map((charge: any) => ({
         chargeId: charge.id,

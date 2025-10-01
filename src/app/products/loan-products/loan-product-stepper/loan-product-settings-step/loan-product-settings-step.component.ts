@@ -120,7 +120,7 @@ export class LoanProductSettingsStepComponent implements OnInit {
       minimumGap: this.loanProductsTemplate.minimumGap,
       maximumGap: this.loanProductsTemplate.maximumGap,
       canUseForTopup: this.loanProductsTemplate.canUseForTopup,
-      isLocEnabled: this.loanProductsTemplate.additionalProperties?.isLocEnabled || false,
+      isLocEnabled: this.loanProductsTemplate?.isLocEnabled || false,
       isInterestRecalculationEnabled: this.loanProductsTemplate.isInterestRecalculationEnabled,
       holdGuaranteeFunds: this.loanProductsTemplate.holdGuaranteeFunds,
       multiDisburseLoan: this.loanProductsTemplate.multiDisburseLoan,

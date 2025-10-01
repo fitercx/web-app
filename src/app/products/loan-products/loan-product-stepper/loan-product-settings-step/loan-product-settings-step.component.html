@@ -1,6 +1,15 @@
 <form [formGroup]="loanProductSettingsForm">
   <div fxLayout="row wrap" fxLayoutGap="2%" fxLayout.lt-md="column" fxLayoutAlign.gt-sm="start center">
     <h3 fxFlex="96%" class="mat-h3 m-r-10">
+      {{ 'labels.inputs.Line of Credit Product' | translate }}
+      <i class="fas fa-question" matTooltip="{{ 'tooltips.Line of Credit Product Information' | translate }}"></i>
+    </h3>
+
+    <mat-checkbox fxFlex="73%" labelPosition="before" formControlName="isLocEnabled" class="margin-b">
+      {{ 'labels.inputs.Enable LOC product' | translate }}
+    </mat-checkbox>
+
+    <h3 fxFlex="96%" class="mat-h3 m-r-10">
       {{ 'labels.inputs.Factor Rate Product' | translate }}
       <i class="fas fa-question" matTooltip="{{ 'tooltips.Factor Rate Product Informatation' | translate }}"></i>
     </h3>
@@ -540,10 +549,6 @@
         class="margin-v"
       >
         {{ 'labels.inputs.Allowed to be used for providing Topup Loans' | translate }}
-      </mat-checkbox>
-
-      <mat-checkbox fxFlex="48%" labelPosition="before" formControlName="isLocEnabled" class="margin-v">
-        {{ 'labels.inputs.Is LOC product' | translate }}
       </mat-checkbox>
     </div>
 

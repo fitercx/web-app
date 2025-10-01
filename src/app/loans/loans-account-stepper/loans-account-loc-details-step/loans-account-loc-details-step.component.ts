@@ -1,6 +1,6 @@
 /** Angular Imports */
 import { Component, OnInit, Input, OnChanges, SimpleChanges } from '@angular/core';
-import { UntypedFormGroup, UntypedFormBuilder, Validators } from '@angular/forms';
+import { UntypedFormGroup, UntypedFormBuilder, Validators, AbstractControl } from '@angular/forms';
 
 /** Custom Services */
 import { SettingsService } from 'app/settings/settings.service';
@@ -33,10 +33,22 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
   /** Currency Options */
   currencyOptions: any[] = [];
 
+  /** Buyer/Supplier Options from selected LOC */
+  buyerSupplierOptions: any[] = [];
+
   /** Minimum date allowed. */
   minDate = new Date(2000, 0, 1);
   /** Maximum date allowed. */
   maxDate = new Date(2100, 0, 1);
+
+  /** Get minimum date for invoice due date (should be invoice date or later) */
+  get invoiceDueDateMinDate(): Date {
+    const invoiceDate = this.locDetailsForm?.get('invoiceDate')?.value;
+    if (invoiceDate) {
+      return new Date(invoiceDate);
+    }
+    return this.minDate;
+  }
 
   /**
    * @param {UntypedFormBuilder} formBuilder Form Builder
@@ -54,6 +66,9 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
 
     // Set currency options from the loan product template or loan account template
     this.setCurrencyOptions();
+
+    // Update buyer/supplier options from selected LOC
+    this.updateBuyerSupplierOptions();
 
     // For edit mode, populate form with existing LOC data from additionalProperties
     if (this.loansAccountTemplate) {
@@ -137,6 +152,9 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
         // Update form validators based on LOC type after patching
         this.updateFormValidators();
 
+        // For dropdown fields, ensure the values match the available options
+        this.matchDropdownValuesWithOptions();
+
         // Trigger computed field calculations after patching values
         this.calculateComputedFields();
       }
@@ -156,6 +174,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
 
     // Update form validators when LOC selection changes
     if (changes['selectedLocId'] || changes['locOptions']) {
+      this.updateBuyerSupplierOptions();
       this.updateFormValidators();
       this.prefillAdvancePercentageFromSelectedLoc();
     }
@@ -178,6 +197,34 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       // Empty array if no currency options are available
       this.currencyOptions = [];
     }
+  }
+
+  /**
+   * Custom validator for array fields (buyer/supplier details)
+   */
+  arrayRequiredValidator(control: AbstractControl): { [key: string]: any } | null {
+    const value = control.value;
+    if (!value || !Array.isArray(value) || value.length === 0) {
+      return { required: true };
+    }
+    return null;
+  }
+
+  /**
+   * Custom validator for disapproved amount - cannot be greater than invoice amount
+   */
+  disapprovedAmountValidator(control: AbstractControl): { [key: string]: any } | null {
+    const disapprovedAmount = control.value;
+    const invoiceAmount = this.locDetailsForm?.get('invoiceAmount')?.value || 0;
+
+    if (disapprovedAmount && invoiceAmount && disapprovedAmount > invoiceAmount) {
+      return { disapprovedAmountExceeded: true };
+    }
+    return null;
+  }
+
+  trackByOptionId(index: number, option: any): any {
+    return option.id;
   }
 
   /**
@@ -211,8 +258,10 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
 
       // Shared fields
       disapprovedAmount: [
-        '',
-        [Validators.min(0)]
+        0,
+        [
+          Validators.min(0),
+          this.disapprovedAmountValidator.bind(this)]
       ],
 
       // Receivable-specific fields
@@ -224,7 +273,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
           Validators.max(100)]
       ],
       amountAfterAdvance: [{ value: '', disabled: true }], // Computed field
-      buyerDetails: [''],
+      buyerDetails: [[]],
 
       // Payable-specific fields
       exchangeRate: [
@@ -232,12 +281,12 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
         [Validators.min(0.01)]
       ],
       markup: [
-        '',
+        0,
         [Validators.min(0)]
       ],
       amountInFacilityCurrency: [{ value: '', disabled: true }], // Computed field
       approvedPayableAmount: [{ value: '', disabled: true }], // Computed field
-      supplierDetails: ['']
+      supplierDetails: [[]]
     });
 
     // Set up value change listeners for computed fields
@@ -255,12 +304,13 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       // Make shared and receivable fields required for RECEIVABLE type LOCs
       this.locDetailsForm.get('disapprovedAmount')?.setValidators([
         Validators.required,
-        Validators.min(0)]);
+        Validators.min(0),
+        this.disapprovedAmountValidator.bind(this)]);
       this.locDetailsForm.get('advancePercentage')?.setValidators([
         Validators.required,
         Validators.min(0),
         Validators.max(100)]);
-      this.locDetailsForm.get('buyerDetails')?.setValidators([Validators.required]);
+      this.locDetailsForm.get('buyerDetails')?.setValidators([this.arrayRequiredValidator]);
 
       // Remove payable validators but DON'T clear payable field values
       this.locDetailsForm.get('exchangeRate')?.setValidators([Validators.min(0.01)]);
@@ -270,14 +320,15 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       // Make shared and payable fields required for PAYABLE type LOCs
       this.locDetailsForm.get('disapprovedAmount')?.setValidators([
         Validators.required,
-        Validators.min(0)]);
+        Validators.min(0),
+        this.disapprovedAmountValidator.bind(this)]);
       this.locDetailsForm.get('exchangeRate')?.setValidators([
         Validators.required,
         Validators.min(0.01)]);
       this.locDetailsForm.get('markup')?.setValidators([
         Validators.required,
         Validators.min(0)]);
-      this.locDetailsForm.get('supplierDetails')?.setValidators([Validators.required]);
+      this.locDetailsForm.get('supplierDetails')?.setValidators([this.arrayRequiredValidator]);
 
       // Remove receivable validators but DON'T clear receivable field values
       this.locDetailsForm.get('advancePercentage')?.setValidators([
@@ -286,7 +337,9 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       this.locDetailsForm.get('buyerDetails')?.setValidators([]);
     } else {
       // Remove all required validators for other LOC types
-      this.locDetailsForm.get('disapprovedAmount')?.setValidators([Validators.min(0)]);
+      this.locDetailsForm.get('disapprovedAmount')?.setValidators([
+        Validators.min(0),
+        this.disapprovedAmountValidator.bind(this)]);
       this.locDetailsForm.get('advancePercentage')?.setValidators([
         Validators.min(0),
         Validators.max(100)]);
@@ -367,15 +420,17 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
    */
   setupComputedFields() {
     // Listen to invoice amount and disapproved amount changes to compute approved amounts
-    this.locDetailsForm.get('invoiceAmount')?.valueChanges.subscribe((value) => {
+    this.locDetailsForm.get('invoiceAmount')?.valueChanges.subscribe((value: any) => {
       // Only trigger calculations if the value is meaningful
       if (value !== null && value !== undefined && value !== '') {
         this.updateApprovedReceivableAmount();
         this.updateApprovedPayableAmount();
+        // Re-validate disapproved amount when invoice amount changes
+        this.locDetailsForm.get('disapprovedAmount')?.updateValueAndValidity({ emitEvent: false });
       }
     });
 
-    this.locDetailsForm.get('disapprovedAmount')?.valueChanges.subscribe((value) => {
+    this.locDetailsForm.get('disapprovedAmount')?.valueChanges.subscribe((value: any) => {
       // Only update approved amounts when disapproved amount changes
       // Do not interfere with other fields like principal or invoice amount
       this.updateApprovedReceivableAmount();
@@ -383,7 +438,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
     });
 
     // Listen to approved receivable amount and advance percentage changes to compute amount after advance
-    this.locDetailsForm.get('advancePercentage')?.valueChanges.subscribe((value) => {
+    this.locDetailsForm.get('advancePercentage')?.valueChanges.subscribe((value: any) => {
       // Only trigger calculations if the value is meaningful
       if (value !== null && value !== undefined && value !== '') {
         this.updateAmountAfterAdvance();
@@ -391,14 +446,14 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
     });
 
     // Listen to exchange rate and markup changes for payable calculations
-    this.locDetailsForm.get('exchangeRate')?.valueChanges.subscribe((value) => {
+    this.locDetailsForm.get('exchangeRate')?.valueChanges.subscribe((value: any) => {
       // Only trigger calculations if the value is meaningful
       if (value !== null && value !== undefined && value !== '') {
         this.updateAmountInFacilityCurrency();
       }
     });
 
-    this.locDetailsForm.get('markup')?.valueChanges.subscribe((value) => {
+    this.locDetailsForm.get('markup')?.valueChanges.subscribe((value: any) => {
       this.updateAmountInFacilityCurrency();
     });
   }
@@ -407,19 +462,21 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
    * Updates the approved receivable amount (Invoice Amount - Disapproved Amount)
    */
   updateApprovedReceivableAmount() {
-    const invoiceAmount = this.locDetailsForm.get('invoiceAmount')?.value || 0;
-    const disapprovedAmount = this.locDetailsForm.get('disapprovedAmount')?.value || 0;
-    const approvedAmount = invoiceAmount - disapprovedAmount;
+    if (this.isReceivableType) {
+      const invoiceAmount = Math.max(0, this.locDetailsForm.get('invoiceAmount')?.value || 0);
+      const disapprovedAmount = Math.max(0, this.locDetailsForm.get('disapprovedAmount')?.value || 0);
+      const approvedAmount = Math.max(0, invoiceAmount - disapprovedAmount);
 
-    // Only update if the approved amount is actually different from current value
-    const currentApprovedAmount = this.locDetailsForm.get('approvedReceivableAmount')?.value;
-    if (currentApprovedAmount !== approvedAmount) {
-      this.locDetailsForm
-        .get('approvedReceivableAmount')
-        ?.setValue(approvedAmount >= 0 ? approvedAmount : 0, { emitEvent: false });
+      // Only update if the approved amount is actually different from current value
+      const currentApprovedAmount = this.locDetailsForm.get('approvedReceivableAmount')?.value;
+      if (currentApprovedAmount !== approvedAmount) {
+        this.locDetailsForm.get('approvedReceivableAmount')?.setValue(approvedAmount, { emitEvent: false });
 
-      // Also update amount after advance when approved amount changes
-      this.updateAmountAfterAdvance();
+        // Also update amount after advance when approved amount changes
+        this.updateAmountAfterAdvance();
+      }
+    } else {
+      this.locDetailsForm.get('approvedReceivableAmount')?.setValue(undefined, { emitEvent: false });
     }
   }
 
@@ -427,16 +484,21 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
    * Updates the approved payable amount (Invoice Amount - Disapproved Amount)
    */
   updateApprovedPayableAmount() {
-    const invoiceAmount = this.locDetailsForm.get('invoiceAmount')?.value || 0;
-    const disapprovedAmount = this.locDetailsForm.get('disapprovedAmount')?.value || 0;
-    const approvedAmount = invoiceAmount - disapprovedAmount;
+    if (this.isPayableType) {
+      const invoiceAmount = Math.max(0, this.locDetailsForm.get('invoiceAmount')?.value || 0);
+      const disapprovedAmount = Math.max(0, this.locDetailsForm.get('disapprovedAmount')?.value || 0);
+      const approvedAmount = Math.max(0, invoiceAmount - disapprovedAmount);
 
-    // Only update if the approved amount is actually different from current value
-    const currentApprovedAmount = this.locDetailsForm.get('approvedPayableAmount')?.value;
-    if (currentApprovedAmount !== approvedAmount) {
-      this.locDetailsForm
-        .get('approvedPayableAmount')
-        ?.setValue(approvedAmount >= 0 ? approvedAmount : 0, { emitEvent: false });
+      // Only update if the approved amount is actually different from current value
+      const currentApprovedAmount = this.locDetailsForm.get('approvedPayableAmount')?.value;
+      if (currentApprovedAmount !== approvedAmount) {
+        this.locDetailsForm.get('approvedPayableAmount')?.setValue(approvedAmount, { emitEvent: false });
+
+        // Update facility amount when approved payable amount changes
+        this.updateAmountInFacilityCurrency();
+      }
+    } else {
+      this.locDetailsForm.get('approvedPayableAmount')?.setValue(undefined, { emitEvent: false });
     }
   }
 
@@ -456,18 +518,21 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
   }
 
   /**
-   * Updates the amount in facility currency (Invoice Amount * (Exchange Rate + Markup))
+   * Updates the amount in facility currency (Approved Amount * (Exchange Rate + Markup))
+   * This becomes the facility amount (principal) for payable LOCs
    */
   updateAmountInFacilityCurrency() {
-    const invoiceAmount = this.locDetailsForm.get('invoiceAmount')?.value || 0;
-    const exchangeRate = this.locDetailsForm.get('exchangeRate')?.value || 0;
-    const markup = this.locDetailsForm.get('markup')?.value || 0;
-    const amountInFacilityCurrency = invoiceAmount * (exchangeRate + markup);
+    const approvedAmount = this.locDetailsForm.get('approvedPayableAmount')?.value || 0;
+    const exchangeRate = Math.max(0, this.locDetailsForm.get('exchangeRate')?.value || 0);
+    const markup = Math.max(0, this.locDetailsForm.get('markup')?.value || 0);
 
-    // Only update if the amount in facility currency is actually different from current value
+    // Facility amount calculation: (markup + exchange rate) * approved amount
+    const facilityAmount = (markup + exchangeRate) * Math.max(0, approvedAmount);
+
+    // Only update if the facility amount is actually different from current value
     const currentAmountInFacilityCurrency = this.locDetailsForm.get('amountInFacilityCurrency')?.value;
-    if (currentAmountInFacilityCurrency !== amountInFacilityCurrency) {
-      this.locDetailsForm.get('amountInFacilityCurrency')?.setValue(amountInFacilityCurrency, { emitEvent: false });
+    if (currentAmountInFacilityCurrency !== facilityAmount) {
+      this.locDetailsForm.get('amountInFacilityCurrency')?.setValue(facilityAmount, { emitEvent: false });
     }
   }
 
@@ -485,16 +550,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
    * Checks if the selected LOC type is receivable
    */
   get isReceivableType(): boolean {
-    // In edit mode, get LOC ID from additionalProperties, then from selectedLocId input, then from template
-    let locId: number | null = null;
-
-    if (this.loansAccountTemplate?.additionalProperties?.lineOfCreditId) {
-      locId = this.loansAccountTemplate.additionalProperties.lineOfCreditId;
-    } else if (this.selectedLocId) {
-      locId = this.selectedLocId;
-    } else if (this.loansAccountTemplate?.lineOfCreditId) {
-      locId = this.loansAccountTemplate.lineOfCreditId;
-    }
+    const locId = this.resolvedSelectedLocId;
 
     // Find the selected LOC from the available options
     if (this.locOptions && locId) {
@@ -523,16 +579,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
    * Checks if the selected LOC type is payable
    */
   get isPayableType(): boolean {
-    // In edit mode, get LOC ID from additionalProperties, then from selectedLocId input, then from template
-    let locId: number | null = null;
-
-    if (this.loansAccountTemplate?.additionalProperties?.lineOfCreditId) {
-      locId = this.loansAccountTemplate.additionalProperties.lineOfCreditId;
-    } else if (this.selectedLocId) {
-      locId = this.selectedLocId;
-    } else if (this.loansAccountTemplate?.lineOfCreditId) {
-      locId = this.loansAccountTemplate.lineOfCreditId;
-    }
+    const locId = this.resolvedSelectedLocId;
 
     // Find the selected LOC from the available options
     if (this.locOptions && locId) {
@@ -562,15 +609,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
   private prefillAdvancePercentageFromSelectedLoc(): void {
     if (!this.locOptions || this.locOptions.length === 0) return;
 
-    // Resolve selected LOC ID (same logic as status helpers)
-    let locId: number | null = null;
-    if (this.loansAccountTemplate?.additionalProperties?.lineOfCreditId) {
-      locId = this.loansAccountTemplate.additionalProperties.lineOfCreditId;
-    } else if (this.selectedLocId) {
-      locId = this.selectedLocId;
-    } else if (this.loansAccountTemplate?.lineOfCreditId) {
-      locId = this.loansAccountTemplate.lineOfCreditId;
-    }
+    const locId = this.resolvedSelectedLocId;
     if (!locId) return;
 
     const selectedLoc = this.locOptions.find((loc: any) => loc.id === locId);
@@ -588,9 +627,162 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
   }
 
   /**
+   * Updates buyer/supplier options from selected LOC's approvedBuyersOrSellers
+   */
+  private updateBuyerSupplierOptions(): void {
+    if (!this.locOptions || this.locOptions.length === 0) {
+      this.buyerSupplierOptions = [];
+      return;
+    }
+
+    const locId = this.resolvedSelectedLocId;
+    if (!locId) {
+      this.buyerSupplierOptions = [];
+      return;
+    }
+
+    const selectedLoc = this.locOptions.find((loc: any) => loc.id === locId);
+    if (!selectedLoc) {
+      this.buyerSupplierOptions = [];
+      return;
+    }
+
+    // Get approved buyers/sellers from the selected LOC
+    this.buyerSupplierOptions = selectedLoc.approvedBuyersOrSellers || [];
+
+    // If current form values are not in the new options, filter out invalid selections
+    const buyerDetailsControl = this.locDetailsForm.get('buyerDetails');
+    const supplierDetailsControl = this.locDetailsForm.get('supplierDetails');
+
+    if (buyerDetailsControl && Array.isArray(buyerDetailsControl.value)) {
+      const currentBuyerValues = buyerDetailsControl.value;
+      const validBuyerValues = currentBuyerValues.filter((value: any) =>
+        this.buyerSupplierOptions.some((option: any) => option.id === value || option.name === value)
+      );
+      if (validBuyerValues.length !== currentBuyerValues.length) {
+        buyerDetailsControl.setValue(validBuyerValues, { emitEvent: false });
+      }
+    }
+
+    if (supplierDetailsControl && Array.isArray(supplierDetailsControl.value)) {
+      const currentSupplierValues = supplierDetailsControl.value;
+      const validSupplierValues = currentSupplierValues.filter((value: any) =>
+        this.buyerSupplierOptions.some((option: any) => option.id === value || option.name === value)
+      );
+      if (validSupplierValues.length !== currentSupplierValues.length) {
+        supplierDetailsControl.setValue(validSupplierValues, { emitEvent: false });
+      }
+    }
+  }
+
+  /**
+   * Matches dropdown values with available options for edit mode
+   */
+  private matchDropdownValuesWithOptions(): void {
+    if (this.buyerSupplierOptions.length === 0) {
+      return;
+    }
+
+    const buyerDetailsControl = this.locDetailsForm.get('buyerDetails');
+    const supplierDetailsControl = this.locDetailsForm.get('supplierDetails');
+
+    // Match buyer details - handle both array and single values from legacy data
+    if (buyerDetailsControl?.value) {
+      let currentValues = buyerDetailsControl.value;
+
+      // Convert single value to array for consistent processing
+      if (!Array.isArray(currentValues)) {
+        currentValues = [currentValues];
+      }
+
+      const matchedValues = currentValues
+        .map((currentValue: any) => {
+          // Handle object format from API: {id: X, name: "Y"}
+          if (currentValue && typeof currentValue === 'object' && currentValue.id) {
+            return currentValue.id;
+          }
+
+          // Handle direct ID/name values
+          let matchedOption = this.buyerSupplierOptions.find(
+            (option: any) => option.id === currentValue || option.name === currentValue
+          );
+
+          // If exact match not found, try to find by name comparison
+          if (!matchedOption && typeof currentValue === 'string') {
+            matchedOption = this.buyerSupplierOptions.find(
+              (option: any) => option.name?.toLowerCase() === currentValue.toLowerCase()
+            );
+          }
+
+          return matchedOption ? matchedOption.id : currentValue;
+        })
+        .filter((value: any) => value !== null && value !== undefined);
+
+      buyerDetailsControl.setValue(matchedValues, { emitEvent: false });
+    }
+
+    // Match supplier details - handle both array and single values from legacy data
+    if (supplierDetailsControl?.value) {
+      let currentValues = supplierDetailsControl.value;
+
+      // Convert single value to array for consistent processing
+      if (!Array.isArray(currentValues)) {
+        currentValues = [currentValues];
+      }
+
+      const matchedValues = currentValues
+        .map((currentValue: any) => {
+          // Handle object format from API: {id: X, name: "Y"}
+          if (currentValue && typeof currentValue === 'object' && currentValue.id) {
+            return currentValue.id;
+          }
+
+          // Handle direct ID/name values
+          let matchedOption = this.buyerSupplierOptions.find(
+            (option: any) => option.id === currentValue || option.name === currentValue
+          );
+
+          // If exact match not found, try to find by name comparison
+          if (!matchedOption && typeof currentValue === 'string') {
+            matchedOption = this.buyerSupplierOptions.find(
+              (option: any) => option.name?.toLowerCase() === currentValue.toLowerCase()
+            );
+          }
+
+          return matchedOption ? matchedOption.id : currentValue;
+        })
+        .filter((value: any) => value !== null && value !== undefined);
+
+      supplierDetailsControl.setValue(matchedValues, { emitEvent: false });
+    }
+  }
+
+  /**
+   * Gets the currently selected Line of Credit ID from various sources
+   */
+  get resolvedSelectedLocId(): number | null {
+    // Priority: additionalProperties > selectedLocId input > template lineOfCreditId
+    if (this.loansAccountTemplate?.additionalProperties?.lineOfCreditId) {
+      return this.loansAccountTemplate.additionalProperties.lineOfCreditId;
+    } else if (this.selectedLocId) {
+      return this.selectedLocId;
+    } else if (this.loansAccountTemplate?.lineOfCreditId) {
+      return this.loansAccountTemplate.lineOfCreditId;
+    }
+    return null;
+  }
+
+  /**
    * Returns the form value for LOC Details
    */
   get locDetails() {
-    return this.locDetailsForm.getRawValue();
+    const formData = this.locDetailsForm.getRawValue();
+
+    // Add LOC type information for proper preview display
+    return {
+      ...formData,
+      locType: this.isReceivableType ? 'RECEIVABLE' : this.isPayableType ? 'PAYABLE' : null,
+      buyerSupplierOptions: this.buyerSupplierOptions
+    };
   }
 }
