@@ -217,11 +217,8 @@ export class CreateLoansAccountComponent {
     if (this.isLocEnabled && this.loansAccountLocDetailsStep) {
       const locDetails = this.loansAccountLocDetailsStep.locDetails;
 
-      // Remove preview-specific fields that shouldn't be submitted
-      const { locType, ...submissionLocDetails } = locDetails;
-
-      // Only include LOC fields that have meaningful (non-empty, non-null) values
-      const filteredLocDetails = this.filterEmptyValues(submissionLocDetails);
+      // Include all LOC details for preview display (locType will be filtered out later for API submission)
+      const filteredLocDetails = this.filterEmptyValues(locDetails);
 
       // Only flatten LOC details if there are actually meaningful values
       if (Object.keys(filteredLocDetails).length > 0) {
@@ -234,7 +231,7 @@ export class CreateLoansAccountComponent {
         // Determine which approved amount to use based on LOC type
         const approvedReceivableAmount = filteredLocDetails.approvedReceivableAmount;
         const approvedPayableAmount = filteredLocDetails.amountInFacilityCurrency;
-        const isReceivableType = filteredLocDetails.isReceivableType;
+        const isReceivableType = filteredLocDetails.locType === 'RECEIVABLE';
 
         // Use the appropriate approved facility amount as principal
         if (approvedReceivableAmount != null && approvedReceivableAmount > 0 && isReceivableType) {
@@ -286,8 +283,11 @@ export class CreateLoansAccountComponent {
     const dateFormat = this.settingsService.dateFormat;
     const loanAccountData = this.loansAccount;
 
+    // Remove preview-specific fields that shouldn't be submitted to API
+    const { locType, buyerSupplierOptions, ...submissionData } = loanAccountData;
+
     const payload = this.loansService.buildLoanRequestPayload(
-      loanAccountData,
+      submissionData,
       this.loansAccountTemplate,
       this.loansAccountProductTemplate.calendarOptions,
       locale,

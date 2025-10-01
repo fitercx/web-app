@@ -230,7 +230,7 @@ const routes: Routes = [
           {
             path: 'loc-details',
             component: LocDetailsTabComponent,
-            data: { title: 'LOC Details', breadcrumb: 'LOC Details', routeParamBreadcrumb: false }
+            data: { title: 'Invoice Details', breadcrumb: 'Invoice Details', routeParamBreadcrumb: false }
           },
           {
             path: 'external-asset-owner',

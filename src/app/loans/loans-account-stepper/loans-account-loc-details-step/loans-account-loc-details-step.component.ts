@@ -41,6 +41,15 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
   /** Maximum date allowed. */
   maxDate = new Date(2100, 0, 1);
 
+  /** Get minimum date for invoice due date (should be invoice date or later) */
+  get invoiceDueDateMinDate(): Date {
+    const invoiceDate = this.locDetailsForm?.get('invoiceDate')?.value;
+    if (invoiceDate) {
+      return new Date(invoiceDate);
+    }
+    return this.minDate;
+  }
+
   /**
    * @param {UntypedFormBuilder} formBuilder Form Builder
    * @param {SettingsService} settingsService Settings Service
@@ -411,7 +420,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
    */
   setupComputedFields() {
     // Listen to invoice amount and disapproved amount changes to compute approved amounts
-    this.locDetailsForm.get('invoiceAmount')?.valueChanges.subscribe((value) => {
+    this.locDetailsForm.get('invoiceAmount')?.valueChanges.subscribe((value: any) => {
       // Only trigger calculations if the value is meaningful
       if (value !== null && value !== undefined && value !== '') {
         this.updateApprovedReceivableAmount();
@@ -421,7 +430,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       }
     });
 
-    this.locDetailsForm.get('disapprovedAmount')?.valueChanges.subscribe((value) => {
+    this.locDetailsForm.get('disapprovedAmount')?.valueChanges.subscribe((value: any) => {
       // Only update approved amounts when disapproved amount changes
       // Do not interfere with other fields like principal or invoice amount
       this.updateApprovedReceivableAmount();
@@ -429,7 +438,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
     });
 
     // Listen to approved receivable amount and advance percentage changes to compute amount after advance
-    this.locDetailsForm.get('advancePercentage')?.valueChanges.subscribe((value) => {
+    this.locDetailsForm.get('advancePercentage')?.valueChanges.subscribe((value: any) => {
       // Only trigger calculations if the value is meaningful
       if (value !== null && value !== undefined && value !== '') {
         this.updateAmountAfterAdvance();
@@ -437,14 +446,14 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
     });
 
     // Listen to exchange rate and markup changes for payable calculations
-    this.locDetailsForm.get('exchangeRate')?.valueChanges.subscribe((value) => {
+    this.locDetailsForm.get('exchangeRate')?.valueChanges.subscribe((value: any) => {
       // Only trigger calculations if the value is meaningful
       if (value !== null && value !== undefined && value !== '') {
         this.updateAmountInFacilityCurrency();
       }
     });
 
-    this.locDetailsForm.get('markup')?.valueChanges.subscribe((value) => {
+    this.locDetailsForm.get('markup')?.valueChanges.subscribe((value: any) => {
       this.updateAmountInFacilityCurrency();
     });
   }

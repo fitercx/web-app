@@ -1185,6 +1185,9 @@
       "Principal Amount": "Principal Amount"
     },
     "inputs": {
+      "Facility Amount (Principal)": "Facility Amount (Principal)",
+      "Invoice Details": "Invoice Details",
+      "Line of Credit Product": "Line of Credit Product",
       "Approved Facility": "Approved Facility",
       "Principal/Invoice Amount": "Principal/Invoice Amount",
       "INVOICE DETAILS": "INVOICE DETAILS",
@@ -1789,7 +1792,7 @@
       "Advance Paid": "Advance Paid",
       "Incentive Type": "Incentive Type",
       "Include in Customer Loan Counter": "Include in Customer Loan Counter",
-      "Is LOC product": "Is LOC product",
+      "Enable LOC product": "Enable LOC product",
       "Income Account": "Income Account",
       "Income capitalization": "Income capitalization",
       "INCOME CAPITALIZATION": "INCOME CAPITALIZATION",
@@ -3522,6 +3525,7 @@
   },
   "not_found_subtitle": "Oops.. Looks like this page doesn't exist.",
   "tooltips": {
+    "Line of Credit Product Information": "Line of Credit Product Information",
     "A borrower loan counter (cycle)": "A borrower loan counter (cycle) is used for tracking how many time the client has taken this particular product.",
     "A loan is in arrears once the number of days": "A loan is in arrears once the number of days entered into this field is exceeded. If this field is blank, the loan will be in arrears the day after a scheduled payment is missed.",
     "A period of time during which a fixed deposit account": "A period of time during which a fixed deposit account based on this fixed deposit product will be locked-in after it is opened.",

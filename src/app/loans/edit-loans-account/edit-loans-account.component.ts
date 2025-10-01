@@ -142,11 +142,8 @@ export class EditLoansAccountComponent {
     if (this.isLocEnabled && this.loansAccountLocDetailsStep) {
       const locDetails = this.loansAccountLocDetailsStep.locDetails;
 
-      // Remove preview-specific fields that shouldn't be submitted
-      const { locType, ...submissionLocDetails } = locDetails;
-
-      // Only include LOC fields that have meaningful (non-empty, non-null) values
-      const filteredLocDetails = this.filterEmptyValues(submissionLocDetails);
+      // Include all LOC details for preview display (locType will be filtered out later for API submission)
+      const filteredLocDetails = this.filterEmptyValues(locDetails);
 
       // Only flatten LOC details if there are actually meaningful values
       if (Object.keys(filteredLocDetails).length > 0) {
@@ -156,10 +153,10 @@ export class EditLoansAccountComponent {
       // For LOC loans, use the approved facility amount as principal
       const locId = this.loansAccountDetailsStep?.loansAccountDetailsForm?.get('lineOfCreditId')?.value;
       if (locId) {
-        // Determine which approved amount to use based on LOC type (use original locType before filtering)
+        // Determine which approved amount to use based on LOC type
         const approvedReceivableAmount = filteredLocDetails.approvedReceivableAmount;
         const approvedPayableAmount = filteredLocDetails.amountInFacilityCurrency;
-        const isReceivableType = locType === 'RECEIVABLE';
+        const isReceivableType = filteredLocDetails.locType === 'RECEIVABLE';
 
         // Use the appropriate approved facility amount as principal
         if (approvedReceivableAmount != null && approvedReceivableAmount > 0 && isReceivableType) {
@@ -210,8 +207,12 @@ export class EditLoansAccountComponent {
     const locale = this.settingsService.language.code;
     const dateFormat = this.settingsService.dateFormat;
     const loanType = 'individual';
+
+    // Remove preview-specific fields that shouldn't be submitted to API
+    const { locType, buyerSupplierOptions, ...loansAccountForSubmission } = this.loansAccount;
+
     const loansAccountData = {
-      ...this.loansAccount,
+      ...loansAccountForSubmission,
       clientId: this.loansAccountAndTemplate.clientId,
       charges: this.loansAccount.charges.map((charge: any) => ({
         chargeId: charge.id,
