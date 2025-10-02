@@ -584,11 +584,6 @@ export class CreateLocComponent implements OnInit {
     this.editingCharge = charge;
     // copy current amount to editable field if not present
     charge.editableAmount = charge.editableAmount ?? charge.amount;
-    console.log('Starting edit for charge:', {
-      name: charge.name,
-      amount: charge.amount,
-      editableAmount: charge.editableAmount
-    });
   }
 
   onAmountChange(charge: any, event: any) {
@@ -598,10 +593,6 @@ export class CreateLocComponent implements OnInit {
 
   saveEdit(charge: any) {
     // apply edited value to charge.amount so it will be included in payload
-    console.log('Saving charge edit:', {
-      oldAmount: charge.amount,
-      newAmount: charge.editableAmount
-    });
     charge.amount = charge.editableAmount;
     this.editingCharge = null;
     // Force change detection by updating the array reference
