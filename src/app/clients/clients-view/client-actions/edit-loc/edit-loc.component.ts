@@ -53,6 +53,14 @@ export class EditLocComponent implements OnInit {
   // Original LOC data for prepopulation
   originalLocData: any = null;
 
+  // Dynamic labels for buyers/suppliers
+  buyerSupplierLabel: string = 'Buyer';
+  approvedBuyerSupplierLabel: string = 'Approved Buyer';
+
+  // Vendor editing properties
+  editingVendorIndex: number | null = null;
+  editingVendorName: string = '';
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
@@ -123,22 +131,28 @@ export class EditLocComponent implements OnInit {
     return time?.value || timeIdOrCode || '';
   }
 
-  // Return the appropriate label for buyers/suppliers based on product type
-  get buyerSupplierLabel(): string {
-    const productType = this.locForm?.get([
-      'basicInfo',
-      'productType'
-    ])?.value;
-    return productType === 'payable' ? 'Supplier' : 'Buyer';
-  }
+  // Update buyer/supplier labels based on product type
+  updateBuyerSupplierLabels(productType: any) {
+    // Find the product type option to get its code/value
+    let productTypeOption = this.productTypeOptions.find((pt) => pt.id == productType);
+    if (!productTypeOption) {
+      productTypeOption = this.productTypeOptions.find((pt) => pt.code === productType || pt.value === productType);
+    }
 
-  // Return the appropriate label for approved buyers/suppliers based on product type
-  get approvedBuyerSupplierLabel(): string {
-    const productType = this.locForm?.get([
-      'basicInfo',
-      'productType'
-    ])?.value;
-    return productType === 'payable' ? 'Approved Supplier' : 'Approved Buyer';
+    const productTypeCode = productTypeOption?.code || productTypeOption?.value || productType;
+
+    // Check for payable variations (could be 'payable', 'PAYABLE', 'Payable', etc.)
+    if (productTypeCode && productTypeCode.toString().toLowerCase().includes('payable')) {
+      this.buyerSupplierLabel = 'Supplier';
+      this.approvedBuyerSupplierLabel = 'Approved Supplier';
+    } else if (productTypeCode && productTypeCode.toString().toLowerCase().includes('receivable')) {
+      this.buyerSupplierLabel = 'Buyer';
+      this.approvedBuyerSupplierLabel = 'Approved Buyer';
+    } else {
+      // Default fallback
+      this.buyerSupplierLabel = 'Buyer';
+      this.approvedBuyerSupplierLabel = 'Approved Buyer';
+    }
   }
 
   // ---- Vendors helpers ----
@@ -209,6 +223,8 @@ export class EditLocComponent implements OnInit {
       ])
       ?.valueChanges.subscribe((productType) => {
         this.updateAdvancePercentage(productType);
+        this.updateBuyerSupplierLabels(productType);
+        this.updateInterestChargeTime(productType);
       });
 
     // Mock fetching client data
@@ -251,6 +267,16 @@ export class EditLocComponent implements OnInit {
         value: 'Custom',
         code: 'CUSTOM'
       });
+
+      // Update labels and interest charge time based on current product type now that options are loaded
+      const currentProductType = this.locForm.get([
+        'basicInfo',
+        'productType'
+      ])?.value;
+      if (currentProductType) {
+        this.updateBuyerSupplierLabels(currentProductType);
+        this.updateInterestChargeTime(currentProductType);
+      }
     }
 
     // read resolved currencies from route
@@ -327,10 +353,27 @@ export class EditLocComponent implements OnInit {
           ...charge,
           // Include name and other properties from charge definition
           name: chargeDefinition?.name || 'Unknown Charge',
-          chargeCalculationType: chargeDefinition?.chargeCalculationType || charge.chargeCalculationType,
-          editableAmount: charge.amount
+          calculationType: chargeDefinition?.chargeCalculationType || {},
+          chargeTimeType: chargeDefinition?.chargeTimeType || {},
+          penalty: chargeDefinition?.penalty || false,
+          active: chargeDefinition?.active || false,
+          // Add editing state
+          isEditing: false
         };
       });
+    }
+
+    // Update buyer/supplier labels and compute interim review date
+    const productType = this.locForm.get([
+      'basicInfo',
+      'productType'
+    ])?.value;
+    this.updateBuyerSupplierLabels(productType);
+    this.computeInterimReviewDate();
+
+    // Set the correct interest charge time based on product type
+    if (productType && this.interestChargeTimeOptions && this.interestChargeTimeOptions.length > 0) {
+      this.updateInterestChargeTime(productType);
     }
 
     // Prepopulate approved buyers if any
@@ -487,21 +530,6 @@ export class EditLocComponent implements OnInit {
     }
   }
 
-  // Validator to ensure maxPerDrawdown is not greater than maxCreditLimit
-  maxPerDrawdownValidator: ValidatorFn = (group: AbstractControl) => {
-    const maxCtrl = group.get('maxCreditLimit');
-    const perCtrl = group.get('maxPerDrawdown');
-    if (!maxCtrl || !perCtrl) {
-      return null;
-    }
-    const max = maxCtrl.value;
-    const per = perCtrl.value;
-    if (max !== null && max !== '' && per !== null && per !== '' && Number(per) > Number(max)) {
-      return { perDrawdownExceedsLimit: true };
-    }
-    return null;
-  };
-
   createForm() {
     // Nested groups so each step can have its own validators
     this.locForm = this.formBuilder.group({
@@ -536,10 +564,7 @@ export class EditLocComponent implements OnInit {
           '',
           Validators.required
         ],
-        startDate: [
-          new Date().toISOString().slice(0, 10),
-          Validators.required
-        ],
+        startDate: [''],
         expiryDate: [''],
         reviewPeriod: ['6'], // Default to 6 months
         interimReviewDate: [{ value: '', disabled: true }],
@@ -917,6 +942,60 @@ export class EditLocComponent implements OnInit {
   removeVendor(index: number) {
     if (index > -1 && index < this.approvedBuyersArray.length) {
       this.approvedBuyersArray.removeAt(index);
+    }
+  }
+
+  // Start editing a vendor/supplier name
+  startEditVendor(index: number, currentName: string) {
+    this.editingVendorIndex = index;
+    this.editingVendorName = currentName;
+  }
+
+  // Save the edited vendor/supplier name
+  saveEditVendor(index: number) {
+    if (this.editingVendorName.trim()) {
+      const control = this.approvedBuyersArray.at(index);
+      control.patchValue({ name: this.editingVendorName.trim() });
+      this.cancelEditVendor();
+    }
+  }
+
+  // Cancel editing vendor/supplier
+  cancelEditVendor() {
+    this.editingVendorIndex = null;
+    this.editingVendorName = '';
+  }
+
+  // Auto-select interest charge time based on product type
+  updateInterestChargeTime(productType: Number) {
+    // If no interest charge time options loaded yet, skip update
+    if (!this.interestChargeTimeOptions || this.interestChargeTimeOptions.length === 0) {
+      return;
+    }
+
+    const control = this.locForm.get([
+      'limitsTerms',
+      'interestChargeTime'
+    ]);
+
+    if (!control) {
+      return;
+    }
+
+    if (productType && productType === 2) {
+      // For payable (productType 2): set to "post disbursement"
+      const postDisbursementOption = this.interestChargeTimeOptions.find((ict) => ict.code === 'POST_DISBURSEMENT');
+
+      if (postDisbursementOption) {
+        control?.setValue(postDisbursementOption.id);
+      }
+    } else if (productType && productType === 1) {
+      // For receivable: set to "upfront"
+      const upfrontOption = this.interestChargeTimeOptions.find((ict) => ict.code === 'UPFRONT');
+
+      if (upfrontOption) {
+        control?.setValue(upfrontOption.id);
+      }
     }
   }
 }
