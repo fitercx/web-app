@@ -12,7 +12,7 @@
 
     <mifosx-input-amount
       fxFlex="58%"
-      *ngIf="currency"
+      *ngIf="currency && !locSelected"
       [currency]="currency"
       [isRequired]="true"
       [inputFormControl]="loansAccountTermsForm.controls.principalAmount"

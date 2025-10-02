@@ -79,6 +79,12 @@
                     </td>
                   </tr>
                   <!-- Removed separate Approved Facility row; Credit Limit label below will be renamed to Approved Facility -->
+                  <tr *ngIf="locDetails?.startDate">
+                    <td>
+                      <b>{{ 'labels.inputs.Start Date' | translate }}</b>
+                    </td>
+                    <td>{{ locDetails?.startDate | dateFormat }}</td>
+                  </tr>
                   <tr *ngIf="locDetails?.endDate">
                     <td>
                       <b>{{ 'labels.inputs.End Date' | translate }}</b>
@@ -540,12 +546,13 @@
           <mat-card-content>
             <div class="approved-buyers-section">
               <h4 style="margin: 0 0 12px 0; color: #666; font-size: 14px; font-weight: 500">
-                Approved Buyers List
+                {{ locDetails?.type === 'LOC PAYABLE' ? 'Approved Suppliers List' : 'Approved Buyers List' }}
                 <span style="font-size: 11px; color: #999"
-                  >({{ locDetails?.approvedBuyersList?.length || 0 }} buyers)</span
+                  >({{ locDetails?.approvedBuyersList?.length || 0 }}
+                  {{ locDetails?.type === 'LOC PAYABLE' ? 'suppliers' : 'buyers' }})</span
                 >
               </h4>
-              <div *ngIf="locDetails?.approvedBuyersList?.length; else noBuyers">
+              <div *ngIf="locDetails?.approvedBuyersList?.length; else noBuyersSuppliers">
                 <div
                   class="buyers-grid"
                   style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px"
@@ -567,7 +574,7 @@
                   </div>
                 </div>
               </div>
-              <ng-template #noBuyers>
+              <ng-template #noBuyersSuppliers>
                 <div
                   style="
                     text-align: center;
@@ -578,7 +585,9 @@
                     border: 1px dashed #ddd;
                   "
                 >
-                  <span style="font-style: italic; font-size: 13px">No approved buyers configured</span>
+                  <span style="font-style: italic; font-size: 13px"
+                    >No approved {{ locDetails?.type === 'LOC PAYABLE' ? 'suppliers' : 'buyers' }} configured</span
+                  >
                 </div>
               </ng-template>
             </div>
