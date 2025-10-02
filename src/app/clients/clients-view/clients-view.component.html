@@ -206,6 +206,9 @@
         >
           {{ 'labels.buttons.New Savings Account' | translate }}
         </button>
+        <button mat-menu-item [routerLink]="['loc', 'create']">
+          {{ 'labels.buttons.New Line Of Credit' | translate: {} : 'New Line Of Credit' }}
+        </button>
         <button mat-menu-item *mifosxHasPermission="'CREATE_SHAREACCOUNT'" [routerLink]="['shares-accounts', 'create']">
           {{ 'labels.buttons.New Share Account' | translate }}
         </button>
@@ -300,9 +303,6 @@
         </button>
         <button mat-menu-item (click)="doAction('Client Screen Reports')">
           {{ 'labels.buttons.Client Screen Reports' | translate }}
-        </button>
-        <button mat-menu-item [routerLink]="['loc', 'create']">
-          {{ 'labels.buttons.Create LOC' | translate: {} : 'Create LOC' }}
         </button>
         <button
           mat-menu-item

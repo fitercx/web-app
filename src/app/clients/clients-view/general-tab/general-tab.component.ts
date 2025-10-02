@@ -120,6 +120,16 @@ export class GeneralTabComponent {
     'expand'
   ];
 
+  locLoanColumns: string[] = [
+    'Account No',
+    'Loan Product',
+    'Loan Amount',
+    'Outstanding Balance',
+    'Amount Paid',
+    'Actions',
+    'expand'
+  ];
+
   /** Client Account Data */
   clientAccountData: any;
   /** Loan Accounts Data */

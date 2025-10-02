@@ -106,7 +106,12 @@
               </mat-form-field>
             </div>
 
-            <mifosx-stepper-buttons></mifosx-stepper-buttons>
+            <div fxLayout="row" class="margin-t" fxLayout.xs="column" fxLayoutAlign="center" fxLayoutGap="2%">
+              <button type="button" mat-raised-button matStepperNext [disabled]="!locForm.get('basicInfo')?.valid">
+                <fa-icon icon="arrow-right" class="m-r-10"></fa-icon>
+                Next
+              </button>
+            </div>
           </mat-step>
 
           <!-- Step 2: Limits & Terms -->
@@ -137,20 +142,65 @@
               <div *ngIf="approvedBuyersArray.length === 0" class="mat-body-2" style="opacity: 0.7">
                 No approved {{ buyerSupplierLabel.toLowerCase() }} added yet.
               </div>
-              <mat-chip-list *ngIf="approvedBuyersArray.length > 0" aria-label="Vendors list">
-                <mat-chip
-                  *ngFor="let v of approvedBuyersArray.controls; let i = index"
-                  removable="true"
-                  (removed)="removeVendor(i)"
-                >
-                  {{ v.value?.name }}
-                  <button matChipRemove [attr.aria-label]="'Remove ' + approvedBuyerSupplierLabel">
-                    <mat-icon>cancel</mat-icon>
-                  </button>
-                </mat-chip>
-              </mat-chip-list>
-              <div *ngIf="approvedBuyersArray.length > 0" class="mat-caption" style="margin-top: 8px">
-                Total Approved {{ buyerSupplierLabel }}s: {{ approvedBuyersArray.length }}
+
+              <!-- Editable list of approved buyers/suppliers -->
+              <div *ngIf="approvedBuyersArray.length > 0" class="approved-list">
+                <h4 class="mat-h4">Approved {{ buyerSupplierLabel }}s ({{ approvedBuyersArray.length }})</h4>
+                <mat-list>
+                  <mat-list-item *ngFor="let v of approvedBuyersArray.controls; let i = index" class="approved-item">
+                    <div fxLayout="row" fxLayoutAlign="space-between center" fxFlex="100%">
+                      <div fxFlex="70%" *ngIf="editingVendorIndex !== i">
+                        <span class="vendor-name">{{ v.value?.name }}</span>
+                      </div>
+                      <div fxFlex="70%" *ngIf="editingVendorIndex === i">
+                        <mat-form-field fxFlex>
+                          <input
+                            matInput
+                            [(ngModel)]="editingVendorName"
+                            placeholder="Enter {{ buyerSupplierLabel.toLowerCase() }} name"
+                          />
+                        </mat-form-field>
+                      </div>
+                      <div fxFlex="30%" fxLayoutAlign="end center" fxLayoutGap="8px">
+                        <button
+                          *ngIf="editingVendorIndex !== i"
+                          mat-icon-button
+                          (click)="startEditVendor(i, v.value?.name)"
+                          matTooltip="Edit {{ buyerSupplierLabel.toLowerCase() }} name"
+                        >
+                          <mat-icon>edit</mat-icon>
+                        </button>
+                        <button
+                          *ngIf="editingVendorIndex === i"
+                          mat-icon-button
+                          color="primary"
+                          (click)="saveEditVendor(i)"
+                          matTooltip="Save changes"
+                        >
+                          <mat-icon>save</mat-icon>
+                        </button>
+                        <button
+                          *ngIf="editingVendorIndex === i"
+                          mat-icon-button
+                          (click)="cancelEditVendor()"
+                          matTooltip="Cancel editing"
+                        >
+                          <mat-icon>cancel</mat-icon>
+                        </button>
+                        <button
+                          *ngIf="editingVendorIndex !== i"
+                          mat-icon-button
+                          color="warn"
+                          (click)="removeVendor(i)"
+                          [attr.aria-label]="'Remove ' + approvedBuyerSupplierLabel"
+                          matTooltip="Remove {{ buyerSupplierLabel.toLowerCase() }}"
+                        >
+                          <mat-icon>delete</mat-icon>
+                        </button>
+                      </div>
+                    </div>
+                  </mat-list-item>
+                </mat-list>
               </div>
             </div>
             <mifosx-stepper-buttons></mifosx-stepper-buttons>
@@ -187,19 +237,24 @@
               <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
                 <mat-form-field fxFlex>
                   <mat-label>Start Date</mat-label>
-                  <input matInput [matDatepicker]="activationPicker" formControlName="startDate" required />
+                  <input matInput [matDatepicker]="activationPicker" formControlName="startDate" />
                   <mat-datepicker-toggle matSuffix [for]="activationPicker"></mat-datepicker-toggle>
                   <mat-datepicker #activationPicker></mat-datepicker>
-                  <mat-error *ngIf="locForm.get(['limitsTerms', 'startDate'])?.hasError('required')"
-                    >This field is required.</mat-error
-                  >
                 </mat-form-field>
 
                 <mat-form-field fxFlex>
                   <mat-label>Expiry Date</mat-label>
-                  <input matInput [matDatepicker]="expiryPicker" formControlName="expiryDate" />
+                  <input
+                    matInput
+                    [matDatepicker]="expiryPicker"
+                    formControlName="expiryDate"
+                    [min]="locForm.get(['limitsTerms', 'startDate'])?.value"
+                  />
                   <mat-datepicker-toggle matSuffix [for]="expiryPicker"></mat-datepicker-toggle>
                   <mat-datepicker #expiryPicker></mat-datepicker>
+                  <mat-error *ngIf="locForm.get('limitsTerms')?.hasError('dateRangeInvalid')">
+                    End date cannot be before start date
+                  </mat-error>
                 </mat-form-field>
               </div>
 
@@ -252,11 +307,12 @@
 
                 <mat-form-field fxFlex>
                   <mat-label>Interest Charge Time</mat-label>
-                  <mat-select formControlName="interestChargeTime">
+                  <mat-select formControlName="interestChargeTime" disabled>
                     <mat-option *ngFor="let ict of interestChargeTimeOptions" [value]="ict.id">
                       {{ ict.value }}
                     </mat-option>
                   </mat-select>
+                  <mat-hint>Automatically set based on LOC Type</mat-hint>
                 </mat-form-field>
               </div>
 
@@ -381,8 +437,8 @@
                       <th mat-header-cell *matHeaderCellDef>Amount</th>
                       <td mat-cell *matCellDef="let charge">
                         <div *ngIf="editingCharge !== charge">
-                          <span *ngIf="charge.chargeCalculationType === 'PERCENT'">{{ charge.amount || '—' }}%</span>
-                          <span *ngIf="charge.chargeCalculationType !== 'PERCENT'"
+                          <span *ngIf="charge.chargeCalculationType?.id === 2">{{ charge.amount || '—' }}%</span>
+                          <span *ngIf="charge.chargeCalculationType?.id !== 2"
                             >{{ charge.amount || '—' }} {{ selectedCurrencyCode || '' }}</span
                           >
                           <button mat-icon-button (click)="startEdit(charge)" aria-label="Edit amount">
@@ -395,7 +451,20 @@
                           fxLayoutAlign="start center"
                           fxLayoutGap="8px"
                         >
-                          <input matInput type="number" [(ngModel)]="charge.editableAmount" style="width: 120px" />
+                          <div style="display: flex; align-items: center; gap: 4px">
+                            <input
+                              type="number"
+                              [(ngModel)]="charge.editableAmount"
+                              style="width: 80px; padding: 8px; border: 1px solid #ccc; border-radius: 4px"
+                              step="0.01"
+                              min="0.01"
+                              (input)="onAmountChange(charge, $event)"
+                            />
+                            <span *ngIf="charge.chargeCalculationType?.id === 2" style="font-weight: 500">%</span>
+                            <span *ngIf="charge.chargeCalculationType?.id !== 2" style="font-weight: 500">{{
+                              selectedCurrencyCode || ''
+                            }}</span>
+                          </div>
                           <button mat-icon-button color="primary" (click)="saveEdit(charge)">
                             <fa-icon icon="save"></fa-icon>
                           </button>
@@ -431,121 +500,139 @@
             <ng-template matStepLabel>Preview</ng-template>
 
             <div fxLayout="row wrap" fxLayout.lt-md="column">
-              <h3 class="mat-h3" fxFlexFill>Review</h3>
-
+              <h3 class="mat-h3" fxFlexFill>Basic Information</h3>
               <mat-divider fxFlexFill></mat-divider>
 
-              <div fxFlexFill>
-                <span fxFlex="40%">Type</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Type</span>
                 <span fxFlex="60%">{{
                   previewPayload.productType === 'payable' ? 'LOC Payable' : 'LOC Receivable'
                 }}</span>
               </div>
 
-              <div fxFlexFill>
-                <span fxFlex="40%">External Id</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">External Id</span>
                 <span fxFlex="60%">{{ previewPayload.externalId || '—' }}</span>
               </div>
 
-              <div fxFlexFill>
-                <span fxFlex="40%">Note</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Virtual Account</span>
+                <span fxFlex="60%">{{ previewPayload.virtualAccount || '—' }}</span>
+              </div>
+
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Currency</span>
+                <span fxFlex="60%">{{ selectedCurrencyCode || '—' }}</span>
+              </div>
+
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Loan Officer</span>
+                <span fxFlex="60%">{{ getLoanOfficerDisplay() || '—' }}</span>
+              </div>
+
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Note</span>
                 <span fxFlex="60%">{{ previewPayload.specialConditions || '—' }}</span>
               </div>
-              <h3 class="mat-h3" fxFlexFill style="margin-top: 16px">Client Details</h3>
+
+              <h3 class="mat-h3" fxFlexFill style="margin-top: 16px">Business Information</h3>
               <mat-divider fxFlexFill></mat-divider>
 
-              <div fxFlexFill>
-                <span fxFlex="40%">Company</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Distribution Partner</span>
+                <span fxFlex="60%">{{ previewPayload.distributionPartner || '—' }}</span>
+              </div>
+
+              <div
+                fxFlexFill
+                class="preview-field"
+                *ngIf="!previewPayload.approvedBuyers || previewPayload.approvedBuyers.length === 0"
+              >
+                <span fxFlex="40%" class="preview-label">{{ approvedBuyerSupplierLabel }}s</span>
+                <span fxFlex="60%">No approved {{ buyerSupplierLabel.toLowerCase() }}s</span>
+              </div>
+              <div fxFlexFill class="preview-field" *ngFor="let v of previewPayload.approvedBuyers">
+                <span fxFlex="40%" class="preview-label">{{ approvedBuyerSupplierLabel }}</span>
+                <span fxFlex="60%">{{ v.name }}</span>
+              </div>
+
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Company</span>
                 <span fxFlex="60%">{{ previewPayload.clientCompanyName || '—' }}</span>
               </div>
 
-              <div fxFlexFill>
-                <span fxFlex="40%">Contact Person</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Contact Person</span>
                 <span fxFlex="60%">{{ previewPayload.clientContactPersonName || '—' }}</span>
               </div>
 
-              <div fxFlexFill>
-                <span fxFlex="40%">Contact Phone</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Contact Phone</span>
                 <span fxFlex="60%">{{ previewPayload.clientContactPersonPhone || '—' }}</span>
               </div>
 
-              <div fxFlexFill>
-                <span fxFlex="40%">Contact Email</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Contact Email</span>
                 <span fxFlex="60%">{{ previewPayload.clientContactPersonEmail || '—' }}</span>
               </div>
 
-              <div fxFlexFill>
-                <span fxFlex="40%">Authorized Signatory</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Authorized Signatory</span>
                 <span fxFlex="60%">{{ previewPayload.authorizedSignatoryName || '—' }}</span>
               </div>
 
-              <div fxFlexFill>
-                <span fxFlex="40%">Signatory Phone</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Signatory Phone</span>
                 <span fxFlex="60%">{{ previewPayload.authorizedSignatoryPhone || '—' }}</span>
               </div>
 
-              <div fxFlexFill>
-                <span fxFlex="40%">Signatory Email</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Signatory Email</span>
                 <span fxFlex="60%">{{ previewPayload.authorizedSignatoryEmail || '—' }}</span>
-              </div>
-
-              <div fxFlexFill>
-                <span fxFlex="40%">Virtual Account</span>
-                <span fxFlex="60%">{{ previewPayload.va || '—' }}</span>
               </div>
 
               <h3 class="mat-h3" fxFlexFill style="margin-top: 16px">Limits & Terms</h3>
               <mat-divider fxFlexFill></mat-divider>
 
-              <h3 class="mat-h3" fxFlexFill style="margin-top: 16px">Distribution & Vendors</h3>
-              <mat-divider fxFlexFill></mat-divider>
-              <div fxFlexFill>
-                <span fxFlex="40%">Distribution Partner</span>
-                <span fxFlex="60%">{{ previewPayload.distributionPartner || '—' }}</span>
-              </div>
-              <div fxFlexFill *ngIf="!previewPayload.approvedBuyers || previewPayload.approvedBuyers.length === 0">
-                No approved {{ buyerSupplierLabel.toLowerCase() }}s
-              </div>
-              <div fxFlexFill *ngFor="let v of previewPayload.approvedBuyers">
-                <span fxFlex="40%">{{ approvedBuyerSupplierLabel }}</span>
-                <span fxFlex="60%">{{ v.name }}</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Maximum Credit Limit</span>
+                <span fxFlex="60%">{{
+                  (previewPayload.maximumAmount || previewPayload.maxCreditLimit || '0.00') +
+                    ' ' +
+                    (selectedCurrencyCode || '')
+                }}</span>
               </div>
 
-              <div fxFlexFill>
-                <span fxFlex="40%">Maximum Credit Limit</span>
-                <span fxFlex="60%">{{ previewPayload.maximumAmount || previewPayload.maxCreditLimit || '0.00' }}</span>
-              </div>
-
-              <div fxFlexFill>
-                <span fxFlex="40%">Start Date</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Start Date</span>
                 <span fxFlex="60%">{{ previewPayload.startDate || previewPayload.activationDate || '—' }}</span>
               </div>
 
-              <div fxFlexFill>
-                <span fxFlex="40%">Expiry Date</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Expiry Date</span>
                 <span fxFlex="60%">{{ previewPayload.endDate || previewPayload.expiryDate || '—' }}</span>
               </div>
 
-              <div fxFlexFill>
-                <span fxFlex="40%">Annual Interest Rate</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Annual Interest Rate</span>
                 <span fxFlex="60%"
                   >{{ previewPayload.annualInterestRate || '—'
                   }}<span *ngIf="previewPayload.annualInterestRate">%</span></span
                 >
               </div>
 
-              <div fxFlexFill>
-                <span fxFlex="40%">Tenor (Days)</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Tenor (Days)</span>
                 <span fxFlex="60%">{{ previewPayload.tenorDays || '—' }}</span>
               </div>
 
-              <div fxFlexFill>
-                <span fxFlex="40%">Cash Margin Type</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Cash Margin Type</span>
                 <span fxFlex="60%">{{ getCashMarginTypeDisplay(previewPayload.cashMarginType) || '—' }}</span>
               </div>
 
-              <div fxFlexFill>
-                <span fxFlex="40%">Cash Margin Value</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Cash Margin Value</span>
                 <span fxFlex="60%"
                   >{{ previewPayload.cashMarginValue || '—'
                   }}{{
@@ -558,20 +645,20 @@
                 >
               </div>
 
-              <div fxFlexFill>
-                <span fxFlex="40%">Interest Charge Time</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Interest Charge Time</span>
                 <span fxFlex="60%">{{ getInterestChargeTimeDisplay(previewPayload.interestChargeTime) || '—' }}</span>
               </div>
 
-              <div fxFlexFill>
-                <span fxFlex="40%">Review Period</span>
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Review Period</span>
                 <span fxFlex="60%">{{
                   previewPayload.reviewPeriodDisplay || previewPayload.review_period || '—'
                 }}</span>
               </div>
 
-              <div fxFlexFill *ngIf="previewPayload.interimReviewDate">
-                <span fxFlex="40%">Next Review Date</span>
+              <div fxFlexFill class="preview-field" *ngIf="previewPayload.interimReviewDate">
+                <span fxFlex="40%" class="preview-label">Next Review Date</span>
                 <span fxFlex="60%">{{ previewPayload.interimReviewDate }}</span>
               </div>
 
@@ -579,11 +666,14 @@
 
               <h3 class="mat-h3" fxFlexFill style="margin-top: 16px">Charges</h3>
               <mat-divider fxFlexFill></mat-divider>
-              <div fxFlexFill *ngIf="chargesDataSource.length === 0">No charges added</div>
-              <div fxFlexFill *ngFor="let c of chargesDataSource">
-                <span fxFlex="40%">{{ c.name }}</span>
+              <div fxFlexFill class="preview-field" *ngIf="chargesDataSource.length === 0">
+                <span fxFlex="40%" class="preview-label">Charges</span>
+                <span fxFlex="60%">No charges added</span>
+              </div>
+              <div fxFlexFill class="preview-field" *ngFor="let c of chargesDataSource">
+                <span fxFlex="40%" class="preview-label">{{ c.name }}</span>
                 <span fxFlex="60%">{{
-                  c.chargeCalculationType === 'PERCENT'
+                  c.chargeCalculationType?.id === 2
                     ? c.amount + '%'
                     : c.amount
                       ? c.amount + ' ' + (selectedCurrencyCode || '')

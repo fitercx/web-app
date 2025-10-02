@@ -39,19 +39,42 @@ export class AuditTrailTabComponent implements OnInit {
    * Process audit data from LOC details
    */
   private processAuditData(data: any): void {
-    // Extract audit information
+    // Check if timeLineData exists and use it, otherwise fallback to direct properties
+    const timelineData = data.timeLineData || data;
+
+    // Extract audit information from timeLineData structure
     this.auditData = {
-      createdDate: this.parseDate(data.createdDate),
-      lastModifiedDate: this.parseDate(data.lastModifiedDate),
+      // Submitted information
+      submittedDate: this.parseDate(timelineData.submittedOnDate),
+      submittedByUsername:
+        timelineData.submittedByFirstname && timelineData.submittedByLastname
+          ? `${timelineData.submittedByFirstname} ${timelineData.submittedByLastname}`
+          : null,
+
+      // Approved information
+      approvedDate: this.parseDate(timelineData.approvedOnDate),
+      approvedByUsername:
+        timelineData.approvedByFirstname && timelineData.approvedByLastname
+          ? `${timelineData.approvedByFirstname} ${timelineData.approvedByLastname}`
+          : null,
+
+      // Activated information
+      activatedDate: this.parseDate(timelineData.activatedOnDate),
+      activatedByUsername:
+        timelineData.activatedByFirstname && timelineData.activatedByLastname
+          ? `${timelineData.activatedByFirstname} ${timelineData.activatedByLastname}`
+          : null,
+
+      // Last modified information
+      lastModifiedDate: this.parseDate(timelineData.updatedOnDate),
+      lastModifiedByUsername:
+        timelineData.updatedByFirstname && timelineData.updatedByLastname
+          ? `${timelineData.updatedByFirstname} ${timelineData.updatedByLastname}`
+          : null,
+
+      // Fallback to original structure if timeLineData is not available
+      createdDate: this.parseDate(timelineData.createdDate || data.createdDate),
       createdByUsername: data.createdByUsername,
-      lastModifiedByUsername: data.lastModifiedByUsername,
-      // Additional audit fields if available
-      submittedDate: this.parseDate(data.submittedDate),
-      submittedByUsername: data.submittedByUsername,
-      approvedDate: this.parseDate(data.approvedDate),
-      approvedByUsername: data.approver?.username,
-      activatedDate: this.parseDate(data.activatedDate || data.activationDate),
-      activatedByUsername: data.activator?.username,
       closedDate: this.parseDate(data.closedDate),
       closedByUsername: data.closer?.username,
       rejectedDate: this.parseDate(data.rejectedDate),
@@ -70,19 +93,7 @@ export class AuditTrailTabComponent implements OnInit {
   private buildAuditEntries(): void {
     const entries: any[] = [];
 
-    // Creation entry
-    if (this.auditData.createdDate) {
-      entries.push({
-        date: this.auditData.createdDate,
-        action: 'Created',
-        user: this.auditData.createdByUsername || 'System',
-        details: 'Line of Credit was created',
-        icon: 'add_circle',
-        color: 'primary'
-      });
-    }
-
-    // Submission entry
+    // Submission entry (from timeLineData)
     if (this.auditData.submittedDate) {
       entries.push({
         date: this.auditData.submittedDate,
@@ -94,7 +105,7 @@ export class AuditTrailTabComponent implements OnInit {
       });
     }
 
-    // Approval entry
+    // Approval entry (from timeLineData)
     if (this.auditData.approvedDate) {
       entries.push({
         date: this.auditData.approvedDate,
@@ -106,7 +117,7 @@ export class AuditTrailTabComponent implements OnInit {
       });
     }
 
-    // Activation entry
+    // Activation entry (from timeLineData)
     if (this.auditData.activatedDate) {
       entries.push({
         date: this.auditData.activatedDate,
@@ -118,7 +129,31 @@ export class AuditTrailTabComponent implements OnInit {
       });
     }
 
-    // Rejection entry
+    // Last modification entry (from timeLineData)
+    if (this.auditData.lastModifiedDate) {
+      entries.push({
+        date: this.auditData.lastModifiedDate,
+        action: 'Updated',
+        user: this.auditData.lastModifiedByUsername || 'System',
+        details: 'Line of Credit details were updated',
+        icon: 'edit',
+        color: 'accent'
+      });
+    }
+
+    // Creation entry (fallback if available)
+    if (this.auditData.createdDate) {
+      entries.push({
+        date: this.auditData.createdDate,
+        action: 'Created',
+        user: this.auditData.createdByUsername || 'System',
+        details: 'Line of Credit was created',
+        icon: 'add_circle',
+        color: 'primary'
+      });
+    }
+
+    // Rejection entry (if available)
     if (this.auditData.rejectedDate) {
       entries.push({
         date: this.auditData.rejectedDate,
@@ -130,7 +165,7 @@ export class AuditTrailTabComponent implements OnInit {
       });
     }
 
-    // Withdrawal entry
+    // Withdrawal entry (if available)
     if (this.auditData.withdrawnDate) {
       entries.push({
         date: this.auditData.withdrawnDate,
@@ -142,7 +177,7 @@ export class AuditTrailTabComponent implements OnInit {
       });
     }
 
-    // Closure entry
+    // Closure entry (if available)
     if (this.auditData.closedDate) {
       entries.push({
         date: this.auditData.closedDate,
@@ -151,22 +186,6 @@ export class AuditTrailTabComponent implements OnInit {
         details: 'Line of Credit was closed',
         icon: 'block',
         color: 'warn'
-      });
-    }
-
-    // Last modification entry (if different from creation)
-    if (
-      this.auditData.lastModifiedDate &&
-      this.auditData.createdDate &&
-      this.auditData.lastModifiedDate.getTime() !== this.auditData.createdDate.getTime()
-    ) {
-      entries.push({
-        date: this.auditData.lastModifiedDate,
-        action: 'Modified',
-        user: this.auditData.lastModifiedByUsername || 'System',
-        details: 'Line of Credit details were modified',
-        icon: 'edit',
-        color: 'accent'
       });
     }
 
