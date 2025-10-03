@@ -24,6 +24,7 @@ export class ViewLocChargesComponent implements OnInit {
   totalRecords = 0;
   pageSize = 20;
   locStatus: string = '';
+  locCurrency: string = '';
   currentPage = 0;
   charges: any[] = [];
 
@@ -36,7 +37,7 @@ export class ViewLocChargesComponent implements OnInit {
 
   ngOnInit(): void {
     this.fetchCharges(0, this.pageSize);
-    this.loadLocStatus();
+    this.loadLocStatusFromResolver();
   }
 
   fetchCharges(offset: number, limit: number): void {
@@ -52,14 +53,12 @@ export class ViewLocChargesComponent implements OnInit {
     }
   }
 
-  loadLocStatus(): void {
-    const locId = this.route.parent?.snapshot.paramMap.get('locId');
-    const clientId = this.route.parent?.parent?.snapshot.paramMap.get('clientId');
-
-    if (clientId && locId) {
-      this.clientsService.getClientCreditLine(clientId, locId).subscribe((locData: any) => {
-        this.locStatus = locData.status;
-      });
+  loadLocStatusFromResolver(): void {
+    // Get LOC data from parent component's resolver instead of making another API call
+    const locData = this.route.parent?.snapshot.data['locData'];
+    if (locData) {
+      this.locStatus = locData.status?.code || locData.status?.value || locData.status;
+      this.locCurrency = locData.currency || '';
     }
   }
 

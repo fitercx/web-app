@@ -57,6 +57,7 @@ export interface CreditLineDetails {
   specialConditions?: string;
   createdDate?: number[];
   lastModifiedDate?: number[];
+  interestRate?: number;
 }
 
 export interface CreditLineResponse {

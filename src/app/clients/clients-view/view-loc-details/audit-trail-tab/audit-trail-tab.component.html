@@ -1,0 +1,38 @@
+<div class="audit-trail-container">
+  <div class="audit-timeline-section">
+    <div class="audit-timeline" *ngIf="auditEntries.length > 0; else noAuditData">
+      <div class="timeline-item" *ngFor="let entry of auditEntries; let first = first; let last = last">
+        <div class="timeline-marker" [ngClass]="'marker-' + entry.color">
+          <mat-icon>{{ entry.icon }}</mat-icon>
+        </div>
+        <div class="timeline-content">
+          <mat-card class="timeline-card">
+            <mat-card-content>
+              <div class="timeline-header">
+                <h4 class="timeline-action">{{ entry.action }}</h4>
+                <span class="timeline-date">{{ entry.date | dateFormat }}</span>
+              </div>
+              <div class="timeline-details">
+                <p class="timeline-description">{{ entry.details }}</p>
+                <div class="timeline-meta">
+                  <span class="timeline-user">
+                    <mat-icon class="user-icon">person</mat-icon>
+                    {{ entry.user }}
+                  </span>
+                  <span class="timeline-relative">{{ getRelativeTime(entry.date) }}</span>
+                </div>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        </div>
+      </div>
+    </div>
+
+    <ng-template #noAuditData>
+      <div class="no-audit-data">
+        <mat-icon class="no-data-icon">history_toggle_off</mat-icon>
+        <p>No audit information is available for this Line of Credit.</p>
+      </div>
+    </ng-template>
+  </div>
+</div>

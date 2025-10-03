@@ -34,8 +34,12 @@ export class LoansAccountScheduleStepComponent {
     this.repaymentScheduleDetails = { periods: [] };
     const locale = this.settingsService.language.code;
     const dateFormat = this.settingsService.dateFormat;
+
+    // Remove LOC helper fields that shouldn't be sent to API for schedule calculation
+    const { locType, buyerSupplierOptions, ...loansAccountForSchedule } = this.loansAccount;
+
     const payload = this.loansService.buildLoanRequestPayload(
-      this.loansAccount,
+      loansAccountForSchedule,
       this.loansAccountTemplate,
       this.loansAccountProductTemplate.calendarOptions,
       locale,

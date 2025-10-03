@@ -51,6 +51,7 @@ export class CreateLoansAccountComponent {
   currencies: any[] = [];
   /** Optional Line of Credit context (drawdown) */
   lineOfCreditId?: string | null;
+  /** Subscriptions cleanup */
 
   /**
    * Sets loans account create form.
@@ -83,6 +84,11 @@ export class CreateLoansAccountComponent {
     this.loansAccountProductTemplate = $event;
     this.currencyCode = this.loansAccountProductTemplate.currency.code;
     const clientId = this.loansAccountTemplate.clientId;
+
+    // Set up LOC interest rate defaulting if LOC is enabled
+    if ($event.additionalProperties?.isLocEnabled && $event.additionalProperties?.lineOfCreditOptions) {
+      this.setupLocInterestRateDefaulting($event.additionalProperties.lineOfCreditOptions);
+    }
     // If creating as drawdown, optionally restrict products here (future enhancement)
     if (!!clientId) {
       this.clientService.getCollateralTemplate(clientId).subscribe((response: any) => {
@@ -103,6 +109,25 @@ export class CreateLoansAccountComponent {
       this.multiDisburseLoan = response.multiDisburseLoan;
     });
     this.setDatatables();
+  }
+
+  /**
+   * Sets up LOC interest rate defaulting when LOC is selected
+   * @param {any[]} lineOfCreditOptions Available LOC options
+   */
+  setupLocInterestRateDefaulting(lineOfCreditOptions: any[]) {
+    // Watch for changes in the LOC selection
+    this.loansAccountDetailsStep.loansAccountDetailsForm.get('lineOfCreditId')?.valueChanges.subscribe((locId: any) => {
+      if (locId && lineOfCreditOptions) {
+        const selectedLoc = lineOfCreditOptions.find((loc: any) => loc.id === locId);
+        if (selectedLoc?.interestRate && this.loansAccountTermsStep) {
+          // Set the interest rate from the selected LOC
+          this.loansAccountTermsStep.loansAccountTermsForm.patchValue({
+            interestRatePerPeriod: selectedLoc.interestRate
+          });
+        }
+      }
+    });
   }
 
   convertSnakeToPascalCase(snakeCase: string): string {
@@ -192,12 +217,28 @@ export class CreateLoansAccountComponent {
     if (this.isLocEnabled && this.loansAccountLocDetailsStep) {
       const locDetails = this.loansAccountLocDetailsStep.locDetails;
 
-      // Only include LOC fields that have meaningful (non-empty, non-null) values
+      // Include all LOC details for preview display (locType will be filtered out later for API submission)
       const filteredLocDetails = this.filterEmptyValues(locDetails);
 
       // Only flatten LOC details if there are actually meaningful values
       if (Object.keys(filteredLocDetails).length > 0) {
         Object.assign(baseData, filteredLocDetails);
+      }
+
+      // For LOC loans, use the approved facility amount as principal
+      const locId = this.loansAccountDetailsStep?.loansAccountDetailsForm?.get('lineOfCreditId')?.value;
+      if (locId) {
+        // Determine which approved amount to use based on LOC type
+        const approvedReceivableAmount = filteredLocDetails.approvedReceivableAmount;
+        const approvedPayableAmount = filteredLocDetails.amountInFacilityCurrency;
+        const isReceivableType = filteredLocDetails.locType === 'RECEIVABLE';
+
+        // Use the appropriate approved facility amount as principal
+        if (approvedReceivableAmount != null && approvedReceivableAmount > 0 && isReceivableType) {
+          baseData.principalAmount = approvedReceivableAmount;
+        } else if (approvedPayableAmount != null && approvedPayableAmount > 0 && !isReceivableType) {
+          baseData.principalAmount = approvedPayableAmount;
+        }
       }
     }
 
@@ -242,8 +283,11 @@ export class CreateLoansAccountComponent {
     const dateFormat = this.settingsService.dateFormat;
     const loanAccountData = this.loansAccount;
 
+    // Remove preview-specific fields that shouldn't be submitted to API
+    const { locType, buyerSupplierOptions, ...submissionData } = loanAccountData;
+
     const payload = this.loansService.buildLoanRequestPayload(
-      loanAccountData,
+      submissionData,
       this.loansAccountTemplate,
       this.loansAccountProductTemplate.calendarOptions,
       locale,

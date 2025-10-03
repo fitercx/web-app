@@ -132,13 +132,22 @@
 }
 
 .expand-cell {
-  width: 48px;
+  width: 56px;
   text-align: center;
+  vertical-align: middle;
 }
 
 .expand-button {
+  transition: all 0.2s ease;
+
   &:hover {
-    background-color: rgb(0 0 0 / 4%);
+    background-color: rgb(0 0 0 / 6%);
+    transform: scale(1.05);
+  }
+
+  // Add visual indicator for expanded state
+  .mat-icon {
+    transition: transform 0.2s ease;
   }
 }
 
@@ -204,154 +213,77 @@
 }
 
 .loc-loans-section {
-  padding: 8px 8px 4px;
+  padding: 16px;
   background: transparent; // match page background
 
-  .loans-header {
-    margin: 0 0 16px;
-    font-size: 16px;
-    font-weight: 500;
-    color: #424242;
-  }
-
   .no-loans {
-    padding: 12px;
+    padding: 24px;
     text-align: center;
     background: transparent;
     border: none;
 
     p {
       margin: 0;
-      color: #999;
+      color: rgb(0 0 0 / 54%);
       font-style: italic;
+      font-size: 14px;
     }
   }
 }
 
-// Inner LOC loan table base
-.loc-loans-section .inner-table {
-  width: 100%;
-  border-spacing: 0;
-  border-collapse: separate; // mimic mat-table (which uses display: table)
-  background: #fff; // match standard mat-table background
-  border: 1px solid rgb(0 0 0 / 8%);
-  border-radius: 4px;
+// Target the specific inner table with row borders
+:host ::ng-deep .loc-inner-table {
+  .mat-row {
+    border-bottom: 1px solid rgb(0 0 0 / 3%) !important;
+  }
+
+  .mat-row:last-child {
+    border-bottom: none !important;
+  }
+
+  .mat-row:hover {
+    background-color: rgb(0 0 0 / 4%) !important;
+  }
+
+  .mat-header-row {
+    border-bottom: 1px solid rgb(0 0 0 / 5%) !important;
+  }
+
+  // Also ensure cells have proper borders
+  .mat-cell {
+    border-bottom: 1px solid rgb(0 0 0 / 3%) !important;
+  }
+
+  .mat-row:last-child .mat-cell {
+    border-bottom: none !important;
+  }
 }
 
-// Header cells
-.loc-loans-section .inner-table thead th {
-  padding: 4px 16px;
-  font-weight: 500;
-  font-size: 12.25px;
-  letter-spacing: 0;
-  text-transform: none;
-  color: #555;
-  border-bottom: 1px solid rgb(0 0 0 / 12%);
-  vertical-align: middle;
-  line-height: 20px;
-}
+// Add hover effect to main LOC table
+:host ::ng-deep .mat-table {
+  .mat-row:hover {
+    background-color: rgb(0 0 0 / 4%) !important;
+    cursor: pointer;
+  }
 
-.loc-loans-section .inner-table thead th.r-amount {
-  text-align: right;
-}
+  .mat-row.expanded-row {
+    background-color: rgb(0 0 0 / 6%) !important;
+  }
 
-.loc-loans-section .inner-table thead th.center {
-  text-align: left;
-}
-
-.loc-loans-section .inner-table thead th:last-child {
-  width: 48px;
-  padding-right: 8px;
-  text-align: left;
-}
-
-// Loan rows
-.loc-loans-section .inner-table tbody tr.inner-row {
-  cursor: pointer;
-  transition: background-color 0.2s;
-  border-bottom: 1px solid rgb(0 0 0 / 6%);
-}
-
-.loc-loans-section .inner-table tbody tr.inner-row:hover {
-  background: rgb(0 0 0 / 2%);
-}
-
-.loc-loans-section .inner-table tbody tr.inner-row.expanded-row {
-  background: rgb(0 0 0 / 3%);
-}
-
-// Detail expansion row (reduced selector complexity)
-.loc-loans-section .inner-table tbody tr.detail-row td {
-  padding: 0 0 6px;
-  background: #fff;
-}
-
-// Cell styles
-.loc-loans-section .inner-table tbody tr.inner-row td {
-  padding: 4px 10px;
-  font-size: 12px;
-  line-height: 18px;
-  border-bottom: 1px solid rgb(0 0 0 / 6%);
-  color: #333;
-}
-
-.loc-loans-section .inner-table tbody tr.inner-row:last-child td {
-  border-bottom: none;
-}
-
-.loc-loans-section .inner-table tbody tr.inner-row td.r-amount {
-  text-align: right;
-}
-
-.loc-loans-section .inner-table tbody tr.inner-row td.center {
-  text-align: center;
-}
-
-// Status badge (reduced selector depth)
-.inner-table tbody tr.inner-row td .status-badge {
-  display: inline-block;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-size: 11px;
-  font-weight: 500;
-  background: #f5f5f5;
-  color: #555;
-}
-
-.inner-table tbody tr.inner-row td .status-badge.loanStatusType\.active {
-  background: #e8f5e9;
-  color: #2e7d32;
-}
-
-.inner-table tbody tr.inner-row td .status-badge.loanStatusType\.pendingApproval {
-  background: #fff3cd;
-  color: #856404;
-}
-
-.inner-table tbody tr.inner-row td .status-badge.loanStatusType\.overpaid {
-  background: #ede7f6;
-  color: #5e35b1;
-}
-
-// Action buttons
-.inner-table td.actions-cell {
-  display: flex;
-  justify-content: flex-end;
-  gap: 4px;
-}
-
-.inner-table td.actions-cell .account-action-button {
-  margin: 0 0 0 4px;
+  .mat-row.expanded-row:hover {
+    background-color: rgb(0 0 0 / 8%) !important;
+  }
 }
 
 // Keep existing LOC card styles for reference (can be removed later)
 
+// LOC Main Table Header Alignment
 :host ::ng-deep .mat-table .mat-header-cell.center {
-  text-align: left !important;
+  text-align: center !important;
 }
 
 :host ::ng-deep table.mat-table th.center {
-  text-align: left !important;
+  text-align: center !important;
 }
 
 // Force all header cells in this component to left align unless explicitly right-aligned or center-aligned
@@ -363,8 +295,13 @@
   text-align: right !important;
 }
 
-:host ::ng-deep table.mat-table th.mat-header-cell.c-align {
+// LOC Main Table Cell Alignment
+:host ::ng-deep table.mat-table td.mat-cell.center {
   text-align: center !important;
+}
+
+:host ::ng-deep table.mat-table td.mat-cell.r-amount {
+  text-align: right !important;
 }
 
 /* Inner LOC loan table header alignment integrated above; duplicate selectors removed */

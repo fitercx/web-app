@@ -38,6 +38,7 @@ export class EditLoansAccountComponent {
   currencyCode: string;
   /** Available Currencies */
   currencies: any[] = [];
+  /** Subscriptions */
 
   /**
    * Sets loans account edit form.
@@ -137,14 +138,66 @@ export class EditLoansAccountComponent {
       ...this.loansAccountTermsStep.disbursementData
     };
 
-    // Include LOC details flattened at root level if LOC is enabled
+    // Include LOC details flattened at root level if LOC is enabled and has meaningful data
     if (this.isLocEnabled && this.loansAccountLocDetailsStep) {
       const locDetails = this.loansAccountLocDetailsStep.locDetails;
-      // Flatten all LOC fields to root level
-      Object.assign(baseData, locDetails);
+
+      // Include all LOC details for preview display (locType will be filtered out later for API submission)
+      const filteredLocDetails = this.filterEmptyValues(locDetails);
+
+      // Only flatten LOC details if there are actually meaningful values
+      if (Object.keys(filteredLocDetails).length > 0) {
+        Object.assign(baseData, filteredLocDetails);
+      }
+
+      // For LOC loans, use the approved facility amount as principal
+      const locId = this.loansAccountDetailsStep?.loansAccountDetailsForm?.get('lineOfCreditId')?.value;
+      if (locId) {
+        // Determine which approved amount to use based on LOC type
+        const approvedReceivableAmount = filteredLocDetails.approvedReceivableAmount;
+        const approvedPayableAmount = filteredLocDetails.amountInFacilityCurrency;
+        const isReceivableType = filteredLocDetails.locType === 'RECEIVABLE';
+
+        // Use the appropriate approved facility amount as principal
+        if (approvedReceivableAmount != null && approvedReceivableAmount > 0 && isReceivableType) {
+          baseData.principalAmount = approvedReceivableAmount;
+        } else if (approvedPayableAmount != null && approvedPayableAmount > 0 && !isReceivableType) {
+          baseData.principalAmount = approvedPayableAmount;
+        }
+      }
     }
 
     return baseData;
+  }
+
+  /**
+   * Filters out empty, null, undefined values and empty strings from an object
+   */
+  private filterEmptyValues(obj: any): any {
+    const filtered: any = {};
+
+    for (const [
+      key,
+      value
+    ] of Object.entries(obj)) {
+      // Include the value if it's meaningful (not empty, null, or undefined)
+      if (value !== null && value !== undefined && value !== '') {
+        // For numbers, include even if 0
+        if (typeof value === 'number') {
+          filtered[key] = value;
+        }
+        // For strings, include only if not empty
+        else if (typeof value === 'string' && value.trim() !== '') {
+          filtered[key] = value;
+        }
+        // For other types (dates, booleans, objects), include as is
+        else if (typeof value !== 'string') {
+          filtered[key] = value;
+        }
+      }
+    }
+
+    return filtered;
   }
 
   /**
@@ -154,8 +207,12 @@ export class EditLoansAccountComponent {
     const locale = this.settingsService.language.code;
     const dateFormat = this.settingsService.dateFormat;
     const loanType = 'individual';
+
+    // Remove preview-specific fields that shouldn't be submitted to API
+    const { locType, buyerSupplierOptions, ...loansAccountForSubmission } = this.loansAccount;
+
     const loansAccountData = {
-      ...this.loansAccount,
+      ...loansAccountForSubmission,
       clientId: this.loansAccountAndTemplate.clientId,
       charges: this.loansAccount.charges.map((charge: any) => ({
         chargeId: charge.id,

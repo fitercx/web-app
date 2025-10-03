@@ -90,10 +90,11 @@
             </mat-error>
           </mat-form-field>
           <!--
-   * minCap and maxCap only allowed for loan ,shares and savings entitites
+   * minCap and maxCap only allowed for loan, shares, savings, and line of credit entities
    * In Loan case: Only for the "charge calculation type" set as "%amount", "% loan amount+interest", "%interest",and "%disbursement amount".
    * In saving case: Only for 1. charge time type is "withdrawlfee" or "savings no activity fee" with charge calculation type as "% amount"
    * In shares case: Only for charge time type: SHARE_PURCHASE and SHARE_REDEEM and with charge calculation type as % amount only
+   * In line of credit case: Only for charge calculation type as "% amount"
   -->
           <mat-form-field
             fxFlex="48%"
@@ -108,7 +109,8 @@
                 chargeForm.controls.chargeCalculationType.value === 2) ||
               (chargeForm.controls.chargeAppliesTo.value === 4 &&
                 (chargeForm.controls.chargeTimeType.value === 14 || chargeForm.controls.chargeTimeType.value === 15) &&
-                chargeForm.controls.chargeCalculationType.value === 2)
+                chargeForm.controls.chargeCalculationType.value === 2) ||
+              (chargeForm.controls.chargeAppliesTo.value === 5 && chargeForm.controls.chargeCalculationType.value === 2)
             "
           >
             <mat-label>{{ 'labels.inputs.Minimum Charge Cap' | translate }}</mat-label>
@@ -127,7 +129,8 @@
                 chargeForm.controls.chargeCalculationType.value === 2) ||
               (chargeForm.controls.chargeAppliesTo.value === 4 &&
                 (chargeForm.controls.chargeTimeType.value === 14 || chargeForm.controls.chargeTimeType.value === 15) &&
-                chargeForm.controls.chargeCalculationType.value === 2)
+                chargeForm.controls.chargeCalculationType.value === 2) ||
+              (chargeForm.controls.chargeAppliesTo.value === 5 && chargeForm.controls.chargeCalculationType.value === 2)
             "
           >
             <mat-label>{{ 'labels.inputs.Maximum Charge Cap' | translate }}</mat-label>

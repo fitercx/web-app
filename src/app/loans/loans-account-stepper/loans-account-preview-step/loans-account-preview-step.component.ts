@@ -72,4 +72,44 @@ export class LoansAccountPreviewStepComponent implements OnChanges {
         .reduce((acc: number, member: any) => acc + (member.principal ?? 0), 0);
     }
   }
+
+  /**
+   * Checks if the LOC type is receivable based on the locType flag
+   */
+  get isReceivableType(): boolean {
+    return (
+      this.loansAccount?.locType === 'RECEIVABLE' || this.loansAccount?.additionalProperties?.locType === 'RECEIVABLE'
+    );
+  }
+
+  /**
+   * Checks if the LOC type is payable based on the locType flag
+   */
+  get isPayableType(): boolean {
+    return this.loansAccount?.locType === 'PAYABLE' || this.loansAccount?.additionalProperties?.locType === 'PAYABLE';
+  }
+
+  /**
+   * Converts supplier/buyer detail IDs to their corresponding names
+   */
+  getSupplierBuyerNames(detailIds: any): string {
+    if (!detailIds) return '';
+
+    // Handle both array and single values
+    const ids = Array.isArray(detailIds) ? detailIds : [detailIds];
+
+    // Get the buyer/supplier options from the loan account data
+    const options =
+      this.loansAccount?.buyerSupplierOptions || this.loansAccount?.additionalProperties?.buyerSupplierOptions || [];
+
+    // Map IDs to names
+    const names = ids
+      .map((id: any) => {
+        const option = options.find((opt: any) => opt.id === id);
+        return option ? option.name : id; // Fallback to ID if name not found
+      })
+      .filter((name: any) => name); // Remove empty values
+
+    return names.join(', ');
+  }
 }

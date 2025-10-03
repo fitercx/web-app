@@ -31,7 +31,7 @@
   </div>
 
   <div fxFlexFill>
-    <span fxFlex="47%">{{ 'labels.inputs.Is LOC product' | translate }}:</span>
+    <span fxFlex="47%">{{ 'labels.inputs.Enable LOC product' | translate }}:</span>
     <span fxFlex="53%">{{ loanProduct.additionalProperties?.isLocEnabled | yesNo }}</span>
   </div>
 
@@ -85,11 +85,21 @@
 
   <div fxFlexFill>
     <span fxFlex="47%">{{ 'labels.inputs.Principal' | translate }}:</span>
-    <span fxFlex="53%"
-      >{{ loanProduct.principal | formatNumber }} (Min
+    <span fxFlex="53%">
+      {{ loanProduct.principal | formatNumber }} (Min
       {{ (loanProduct.minPrincipal ? loanProduct.minPrincipal : loanProduct.principal) | formatNumber }} : Max
       {{ (loanProduct.maxPrincipal ? loanProduct.maxPrincipal : loanProduct.principal) | formatNumber }})
     </span>
+  </div>
+
+  <div fxFlexFill>
+    <span fxFlex="47%">{{ 'labels.inputs.Enable Factor Rate Product' | translate }}:</span>
+    <span fxFlex="53%">{{ loanProduct.factorRateProductEnabled | yesNo }}</span>
+  </div>
+
+  <div fxFlexFill *ngIf="loanProduct.factorRateProductEnabled">
+    <span fxFlex="47%">{{ 'labels.inputs.Factor Rate' | translate }}:</span>
+    <span fxFlex="53%">{{ loanProduct.factorRate | formatNumber: 0 }}</span>
   </div>
 
   <div fxFlexFill>
@@ -124,12 +134,12 @@
     }}</span>
   </div>
 
-  <div fxFlexFill>
+  <div fxFlexFill *ngIf="!loanProduct.factorRateProductEnabled">
     <span fxFlex="47%">{{ 'labels.inputs.Linked to floating interest rates' | translate }}:</span>
     <span fxFlex="53%">{{ loanProduct.isLinkedToFloatingInterestRates | yesNo }}</span>
   </div>
 
-  <div fxFlexFill *ngIf="!loanProduct.isLinkedToFloatingInterestRates">
+  <div fxFlexFill *ngIf="!loanProduct.isLinkedToFloatingInterestRates && !loanProduct.factorRateProductEnabled">
     <span fxFlex="47%">{{ 'labels.inputs.Nominal interest rate' | translate }}:</span>
     <span fxFlex="53%"
       >{{
@@ -148,7 +158,12 @@
     >
   </div>
 
-  <div fxFlexFill *ngIf="loanProduct.isLinkedToFloatingInterestRates" fxLayout="row wrap" fxLayout.lt-md="column">
+  <div
+    fxFlexFill
+    *ngIf="loanProduct.isLinkedToFloatingInterestRates && !loanProduct.factorRateProductEnabled"
+    fxLayout="row wrap"
+    fxLayout.lt-md="column"
+  >
     <span fxFlex="47%">{{ 'labels.inputs.Floating Lending Interest Rate' | translate }}:</span>
     <span fxFlex="53%">{{ loanProduct.floatingRateName }}</span>
     <span fxFlex="47%">{{ 'labels.inputs.Interest Rate Differential' | translate }}:</span>
@@ -350,24 +365,24 @@
     <span fxFlex="53%">{{ loanProduct.isEqualAmortization | yesNo }}</span>
   </div>
 
-  <div fxFlexFill>
+  <div fxFlexFill *ngIf="!loanProduct.factorRateProductEnabled">
     <span fxFlex="47%">{{ 'labels.inputs.Interest Method' | translate }}:</span>
     <span fxFlex="53%">{{ loanProduct.interestType?.value | translateKey: 'catalogs' }}</span>
   </div>
 
-  <div fxFlexFill>
+  <div fxFlexFill *ngIf="!loanProduct.factorRateProductEnabled">
     <span fxFlex="47%">{{ 'labels.inputs.Interest Calculation Period' | translate }}:</span>
     <span fxFlex="53%">{{ loanProduct.interestCalculationPeriodType?.value | translateKey: 'catalogs' }}</span>
   </div>
 
-  <div fxFlexFill>
+  <div fxFlexFill *ngIf="!loanProduct.factorRateProductEnabled">
     <span fxFlex="47%"
       >{{ 'labels.inputs.Allow Partial Interest Calculation with same as repayment' | translate }}:</span
     >
     <span fxFlex="53%">{{ loanProduct.allowPartialPeriodInterestCalculation | yesNo }}</span>
   </div>
 
-  <div fxFlexFill>
+  <div fxFlexFill *ngIf="!loanProduct.factorRateProductEnabled">
     <span fxFlex="47%">{{ 'labels.inputs.Is interest recognition on disbursement date?' | translate }}:</span>
     <span fxFlex="53%">{{ loanProduct.interestRecognitionOnDisbursementDate | yesNo }}</span>
   </div>
@@ -566,118 +581,128 @@
     <span fxFlex="53%">{{ loanProduct.canUseForTopup | yesNo }}</span>
   </div>
 
-  <h3 class="mat-h3" fxFlexFill>{{ 'labels.heading.Interest Recalculation' | translate }}</h3>
+  <div fxFlexFill *ngIf="!loanProduct.factorRateProductEnabled">
+    <h3 class="mat-h3" fxFlexFill>{{ 'labels.heading.Interest Recalculation' | translate }}</h3>
 
-  <mat-divider [inset]="true"></mat-divider>
+    <mat-divider [inset]="true"></mat-divider>
 
-  <div fxFlexFill>
-    <span fxFlex="47%">{{ 'labels.inputs.Recalculate Interest' | translate }}:</span>
-    <span fxFlex="53%">{{ loanProduct.isInterestRecalculationEnabled | yesNo }}</span>
-  </div>
+    <div fxFlexFill>
+      <span fxFlex="47%">{{ 'labels.inputs.Recalculate Interest' | translate }}:</span>
+      <span fxFlex="53%">{{ loanProduct.isInterestRecalculationEnabled | yesNo }}</span>
+    </div>
 
-  <div fxFlexFill *ngIf="loanProduct.isInterestRecalculationEnabled" fxLayout="row wrap" fxLayout.lt-md="column">
-    <span fxFlex="47%">{{ 'labels.inputs.Pre-closure interest calculation rule' | translate }}:</span>
-    <span fxFlex="53%">{{ loanProduct.interestRecalculationData.preClosureInterestCalculationStrategy.value }}</span>
-    <span fxFlex="47%">{{ 'labels.inputs.Advance payments adjustment type' | translate }}:</span>
-    <span fxFlex="53%">{{ loanProduct.interestRecalculationData.rescheduleStrategyType.value }}</span>
-    <span fxFlex="47%">{{ 'labels.inputs.Interest recalculation compounding on' | translate }}:</span>
-    <span fxFlex="53%">{{ loanProduct.interestRecalculationData.interestRecalculationCompoundingType.value }}</span>
-    <div
-      fxFlexFill
-      *ngIf="loanProduct.interestRecalculationData.interestRecalculationCompoundingType.id !== 0"
-      fxLayout="row wrap"
-      fxLayout.lt-md="column"
-    >
-      <span fxFlex="47%">{{ 'labels.inputs.Frequency for compounding' | translate }}:</span>
-      <span fxFlex="53%">
-        {{ loanProduct.interestRecalculationData.recalculationCompoundingFrequencyType.value }}
-        <span
-          *ngIf="
-            loanProduct.interestRecalculationData.recalculationCompoundingFrequencyType.id === 4 &&
-            loanProduct.interestRecalculationData.recalculationCompoundingFrequencyNthDay
-          "
-          >&nbsp;&nbsp;{{
-            'on ' + loanProduct.interestRecalculationData.recalculationCompoundingFrequencyNthDay?.value
-          }}</span
-        >
-        <span
-          *ngIf="
-            (loanProduct.interestRecalculationData.recalculationCompoundingFrequencyType.id === 4 &&
-              !loanProduct.interestRecalculationData.recalculationCompoundingFrequencyOnDay) ||
-            loanProduct.interestRecalculationData.recalculationCompoundingFrequencyType.id === 3
-          "
-          >&nbsp;&nbsp;{{ loanProduct.interestRecalculationData.recalculationCompoundingFrequencyWeekday?.value }}</span
-        >
-        <span
-          *ngIf="
-            loanProduct.interestRecalculationData.recalculationCompoundingFrequencyType.id === 4 &&
-            loanProduct.interestRecalculationData.recalculationCompoundingFrequencyOnDay
-          "
-          >&nbsp;&nbsp;{{
-            'on day ' + loanProduct.interestRecalculationData.recalculationCompoundingFrequencyOnDay
-          }}</span
-        >
-      </span>
+    <div fxFlexFill *ngIf="loanProduct.isInterestRecalculationEnabled" fxLayout="row wrap" fxLayout.lt-md="column">
+      <span fxFlex="47%">{{ 'labels.inputs.Pre-closure interest calculation rule' | translate }}:</span>
+      <span fxFlex="53%">{{ loanProduct.interestRecalculationData.preClosureInterestCalculationStrategy.value }}</span>
+      <span fxFlex="47%">{{ 'labels.inputs.Advance payments adjustment type' | translate }}:</span>
+      <span fxFlex="53%">{{ loanProduct.interestRecalculationData.rescheduleStrategyType.value }}</span>
+      <span fxFlex="47%">{{ 'labels.inputs.Interest recalculation compounding on' | translate }}:</span>
+      <span fxFlex="53%">{{ loanProduct.interestRecalculationData.interestRecalculationCompoundingType.value }}</span>
       <div
         fxFlexFill
-        *ngIf="loanProduct.interestRecalculationData.recalculationCompoundingFrequencyType.id !== 1"
+        *ngIf="loanProduct.interestRecalculationData.interestRecalculationCompoundingType.id !== 0"
         fxLayout="row wrap"
         fxLayout.lt-md="column"
       >
-        <span fxFlex="47%">{{ 'labels.inputs.Frequency Interval for compounding' | translate }}:</span>
-        <span fxFlex="53%">{{ loanProduct.interestRecalculationData.recalculationCompoundingFrequencyInterval }}</span>
+        <span fxFlex="47%">{{ 'labels.inputs.Frequency for compounding' | translate }}:</span>
+        <span fxFlex="53%">
+          {{ loanProduct.interestRecalculationData.recalculationCompoundingFrequencyType.value }}
+          <span
+            *ngIf="
+              loanProduct.interestRecalculationData.recalculationCompoundingFrequencyType.id === 4 &&
+              loanProduct.interestRecalculationData.recalculationCompoundingFrequencyNthDay
+            "
+            >&nbsp;&nbsp;{{
+              'on ' + loanProduct.interestRecalculationData.recalculationCompoundingFrequencyNthDay?.value
+            }}</span
+          >
+          <span
+            *ngIf="
+              (loanProduct.interestRecalculationData.recalculationCompoundingFrequencyType.id === 4 &&
+                !loanProduct.interestRecalculationData.recalculationCompoundingFrequencyOnDay) ||
+              loanProduct.interestRecalculationData.recalculationCompoundingFrequencyType.id === 3
+            "
+            >&nbsp;&nbsp;{{
+              loanProduct.interestRecalculationData.recalculationCompoundingFrequencyWeekday?.value
+            }}</span
+          >
+          <span
+            *ngIf="
+              loanProduct.interestRecalculationData.recalculationCompoundingFrequencyType.id === 4 &&
+              loanProduct.interestRecalculationData.recalculationCompoundingFrequencyOnDay
+            "
+            >&nbsp;&nbsp;{{
+              'on day ' + loanProduct.interestRecalculationData.recalculationCompoundingFrequencyOnDay
+            }}</span
+          >
+        </span>
+        <div
+          fxFlexFill
+          *ngIf="loanProduct.interestRecalculationData.recalculationCompoundingFrequencyType.id !== 1"
+          fxLayout="row wrap"
+          fxLayout.lt-md="column"
+        >
+          <span fxFlex="47%">{{ 'labels.inputs.Frequency Interval for compounding' | translate }}:</span>
+          <span fxFlex="53%">{{
+            loanProduct.interestRecalculationData.recalculationCompoundingFrequencyInterval
+          }}</span>
+        </div>
       </div>
-    </div>
-    <div fxFlexFill fxLayout="row wrap" fxLayout.lt-md="column">
-      <span fxFlex="47%">{{ 'labels.inputs.Frequency for recalculate Outstanding Principal' | translate }}:</span>
-      <span fxFlex="53%">
-        {{ loanProduct.interestRecalculationData.recalculationRestFrequencyType.value }}
-        <span
-          *ngIf="
-            loanProduct.interestRecalculationData.recalculationRestFrequencyType.id === 4 &&
-            loanProduct.interestRecalculationData.recalculationRestFrequencyNthDay
-          "
-          >&nbsp;&nbsp;{{ 'on ' + loanProduct.interestRecalculationData.recalculationRestFrequencyNthDay?.value }}</span
-        >
-        <span
-          *ngIf="
-            (loanProduct.interestRecalculationData.recalculationRestFrequencyType.id === 4 &&
-              !loanProduct.interestRecalculationData.recalculationRestFrequencyOnDay) ||
-            loanProduct.interestRecalculationData.recalculationRestFrequencyType.id === 3
-          "
-          >&nbsp;&nbsp;{{ loanProduct.interestRecalculationData.recalculationRestFrequencyWeekday?.value }}</span
-        >
-        <span
-          *ngIf="
-            loanProduct.interestRecalculationData.recalculationRestFrequencyType.id === 4 &&
-            loanProduct.interestRecalculationData.recalculationRestFrequencyOnDay
-          "
-          >&nbsp;&nbsp;{{ 'on day ' + loanProduct.interestRecalculationData.recalculationRestFrequencyOnDay }}</span
-        >
-      </span>
-    </div>
-    <div
-      fxFlexFill
-      *ngIf="loanProduct.interestRecalculationData.recalculationRestFrequencyType.id !== 1"
-      fxLayout="row wrap"
-      fxLayout.lt-md="column"
-    >
-      <span fxFlex="47%">{{ 'labels.inputs.Frequency Interval for recalculation' | translate }}:</span>
-      <span fxFlex="53%">{{ loanProduct.interestRecalculationData.recalculationRestFrequencyInterval }}</span>
-      <div fxFlexFill *ngIf="loanProduct.recalculationRestFrequencyDate">
-        <span fxFlex="47%">{{ 'labels.inputs.Rest Frequency Date' | translate }}:</span>
-        <span fxFlex="53%">{{ loanProduct.interestRecalculationData.recalculationRestFrequencyDate }}</span>
+      <div fxFlexFill fxLayout="row wrap" fxLayout.lt-md="column">
+        <span fxFlex="47%">{{ 'labels.inputs.Frequency for recalculate Outstanding Principal' | translate }}:</span>
+        <span fxFlex="53%">
+          {{ loanProduct.interestRecalculationData.recalculationRestFrequencyType.value }}
+          <span
+            *ngIf="
+              loanProduct.interestRecalculationData.recalculationRestFrequencyType.id === 4 &&
+              loanProduct.interestRecalculationData.recalculationRestFrequencyNthDay
+            "
+            >&nbsp;&nbsp;{{
+              'on ' + loanProduct.interestRecalculationData.recalculationRestFrequencyNthDay?.value
+            }}</span
+          >
+          <span
+            *ngIf="
+              (loanProduct.interestRecalculationData.recalculationRestFrequencyType.id === 4 &&
+                !loanProduct.interestRecalculationData.recalculationRestFrequencyOnDay) ||
+              loanProduct.interestRecalculationData.recalculationRestFrequencyType.id === 3
+            "
+            >&nbsp;&nbsp;{{ loanProduct.interestRecalculationData.recalculationRestFrequencyWeekday?.value }}</span
+          >
+          <span
+            *ngIf="
+              loanProduct.interestRecalculationData.recalculationRestFrequencyType.id === 4 &&
+              loanProduct.interestRecalculationData.recalculationRestFrequencyOnDay
+            "
+            >&nbsp;&nbsp;{{ 'on day ' + loanProduct.interestRecalculationData.recalculationRestFrequencyOnDay }}</span
+          >
+        </span>
       </div>
-    </div>
-    <div fxFlexFill>
-      <span fxFlex="47%">{{ 'labels.inputs.Is Arrears recognization based on original schedule' | translate }}:</span>
-      <span fxFlex="53%">{{ loanProduct.interestRecalculationData.isArrearsBasedOnOriginalSchedule | yesNo }}</span>
-    </div>
-    <div fxFlexFill *ngIf="loanProduct.loanScheduleType.code === 'PROGRESSIVE'">
-      <span fxFlex="47%"
-        >{{ 'labels.inputs.Do not calculate interest on past due principal balances' | translate }}:</span
+      <div
+        fxFlexFill
+        *ngIf="loanProduct.interestRecalculationData.recalculationRestFrequencyType.id !== 1"
+        fxLayout="row wrap"
+        fxLayout.lt-md="column"
       >
-      <span fxFlex="53%">{{ loanProduct.interestRecalculationData.disallowInterestCalculationOnPastDue | yesNo }}</span>
+        <span fxFlex="47%">{{ 'labels.inputs.Frequency Interval for recalculation' | translate }}:</span>
+        <span fxFlex="53%">{{ loanProduct.interestRecalculationData.recalculationRestFrequencyInterval }}</span>
+        <div fxFlexFill *ngIf="loanProduct.recalculationRestFrequencyDate">
+          <span fxFlex="47%">{{ 'labels.inputs.Rest Frequency Date' | translate }}:</span>
+          <span fxFlex="53%">{{ loanProduct.interestRecalculationData.recalculationRestFrequencyDate }}</span>
+        </div>
+      </div>
+      <div fxFlexFill>
+        <span fxFlex="47%">{{ 'labels.inputs.Is Arrears recognization based on original schedule' | translate }}:</span>
+        <span fxFlex="53%">{{ loanProduct.interestRecalculationData.isArrearsBasedOnOriginalSchedule | yesNo }}</span>
+      </div>
+      <div fxFlexFill *ngIf="loanProduct.loanScheduleType.code === 'PROGRESSIVE'">
+        <span fxFlex="47%"
+          >{{ 'labels.inputs.Do not calculate interest on past due principal balances' | translate }}:</span
+        >
+        <span fxFlex="53%">{{
+          loanProduct.interestRecalculationData.disallowInterestCalculationOnPastDue | yesNo
+        }}</span>
+      </div>
     </div>
   </div>
 
@@ -760,12 +785,16 @@
   <div fxFlexFill *ngIf="loanProduct.allowAttributeConfiguration" fxLayout="row wrap" fxLayout.lt-md="column">
     <span fxFlex="47%">{{ 'labels.inputs.Amortization' | translate }}:</span>
     <span fxFlex="53%">{{ loanProduct.allowAttributeOverrides.amortizationType | yesNo }}</span>
-    <span fxFlex="47%">{{ 'labels.inputs.Interest method' | translate }}:</span>
+    <span fxFlex="47%" *ngIf="!loanProduct.factorRateProductEnabled"
+      >{{ 'labels.inputs.Interest method' | translate }}:</span
+    >
     <span fxFlex="53%">{{ loanProduct.allowAttributeOverrides.interestType | yesNo }}</span>
     <span fxFlex="47%">{{ 'labels.inputs.Repayment strategy' | translate }}:</span>
     <span fxFlex="53%">{{ loanProduct.allowAttributeOverrides.transactionProcessingStrategyCode | yesNo }}</span>
     <span fxFlex="47%">{{ 'labels.inputs.Interest calculation period' | translate }}:</span>
-    <span fxFlex="53%">{{ loanProduct.allowAttributeOverrides.interestCalculationPeriodType | yesNo }}</span>
+    <span fxFlex="53%" *ngIf="!loanProduct.factorRateProductEnabled">{{
+      loanProduct.allowAttributeOverrides.interestCalculationPeriodType | yesNo
+    }}</span>
     <span fxFlex="47%">{{ 'labels.inputs.Arrears tolerance' | translate }}:</span>
     <span fxFlex="53%">{{ loanProduct.allowAttributeOverrides.inArrearsTolerance | yesNo }}</span>
     <span fxFlex="47%">{{ 'labels.inputs.Repaid every' | translate }}:</span>

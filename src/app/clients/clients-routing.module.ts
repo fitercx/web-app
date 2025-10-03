@@ -23,6 +23,7 @@ import { EditClientComponent } from './edit-client/edit-client.component';
 import { CreateClientComponent } from './create-client/create-client.component';
 import { ActiveLoansTabComponent } from './clients-view/view-loc-details/active-loans-tab/active-loans-tab.component';
 import { TransactionHistoryTabComponent } from './clients-view/view-loc-details/transaction-history-tab/transaction-history-tab.component';
+import { AuditTrailTabComponent } from './clients-view/view-loc-details/audit-trail-tab/audit-trail-tab.component';
 
 /** Custom Resolvers */
 import { ClientViewResolver } from './common-resolvers/client-view.resolver';
@@ -326,6 +327,10 @@ const routes: Routes = [
                 {
                   path: 'charges',
                   component: ViewLocChargesComponent
+                },
+                {
+                  path: 'audit-trail',
+                  component: AuditTrailTabComponent
                 }
               ]
             },

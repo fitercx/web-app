@@ -136,13 +136,6 @@
       </td>
     </ng-container>
 
-    <ng-container matColumnDef="Account No">
-      <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Account No' | translate }}</th>
-      <td mat-cell *matCellDef="let element">
-        <mifosx-account-number accountNo="{{ element.accountNo }}"></mifosx-account-number>
-      </td>
-    </ng-container>
-
     <ng-container matColumnDef="Credit Limit">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Credit Limit' | translate }}</th>
       <td mat-cell *matCellDef="let element">{{ element.creditLimit | formatNumber }}</td>
@@ -154,7 +147,7 @@
     </ng-container>
 
     <ng-container matColumnDef="Type">
-      <th mat-header-cell *matHeaderCellDef class="loc-type-header">{{ 'labels.inputs.Type' | translate }}</th>
+      <th mat-header-cell class="center" *matHeaderCellDef>{{ 'labels.inputs.Type' | translate }}</th>
       <td mat-cell *matCellDef="let element" class="loc-type-cell">
         <span class="loc-type-badge" [ngClass]="element.type === 'Receivable' ? 'receivable' : 'payable'">
           {{ element.type }}
@@ -212,136 +205,182 @@
       <td mat-cell *matCellDef="let element" [attr.colspan]="locColumns.length">
         <div class="detail-row-container" [@detailExpand]="element == expandedLOCElement ? 'expanded' : 'collapsed'">
           <div class="loc-loans-section">
-            <h4 class="loans-header">{{ 'labels.heading.Loan Accounts' | translate }}</h4>
-            <table class="inner-table" *ngIf="element.loans && element.loans.length > 0">
-              <thead>
-                <tr>
-                  <th>{{ 'labels.inputs.Account No' | translate }}</th>
-                  <th>{{ 'labels.inputs.Loan Product' | translate }}</th>
-                  <th>{{ 'labels.inputs.Loan Amount' | translate }}</th>
-                  <th class="r-amount">{{ 'labels.inputs.Outstanding Balance' | translate }}</th>
-                  <th class="r-amount">{{ 'labels.inputs.Amount Paid' | translate }}</th>
-                  <th class="r-amount">{{ 'labels.inputs.Actions' | translate }}</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  *ngFor="let loan of element.loans"
-                  class="inner-row select-row"
-                  [class.expanded-row]="expandedLOCLoanElement === loan"
-                  (click)="navigateToLoan(loan.id, $event)"
-                >
-                  <td>
-                    <i
-                      class="fa fa-stop"
-                      [ngClass]="loan.inArrears ? 'status-active-overdue' : (loan.status.code | statusLookup)"
-                    ></i>
-                    {{ loan.accountNo }}
-                  </td>
-                  <td>{{ loan.productName }}</td>
-                  <td>{{ loan.originalLoan | formatNumber }}</td>
-                  <td class="r-amount">{{ loan.loanBalance | formatNumber }}</td>
-                  <td class="r-amount">{{ loan.amountPaid | formatNumber }}</td>
-                  <td class="r-amount actions-cell">
+            <p class="loans-header">{{ 'labels.heading.Loan Accounts' | translate }}</p>
+            <table
+              mat-table
+              [dataSource]="element.loans"
+              multiTemplateDataRows
+              class="loc-inner-table"
+              *ngIf="element.loans && element.loans.length > 0"
+            >
+              <ng-container matColumnDef="Account No">
+                <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Account No' | translate }}</th>
+                <td mat-cell *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
+                  <i
+                    class="fa fa-stop"
+                    [ngClass]="loan.inArrears ? 'status-active-overdue' : (loan.status.code | statusLookup)"
+                  ></i>
+                  {{ loan.accountNo }}
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="Loan Product">
+                <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Loan Product' | translate }}</th>
+                <td mat-cell *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
+                  {{ loan.productName }}
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="Loan Amount">
+                <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Loan Amount' | translate }}</th>
+                <td mat-cell *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
+                  {{ loan.originalLoan | formatNumber }}
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="Outstanding Balance">
+                <th mat-header-cell class="r-amount" *matHeaderCellDef>
+                  {{ 'labels.inputs.Outstanding Balance' | translate }}
+                </th>
+                <td mat-cell class="r-amount" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
+                  {{ loan.loanBalance | formatNumber }}
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="Amount Paid">
+                <th mat-header-cell class="r-amount" *matHeaderCellDef>
+                  {{ 'labels.inputs.Amount Paid' | translate }}
+                </th>
+                <td mat-cell class="r-amount" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
+                  {{ loan.amountPaid | formatNumber }}
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="Actions">
+                <th mat-header-cell class="center" *matHeaderCellDef>{{ 'labels.inputs.Actions' | translate }}</th>
+                <td mat-cell class="center" *matCellDef="let loan">
+                  <button
+                    *ngIf="loan.status.active"
+                    class="account-action-button"
+                    mat-raised-button
+                    color="primary"
+                    matTooltip="{{ 'tooltips.Make Repayment' | translate }}"
+                    matTooltipPosition="above"
+                    (click)="routeEdit($event)"
+                    [routerLink]="['../', 'loans-accounts', loan.id, 'actions', 'Make Repayment']"
+                  >
+                    <i class="fa fa-dollar"></i>
+                  </button>
+                  <span *ngIf="loan.status.pendingApproval">
                     <button
-                      *ngIf="loan.status.active"
                       class="account-action-button"
                       mat-raised-button
                       color="primary"
-                      matTooltip="{{ 'tooltips.Make Repayment' | translate }}"
+                      matTooltip="{{ 'tooltips.Approve' | translate }}"
                       matTooltipPosition="above"
+                      *mifosxHasPermission="'APPROVE_LOAN'"
                       (click)="routeEdit($event)"
-                      [routerLink]="['../', 'loans-accounts', loan.id, 'actions', 'Make Repayment']"
+                      [routerLink]="['../', 'loans-accounts', loan.id, 'actions', 'Approve']"
                     >
-                      <i class="fa fa-dollar"></i>
+                      <i class="fa fa-check"></i>
                     </button>
-                    <span *ngIf="loan.status.pendingApproval">
-                      <button
-                        class="account-action-button"
-                        mat-raised-button
-                        color="primary"
-                        matTooltip="{{ 'tooltips.Approve' | translate }}"
-                        matTooltipPosition="above"
-                        *mifosxHasPermission="'APPROVE_LOAN'"
-                        (click)="routeEdit($event)"
-                        [routerLink]="['../', 'loans-accounts', loan.id, 'actions', 'Approve']"
-                      >
-                        <i class="fa fa-check"></i>
-                      </button>
-                    </span>
-                    <span *ngIf="!loan.status.pendingApproval && !loan.status.active && !loan.status.overpaid">
-                      <button
-                        class="account-action-button"
-                        mat-raised-button
-                        color="primary"
-                        matTooltip="{{ 'tooltips.Disburse' | translate }}"
-                        matTooltipPosition="above"
-                        *mifosxHasPermission="'DISBURSE_LOAN'"
-                        (click)="routeEdit($event)"
-                        [routerLink]="['../', 'loans-accounts', loan.id, 'actions', 'Disburse']"
-                      >
-                        <i class="fa fa-flag"></i>
-                      </button>
-                    </span>
-                    <span *ngIf="!loan.status.pendingApproval && !loan.status.active && loan.status.overpaid">
-                      <button
-                        class="account-action-button"
-                        mat-raised-button
-                        color="primary"
-                        matTooltip="{{ 'tooltips.Transfer Funds' | translate }}"
-                        matTooltipPosition="above"
-                        *mifosxHasPermission="'DISBURSE_LOAN'"
-                        (click)="routeEdit($event); routeTransferFund(loan.id)"
-                      >
-                        <i class="fa fa-exchange"></i>
-                      </button>
-                    </span>
-                  </td>
-                  <td class="expand-cell">
-                    <button mat-icon-button (click)="toggleLOCInnerLoanRow(loan, $event)" class="expand-button">
-                      <mat-icon>{{ expandedLOCLoanElement === loan ? 'expand_less' : 'expand_more' }}</mat-icon>
-                    </button>
-                  </td>
-                </tr>
-                <tr *ngFor="let loan of element.loans">
-                  <td class="detail-row" [attr.colspan]="7" *ngIf="expandedLOCLoanElement === loan">
-                    <div
-                      class="detail-row-container"
-                      [@detailExpand]="expandedLOCLoanElement === loan ? 'expanded' : 'collapsed'"
+                  </span>
+                  <span *ngIf="!loan.status.pendingApproval && !loan.status.active && !loan.status.overpaid">
+                    <button
+                      class="account-action-button"
+                      mat-raised-button
+                      color="primary"
+                      matTooltip="{{ 'tooltips.Disburse' | translate }}"
+                      matTooltipPosition="above"
+                      *mifosxHasPermission="'DISBURSE_LOAN'"
+                      (click)="routeEdit($event)"
+                      [routerLink]="['../', 'loans-accounts', loan.id, 'actions', 'Disburse']"
                     >
-                      <div class="loan-details-expand">
-                        <div class="details-grid">
-                          <div class="detail-item">
-                            <span class="detail-label">{{ 'labels.inputs.Loan Status' | translate }}:</span>
-                            <span class="detail-value">{{ loan.status?.value || loan.status?.code || '-' }}</span>
-                          </div>
-                          <div class="detail-item">
-                            <span class="detail-label">{{ 'labels.inputs.Amount' | translate }}:</span>
-                            <span class="detail-value">{{ loan.originalLoan | formatNumber }}</span>
-                          </div>
-                          <div class="detail-item">
-                            <span class="detail-label">{{ 'labels.inputs.Outstanding Balance' | translate }}:</span>
-                            <span class="detail-value">{{ loan.loanBalance | formatNumber }}</span>
-                          </div>
-                          <div class="detail-item">
-                            <span class="detail-label">{{ 'labels.inputs.Amount Paid' | translate }}:</span>
-                            <span class="detail-value">{{ loan.amountPaid | formatNumber }}</span>
-                          </div>
-                          <div class="detail-item">
-                            <span class="detail-label">{{ 'labels.inputs.Issued Date' | translate }}:</span>
-                            <span class="detail-value">{{ loan.timeline?.actualDisbursementDate | dateFormat }}</span>
-                          </div>
-                          <div class="detail-item" *ngIf="loan.additionalProperties?.daysPastDue != null">
-                            <span class="detail-label">{{ 'labels.inputs.DPD' | translate }}:</span>
-                            <span class="detail-value">{{ loan.additionalProperties.daysPastDue }}</span>
-                          </div>
+                      <i class="fa fa-flag"></i>
+                    </button>
+                  </span>
+                  <span *ngIf="!loan.status.pendingApproval && !loan.status.active && loan.status.overpaid">
+                    <button
+                      class="account-action-button"
+                      mat-raised-button
+                      color="primary"
+                      matTooltip="{{ 'tooltips.Transfer Funds' | translate }}"
+                      matTooltipPosition="above"
+                      *mifosxHasPermission="'DISBURSE_LOAN'"
+                      (click)="routeEdit($event); routeTransferFund(loan.id)"
+                    >
+                      <i class="fa fa-exchange"></i>
+                    </button>
+                  </span>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="expand">
+                <th mat-header-cell *matHeaderCellDef></th>
+                <td mat-cell *matCellDef="let loan" class="expand-cell">
+                  <button mat-icon-button (click)="toggleLOCInnerLoanRow(loan, $event)" class="expand-button">
+                    <mat-icon>{{ expandedLOCLoanElement === loan ? 'expand_less' : 'expand_more' }}</mat-icon>
+                  </button>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="expandedLoanDetail">
+                <td mat-cell *matCellDef="let loan" [attr.colspan]="locLoanColumns.length">
+                  <div
+                    class="detail-row-container"
+                    [@detailExpand]="expandedLOCLoanElement === loan ? 'expanded' : 'collapsed'"
+                  >
+                    <div class="loan-details-expand">
+                      <div class="details-grid">
+                        <div class="detail-item">
+                          <span class="detail-label">{{ 'labels.inputs.Loan Status' | translate }}:</span>
+                          <span class="detail-value">{{ loan.status?.value || loan.status?.code || '-' }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">{{ 'labels.inputs.Amount' | translate }}:</span>
+                          <span class="detail-value">{{ loan.originalLoan | formatNumber }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">{{ 'labels.inputs.Outstanding Balance' | translate }}:</span>
+                          <span class="detail-value">{{ loan.loanBalance | formatNumber }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">{{ 'labels.inputs.Amount Paid' | translate }}:</span>
+                          <span class="detail-value">{{ loan.amountPaid | formatNumber }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">{{ 'labels.inputs.Issued Date' | translate }}:</span>
+                          <span class="detail-value">
+                            <ng-container *ngIf="loan.status?.waitingForDisbursal || loan.status?.pendingApproval">
+                              N/A
+                            </ng-container>
+                            <ng-container *ngIf="!(loan.status?.waitingForDisbursal || loan.status?.pendingApproval)">
+                              {{
+                                loan.timeline?.actualDisbursementDate
+                                  ? (loan.timeline.actualDisbursementDate | dateFormat)
+                                  : '-'
+                              }}
+                            </ng-container>
+                          </span>
+                        </div>
+                        <div class="detail-item" *ngIf="loan.additionalProperties?.daysPastDue != null">
+                          <span class="detail-label">{{ 'labels.inputs.DPD' | translate }}:</span>
+                          <span class="detail-value">{{ loan.additionalProperties.daysPastDue }}</span>
                         </div>
                       </div>
                     </div>
-                  </td>
-                </tr>
-              </tbody>
+                  </div>
+                </td>
+              </ng-container>
+
+              <tr mat-header-row *matHeaderRowDef="locLoanColumns"></tr>
+              <tr
+                mat-row
+                *matRowDef="let row; columns: locLoanColumns"
+                class="select-row"
+                [class.expanded-row]="expandedLOCLoanElement === row"
+              ></tr>
+              <tr mat-row *matRowDef="let row; columns: ['expandedLoanDetail']" class="detail-row"></tr>
             </table>
             <div class="no-loans" *ngIf="!element.loans || element.loans.length === 0">
               <p>{{ 'labels.messages.No drawdowns/loans for this line of credit' | translate }}</p>

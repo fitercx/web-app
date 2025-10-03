@@ -1,5 +1,5 @@
 /** Angular Imports */
-import { Component, OnInit, Input, OnChanges } from '@angular/core';
+import { Component, OnInit, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, FormArray, UntypedFormControl } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute } from '@angular/router';
@@ -40,6 +40,12 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
   @Input() collateralOptions: any;
   // @Input loanPrincipal: Loan Principle
   @Input() loanPrincipal: any;
+  /** Whether a LOC is selected (for dynamic principal label) */
+  @Input() locSelected: boolean = false;
+  /** LOC Options for detecting LOC product */
+  @Input() locOptions: any[] = [];
+  /** Selected LOC ID for tracking changes */
+  @Input() selectedLocId: any;
 
   /** Minimum date allowed. */
   minDate = new Date(2000, 0, 1);
@@ -102,11 +108,14 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
   productEnableDownPayment = false;
   enableIncomeCapitalization = false;
   isProgressive = false;
+  factorRateEnabled = false;
 
   /**
    * Create Loans Account Terms Form
    * @param formBuilder FormBuilder
    * @param {SettingsService} settingsService SettingsService
+   * @param route
+   * @param dialog
    */
   constructor(
     private formBuilder: UntypedFormBuilder,
@@ -120,28 +129,50 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
   /**
    * Executes on change of input values
    */
-  ngOnChanges() {
+  ngOnChanges(changes: SimpleChanges) {
     if (this.loansAccountProductTemplate) {
       this.currency = this.loansAccountProductTemplate.currency;
-
       this.loansAccountTermsData = this.loansAccountProductTemplate;
+      let factorRate = this.loansAccountProductTemplate?.product?.factorRate;
       if (this.loanId != null && this.loansAccountTemplate.accountNo) {
         this.loansAccountTermsData = this.loansAccountTemplate;
+        factorRate = this.loansAccountTemplate.factorRate;
       }
       this.productEnableDownPayment = this.loansAccountTermsData.product.enableDownPayment;
       this.enableIncomeCapitalization = this.loansAccountTermsData.product.enableIncomeCapitalization;
+
       this.isProgressive =
         this.loansAccountTermsData.loanScheduleType.code == LoanProducts.LOAN_SCHEDULE_TYPE_PROGRESSIVE;
       if (this.loansAccountTermsData.product) {
         this.loanProduct = this.loansAccountTermsData.product;
       }
-
+      this.factorRateEnabled = this.loansAccountProductTemplate?.product?.factorRateProductEnabled;
       this.interestRateFrequencyTypeData = this.loansAccountTermsData.interestRateFrequencyTypeOptions;
 
+      // Handle LOC products: use tenorDays from additionalProperties if available
+      let loanTermFrequency = this.loansAccountTermsData.termFrequency;
+      let loanTermFrequencyType = this.loansAccountTermsData.termPeriodFrequencyType.id;
+
+      if (this.isLocProduct()) {
+        const tenorDays = this.getTenorDaysForLoc();
+        if (tenorDays) {
+          loanTermFrequency = tenorDays;
+          // Find the ID for "DAYS" frequency type
+          const daysFrequencyType = this.loansAccountProductTemplate?.termFrequencyTypeOptions?.find(
+            (option: any) => option.code === 'DAYS' || option.value === 'Days'
+          );
+          if (daysFrequencyType) {
+            loanTermFrequencyType = daysFrequencyType.id;
+          }
+        }
+      }
+
       this.loansAccountTermsForm.patchValue({
+        factorRate: factorRate,
+        factorRateEnabled: this.factorRateEnabled,
         principalAmount: this.loansAccountTermsData.principal,
-        loanTermFrequency: this.loansAccountTermsData.termFrequency,
-        loanTermFrequencyType: this.loansAccountTermsData.termPeriodFrequencyType.id,
+        loanTermFrequency: loanTermFrequency,
+        loanTermFrequencyType: loanTermFrequencyType,
         numberOfRepayments: this.loansAccountTermsData.numberOfRepayments,
         repaymentEvery: this.loansAccountTermsData.repaymentEvery,
         repaymentFrequencyType: this.loansAccountTermsData.repaymentFrequencyType.id,
@@ -167,9 +198,15 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
         interestRecognitionOnDisbursementDate: this.loansAccountTermsData.interestRecognitionOnDisbursementDate || false
       });
 
+      // Handle LOC product field restrictions
+      this.handleLocProductTerms();
+
       this.setAdvancedPaymentStrategyControls();
 
-      if (this.loansAccountTermsData.loanScheduleType.code == LoanProducts.LOAN_SCHEDULE_TYPE_CUMULATIVE) {
+      if (
+        this.loansAccountTermsData.loanScheduleType.code == LoanProducts.LOAN_SCHEDULE_TYPE_CUMULATIVE ||
+        this.loansAccountTermsData.loanScheduleType.code == LoanProducts.LINE_OF_CREDIT
+      ) {
         this.loansAccountTermsForm.removeControl('interestRecognitionOnDisbursementDate');
       }
 
@@ -196,7 +233,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
       }
       this.collateralDataSource = this.loansAccountTermsData.collateral || [];
       if (this.productEnableDownPayment) {
-        const enableDownPayment = this.loansAccountTermsData['enableDownPayment'] === false ? false : true;
+        const enableDownPayment = this.loansAccountTermsData['enableDownPayment'] !== false;
         this.loansAccountTermsForm.addControl('enableDownPayment', new UntypedFormControl(enableDownPayment));
       }
 
@@ -232,13 +269,20 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
       }
       this.setOptions();
     }
+
+    // Handle changes in LOC selection
+    if (changes['selectedLocId'] && this.isLocProduct()) {
+      this.updateLoanTermForSelectedLoc();
+    }
   }
 
   ngOnInit() {
     this.maxDate = this.settingsService.maxFutureDate;
     this.loansAccountTermsData = this.loansAccountProductTemplate;
+    let factorRate = this.loansAccountProductTemplate?.product?.factorRate;
     if (this.loanId != null && this.loansAccountTemplate.accountNo) {
       this.loansAccountTermsData = this.loansAccountTemplate;
+      factorRate = this.loansAccountTemplate.factorRate;
     }
 
     if (this.loansAccountTermsData) {
@@ -252,10 +296,32 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
           repaymentsStartingFromDate: this.loansAccountTermsData.expectedFirstRepaymentOnDate && formattedDate
         });
       }
+
+      // Handle LOC products: use tenorDays from additionalProperties if available
+      let loanTermFrequency = this.loansAccountTermsData.termFrequency;
+      let loanTermFrequencyType = this.loansAccountTermsData.termPeriodFrequencyType.id;
+
+      if (this.isLocProduct()) {
+        const tenorDays = this.getTenorDaysForLoc();
+        if (tenorDays) {
+          loanTermFrequency = tenorDays;
+          // Find the ID for "DAYS" frequency type
+          const daysFrequencyType = this.loansAccountProductTemplate?.termFrequencyTypeOptions?.find(
+            (option: any) => option.code === 'DAYS' || option.value === 'Days'
+          );
+          if (daysFrequencyType) {
+            loanTermFrequencyType = daysFrequencyType.id;
+          }
+        }
+      }
+
+      this.factorRateEnabled = this.loansAccountProductTemplate?.product?.factorRateProductEnabled;
       this.loansAccountTermsForm.patchValue({
+        factorRate: factorRate,
+        factorRateEnabled: this.factorRateEnabled,
         principalAmount: this.loansAccountTermsData.principal,
-        loanTermFrequency: this.loansAccountTermsData.termFrequency,
-        loanTermFrequencyType: this.loansAccountTermsData.termPeriodFrequencyType.id,
+        loanTermFrequency: loanTermFrequency,
+        loanTermFrequencyType: loanTermFrequencyType,
         numberOfRepayments: this.loansAccountTermsData.numberOfRepayments,
         repaymentEvery: this.loansAccountTermsData.repaymentEvery,
         repaymentFrequencyType: this.loansAccountTermsData.repaymentFrequencyType.id,
@@ -279,11 +345,19 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
         balloonRepaymentAmount: this.loansAccountTermsData.balloonRepaymentAmount,
         interestRecognitionOnDisbursementDate: this.loansAccountTermsData.interestRecognitionOnDisbursementDate || false
       });
+
+      // Handle LOC product field restrictions
+      this.handleLocProductTerms();
     }
     this.createloansAccountTermsForm();
     this.setAdvancedPaymentStrategyControls();
     // this.setCustomValidators();
     this.setLoanTermListener();
+
+    // Update loan term if LOC is already selected during initialization
+    if (this.isLocProduct() && this.selectedLocId) {
+      this.updateLoanTermForSelectedLoc();
+    }
   }
 
   allowAddDisbursementDetails() {
@@ -379,12 +453,14 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
   /** Create Loans Account Terms Form */
   createloansAccountTermsForm() {
     this.loansAccountTermsForm = this.formBuilder.group({
+      factorRate: [''],
+      factorRateEnabled: [false],
       principalAmount: [
         '',
         Validators.required
       ],
       loanTermFrequency: [
-        { value: '', disabled: true },
+        '',
         Validators.required
       ],
       loanTermFrequencyType: [
@@ -509,7 +585,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
     });
     dialogRef.afterClosed().subscribe((response: any) => {
       if (response.delete) {
-        const principal = this.disbursementDataSource[index]['principal'] * 1;
+        const principal = (this.disbursementDataSource[index] as any)['principal'] * 1;
         this.disbursementDataSource.splice(index, 1);
         this.disbursementDataSource = this.disbursementDataSource.concat([]);
         this.totalMultiDisbursed -= principal;
@@ -583,7 +659,10 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
     this.clientActiveLoanData = this.loansAccountProductTemplate.clientActiveLoanOptions;
     this.loanScheduleType = this.loansAccountProductTemplate.loanScheduleType;
     this.transactionProcessingStrategyOptions = [];
-    if (this.loanScheduleType.code === LoanProducts.LOAN_SCHEDULE_TYPE_CUMULATIVE) {
+    if (
+      this.loanScheduleType.code === LoanProducts.LOAN_SCHEDULE_TYPE_CUMULATIVE ||
+      this.loanScheduleType.code === LoanProducts.LINE_OF_CREDIT
+    ) {
       // Filter Advanced Payment Allocation Strategy
       this.transactionProcessingStrategyOptions =
         this.loansAccountProductTemplate.transactionProcessingStrategyOptions.filter(
@@ -616,5 +695,111 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
     return {
       collateral: this.collateralDataSource
     };
+  }
+
+  /** Dynamic label for principal field */
+  get principalLabel(): string {
+    return this.locSelected ? 'Principal/Invoice Amount' : 'Principal';
+  }
+
+  /**
+   * Checks if the current product is a LOC product
+   */
+  private isLocProduct(): boolean {
+    // Check if LOC is enabled in the product template
+    return !!(
+      this.loansAccountProductTemplate?.additionalProperties?.isLocEnabled ||
+      this.loansAccountTemplate?.additionalProperties?.isLocEnabled ||
+      (this.locOptions && this.locOptions.length > 0)
+    );
+  }
+
+  /**
+   * Gets tenor days for LOC products from additional properties or selected LOC
+   */
+  private getTenorDaysForLoc(): number | null {
+    // First, try to get tenor days from selected LOC
+    const tenorFromSelectedLoc = this.getTenorDaysFromSelectedLoc();
+    if (tenorFromSelectedLoc) {
+      return tenorFromSelectedLoc;
+    }
+
+    // For edit mode - check additionalProperties first
+    if (this.loansAccountTemplate?.additionalProperties?.tenorDays) {
+      return this.loansAccountTemplate.additionalProperties.tenorDays;
+    }
+
+    // For create mode - check product template
+    if (this.loansAccountProductTemplate?.additionalProperties?.tenorDays) {
+      return this.loansAccountProductTemplate.additionalProperties.tenorDays;
+    }
+
+    // Check if available in the main template data
+    if (this.loansAccountTermsData?.tenorDays) {
+      return this.loansAccountTermsData.tenorDays;
+    }
+
+    return null;
+  }
+
+  /**
+   * Gets tenor days from the currently selected LOC
+   */
+  private getTenorDaysFromSelectedLoc(): number | null {
+    if (!this.locOptions || this.locOptions.length === 0 || !this.selectedLocId) {
+      return null;
+    }
+
+    const selectedLoc = this.locOptions.find((loc: any) => loc.id === this.selectedLocId);
+    return selectedLoc?.tenorDays || null;
+  }
+
+  /**
+   * Updates loan term frequency when LOC selection changes
+   */
+  private updateLoanTermForSelectedLoc(): void {
+    if (!this.isLocProduct() || !this.loansAccountTermsForm) {
+      return;
+    }
+
+    const tenorDays = this.getTenorDaysFromSelectedLoc();
+    if (tenorDays) {
+      // Find the ID for "DAYS" frequency type
+      const daysFrequencyType = this.loansAccountProductTemplate?.termFrequencyTypeOptions?.find(
+        (option: any) => option.code === 'DAYS' || option.value === 'Days'
+      );
+
+      // Update the form with the new tenor days
+      this.loansAccountTermsForm.patchValue({
+        loanTermFrequency: tenorDays,
+        loanTermFrequencyType: daysFrequencyType?.id || this.loansAccountTermsForm.get('loanTermFrequencyType')?.value
+      });
+
+      // Ensure fields remain enabled for LOC products (users can still edit)
+      this.handleLocProductTerms();
+    }
+  }
+
+  /**
+   * Handles loan term and frequency restrictions for LOC products
+   */
+  private handleLocProductTerms(): void {
+    const isLocProduct = this.isLocProduct();
+
+    if (isLocProduct) {
+      // For LOC products, set frequency type to days but keep fields editable
+      const daysFrequencyType = this.loansAccountProductTemplate?.termFrequencyTypeOptions?.find(
+        (option: any) => option.code === 'DAYS' || option.value === 'Days'
+      );
+      if (daysFrequencyType) {
+        this.loansAccountTermsForm.patchValue({
+          loanTermFrequencyType: daysFrequencyType.id
+        });
+      }
+    }
+
+    // Always ensure fields are enabled for both LOC and non-LOC products
+    this.loansAccountTermsForm.get('loanTermFrequency')?.enable();
+    this.loansAccountTermsForm.get('loanTermFrequencyType')?.enable();
   }
 }

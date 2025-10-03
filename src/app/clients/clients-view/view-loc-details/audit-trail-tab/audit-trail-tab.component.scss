@@ -1,0 +1,296 @@
+mat-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+
+.audit-trail-container {
+  padding: 16px 0;
+}
+
+/* Audit Summary Cards */
+.audit-summary {
+  margin-bottom: 32px;
+}
+
+.summary-card {
+  height: 120px;
+  position: relative;
+  overflow: hidden;
+
+  &.created {
+    border-left: 4px solid #4caf50;
+  }
+
+  &.approved {
+    border-left: 4px solid #2196f3;
+  }
+
+  &.activated {
+    border-left: 4px solid #ff9800;
+  }
+
+  &.modified {
+    border-left: 4px solid #9c27b0;
+  }
+
+  mat-card-content {
+    padding: 16px !important;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .summary-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    font-weight: 500;
+    color: #555;
+  }
+
+  .summary-details {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    .summary-date {
+      font-weight: 600;
+      color: #333;
+      font-size: 14px;
+    }
+
+    .summary-user {
+      color: #666;
+      font-size: 13px;
+    }
+
+    .summary-time {
+      color: #999;
+      font-size: 12px;
+      font-style: italic;
+    }
+
+    .no-data {
+      color: #999;
+      font-style: italic;
+      font-size: 13px;
+    }
+  }
+}
+
+/* Timeline Section */
+.audit-timeline-section {
+  h3 {
+    margin: 0 0 24px;
+    color: #333;
+    font-weight: 500;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    &::before {
+      content: '';
+      width: 4px;
+      height: 24px;
+      background: linear-gradient(45deg, #2196f3, #4caf50);
+      border-radius: 2px;
+    }
+  }
+}
+
+/* Timeline Styles */
+.audit-timeline {
+  position: relative;
+  padding-left: 32px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    left: 16px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(to bottom, #e0e0e0, #f5f5f5);
+  }
+}
+
+.timeline-item {
+  position: relative;
+  margin-bottom: 24px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+}
+
+.timeline-marker {
+  position: absolute;
+  left: -24px;
+  top: 16px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: white;
+  border: 2px solid;
+  z-index: 2;
+
+  &.marker-primary {
+    border-color: #2196f3;
+    color: #2196f3;
+  }
+
+  &.marker-accent {
+    border-color: #ff9800;
+    color: #ff9800;
+  }
+
+  &.marker-warn {
+    border-color: #f44336;
+    color: #f44336;
+  }
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+.timeline-card {
+  transition: all 0.3s ease;
+
+  &:hover {
+    transform: translateX(4px);
+    box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+  }
+
+  mat-card-content {
+    padding: 16px !important;
+  }
+}
+
+.timeline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+
+  .timeline-action {
+    margin: 0;
+    color: #333;
+    font-weight: 600;
+    font-size: 16px;
+  }
+
+  .timeline-date {
+    color: #666;
+    font-size: 13px;
+    font-weight: 500;
+  }
+}
+
+.timeline-details {
+  .timeline-description {
+    margin: 0 0 12px;
+    margin: 0 12px;
+    color: #555;
+    line-height: 1.4;
+  }
+
+  .timeline-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+
+    .timeline-user {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: #666;
+
+      .user-icon {
+        font-size: 16px;
+        width: 16px;
+        height: 16px;
+      }
+    }
+
+    .timeline-relative {
+      color: #999;
+      font-style: italic;
+    }
+  }
+}
+
+/* No Data State */
+.no-audit-data {
+  text-align: center;
+  padding: 48px 24px;
+  color: #666;
+
+  .no-data-icon {
+    font-size: 64px;
+    width: 64px;
+    height: 64px;
+    color: #ddd;
+    margin-bottom: 16px;
+  }
+
+  h3 {
+    margin: 0 0 8px;
+    color: #999;
+  }
+
+  p {
+    margin: 0;
+    font-size: 14px;
+    color: #bbb;
+  }
+}
+
+/* Responsive Design */
+@media (width <= 768px) {
+  .audit-timeline {
+    padding-left: 24px;
+
+    &::before {
+      left: 12px;
+    }
+  }
+
+  .timeline-marker {
+    left: -20px;
+    width: 24px;
+    height: 24px;
+
+    mat-icon {
+      font-size: 14px;
+      width: 14px;
+      height: 14px;
+    }
+  }
+
+  .timeline-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .timeline-meta {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .summary-card {
+    height: auto;
+    min-height: 100px;
+  }
+}

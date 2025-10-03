@@ -89,7 +89,6 @@
       {{
         loansAccount.principalAmount | currency: loansAccountProductTemplate.currency.code : 'symbol-narrow' : '1.2-2'
       }}
-      <span class="m-l-5">{{ loansAccountProductTemplate.currency.code }}</span>
     </span>
   </div>
 
@@ -136,7 +135,7 @@
     <span fxFlex="60%">{{ loansAccount.repaymentsStartingFromDate | dateFormat }}</span>
   </div>
 
-  <div fxFlexFill *ngIf="loansAccount.interestChargedFromDate">
+  <div fxFlexFill *ngIf="loansAccount.interestChargedFromDate && !loansAccount.factoRateEnabled">
     <span fxFlex="40%">{{ 'labels.inputs.Interest charged from' | translate }}:</span>
     <span fxFlex="60%">{{ loansAccount.interestChargedFromDate | dateFormat }}</span>
   </div>
@@ -167,7 +166,7 @@
     }}</span>
   </div>
 
-  <div fxFlexFill>
+  <div fxFlexFill *ngIf="!loansAccount.factorRateEnabled">
     <span fxFlex="40%">{{ 'labels.inputs.Interest calculation period' | translate }}: </span>
     <span fxFlex="60%">{{
       loansAccount.interestCalculationPeriodType
@@ -198,7 +197,7 @@
     }}</span>
   </div>
 
-  <div fxFlexFill>
+  <div fxFlexFill *ngIf="!loansAccount.factorRateEnabled">
     <span fxFlex="40%"> {{ 'labels.inputs.Installment Amount' | translate }} </span>
     <span fxFlex="60%"> {{ loansAccount.fixedEmiAmount | formatNumber }} </span>
   </div>
@@ -237,7 +236,7 @@
     <span fxFlex="60%">{{ loansAccount.isTopup }}</span>
   </div>
 
-  <div fxFlexFill>
+  <div fxFlexFill *ngIf="!loansAccount.factorRateEnabled">
     <span fxFlex="40%">{{ 'labels.inputs.Recalculate Interest' | translate }}: </span>
     <span fxFlex="60%">{{ loansAccountProductTemplate?.isInterestRecalculationEnabled | yesNo }}</span>
   </div>
@@ -320,7 +319,7 @@
     fxLayout.lt-md="column"
     class="margin-t"
   >
-    <h3 class="mat-h3" fxFlexFill>{{ 'labels.heading.LOC Details' | translate }}</h3>
+    <h3 class="mat-h3" fxFlexFill>{{ 'labels.heading.Invoice Details' | translate }}</h3>
 
     <mat-divider fxFlexFill></mat-divider>
 
@@ -384,13 +383,14 @@
       }}</span>
     </div>
 
-    <!-- Receivable Details -->
+    <!-- Receivable Details (only show if receivable LOC type) -->
     <div
       fxFlexFill
       *ngIf="
-        (loansAccount.approvedReceivableAmount !== undefined && loansAccount.approvedReceivableAmount !== null) ||
-        (loansAccount.additionalProperties?.approvedReceivableAmount !== undefined &&
-          loansAccount.additionalProperties?.approvedReceivableAmount !== null)
+        isReceivableType &&
+        ((loansAccount.approvedReceivableAmount !== undefined && loansAccount.approvedReceivableAmount !== null) ||
+          (loansAccount.additionalProperties?.approvedReceivableAmount !== undefined &&
+            loansAccount.additionalProperties?.approvedReceivableAmount !== null))
       "
     >
       <span fxFlex="40%">{{ 'labels.inputs.Approved Receivable Amount' | translate }}:</span>
@@ -405,9 +405,10 @@
     <div
       fxFlexFill
       *ngIf="
-        (loansAccount.advancePercentage !== undefined && loansAccount.advancePercentage !== null) ||
-        (loansAccount.additionalProperties?.advancePercentage !== undefined &&
-          loansAccount.additionalProperties?.advancePercentage !== null)
+        isReceivableType &&
+        ((loansAccount.advancePercentage !== undefined && loansAccount.advancePercentage !== null) ||
+          (loansAccount.additionalProperties?.advancePercentage !== undefined &&
+            loansAccount.additionalProperties?.advancePercentage !== null))
       "
     >
       <span fxFlex="40%">{{ 'labels.inputs.Advance %' | translate }}:</span>
@@ -423,9 +424,10 @@
     <div
       fxFlexFill
       *ngIf="
-        (loansAccount.amountAfterAdvance !== undefined && loansAccount.amountAfterAdvance !== null) ||
-        (loansAccount.additionalProperties?.amountAfterAdvance !== undefined &&
-          loansAccount.additionalProperties?.amountAfterAdvance !== null)
+        isReceivableType &&
+        ((loansAccount.amountAfterAdvance !== undefined && loansAccount.amountAfterAdvance !== null) ||
+          (loansAccount.additionalProperties?.amountAfterAdvance !== undefined &&
+            loansAccount.additionalProperties?.amountAfterAdvance !== null))
       "
     >
       <span fxFlex="40%">{{ 'labels.inputs.Amount after Advance' | translate }}:</span>
@@ -437,18 +439,24 @@
       }}</span>
     </div>
 
-    <div fxFlexFill *ngIf="loansAccount.buyerDetails || loansAccount.additionalProperties?.buyerDetails">
+    <div
+      fxFlexFill
+      *ngIf="isReceivableType && (loansAccount.buyerDetails || loansAccount.additionalProperties?.buyerDetails)"
+    >
       <span fxFlex="40%">{{ 'labels.inputs.Buyer Details' | translate }}:</span>
-      <span fxFlex="60%">{{ loansAccount.buyerDetails || loansAccount.additionalProperties?.buyerDetails }}</span>
+      <span fxFlex="60%">{{
+        getSupplierBuyerNames(loansAccount.buyerDetails || loansAccount.additionalProperties?.buyerDetails)
+      }}</span>
     </div>
 
-    <!-- Payable Details -->
+    <!-- Payable Details (only show if payable LOC type) -->
     <div
       fxFlexFill
       *ngIf="
-        (loansAccount.exchangeRate !== undefined && loansAccount.exchangeRate !== null) ||
-        (loansAccount.additionalProperties?.exchangeRate !== undefined &&
-          loansAccount.additionalProperties?.exchangeRate !== null)
+        isPayableType &&
+        ((loansAccount.exchangeRate !== undefined && loansAccount.exchangeRate !== null) ||
+          (loansAccount.additionalProperties?.exchangeRate !== undefined &&
+            loansAccount.additionalProperties?.exchangeRate !== null))
       "
     >
       <span fxFlex="40%">{{ 'labels.inputs.Exchange Rate' | translate }}:</span>
@@ -463,8 +471,10 @@
     <div
       fxFlexFill
       *ngIf="
-        (loansAccount.markup !== undefined && loansAccount.markup !== null) ||
-        (loansAccount.additionalProperties?.markup !== undefined && loansAccount.additionalProperties?.markup !== null)
+        isPayableType &&
+        ((loansAccount.markup !== undefined && loansAccount.markup !== null) ||
+          (loansAccount.additionalProperties?.markup !== undefined &&
+            loansAccount.additionalProperties?.markup !== null))
       "
     >
       <span fxFlex="40%">{{ 'labels.inputs.Markup' | translate }}:</span>
@@ -479,12 +489,13 @@
     <div
       fxFlexFill
       *ngIf="
-        (loansAccount.amountInFacilityCurrency !== undefined && loansAccount.amountInFacilityCurrency !== null) ||
-        (loansAccount.additionalProperties?.amountInFacilityCurrency !== undefined &&
-          loansAccount.additionalProperties?.amountInFacilityCurrency !== null)
+        isPayableType &&
+        ((loansAccount.amountInFacilityCurrency !== undefined && loansAccount.amountInFacilityCurrency !== null) ||
+          (loansAccount.additionalProperties?.amountInFacilityCurrency !== undefined &&
+            loansAccount.additionalProperties?.amountInFacilityCurrency !== null))
       "
     >
-      <span fxFlex="40%">{{ 'labels.inputs.Amount in Facility Currency' | translate }}:</span>
+      <span fxFlex="40%">{{ 'labels.inputs.Facility Amount (Principal)' | translate }}:</span>
       <span fxFlex="60%">{{
         (loansAccount.amountInFacilityCurrency !== undefined && loansAccount.amountInFacilityCurrency !== null
           ? loansAccount.amountInFacilityCurrency
@@ -496,9 +507,10 @@
     <div
       fxFlexFill
       *ngIf="
-        (loansAccount.approvedPayableAmount !== undefined && loansAccount.approvedPayableAmount !== null) ||
-        (loansAccount.additionalProperties?.approvedPayableAmount !== undefined &&
-          loansAccount.additionalProperties?.approvedPayableAmount !== null)
+        isPayableType &&
+        ((loansAccount.approvedPayableAmount !== undefined && loansAccount.approvedPayableAmount !== null) ||
+          (loansAccount.additionalProperties?.approvedPayableAmount !== undefined &&
+            loansAccount.additionalProperties?.approvedPayableAmount !== null))
       "
     >
       <span fxFlex="40%">{{ 'labels.inputs.Approved Payable Amount' | translate }}:</span>
@@ -510,9 +522,14 @@
       }}</span>
     </div>
 
-    <div fxFlexFill *ngIf="loansAccount.supplierDetails || loansAccount.additionalProperties?.supplierDetails">
+    <div
+      fxFlexFill
+      *ngIf="isPayableType && (loansAccount.supplierDetails || loansAccount.additionalProperties?.supplierDetails)"
+    >
       <span fxFlex="40%">{{ 'labels.inputs.Supplier Details' | translate }}:</span>
-      <span fxFlex="60%">{{ loansAccount.supplierDetails || loansAccount.additionalProperties?.supplierDetails }}</span>
+      <span fxFlex="60%">{{
+        getSupplierBuyerNames(loansAccount.supplierDetails || loansAccount.additionalProperties?.supplierDetails)
+      }}</span>
     </div>
   </div>
 

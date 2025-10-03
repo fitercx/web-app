@@ -21,6 +21,7 @@ export class TransactionHistoryTabComponent implements OnInit {
   ];
   totalRecords = 0;
   pageSize = 20;
+  locCurrency: string = '';
 
   @ViewChild(MatPaginator) paginator: MatPaginator;
 
@@ -30,7 +31,16 @@ export class TransactionHistoryTabComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
+    this.loadLocCurrencyFromResolver();
     this.fetchTransactions(0, this.pageSize);
+  }
+
+  private loadLocCurrencyFromResolver(): void {
+    // Get LOC data from parent component's resolver instead of making another API call
+    const locData = this.route.parent?.snapshot.data['locData'];
+    if (locData) {
+      this.locCurrency = locData.currency || '';
+    }
   }
 
   fetchTransactions(offset: number, limit: number): void {

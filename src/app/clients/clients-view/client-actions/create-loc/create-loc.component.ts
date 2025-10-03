@@ -42,6 +42,26 @@ export class CreateLocComponent implements OnInit {
   isSubmitting = false;
   // Settlement account options (client savings)
   savingsAccounts: any[] = [];
+  /** Loan Officer Data */
+  loanOfficerOptions: any[] = [];
+  /** Cash Margin Type Options */
+  cashMarginTypeOptions: any[] = [];
+  /** Interest Charge Time Options */
+  interestChargeTimeOptions: any[] = [];
+
+  // Dynamic labels for buyers/suppliers
+  buyerSupplierLabel: string = 'Buyer';
+  approvedBuyerSupplierLabel: string = 'Approved Buyer';
+
+  // Custom review period handling
+  get isCustomReviewPeriod(): boolean {
+    return (
+      this.locForm?.get([
+        'limitsTerms',
+        'reviewPeriod'
+      ])?.value === 'custom'
+    );
+  }
 
   constructor(
     private route: ActivatedRoute,
@@ -72,22 +92,26 @@ export class CreateLocComponent implements OnInit {
     return '';
   }
 
-  // Return the appropriate label for buyers/suppliers based on product type
-  get buyerSupplierLabel(): string {
-    const productType = this.locForm?.get([
-      'basicInfo',
-      'productType'
-    ])?.value;
-    return productType === 'payable' ? 'Supplier' : 'Buyer';
+  // Get display name for cash margin type
+  getCashMarginTypeDisplay(typeCode: string): string {
+    const type = this.cashMarginTypeOptions.find((cmt) => cmt.code === typeCode || cmt.id === typeCode);
+    return type?.value || typeCode || '';
   }
 
-  // Return the appropriate label for approved buyers/suppliers based on product type
-  get approvedBuyerSupplierLabel(): string {
-    const productType = this.locForm?.get([
-      'basicInfo',
-      'productType'
+  // Get display name for interest charge time
+  getInterestChargeTimeDisplay(timeCode: string): string {
+    const time = this.interestChargeTimeOptions.find((ict) => ict.code === timeCode || ict.id === timeCode);
+    return time?.value || timeCode || '';
+  }
+
+  // Get display name for loan officer
+  getLoanOfficerDisplay(): string {
+    const loanOfficerId = this.locForm.get([
+      'limitsTerms',
+      'loanOfficerId'
     ])?.value;
-    return productType === 'payable' ? 'Approved Supplier' : 'Approved Buyer';
+    const loanOfficer = this.loanOfficerOptions.find((lo) => lo.id === loanOfficerId);
+    return loanOfficer?.displayName || '';
   }
 
   // Savings accounts filtered by the currently selected currency code
@@ -119,6 +143,7 @@ export class CreateLocComponent implements OnInit {
       ])
       ?.valueChanges.subscribe((val) => {
         this.computeInterimReviewDate();
+        this.handleReviewPeriodChange(val);
       });
     // also recompute when start date changes
     this.locForm
@@ -128,7 +153,19 @@ export class CreateLocComponent implements OnInit {
       ])
       ?.valueChanges.subscribe((val) => {
         this.computeInterimReviewDate();
-        this.computeExpiryDate();
+        // Trigger validation when start date changes
+        this.locForm.get('limitsTerms')?.updateValueAndValidity();
+      });
+
+    // Trigger validation when expiry date changes
+    this.locForm
+      .get([
+        'limitsTerms',
+        'expiryDate'
+      ])
+      ?.valueChanges.subscribe((val) => {
+        // Trigger validation when expiry date changes
+        this.locForm.get('limitsTerms')?.updateValueAndValidity();
       });
 
     // Resolve charges (fetched via resolver) and keep only LOC applicable (chargeAppliesTo.id === 5)
@@ -147,6 +184,26 @@ export class CreateLocComponent implements OnInit {
       this.productTypeOptions = resolved.productTypeOptions || [];
       this.reviewPeriodsOptions = resolved.reviewPeriodsOptions || [];
       this.activationStatusOptions = resolved.activationStatusOptions || [];
+      this.loanOfficerOptions = resolved.loanOfficers || [];
+      this.cashMarginTypeOptions = resolved.cashMarginTypeOptions || [];
+      this.interestChargeTimeOptions = resolved.interestChargeTimeOptions || [];
+
+      // Add custom option to review periods
+      this.reviewPeriodsOptions.push({
+        id: 'custom',
+        value: 'Custom',
+        code: 'CUSTOM'
+      });
+
+      // Update labels and interest charge time based on current product type now that options are loaded
+      const currentProductType = this.locForm.get([
+        'basicInfo',
+        'productType'
+      ])?.value;
+      if (currentProductType) {
+        this.updateBuyerSupplierLabels(currentProductType);
+        this.updateInterestChargeTime(currentProductType);
+      }
     }
 
     // Update available charges when currency changes
@@ -200,6 +257,8 @@ export class CreateLocComponent implements OnInit {
       ])
       ?.valueChanges.subscribe((productType) => {
         this.updateAdvancePercentage(productType);
+        this.updateBuyerSupplierLabels(productType);
+        this.updateInterestChargeTime(productType);
       });
   }
 
@@ -241,18 +300,46 @@ export class CreateLocComponent implements OnInit {
     }
   }
 
-  // Validator to ensure maxPerDrawdown is not greater than maxCreditLimit
-  maxPerDrawdownValidator: ValidatorFn = (group: AbstractControl) => {
-    const maxCtrl = group.get('maxCreditLimit');
-    const perCtrl = group.get('maxPerDrawdown');
-    if (!maxCtrl || !perCtrl) {
+  // Date validator to ensure expiry date is not before start date
+  dateRangeValidator: ValidatorFn = (group: AbstractControl): { [key: string]: any } | null => {
+    if (!group) {
       return null;
     }
-    const max = maxCtrl.value;
-    const per = perCtrl.value;
-    if (max !== null && max !== '' && per !== null && per !== '' && Number(per) > Number(max)) {
-      return { perDrawdownExceedsLimit: true };
+
+    const startDateControl = group.get('startDate');
+    const expiryDateControl = group.get('expiryDate');
+
+    if (!startDateControl || !expiryDateControl) {
+      return null;
     }
+
+    const startDate = startDateControl.value;
+    const expiryDate = expiryDateControl.value;
+
+    // If either date is empty, don't validate
+    if (!startDate || !expiryDate) {
+      return null;
+    }
+
+    const start = new Date(startDate);
+    const expiry = new Date(expiryDate);
+
+    // Check if dates are valid
+    if (isNaN(start.getTime()) || isNaN(expiry.getTime())) {
+      return null;
+    }
+
+    // Check if expiry date is before start date
+    if (expiry < start) {
+      return {
+        dateRangeInvalid: {
+          message: 'End date cannot be before start date',
+          startDate: startDate,
+          expiryDate: expiryDate
+        }
+      };
+    }
+
     return null;
   };
 
@@ -261,7 +348,7 @@ export class CreateLocComponent implements OnInit {
     this.locForm = this.formBuilder.group({
       basicInfo: this.formBuilder.group({
         productType: [
-          'payable',
+          '',
           Validators.required
         ],
         currencyCode: [''],
@@ -272,7 +359,7 @@ export class CreateLocComponent implements OnInit {
         authorizedSignatoryName: [''],
         authorizedSignatoryPhone: [''],
         authorizedSignatoryEmail: [''],
-        va: [''],
+        virtualAccount: [''],
         externalId: [
           '',
           Validators.required
@@ -280,10 +367,10 @@ export class CreateLocComponent implements OnInit {
         specialConditions: ['']
       }),
       // Vendors step (list of vendor objects { name })
-      vendorsSection: this.formBuilder.group({
+      approvedBuyersSection: this.formBuilder.group({
         distributionPartner: [''],
-        vendorName: [''],
-        vendors: this.formBuilder.array([])
+        approvedBuyersName: [''],
+        approvedBuyers: this.formBuilder.array([])
       }),
       limitsTerms: this.formBuilder.group(
         {
@@ -291,43 +378,45 @@ export class CreateLocComponent implements OnInit {
             '',
             Validators.required
           ],
-          maxPerDrawdown: [''],
-          startDate: [
-            new Date().toISOString().slice(0, 10),
-            Validators.required
-          ],
+          // maxPerDrawdown field removed as per requirements
+          startDate: [''],
           expiryDate: [''],
-          reviewPeriod: [''],
+          reviewPeriod: ['6'], // Default to 6 months
           interimReviewDate: [{ value: '', disabled: true }],
-          rateType: ['FLAT'],
-          interestPaymentType: ['POST_DISBURSEMENT'],
-          annualInterestRate: [''],
-          tenorDays: [''],
-          advancePercentage: ['100'],
-          cashMarginType: ['FLAT'],
-          cashMarginValue: [''],
-          review_period: [''],
-          loanOfficer: [
+          interestPaymentType: [''],
+          annualInterestRate: [
             '',
             Validators.required
           ],
-          repaymentStrategy: [
+          tenorDays: [
             '',
             Validators.required
+          ],
+          advancePercentage: [
+            '100',
+            Validators.required
+          ],
+          cashMarginType: [''],
+          cashMarginValue: [''],
+          interestChargeTime: [''],
+          loanOfficerId: [
+            ''
           ]
         },
-        { validators: this.maxPerDrawdownValidator }
+        { validators: [this.dateRangeValidator] }
       ),
       // feesSettings group removed per requirement
       // Root-level control for settlement account selection (drives visibility of charges UI)
       settlementSavingsAccountId: ['']
     });
 
-    // Set initial expiry date based on default start date
-    this.computeExpiryDate();
-
     // Set initial advance percentage based on default product type
     this.updateAdvancePercentage('payable');
+
+    // Initial labels and interest charge time will be set later when product type options are loaded
+
+    // Compute initial interim review date based on default review period
+    this.computeInterimReviewDate();
   }
 
   selectProductType(type: string) {
@@ -336,6 +425,20 @@ export class CreateLocComponent implements OnInit {
       'productType'
     ]);
     control?.setValue(type);
+  }
+
+  // Handle review period change to enable/disable interim review date field
+  handleReviewPeriodChange(value: string) {
+    const interimReviewDateControl = this.locForm.get([
+      'limitsTerms',
+      'interimReviewDate'
+    ]);
+
+    if (value === 'custom') {
+      interimReviewDateControl?.enable();
+    } else {
+      interimReviewDateControl?.disable();
+    }
   }
 
   // Example computed interim review date based on activationDate + reviewPeriod months
@@ -352,10 +455,24 @@ export class CreateLocComponent implements OnInit {
       'limitsTerms',
       'interimReviewDate'
     ]);
-    if (activation && period) {
-      const d = new Date(activation);
-      d.setMonth(d.getMonth() + Number(period));
-      control?.setValue(d.toISOString().slice(0, 10));
+
+    // Only compute for non-custom periods
+    if (activation && period && period !== 'custom') {
+      const monthsToAdd = Number(period);
+
+      if (!isNaN(monthsToAdd) && monthsToAdd > 0) {
+        const d = new Date(activation);
+        d.setMonth(d.getMonth() + monthsToAdd);
+        control?.setValue(d.toISOString().slice(0, 10));
+      } else {
+        control?.setValue('');
+      }
+    } else if (period === 'custom') {
+      // For custom periods, don't auto-compute, let user select manually
+      // Clear the field if switching to custom mode
+      if (control?.disabled) {
+        control?.setValue('');
+      }
     } else {
       control?.setValue('');
     }
@@ -396,6 +513,54 @@ export class CreateLocComponent implements OnInit {
     }
   }
 
+  // Update interest charge time based on product type
+  updateInterestChargeTime(productType: Number) {
+    // If no interest charge time options loaded yet, skip update
+    if (!this.interestChargeTimeOptions || this.interestChargeTimeOptions.length === 0) {
+      return;
+    }
+
+    const control = this.locForm.get([
+      'limitsTerms',
+      'interestChargeTime'
+    ]);
+
+    if (!control) {
+      return;
+    }
+
+    if (productType && productType === 2) {
+      // For payable (productType 2): set to "post disbursement"
+      const postDisbursementOption = this.interestChargeTimeOptions.find((ict) => ict.code === 'POST_DISBURSEMENT');
+
+      if (postDisbursementOption) {
+        control?.setValue(postDisbursementOption.id);
+      }
+    } else if (productType && productType === 1) {
+      // For receivable: set to "upfront"
+      const upfrontOption = this.interestChargeTimeOptions.find((ict) => ict.code === 'UPFRONT');
+
+      if (upfrontOption) {
+        control?.setValue(upfrontOption.id);
+      }
+    }
+  }
+
+  // Update buyer/supplier labels based on product type
+  updateBuyerSupplierLabels(productType: Number) {
+    // Check for payable variations (could be 'payable', 'PAYABLE', 'Payable', etc.)
+    if (productType && productType === 2) {
+      this.buyerSupplierLabel = 'Supplier';
+      this.approvedBuyerSupplierLabel = 'Approved Supplier';
+    } else if (productType && productType === 1) {
+      this.buyerSupplierLabel = 'Buyer';
+      this.approvedBuyerSupplierLabel = 'Approved Buyer';
+    } else {
+      this.buyerSupplierLabel = 'Buyer';
+      this.approvedBuyerSupplierLabel = 'Approved Buyer';
+    }
+  }
+
   // Charges step helpers
   addCharge(chargeSelect: any) {
     if (chargeSelect && chargeSelect.value) {
@@ -421,10 +586,17 @@ export class CreateLocComponent implements OnInit {
     charge.editableAmount = charge.editableAmount ?? charge.amount;
   }
 
+  onAmountChange(charge: any, event: any) {
+    const newValue = event.target.value;
+    charge.editableAmount = newValue;
+  }
+
   saveEdit(charge: any) {
     // apply edited value to charge.amount so it will be included in payload
     charge.amount = charge.editableAmount;
     this.editingCharge = null;
+    // Force change detection by updating the array reference
+    this.chargesDataSource = [...this.chargesDataSource];
   }
 
   cancelEdit(charge: any) {
@@ -456,34 +628,32 @@ export class CreateLocComponent implements OnInit {
     if (this.locForm.valid) {
       this.isSubmitting = true;
       // Flatten the nested groups into a single payload
-      const value: any = this.locForm.value;
+      // Use getRawValue to include disabled controls (e.g., interimReviewDate)
+      const value: any = this.locForm.getRawValue();
       const payload = {
         ...value.basicInfo,
         // include limits & terms but map maxCreditLimit -> maximumAmount
         ...value.limitsTerms,
         // include vendors if any
-        ...(value.vendorsSection?.distributionPartner
-          ? { distributionPartner: value.vendorsSection.distributionPartner }
+        ...(value.approvedBuyersSection?.distributionPartner
+          ? { distributionPartner: value.approvedBuyersSection.distributionPartner }
           : {}),
-        ...(value.vendorsSection?.vendors?.length ? { vendors: value.vendorsSection.vendors } : {}),
+        ...(value.approvedBuyersSection?.approvedBuyers?.length
+          ? { approvedBuyers: value.approvedBuyersSection.approvedBuyers }
+          : {}),
         // include settlement account if selected
         ...(value.settlementSavingsAccountId ? { settlementSavingsAccountId: value.settlementSavingsAccountId } : {}),
         charges: this.chargesDataSource
       };
-      // Rename JSON field maxCreditLimit -> maximumAmount for backend
-      if (payload.hasOwnProperty('maxCreditLimit')) {
-        payload.maximumAmount = payload.maxCreditLimit;
-        delete payload.maxCreditLimit;
-      }
-      // Ensure startDate is present in payload (map activationDate if previously set)
-      if (payload.hasOwnProperty('activationDate') && !payload.hasOwnProperty('startDate')) {
-        payload.startDate = payload.activationDate;
-        delete payload.activationDate;
-      }
-      // Rename expiryDate -> endDate for backend
+
       if (payload.hasOwnProperty('expiryDate')) {
         payload.endDate = payload.expiryDate;
         delete payload.expiryDate;
+      }
+
+      // Handle custom review period
+      if (payload.reviewPeriod === 'custom') {
+        delete payload.reviewPeriod;
       }
 
       // Attach system locale and dateFormat from settings
@@ -496,7 +666,6 @@ export class CreateLocComponent implements OnInit {
           const dateKeys = [
             'startDate',
             'endDate',
-            'activationDate',
             'interimReviewDate'
           ];
           dateKeys.forEach((k) => {
@@ -553,7 +722,7 @@ export class CreateLocComponent implements OnInit {
         (response: any) => {
           this.isSubmitting = false;
           const resourceId = response?.resourceId || response?.id || response?.creditLineId;
-          // Navigate to the existing LOC view route (clients/:clientId/loc/:locId)
+
           this.router.navigate([
             '/clients',
             this.clientId,
@@ -563,8 +732,6 @@ export class CreateLocComponent implements OnInit {
         },
         (err: any) => {
           this.isSubmitting = false;
-          // Do not navigate on error. Surface error to UI via creationError.
-          console.error('Create LOC failed', err);
           this.creationError = err?.error?.developerMessage || err?.message || 'Failed to create line of credit';
         }
       );
@@ -573,16 +740,17 @@ export class CreateLocComponent implements OnInit {
 
   // Build a flattened payload for preview
   get previewPayload() {
-    const v: any = this.locForm.value;
+    // Use getRawValue so disabled interimReviewDate is included in preview
+    const v: any = this.locForm.getRawValue();
     const payload: any = {
       ...v.basicInfo,
       ...v.limitsTerms
     };
-    if (v.vendorsSection?.distributionPartner) {
-      payload.distributionPartner = v.vendorsSection.distributionPartner;
+    if (v.approvedBuyersSection?.distributionPartner) {
+      payload.distributionPartner = v.approvedBuyersSection.distributionPartner;
     }
-    if (v.vendorsSection?.vendors?.length) {
-      payload.vendors = v.vendorsSection.vendors;
+    if (v.approvedBuyersSection?.approvedBuyers?.length) {
+      payload.approvedBuyers = v.approvedBuyersSection.approvedBuyers;
     }
     if (v.settlementSavingsAccountId) {
       payload.settlementSavingsAccountId = v.settlementSavingsAccountId;
@@ -597,6 +765,15 @@ export class CreateLocComponent implements OnInit {
     if (payload.hasOwnProperty('activationDate')) {
       payload.startDate = payload.activationDate;
     }
+
+    // Add review period display name
+    if (payload.reviewPeriod && payload.reviewPeriod !== 'custom') {
+      const reviewPeriodOption = this.reviewPeriodsOptions.find((rp) => rp.id === payload.reviewPeriod);
+      payload.reviewPeriodDisplay = reviewPeriodOption?.value || payload.reviewPeriod;
+    } else if (payload.reviewPeriod === 'custom') {
+      payload.reviewPeriodDisplay = 'Custom';
+    }
+
     return payload;
   }
 
@@ -607,35 +784,62 @@ export class CreateLocComponent implements OnInit {
   }
 
   // ---- Vendors helpers ----
-  get vendorsArray(): FormArray {
+  get approvedBuyersArray(): FormArray {
     return this.locForm.get([
-      'vendorsSection',
-      'vendors'
+      'approvedBuyersSection',
+      'approvedBuyers'
     ]) as FormArray;
   }
 
-  addVendor() {
+  addApprovedBuyer() {
     const nameControl = this.locForm.get([
-      'vendorsSection',
-      'vendorName'
+      'approvedBuyersSection',
+      'approvedBuyersName'
     ]);
     const raw = (nameControl?.value || '').trim();
     if (!raw) {
       return;
     }
     // Prevent exact duplicates
-    const exists = this.vendorsArray.controls.some((c) => (c.value?.name || '').toLowerCase() === raw.toLowerCase());
+    const exists = this.approvedBuyersArray.controls.some(
+      (c) => (c.value?.name || '').toLowerCase() === raw.toLowerCase()
+    );
     if (exists) {
       nameControl?.setValue('');
       return;
     }
-    this.vendorsArray.push(this.formBuilder.control({ name: raw }));
+    this.approvedBuyersArray.push(this.formBuilder.control({ name: raw }));
     nameControl?.setValue('');
   }
 
+  // Vendor editing properties
+  editingVendorIndex: number | null = null;
+  editingVendorName: string = '';
+
+  // Start editing a vendor/supplier name
+  startEditVendor(index: number, currentName: string) {
+    this.editingVendorIndex = index;
+    this.editingVendorName = currentName;
+  }
+
+  // Save the edited vendor/supplier name
+  saveEditVendor(index: number) {
+    if (this.editingVendorName.trim()) {
+      const control = this.approvedBuyersArray.at(index);
+      control.patchValue({ name: this.editingVendorName.trim() });
+      this.cancelEditVendor();
+    }
+  }
+
+  // Cancel editing vendor/supplier
+  cancelEditVendor() {
+    this.editingVendorIndex = null;
+    this.editingVendorName = '';
+  }
+
   removeVendor(index: number) {
-    if (index > -1 && index < this.vendorsArray.length) {
-      this.vendorsArray.removeAt(index);
+    if (index > -1 && index < this.approvedBuyersArray.length) {
+      this.approvedBuyersArray.removeAt(index);
     }
   }
 }

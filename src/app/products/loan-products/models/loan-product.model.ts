@@ -144,6 +144,24 @@ export interface LoanProduct {
   supportedInterestRefundTypes?: StringEnumOptionData[];
   chargeOffBehaviour?: StringEnumOptionData;
   additionalProperties?: LoanProductAdditionalProperties;
+  factorRateProductEnabled?: boolean;
+  factorRate?: number;
+  overAppliedCalculationType: any;
+  minInterestRatePerPeriod: number;
+  maxInterestRatePerPeriod: number;
+  principalRoundingType: OptionData;
+  interestRoundingType: OptionData;
+  allowMultipleDisbursementsForTopup: boolean;
+  maxTopupAmountPercentage?: number;
+  topupAllowedForAllLoans: boolean;
+  topupLoanProductOptions?: any[];
+  floatingRateName: any;
+  interestRateDifferential: any;
+  defaultDifferentialLendingRate: any;
+  maxDifferentialLendingRate: any;
+  minDifferentialLendingRate: any;
+  fixedLength: any;
+  interestRecognitionOnDisbursementDate: boolean;
 }
 
 export interface LoanProductAdditionalProperties {
