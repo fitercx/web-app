@@ -457,7 +457,7 @@
     </ng-container>
 
     <ng-container matColumnDef="Next Instalment Date">
-      <th mat-header-cell class="c-align" *matHeaderCellDef>{{ 'labels.inputs.Next Instalment Date' | translate }}</th>
+      <th mat-header-cell class="center" *matHeaderCellDef>{{ 'labels.inputs.Next Instalment Date' | translate }}</th>
       <td mat-cell class="center" *matCellDef="let element">
         {{ element.additionalProperties?.nextInstalmentDate | dateFormat }}
       </td>
