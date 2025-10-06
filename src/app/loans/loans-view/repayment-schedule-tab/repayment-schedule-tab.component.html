@@ -91,6 +91,26 @@
       </td>
     </ng-container>
 
+    <ng-container matColumnDef="disbursedAmount">
+      <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Disbursed Amount' | translate }}</th>
+      <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
+        {{ getDisbursedAmount(item) | formatNumber }}
+      </td>
+      <td mat-footer-cell class="r-amount" *matFooterCellDef>
+        <b>&nbsp;</b>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="refundAmount">
+      <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Refund Amount' | translate }}</th>
+      <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
+        {{ getRefundAmount(item) | formatNumber }}
+      </td>
+      <td mat-footer-cell class="r-amount" *matFooterCellDef>
+        <b>&nbsp;</b>
+      </td>
+    </ng-container>
+
     <ng-container matColumnDef="emiAmount">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.EMI Amount' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
@@ -270,6 +290,20 @@
     <ng-container matColumnDef="interest">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Interest' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item">{{ item.interestOriginalDue | formatNumber }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="disbursedAmount">
+      <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Disbursed Amount' | translate }}</th>
+      <td mat-cell class="r-amount" *matCellDef="let item">
+        {{ getDisbursedAmount(item) | formatNumber }}
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="refundAmount">
+      <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Refund Amount' | translate }}</th>
+      <td mat-cell class="r-amount" *matCellDef="let item">
+        {{ getRefundAmount(item) | formatNumber }}
+      </td>
     </ng-container>
 
     <ng-container matColumnDef="emiAmount">

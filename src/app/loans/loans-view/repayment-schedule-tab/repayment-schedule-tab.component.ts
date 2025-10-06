@@ -24,6 +24,8 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   @Input() forEditing = false;
   /** Loan Repayment Schedule Details Data */
   @Input() repaymentScheduleDetails: any = null;
+  /** Loan Data (used for creation flow) */
+  @Input() loanData: any = null;
   loanDetailsDataRepaymentSchedule: any = [];
 
   editCache: { [key: string]: any } = {};
@@ -35,8 +37,10 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
   /** Stores if there is any waived amount */
   isWaived: boolean;
-  /** Columns to be displayed in original schedule table. */
-  displayedColumns: string[] = [
+  /** Loan details data from parent */
+  loanDetailsData: any;
+  /** Base columns for regular loans */
+  baseDisplayedColumns: string[] = [
     'number',
     'days',
     'balanceOfLoan',
@@ -56,8 +60,8 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     'late',
     'outstanding'
   ];
-  /** Columns to be displayed in editable schedule table. */
-  displayedColumnsEdit: string[] = [
+  /** Base columns for editable schedule table */
+  baseDisplayedColumnsEdit: string[] = [
     'number',
     'date',
     'balanceOfLoan',
@@ -68,6 +72,10 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     'due',
     'actions'
   ];
+  /** Columns to be displayed in original schedule table. */
+  displayedColumns: string[] = [];
+  /** Columns to be displayed in editable schedule table. */
+  displayedColumnsEdit: string[] = [];
 
   /** Form functions event */
   @Output() editPeriod = new EventEmitter();
@@ -87,6 +95,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     this.route.parent.data.subscribe((data: { loanDetailsData: any }) => {
       if (data.loanDetailsData) {
         this.currencyCode = data.loanDetailsData.currency.code;
+        this.loanDetailsData = data.loanDetailsData;
       }
       this.loanDetailsDataRepaymentSchedule = data.loanDetailsData ? data.loanDetailsData.repaymentSchedule : [];
     });
@@ -98,6 +107,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       this.repaymentScheduleDetails = this.loanDetailsDataRepaymentSchedule;
     }
     this.isWaived = this.repaymentScheduleDetails.totalWaived > 0;
+    this.updateDisplayedColumns();
     this.updateEditCache();
   }
 
@@ -106,6 +116,11 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     this.listOfData.forEach((item) => {
       this.totalRepaymentExpected = this.totalRepaymentExpected + item.totalDueForPeriod;
     });
+
+    // Update displayed columns if loanData changes
+    if (changes['loanData']) {
+      this.updateDisplayedColumns();
+    }
   }
 
   installmentStyle(installment: RepaymentSchedulePeriod): string {
@@ -241,5 +256,89 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       return false;
     }
     return true;
+  }
+
+  /**
+   * Checks if the loan is a line of credit of receivable type
+   */
+  private isLineOfCreditReceivable(): boolean {
+    // Use loanData (for creation flow) or loanDetailsData (for view flow)
+    const loanInfo = this.loanData || this.loanDetailsData;
+
+    if (!loanInfo) {
+      return false;
+    }
+
+    // Check if loan has a line of credit ID (indicating it's a LOC loan)
+    const hasLineOfCredit = !!(loanInfo.lineOfCreditId || loanInfo.additionalProperties?.lineOfCreditId);
+
+    if (!hasLineOfCredit) {
+      return false;
+    }
+
+    // Check if it's of receivable type
+    // For creation flow, check locType field
+    // For view flow, check locProductType field
+    const locType = loanInfo.locType || loanInfo.additionalProperties?.locProductType;
+    return locType === 'RECEIVABLE';
+  }
+
+  /**
+   * Updates the displayed columns based on loan type
+   */
+  private updateDisplayedColumns(): void {
+    if (this.isLineOfCreditReceivable()) {
+      // For LOC Receivable: remove principal-related columns and add new LOC-specific columns at the end
+      const columnsToRemove = [
+        'principalDue',
+        'due',
+        'emiAmount'
+      ];
+
+      // Start with base columns and remove unwanted ones
+      this.displayedColumns = [...this.baseDisplayedColumns].filter((col) => !columnsToRemove.includes(col));
+      this.displayedColumnsEdit = [...this.baseDisplayedColumnsEdit].filter((col) => !columnsToRemove.includes(col));
+
+      // Add LOC-specific columns at the end of the schedule
+      this.displayedColumns.push('disbursedAmount', 'refundAmount');
+      this.displayedColumnsEdit.push('disbursedAmount', 'refundAmount');
+    } else {
+      // For regular loans: use base columns as-is
+      this.displayedColumns = [...this.baseDisplayedColumns];
+      this.displayedColumnsEdit = [...this.baseDisplayedColumnsEdit];
+    }
+  }
+
+  /**
+   * Calculates the disbursed amount (principal - total interest on loan) for LOC receivable loans
+   * Only shows when the loan is disbursed
+   */
+  getDisbursedAmount(item: any): number {
+    if (!this.isLineOfCreditReceivable() || !item.principalDisbursed) {
+      return 0;
+    }
+
+    const principal = item.principalDisbursed || 0;
+    const totalInterest = this.repaymentScheduleDetails?.totalInterestCharged || 0;
+    return Math.max(0, principal - totalInterest);
+  }
+
+  /**
+   * Calculates the refund amount for overpayments in LOC receivable loans
+   */
+  getRefundAmount(item: any): number {
+    if (!this.isLineOfCreditReceivable()) {
+      return 0;
+    }
+
+    // Check if there's an overpayment (total paid > total due)
+    const totalPaid = item.totalPaidForPeriod || 0;
+    const totalDue = item.totalDueForPeriod || 0;
+
+    if (totalPaid > totalDue) {
+      return totalPaid - totalDue;
+    }
+
+    return 0;
   }
 }
