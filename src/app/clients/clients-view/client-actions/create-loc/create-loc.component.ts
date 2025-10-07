@@ -2,7 +2,15 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { FormBuilder, FormGroup, Validators, ValidatorFn, AbstractControl, FormArray } from '@angular/forms';
+import {
+  FormBuilder,
+  FormGroup,
+  Validators,
+  ValidatorFn,
+  AbstractControl,
+  FormArray,
+  ValidationErrors
+} from '@angular/forms';
 import { of } from 'rxjs';
 import { delay } from 'rxjs/operators';
 import { MatStepper } from '@angular/material/stepper';
@@ -145,14 +153,13 @@ export class CreateLocComponent implements OnInit {
         this.computeInterimReviewDate();
         this.handleReviewPeriodChange(val);
       });
-    // also recompute when start date changes
+    // Trigger validation when start date changes
     this.locForm
       .get([
         'limitsTerms',
         'startDate'
       ])
       ?.valueChanges.subscribe((val) => {
-        this.computeInterimReviewDate();
         // Trigger validation when start date changes
         this.locForm.get('limitsTerms')?.updateValueAndValidity();
       });
@@ -343,6 +350,91 @@ export class CreateLocComponent implements OnInit {
     return null;
   };
 
+  // Custom validator to ensure at least one approved buyer/supplier
+  approvedBuyersValidator = (control: AbstractControl): ValidationErrors | null => {
+    const approvedBuyersArray = control.get('approvedBuyers') as FormArray;
+    if (!approvedBuyersArray || approvedBuyersArray.length === 0) {
+      return { requiredApprovedBuyers: true };
+    }
+    return null;
+  };
+
+  /**
+   * Removes empty/null/undefined values from an object to avoid sending them to backend
+   * @param obj Object to clean
+   * @returns Object with empty values removed
+   */
+  private removeEmptyValues(obj: any): any {
+    const cleaned: any = {};
+    for (const key in obj) {
+      if (obj.hasOwnProperty(key)) {
+        const value = obj[key];
+        // Only include non-empty values
+        if (
+          value !== null &&
+          value !== undefined &&
+          value !== '' &&
+          !(Array.isArray(value) && value.length === 0) &&
+          !(typeof value === 'object' && Object.keys(value).length === 0)
+        ) {
+          // For objects, recursively clean them
+          if (typeof value === 'object' && !Array.isArray(value) && value !== null) {
+            const cleanedNested = this.removeEmptyValues(value);
+            if (Object.keys(cleanedNested).length > 0) {
+              cleaned[key] = cleanedNested;
+            }
+          } else {
+            cleaned[key] = value;
+          }
+        }
+      }
+    }
+    return cleaned;
+  }
+
+  /**
+   * Formats dates according to system settings
+   * @param dates Object containing date fields to format
+   * @param formatType 'backend' for API submission (yyyy-MM-dd), 'display' for preview (dd MMMM yyyy)
+   * @returns Object with formatted dates
+   */
+  private formatDates(dates: any, formatType: 'backend' | 'display' = 'backend'): any {
+    try {
+      const dateFormat =
+        formatType === 'backend'
+          ? this.settingsService.dateFormat || 'yyyy-MM-dd'
+          : this.settingsService.dateFormat || 'dd MMMM yyyy';
+      const locale = this.settingsService.language?.code || this.settingsService.languageCode || 'en';
+      const dp = new DatePipe(locale);
+
+      const result = { ...dates };
+      const dateKeys = [
+        'startDate',
+        'endDate',
+        'expiryDate',
+        'activationDate',
+        'interimReviewDate'
+      ];
+
+      dateKeys.forEach((k) => {
+        if (result[k]) {
+          const parsedDate = new Date(result[k]);
+          if (!isNaN(parsedDate.getTime())) {
+            const formatted = dp.transform(parsedDate, dateFormat);
+            if (formatted) {
+              result[k] = formatted;
+            }
+          }
+        }
+      });
+
+      return result;
+    } catch (e) {
+      console.warn('Date formatting failed', e);
+      return dates;
+    }
+  }
+
   createForm() {
     // Nested groups so each step can have its own validators
     this.locForm = this.formBuilder.group({
@@ -367,11 +459,14 @@ export class CreateLocComponent implements OnInit {
         specialConditions: ['']
       }),
       // Vendors step (list of vendor objects { name })
-      approvedBuyersSection: this.formBuilder.group({
-        distributionPartner: [''],
-        approvedBuyersName: [''],
-        approvedBuyers: this.formBuilder.array([])
-      }),
+      approvedBuyersSection: this.formBuilder.group(
+        {
+          distributionPartner: [''],
+          approvedBuyersName: [''],
+          approvedBuyers: this.formBuilder.array([])
+        },
+        { validators: [this.approvedBuyersValidator] }
+      ),
       limitsTerms: this.formBuilder.group(
         {
           maxCreditLimit: [
@@ -438,15 +533,13 @@ export class CreateLocComponent implements OnInit {
       interimReviewDateControl?.enable();
     } else {
       interimReviewDateControl?.disable();
+      // Recompute the interim review date for non-custom periods
+      this.computeInterimReviewDate();
     }
   }
 
-  // Example computed interim review date based on activationDate + reviewPeriod months
+  // Computed interim review date based on today's date + reviewPeriod months
   computeInterimReviewDate() {
-    const activation = this.locForm.get([
-      'limitsTerms',
-      'startDate'
-    ])?.value;
     const period = this.locForm.get([
       'limitsTerms',
       'reviewPeriod'
@@ -457,13 +550,15 @@ export class CreateLocComponent implements OnInit {
     ]);
 
     // Only compute for non-custom periods
-    if (activation && period && period !== 'custom') {
+    if (period && period !== 'custom') {
       const monthsToAdd = Number(period);
 
       if (!isNaN(monthsToAdd) && monthsToAdd > 0) {
-        const d = new Date(activation);
-        d.setMonth(d.getMonth() + monthsToAdd);
-        control?.setValue(d.toISOString().slice(0, 10));
+        // Use today's date as the base for calculation
+        const today = new Date();
+        today.setMonth(today.getMonth() + monthsToAdd);
+        const computedDate = today.toISOString().slice(0, 10);
+        control?.setValue(computedDate);
       } else {
         control?.setValue('');
       }
@@ -630,10 +725,14 @@ export class CreateLocComponent implements OnInit {
       // Flatten the nested groups into a single payload
       // Use getRawValue to include disabled controls (e.g., interimReviewDate)
       const value: any = this.locForm.getRawValue();
+
+      // Clean up empty values before building payload
+      const cleanBasicInfo = this.removeEmptyValues(value.basicInfo);
+      const cleanLimitsTerms = this.removeEmptyValues(value.limitsTerms);
+
       const payload = {
-        ...value.basicInfo,
-        // include limits & terms but map maxCreditLimit -> maximumAmount
-        ...value.limitsTerms,
+        ...cleanBasicInfo,
+        ...cleanLimitsTerms,
         // include vendors if any
         ...(value.approvedBuyersSection?.distributionPartner
           ? { distributionPartner: value.approvedBuyersSection.distributionPartner }
@@ -643,7 +742,8 @@ export class CreateLocComponent implements OnInit {
           : {}),
         // include settlement account if selected
         ...(value.settlementSavingsAccountId ? { settlementSavingsAccountId: value.settlementSavingsAccountId } : {}),
-        charges: this.chargesDataSource
+        // Only include charges if there are any
+        ...(this.chargesDataSource.length > 0 ? { charges: this.chargesDataSource } : {})
       };
 
       if (payload.hasOwnProperty('expiryDate')) {
@@ -656,53 +756,19 @@ export class CreateLocComponent implements OnInit {
         delete payload.reviewPeriod;
       }
 
-      // Attach system locale and dateFormat from settings
+      // Format dates for backend submission and attach system locale and dateFormat
       try {
         const dateFormat = this.settingsService.dateFormat || 'yyyy-MM-dd';
         const locale = this.settingsService.language?.code || this.settingsService.languageCode || 'en';
-        // Format date fields according to user's dateFormat and locale before sending
-        try {
-          const dp = new DatePipe(locale);
-          const dateKeys = [
-            'startDate',
-            'endDate',
-            'interimReviewDate'
-          ];
-          dateKeys.forEach((k) => {
-            if (!payload.hasOwnProperty(k)) {
-              return;
-            }
-            const raw = payload[k];
-            if (!raw && raw !== 0) {
-              // no value provided -> ensure endDate is not sent
-              if (k === 'endDate' && payload.hasOwnProperty('endDate')) {
-                delete payload.endDate;
-              }
-              return;
-            }
-            const parsed = new Date(raw);
-            if (!isNaN(parsed.getTime())) {
-              const formatted = dp.transform(parsed, dateFormat);
-              if (formatted) {
-                payload[k] = formatted;
-              } else {
-                // If DatePipe couldn't format the date, drop endDate only; keep others as-is
-                if (k === 'endDate') {
-                  delete payload.endDate;
-                }
-                // else leave original value for other date keys
-              }
-            } else {
-              // parsed is invalid -> do not send endDate
-              if (k === 'endDate' && payload.hasOwnProperty('endDate')) {
-                delete payload.endDate;
-              }
-            }
-          });
-        } catch (e) {
-          // formatting failed — proceed without formatting
-          console.warn('Date formatting failed', e);
+
+        // Clean up empty dates first
+        if (!payload.endDate) {
+          delete payload.endDate;
         }
+
+        // Format remaining dates
+        const formattedPayload = this.formatDates(payload, 'backend');
+        Object.assign(payload, formattedPayload);
 
         if (dateFormat) {
           payload.dateFormat = dateFormat;
@@ -712,6 +778,7 @@ export class CreateLocComponent implements OnInit {
         }
       } catch (e) {
         // swallow - settings unavailable in rare cases
+        console.warn('Settings unavailable for date formatting', e);
       }
 
       // Call backend API to create the credit line
@@ -774,7 +841,16 @@ export class CreateLocComponent implements OnInit {
       payload.reviewPeriodDisplay = 'Custom';
     }
 
-    return payload;
+    // Format dates for preview display using system date format
+    return this.formatDates(payload, 'display');
+  }
+
+  // Handle step changes to trigger validation
+  onStepChange(event: any) {
+    // When moving away from approved buyers step (index 1), mark it as touched to show validation errors
+    if (event.previouslySelectedIndex === 1) {
+      this.locForm.get('approvedBuyersSection')?.markAsTouched();
+    }
   }
 
   // Called from the preview step Confirm button
@@ -810,6 +886,9 @@ export class CreateLocComponent implements OnInit {
     }
     this.approvedBuyersArray.push(this.formBuilder.control({ name: raw }));
     nameControl?.setValue('');
+
+    // Trigger validation update
+    this.locForm.get('approvedBuyersSection')?.updateValueAndValidity();
   }
 
   // Vendor editing properties
@@ -840,6 +919,8 @@ export class CreateLocComponent implements OnInit {
   removeVendor(index: number) {
     if (index > -1 && index < this.approvedBuyersArray.length) {
       this.approvedBuyersArray.removeAt(index);
+      // Trigger validation update
+      this.locForm.get('approvedBuyersSection')?.updateValueAndValidity();
     }
   }
 }

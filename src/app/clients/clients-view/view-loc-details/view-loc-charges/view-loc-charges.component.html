@@ -9,14 +9,6 @@
       </td>
     </ng-container>
 
-    <!-- Due Date Column -->
-    <ng-container matColumnDef="dueDate">
-      <th mat-header-cell *matHeaderCellDef>Due Date</th>
-      <td mat-cell *matCellDef="let charge">
-        {{ parseDate(charge.dueDate) | date: 'mediumDate' }}
-      </td>
-    </ng-container>
-
     <!-- Amount Column -->
     <ng-container matColumnDef="amount">
       <th mat-header-cell *matHeaderCellDef>Amount</th>
@@ -56,22 +48,6 @@
         <span class="status-badge status-{{ getChargeStatus(charge).toLowerCase() }}">
           {{ getChargeStatus(charge) }}
         </span>
-      </td>
-    </ng-container>
-
-    <!-- Actions Column -->
-    <ng-container matColumnDef="actions">
-      <th mat-header-cell *matHeaderCellDef>Actions</th>
-      <td mat-cell *matCellDef="let charge">
-        <button
-          mat-icon-button
-          color="warn"
-          *ngIf="canDeleteCharge()"
-          (click)="deleteCharge(charge.id)"
-          matTooltip="Delete Charge"
-        >
-          <mat-icon>delete</mat-icon>
-        </button>
       </td>
     </ng-container>
 

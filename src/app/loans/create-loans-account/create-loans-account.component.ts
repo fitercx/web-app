@@ -229,13 +229,15 @@ export class CreateLoansAccountComponent {
       const locId = this.loansAccountDetailsStep?.loansAccountDetailsForm?.get('lineOfCreditId')?.value;
       if (locId) {
         // Determine which approved amount to use based on LOC type
-        const approvedReceivableAmount = filteredLocDetails.approvedReceivableAmount;
+        const amountAfterAdvance = filteredLocDetails.amountAfterAdvance;
         const approvedPayableAmount = filteredLocDetails.amountInFacilityCurrency;
         const isReceivableType = filteredLocDetails.locType === 'RECEIVABLE';
 
         // Use the appropriate approved facility amount as principal
-        if (approvedReceivableAmount != null && approvedReceivableAmount > 0 && isReceivableType) {
-          baseData.principalAmount = approvedReceivableAmount;
+        // For receivable: use amount after advance (approved amount after applying advance percentage)
+        // For payable: use amount in facility currency
+        if (amountAfterAdvance != null && amountAfterAdvance > 0 && isReceivableType) {
+          baseData.principalAmount = amountAfterAdvance;
         } else if (approvedPayableAmount != null && approvedPayableAmount > 0 && !isReceivableType) {
           baseData.principalAmount = approvedPayableAmount;
         }

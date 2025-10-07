@@ -27,6 +27,9 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
   /** Loans Account Template */
   @Input() loansAccountTemplate: any;
 
+  /** Optional Line of Credit ID from query parameter */
+  @Input() prefilledLineOfCreditId?: string | null;
+
   /** Minimum date allowed. */
   minDate = new Date(2000, 0, 1);
   /** Maximum date allowed. */
@@ -115,7 +118,7 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
           externalId: this.loansAccountTemplate.externalId,
           linkAccountId: this.loansAccountTemplate.linkAccountId,
           createStandingInstructionAtDisbursement: this.loansAccountTemplate.createStandingInstructionAtDisbursement,
-          lineOfCreditId: this.selectedLocId
+          lineOfCreditId: this.getInitialLineOfCreditId()
         });
 
         // Default loan officer from LOC if not already set and LOC has loanOfficerId
@@ -207,6 +210,12 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
         const lineOfCreditControl = this.loansAccountDetailsForm.get('lineOfCreditId');
         if (this.isLocEnabled && this.lineOfCreditOptions.length > 0) {
           lineOfCreditControl?.setValidators([Validators.required]);
+
+          // If there's a prefilled LOC ID and it matches one of the available options, set it
+          const initialLocId = this.getInitialLineOfCreditId();
+          if (initialLocId && this.lineOfCreditOptions.some((loc: any) => loc.id === initialLocId)) {
+            lineOfCreditControl?.setValue(initialLocId);
+          }
         } else {
           lineOfCreditControl?.clearValidators();
           // Clear LOC selection and reset loan officer if LOC is not enabled for this product
@@ -275,6 +284,29 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
    */
   get showLineOfCreditDropdown() {
     return this.isLocEnabled && this.lineOfCreditOptions && this.lineOfCreditOptions.length > 0;
+  }
+
+  /**
+   * Gets the initial Line of Credit ID to use for form initialization
+   */
+  private getInitialLineOfCreditId(): number | null {
+    // Priority: prefilled from query param > template additionalProperties > template direct
+    if (this.prefilledLineOfCreditId) {
+      const numericId = parseInt(this.prefilledLineOfCreditId, 10);
+      if (!isNaN(numericId)) {
+        return numericId;
+      }
+    }
+
+    if (this.loansAccountTemplate) {
+      return (
+        this.loansAccountTemplate.additionalProperties?.lineOfCreditId ||
+        this.loansAccountTemplate.lineOfCreditId ||
+        null
+      );
+    }
+
+    return null;
   }
 
   /**

@@ -121,6 +121,7 @@ export class LoanProductSettingsStepComponent implements OnInit {
       maximumGap: this.loanProductsTemplate.maximumGap,
       canUseForTopup: this.loanProductsTemplate.canUseForTopup,
       isLocEnabled: this.loanProductsTemplate?.isLocEnabled || false,
+      enableLineOfCreditReceivable: this.loanProductsTemplate?.enableLineOfCreditReceivable || false,
       isInterestRecalculationEnabled: this.loanProductsTemplate.isInterestRecalculationEnabled,
       holdGuaranteeFunds: this.loanProductsTemplate.holdGuaranteeFunds,
       multiDisburseLoan: this.loanProductsTemplate.multiDisburseLoan,
@@ -332,7 +333,8 @@ export class LoanProductSettingsStepComponent implements OnInit {
         Validators.required
       ],
       allowAccrualPostingInArrears: [false],
-      isLocEnabled: [false]
+      isLocEnabled: [false],
+      enableLineOfCreditReceivable: [false]
     });
   }
 

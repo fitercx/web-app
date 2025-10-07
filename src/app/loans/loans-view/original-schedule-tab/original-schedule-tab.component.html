@@ -40,6 +40,22 @@
       </td>
     </ng-container>
 
+    <ng-container matColumnDef="disbursedAmount">
+      <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Disbursed Amount' | translate }}</th>
+      <td mat-cell class="r-amount" *matCellDef="let ele">{{ getDisbursedAmount(ele) | formatNumber }}</td>
+      <td mat-footer-cell class="r-amount" *matFooterCellDef>
+        <b>&nbsp;</b>
+      </td>
+    </ng-container>
+
+    <ng-container matColumnDef="refundAmount">
+      <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Refund Amount' | translate }}</th>
+      <td mat-cell class="r-amount" *matCellDef="let ele">{{ getRefundAmount(ele) | formatNumber }}</td>
+      <td mat-footer-cell class="r-amount" *matFooterCellDef>
+        <b>&nbsp;</b>
+      </td>
+    </ng-container>
+
     <ng-container matColumnDef="fees">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Fees' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let ele">{{ ele.feeChargesDue | formatNumber }}</td>

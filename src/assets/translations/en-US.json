@@ -291,8 +291,12 @@
       "Home": "Home"
     },
     "buttons": {
-      "Activate LOC": "Activate LOC",
-      "Approve LOC": "Approve LOC",
+      "Increase Credit Limit LOC": "Increase Credit Limit",
+      "Decrease Credit Limit LOC": "Decrease Credit Limit",
+      "Suspend LOC": "Suspend",
+      "Deactivate LOC": "Deactivate",
+      "Activate LOC": "Activate",
+      "Approve LOC": "Approve",
       "New Drawdown": "New Drawdown",
       "Increase Limit": "Increase Limit",
       "Decrease Limit": "Decrease Limit",
@@ -1185,6 +1189,9 @@
       "Principal Amount": "Principal Amount"
     },
     "inputs": {
+      "Enable Line of Credit Receivable": "Enable Line of Credit Receivable",
+      "Disbursed Amount": "Disbursed Amount",
+      "Refund Amount": "Refund Amount",
       "Facility Amount (Principal)": "Facility Amount (Principal)",
       "Invoice Details": "Invoice Details",
       "Line of Credit Product": "Line of Credit Product",
@@ -1793,7 +1800,7 @@
       "Advance Paid": "Advance Paid",
       "Incentive Type": "Incentive Type",
       "Include in Customer Loan Counter": "Include in Customer Loan Counter",
-      "Enable LOC product": "Enable LOC product",
+      "Enable LOC product": "Enable Line of Credit product",
       "Income Account": "Income Account",
       "Income capitalization": "Income capitalization",
       "INCOME CAPITALIZATION": "INCOME CAPITALIZATION",
@@ -3526,6 +3533,7 @@
   },
   "not_found_subtitle": "Oops.. Looks like this page doesn't exist.",
   "tooltips": {
+    "Enable Line of Credit Receivable functionality": "Enable Line of Credit Receivable functionality",
     "Line of Credit Product Information": "Line of Credit Product Information",
     "A borrower loan counter (cycle)": "A borrower loan counter (cycle) is used for tracking how many time the client has taken this particular product.",
     "A loan is in arrears once the number of days": "A loan is in arrears once the number of days entered into this field is exceeded. If this field is blank, the loan will be in arrears the day after a scheduled payment is missed.",

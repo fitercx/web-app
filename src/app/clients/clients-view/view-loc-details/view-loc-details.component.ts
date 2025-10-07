@@ -171,6 +171,9 @@ export class ViewLocDetailsComponent implements OnInit {
     const rawStatus = rawStatusObj?.code || rawStatusObj?.value || data?.status;
     const normalizedStatus = this.normalizeStatus(rawStatus);
 
+    // Access timeline data for activation date (consistent with audit trail implementation)
+    const timelineData = data.timeLineData || data;
+
     this.locDetails = {
       id: data.id,
       externalId: data.externalId,
@@ -178,7 +181,7 @@ export class ViewLocDetailsComponent implements OnInit {
       type: data.productType === 'PAYABLE' ? 'LOC PAYABLE' : 'LOC RECEIVABLE',
       status: rawStatusObj || rawStatus, // retain original object for pipe consumption (expects code)
       normalizedStatus: normalizedStatus, // separate canonical upper-case for internal logic
-      activationDate: data.activatedOnDate,
+      activationDate: this.parseDate(timelineData.activatedOnDate),
       nextReviewDate: this.parseDate(data.interimReviewDate),
       interestRate: data.interestRateOverride,
       annualInterestRate: data.annualInterestRate,
@@ -443,12 +446,10 @@ export class ViewLocDetailsComponent implements OnInit {
         this.openActionDialog('close');
         break;
       case 'Increase Limit':
-        // Open dialog for increasing limit
-        this.router.navigate(['increase-limit'], { relativeTo: this.route });
+        this.openLimitActionDialog('increasecreditlimit');
         break;
       case 'Decrease Limit':
-        // Open dialog for decreasing limit
-        this.router.navigate(['decrease-limit'], { relativeTo: this.route });
+        this.openLimitActionDialog('decreasecreditlimit');
         break;
       default:
     }
@@ -488,13 +489,75 @@ export class ViewLocDetailsComponent implements OnInit {
           cancelButtonText: 'Cancel'
         },
         pristine: false
-      }
+      },
+      width: '600px',
+      minWidth: '600px'
     });
 
     dialogRef.afterClosed().subscribe((response: any) => {
       if (response && response.data) {
         const formValue = response.data.value;
         const payload = this.buildActionPayload(action, formValue.actionDate, formValue.note);
+        this.performLocAction(action, payload);
+      }
+    });
+  }
+
+  /**
+   * Open action dialog with date, amount and note fields for limit actions
+   */
+  private openLimitActionDialog(action: string): void {
+    const actionTitle = this.getLimitActionTitle(action);
+    const amountLabel = action === 'increasecreditlimit' ? 'Increase Amount' : 'Decrease Amount';
+
+    const dialogRef = this.dialog.open(FormDialogComponent, {
+      data: {
+        formfields: [
+          new DatepickerBase({
+            controlName: 'actionDate',
+            label: 'Action Date',
+            value: new Date(),
+            required: true,
+            order: 1,
+            maxDate: new Date()
+          }),
+          new InputBase({
+            controlName: 'amount',
+            label: amountLabel,
+            value: '',
+            required: true,
+            order: 2,
+            controlType: 'number',
+            validators: [
+              'required',
+              'min(0.01)'
+            ]
+          }),
+          new InputBase({
+            controlName: 'note',
+            label: 'Notes (Optional)',
+            value: '',
+            required: false,
+            order: 3,
+            controlType: 'textarea',
+            rows: 3
+          })
+
+        ],
+        layout: {
+          addButtonText: `${actionTitle} LOC`,
+          cancelButtonText: 'Cancel'
+        },
+        pristine: false
+      },
+      width: '600px',
+      minWidth: '600px'
+    });
+
+    dialogRef.afterClosed().subscribe((response: any) => {
+      if (response && response.data) {
+        const formValue = response.data.value;
+        const payload = this.buildLimitActionPayload(action, formValue.actionDate, formValue.amount, formValue.note);
         this.performLocAction(action, payload);
       }
     });
@@ -511,6 +574,17 @@ export class ViewLocDetailsComponent implements OnInit {
       reactivate: 'Reactivate',
       suspend: 'Suspend',
       close: 'Close'
+    };
+    return titles[action] || action;
+  }
+
+  /**
+   * Get action title for limit actions
+   */
+  private getLimitActionTitle(action: string): string {
+    const titles: { [key: string]: string } = {
+      increasecreditlimit: 'Increase Credit Limit',
+      decreasecreditlimit: 'Decrease Credit Limit'
     };
     return titles[action] || action;
   }
@@ -541,6 +615,26 @@ export class ViewLocDetailsComponent implements OnInit {
       locale: this.locale,
       dateFormat: this.dateFormat,
       [dateFieldName]: formattedDate
+    };
+
+    if (note && note.trim()) {
+      payload.note = note.trim();
+    }
+
+    return payload;
+  }
+
+  /**
+   * Build payload for LOC limit actions with locale, dateFormat, date and amount
+   */
+  private buildLimitActionPayload(action: string, actionDate: Date, amount: number, note?: string): any {
+    const formattedDate = this.formatDateForPayload(actionDate);
+
+    const payload: any = {
+      locale: this.locale,
+      dateFormat: this.dateFormat,
+      actionDate: formattedDate,
+      amount: amount
     };
 
     if (note && note.trim()) {
@@ -735,5 +829,13 @@ export class ViewLocDetailsComponent implements OnInit {
       return 0;
     }
     return Math.max(0, Math.min(100, this.locDetails.utilization));
+  }
+
+  /**
+   * Check if LOC can be edited (only when status is submitted or approved)
+   */
+  canEditLoc(): boolean {
+    const status = this.locDetails?.normalizedStatus;
+    return status === 'SUBMITTED' || status === 'APPROVED';
   }
 }
