@@ -8,7 +8,12 @@
 
     <mat-card-content>
       <form [formGroup]="locForm" (ngSubmit)="submit()">
-        <mat-horizontal-stepper class="mat-elevation-z0" layout="column" #locStepper>
+        <mat-horizontal-stepper
+          class="mat-elevation-z0"
+          labelPosition="bottom"
+          #locStepper
+          (selectionChange)="onStepChange($event)"
+        >
           <div fxFlexFill class="preview-field">
             <span fxFlex="40%">Type</span>
             <span fxFlex="60%">{{ getProductTypeLabel(previewPayload.productType) || '—' }}</span>
@@ -219,6 +224,17 @@
                   </mat-list-item>
                 </mat-list>
               </div>
+
+              <!-- Validation error message -->
+              <mat-error
+                *ngIf="
+                  locForm.get('approvedBuyersSection')?.hasError('requiredApprovedBuyers') &&
+                  (locForm.get('approvedBuyersSection')?.touched || locForm.get('approvedBuyersSection')?.dirty)
+                "
+                class="validation-error"
+              >
+                At least one approved {{ buyerSupplierLabel.toLowerCase() }} is required.
+              </mat-error>
             </div>
             <mifosx-stepper-buttons></mifosx-stepper-buttons>
           </mat-step>

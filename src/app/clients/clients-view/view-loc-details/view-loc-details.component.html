@@ -135,12 +135,14 @@
       </div>
 
       <mat-menu #locMenu="matMenu">
-        <button mat-menu-item [routerLink]="['edit']" *mifosxHasPermission="'UPDATE_CREDITLINE'">
-          <mat-icon matListIcon>
-            <fa-icon icon="edit" size="sm"></fa-icon>
-          </mat-icon>
-          <span>{{ 'labels.buttons.Edit' | translate }}</span>
-        </button>
+        <ng-container *ngIf="canEditLoc()">
+          <button mat-menu-item [routerLink]="['edit']" *mifosxHasPermission="'UPDATE_CREDITLINE'">
+            <mat-icon matListIcon>
+              <fa-icon icon="edit" size="sm"></fa-icon>
+            </mat-icon>
+            <span>{{ 'labels.buttons.Edit' | translate }}</span>
+          </button>
+        </ng-container>
 
         <button mat-menu-item (click)="doAction('New Drawdown')" *ngIf="canCreateDrawdown()">
           <mat-icon matListIcon>

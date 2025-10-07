@@ -9,6 +9,17 @@
       {{ 'labels.inputs.Enable LOC product' | translate }}
     </mat-checkbox>
 
+    <mat-checkbox
+      *ngIf="loanProductSettingsForm.value.isLocEnabled"
+      fxFlex="73%"
+      labelPosition="before"
+      matTooltip="{{ 'tooltips.Enable Line of Credit Receivable functionality' | translate }}"
+      formControlName="enableLineOfCreditReceivable"
+      class="margin-b"
+    >
+      {{ 'labels.inputs.Enable Line of Credit Receivable' | translate }}
+    </mat-checkbox>
+
     <h3 fxFlex="96%" class="mat-h3 m-r-10">
       {{ 'labels.inputs.Factor Rate Product' | translate }}
       <i class="fas fa-question" matTooltip="{{ 'tooltips.Factor Rate Product Informatation' | translate }}"></i>

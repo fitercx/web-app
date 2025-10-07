@@ -13,13 +13,11 @@ export class ViewLocChargesComponent implements OnInit {
   dataSource: MatTableDataSource<any>;
   displayedColumns: string[] = [
     'chargeDefinitionId',
-    'dueDate',
     'amount',
     'amountPaid',
     'amountWaived',
     'amountOutstanding',
-    'status',
-    'actions'
+    'status'
   ];
   totalRecords = 0;
   pageSize = 20;
@@ -76,34 +74,5 @@ export class ViewLocChargesComponent implements OnInit {
     if (charge.waived) return 'WAIVED';
     if (charge.active) return 'ACTIVE';
     return 'INACTIVE';
-  }
-
-  canDeleteCharge(): boolean {
-    return this.locStatus === 'SUBMITTED' || this.locStatus === 'DRAFT';
-  }
-
-  deleteCharge(chargeId: number): void {
-    if (confirm('Are you sure you want to delete this charge?')) {
-      const locId = this.route.parent?.snapshot.paramMap.get('locId');
-      const clientId = this.route.parent?.parent?.snapshot.paramMap.get('clientId');
-
-      if (clientId && locId) {
-        this.clientsService.deleteLocCharge(clientId, locId, chargeId).subscribe(
-          () => {
-            this.fetchCharges(0, this.pageSize);
-          },
-          (error) => {
-            console.error('Error deleting charge:', error);
-          }
-        );
-      }
-    }
-  }
-
-  parseDate(dateArray: any): Date | null {
-    if (Array.isArray(dateArray) && dateArray.length >= 3) {
-      return new Date(dateArray[0], dateArray[1] - 1, dateArray[2]);
-    }
-    return dateArray ? new Date(dateArray) : null;
   }
 }
