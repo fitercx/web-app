@@ -456,6 +456,13 @@
       <td mat-cell class="r-amount" *matCellDef="let element">{{ element.amountPaid | formatNumber }}</td>
     </ng-container>
 
+    <ng-container matColumnDef="Next Instalment Date">
+      <th mat-header-cell class="center" *matHeaderCellDef>{{ 'labels.inputs.Next Instalment Date' | translate }}</th>
+      <td mat-cell class="center" *matCellDef="let element">
+        {{ element.additionalProperties?.nextInstalmentDate | dateFormat }}
+      </td>
+    </ng-container>
+
     <ng-container matColumnDef="Actions">
       <th mat-header-cell class="center" *matHeaderCellDef>{{ 'labels.inputs.Actions' | translate }}</th>
       <td mat-cell class="center" *matCellDef="let element">

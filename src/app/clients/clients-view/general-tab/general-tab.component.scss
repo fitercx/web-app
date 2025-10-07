@@ -286,7 +286,7 @@
   text-align: center !important;
 }
 
-// Force all header cells in this component to left align unless explicitly right-aligned
+// Force all header cells in this component to left align unless explicitly right-aligned or center-aligned
 :host ::ng-deep table.mat-table th.mat-header-cell {
   text-align: left !important;
 }
