@@ -1,6 +1,7 @@
 /** Angular Imports */
-import { Component, OnInit, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, OnInit, Input, OnChanges, SimpleChanges, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, FormArray, UntypedFormControl } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute } from '@angular/router';
 import { LoansAccountAddCollateralDialogComponent } from 'app/loans/custom-dialog/loans-account-add-collateral-dialog/loans-account-add-collateral-dialog.component';
@@ -23,7 +24,7 @@ import { CodeName, OptionData } from 'app/shared/models/option-data.model';
   templateUrl: './loans-account-terms-step.component.html',
   styleUrls: ['./loans-account-terms-step.component.scss']
 })
-export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
+export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDestroy {
   /** Loans Product Options */
   @Input() loansProductOptions: any;
   /** Loans Account Product Template */
@@ -109,6 +110,10 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
   enableIncomeCapitalization = false;
   isProgressive = false;
   factorRateEnabled = false;
+
+  /** Subscriptions for loan term listeners */
+  private loanTermSubscriptions: Subscription[] = [];
+  private currentProductType: 'LOC' | 'STANDARD' | null = null;
 
   /**
    * Create Loans Account Terms Form
@@ -274,6 +279,16 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
     if (changes['selectedLocId'] && this.isLocProduct()) {
       this.updateLoanTermForSelectedLoc();
     }
+
+    // Handle changes in LOC selection state
+    if (changes['locSelected']) {
+      this.handleLocProductTerms();
+    }
+
+    // Set up loan term listeners when product template changes
+    if (changes['loansAccountProductTemplate'] || changes['loansAccountTemplate']) {
+      this.setupLoanTermListeners();
+    }
   }
 
   ngOnInit() {
@@ -313,6 +328,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
             loanTermFrequencyType = daysFrequencyType.id;
           }
         }
+        console.log('isLocProduct - loanTermFrequencyType:', loanTermFrequency);
       }
 
       this.factorRateEnabled = this.loansAccountProductTemplate?.product?.factorRateProductEnabled;
@@ -352,7 +368,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
     this.createloansAccountTermsForm();
     this.setAdvancedPaymentStrategyControls();
     // this.setCustomValidators();
-    this.setLoanTermListener();
+    this.setupLoanTermListeners();
 
     // Update loan term if LOC is already selected during initialization
     if (this.isLocProduct() && this.selectedLocId) {
@@ -389,31 +405,104 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
     });
   }
 
-  /** Custom Listeners for the form to calculate Loan Term */
-  setLoanTermListener() {
-    this.loansAccountTermsForm.get('numberOfRepayments').valueChanges.subscribe((numberOfRepayments) => {
-      const repaymentEvery: number = this.loansAccountTermsForm.value.repaymentEvery;
-      this.calculateLoanTerm(numberOfRepayments, repaymentEvery);
-    });
+  /**
+   * Clears existing loan term listeners
+   */
+  private clearLoanTermListeners(): void {
+    this.loanTermSubscriptions.forEach((subscription) => subscription.unsubscribe());
+    this.loanTermSubscriptions = [];
+  }
 
-    this.loansAccountTermsForm.get('repaymentEvery').valueChanges.subscribe((repaymentEvery) => {
-      const numberOfRepayments: number = this.loansAccountTermsForm.value.numberOfRepayments;
-      this.calculateLoanTerm(numberOfRepayments, repaymentEvery);
-    });
+  /**
+   * Sets up loan term listeners based on the current product type
+   */
+  setupLoanTermListeners(): void {
+    this.clearLoanTermListeners();
 
-    this.loansAccountTermsForm.get('loanTermFrequencyType').valueChanges.subscribe((loanTermFrequencyType) => {
-      this.loansAccountTermsForm.patchValue({ repaymentFrequencyType: loanTermFrequencyType });
-    });
+    if (!this.loansAccountTermsForm) {
+      return;
+    }
 
-    this.loansAccountTermsForm.get('amortizationType').valueChanges.subscribe((amortizationType) => {
-      if (amortizationType === 0) {
-        // Equal Principal Payments
-        this.loansAccountTermsForm.addControl('fixedPrincipalPercentagePerInstallment', new UntypedFormControl(''));
-      } else {
-        // Equal Installments
-        this.loansAccountTermsForm.removeControl('fixedPrincipalPercentagePerInstallment');
+    const isLocProduct = this.isLocProduct();
+    const newProductType: 'LOC' | 'STANDARD' = isLocProduct ? 'LOC' : 'STANDARD';
+
+    // Only set up listeners if product type has changed or is being set for the first time
+    if (this.currentProductType === newProductType) {
+      return;
+    }
+
+    this.currentProductType = newProductType;
+
+    if (isLocProduct) {
+      // For LOC products: sync loanTermFrequency with repaymentEvery
+      const loanTermSub = this.loansAccountTermsForm
+        .get('loanTermFrequency')
+        ?.valueChanges.subscribe((loanTermFrequency) => {
+          console.log('LOC loanTermFrequency changed:', loanTermFrequency);
+          this.loansAccountTermsForm.patchValue({ repaymentEvery: loanTermFrequency }, { emitEvent: false });
+        });
+
+      if (loanTermSub) {
+        this.loanTermSubscriptions.push(loanTermSub);
       }
-    });
+    } else {
+      // For standard loans: calculate loan term from number of repayments and repayment frequency
+      const numberOfRepaymentsSub = this.loansAccountTermsForm
+        .get('numberOfRepayments')
+        ?.valueChanges.subscribe((numberOfRepayments) => {
+          const repaymentEvery: number = this.loansAccountTermsForm.value.repaymentEvery;
+          this.calculateLoanTerm(numberOfRepayments, repaymentEvery);
+        });
+
+      const repaymentEverySub = this.loansAccountTermsForm
+        .get('repaymentEvery')
+        ?.valueChanges.subscribe((repaymentEvery) => {
+          const numberOfRepayments: number = this.loansAccountTermsForm.value.numberOfRepayments;
+          this.calculateLoanTerm(numberOfRepayments, repaymentEvery);
+        });
+
+      const loanTermFrequencyTypeSub = this.loansAccountTermsForm
+        .get('loanTermFrequencyType')
+        ?.valueChanges.subscribe((loanTermFrequencyType) => {
+          this.loansAccountTermsForm.patchValue(
+            { repaymentFrequencyType: loanTermFrequencyType },
+            { emitEvent: false }
+          );
+        });
+
+      const amortizationTypeSub = this.loansAccountTermsForm
+        .get('amortizationType')
+        ?.valueChanges.subscribe((amortizationType) => {
+          if (amortizationType === 0) {
+            // Equal Principal Payments
+            this.loansAccountTermsForm.addControl('fixedPrincipalPercentagePerInstallment', new UntypedFormControl(''));
+          } else {
+            // Equal Installments
+            this.loansAccountTermsForm.removeControl('fixedPrincipalPercentagePerInstallment');
+          }
+        });
+
+      // Add all subscriptions to the array
+      if (numberOfRepaymentsSub) {
+        this.loanTermSubscriptions.push(numberOfRepaymentsSub);
+      }
+      if (repaymentEverySub) {
+        this.loanTermSubscriptions.push(repaymentEverySub);
+      }
+      if (loanTermFrequencyTypeSub) {
+        this.loanTermSubscriptions.push(loanTermFrequencyTypeSub);
+      }
+      if (amortizationTypeSub) {
+        this.loanTermSubscriptions.push(amortizationTypeSub);
+      }
+    }
+  }
+
+  /**
+   * Component cleanup
+   */
+  ngOnDestroy(): void {
+    this.clearLoanTermListeners();
   }
 
   setAdvancedPaymentStrategyControls(): void {
@@ -778,6 +867,9 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
       // Ensure fields remain enabled for LOC products (users can still edit)
       this.handleLocProductTerms();
     }
+
+    // Re-setup listeners as LOC selection might change the effective product type
+    this.setupLoanTermListeners();
   }
 
   /**
@@ -798,7 +890,16 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
       }
     }
 
-    // Always ensure fields are enabled for both LOC and non-LOC products
+    // Handle repaymentEvery field based on LOC selection
+    if (this.locSelected) {
+      // Disable repaymentEvery when LOC is selected
+      this.loansAccountTermsForm.get('repaymentEvery')?.disable();
+    } else {
+      // Enable repaymentEvery when LOC is not selected
+      this.loansAccountTermsForm.get('repaymentEvery')?.enable();
+    }
+
+    // Always ensure loan term fields are enabled for both LOC and non-LOC products
     this.loansAccountTermsForm.get('loanTermFrequency')?.enable();
     this.loansAccountTermsForm.get('loanTermFrequencyType')?.enable();
   }
