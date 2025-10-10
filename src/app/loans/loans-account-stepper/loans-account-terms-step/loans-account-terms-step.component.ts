@@ -328,7 +328,6 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
             loanTermFrequencyType = daysFrequencyType.id;
           }
         }
-        console.log('isLocProduct - loanTermFrequencyType:', loanTermFrequency);
       }
 
       this.factorRateEnabled = this.loansAccountProductTemplate?.product?.factorRateProductEnabled;
@@ -432,18 +431,47 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
     }
 
     this.currentProductType = newProductType;
+    this.doSetupLoanTermListeners(isLocProduct);
+  }
 
+  /**
+   * Forces setup of loan term listeners even if product type hasn't changed
+   * This is useful when specific LOC selection changes within the same product type
+   */
+  private forceSetupLoanTermListeners(): void {
+    this.clearLoanTermListeners();
+
+    if (!this.loansAccountTermsForm) {
+      return;
+    }
+
+    const isLocProduct = this.isLocProduct();
+    this.doSetupLoanTermListeners(isLocProduct);
+  }
+
+  /**
+   * Actually sets up the loan term listeners
+   */
+  private doSetupLoanTermListeners(isLocProduct: boolean): void {
     if (isLocProduct) {
-      // For LOC products: sync loanTermFrequency with repaymentEvery
+      // For LOC products: sync loanTermFrequency with repaymentEvery (bidirectional)
       const loanTermSub = this.loansAccountTermsForm
         .get('loanTermFrequency')
         ?.valueChanges.subscribe((loanTermFrequency) => {
-          console.log('LOC loanTermFrequency changed:', loanTermFrequency);
           this.loansAccountTermsForm.patchValue({ repaymentEvery: loanTermFrequency }, { emitEvent: false });
+        });
+
+      const repaymentEverySub = this.loansAccountTermsForm
+        .get('repaymentEvery')
+        ?.valueChanges.subscribe((repaymentEvery) => {
+          this.loansAccountTermsForm.patchValue({ loanTermFrequency: repaymentEvery }, { emitEvent: false });
         });
 
       if (loanTermSub) {
         this.loanTermSubscriptions.push(loanTermSub);
+      }
+      if (repaymentEverySub) {
+        this.loanTermSubscriptions.push(repaymentEverySub);
       }
     } else {
       // For standard loans: calculate loan term from number of repayments and repayment frequency
@@ -868,8 +896,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
       this.handleLocProductTerms();
     }
 
-    // Re-setup listeners as LOC selection might change the effective product type
-    this.setupLoanTermListeners();
+    this.forceSetupLoanTermListeners();
   }
 
   /**
@@ -888,15 +915,6 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
           loanTermFrequencyType: daysFrequencyType.id
         });
       }
-    }
-
-    // Handle repaymentEvery field based on LOC selection
-    if (this.locSelected) {
-      // Disable repaymentEvery when LOC is selected
-      this.loansAccountTermsForm.get('repaymentEvery')?.disable();
-    } else {
-      // Enable repaymentEvery when LOC is not selected
-      this.loansAccountTermsForm.get('repaymentEvery')?.enable();
     }
 
     // Always ensure loan term fields are enabled for both LOC and non-LOC products
