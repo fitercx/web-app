@@ -114,6 +114,8 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
   /** Subscriptions for loan term listeners */
   private loanTermSubscriptions: Subscription[] = [];
   private currentProductType: 'LOC' | 'STANDARD' | null = null;
+  /** Track if this is the initial load vs. subsequent updates */
+  private isInitialLoad = true;
 
   /**
    * Create Loans Account Terms Form
@@ -172,7 +174,8 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
         }
       }
 
-      this.loansAccountTermsForm.patchValue({
+      // Preserve user input values and only patch fields that haven't been modified
+      this.patchFormPreservingUserInput({
         factorRate: factorRate,
         factorRateEnabled: this.factorRateEnabled,
         principalAmount: this.loansAccountTermsData.principal,
@@ -288,6 +291,11 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
     // Set up loan term listeners when product template changes
     if (changes['loansAccountProductTemplate'] || changes['loansAccountTemplate']) {
       this.setupLoanTermListeners();
+    }
+
+    // Mark initial load as complete after first ngOnChanges
+    if (this.isInitialLoad) {
+      this.isInitialLoad = false;
     }
   }
 
@@ -886,8 +894,8 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
         (option: any) => option.code === 'DAYS' || option.value === 'Days'
       );
 
-      // Update the form with the new tenor days
-      this.loansAccountTermsForm.patchValue({
+      // Update the form with the new tenor days, but preserve user input if they've modified values
+      this.patchFormPreservingUserInput({
         loanTermFrequency: tenorDays,
         loanTermFrequencyType: daysFrequencyType?.id || this.loansAccountTermsForm.get('loanTermFrequencyType')?.value
       });
@@ -911,14 +919,64 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
         (option: any) => option.code === 'DAYS' || option.value === 'Days'
       );
       if (daysFrequencyType) {
-        this.loansAccountTermsForm.patchValue({
-          loanTermFrequencyType: daysFrequencyType.id
-        });
+        // Only set to DAYS if user hasn't specifically chosen a different frequency type
+        const currentFrequencyType = this.loansAccountTermsForm.get('loanTermFrequencyType');
+        if (currentFrequencyType && (currentFrequencyType.pristine || !currentFrequencyType.value)) {
+          this.loansAccountTermsForm.patchValue({
+            loanTermFrequencyType: daysFrequencyType.id
+          });
+        }
       }
     }
 
     // Always ensure loan term fields are enabled for both LOC and non-LOC products
     this.loansAccountTermsForm.get('loanTermFrequency')?.enable();
     this.loansAccountTermsForm.get('loanTermFrequencyType')?.enable();
+  }
+
+  /**
+   * Patches form values while preserving user input.
+   * Only updates fields that haven't been modified by the user.
+   */
+  private patchFormPreservingUserInput(newValues: any): void {
+    if (!this.loansAccountTermsForm) {
+      return;
+    }
+
+    const patchData: any = {};
+
+    // Go through each field in newValues
+    Object.keys(newValues).forEach((key) => {
+      const control = this.loansAccountTermsForm.get(key);
+      if (control) {
+        const currentValue = control.value;
+        const newValue = newValues[key];
+
+        // Preserve user input by checking if the field has been touched/modified
+        // Only patch if:
+        // 1. Form is pristine (no user interaction) OR
+        // 2. Control is pristine (this specific field not touched) OR
+        // 3. Current value is empty/null/undefined (no user input to preserve)
+        const shouldPatch =
+          this.loansAccountTermsForm.pristine ||
+          control.pristine ||
+          currentValue === null ||
+          currentValue === undefined ||
+          currentValue === '' ||
+          this.isInitialLoad;
+
+        if (shouldPatch) {
+          patchData[key] = newValue;
+        }
+      } else {
+        // If control doesn't exist, always include it
+        patchData[key] = newValues[key];
+      }
+    });
+
+    // Apply the patch
+    if (Object.keys(patchData).length > 0) {
+      this.loansAccountTermsForm.patchValue(patchData, { emitEvent: false });
+    }
   }
 }
