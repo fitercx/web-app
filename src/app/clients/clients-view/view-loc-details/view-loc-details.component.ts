@@ -328,21 +328,16 @@ export class ViewLocDetailsComponent implements OnInit {
       case 'ACTIVE':
         return [
           'Deactivate',
-          'Suspend',
           'Increase Limit',
           'Decrease Limit'
         ];
       case 'INACTIVE':
         return [
-          'Reactivate',
-          'Increase Limit',
-          'Decrease Limit'
+          'Reactivate'
         ];
       case 'SUSPENDED':
         return [
-          'Reactivate',
-          'Increase Limit',
-          'Decrease Limit'
+          'Reactivate'
         ];
       case 'CLOSED':
         return [];
@@ -438,9 +433,6 @@ export class ViewLocDetailsComponent implements OnInit {
         break;
       case 'Reactivate':
         this.openActionDialog('reactivate');
-        break;
-      case 'Suspend':
-        this.openActionDialog('suspend');
         break;
       case 'Close':
         this.openActionDialog('close');
