@@ -138,6 +138,18 @@
       </td>
     </ng-container>
 
+    <ng-container matColumnDef="taxes">
+      <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Taxes' | translate }}</th>
+      <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
+        {{ item.taxChargesDue | formatNumber }}
+      </td>
+      <td mat-footer-cell class="r-amount" *matFooterCellDef>
+        <b>
+          {{ repaymentScheduleDetails.totalTaxChargesCharged | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+        </b>
+      </td>
+    </ng-container>
+
     <ng-container matColumnDef="penalties">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Overdue Interest' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
@@ -316,6 +328,11 @@
     <ng-container matColumnDef="fees">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Fees' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item">{{ item.feeChargesDue | formatNumber }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="taxes">
+      <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Taxes' | translate }}</th>
+      <td mat-cell class="r-amount" *matCellDef="let item">{{ item.taxChargesDue | formatNumber }}</td>
     </ng-container>
 
     <ng-container matColumnDef="due">

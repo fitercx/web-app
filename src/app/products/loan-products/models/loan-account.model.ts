@@ -15,6 +15,7 @@ export interface LoanTransaction {
   interestPortion: number;
   feeChargesPortion: number;
   penaltyChargesPortion: number;
+  taxChargesPortion: number;
   overpaymentPortion: number;
   unrecognizedIncomePortion: number;
   externalId: string;
