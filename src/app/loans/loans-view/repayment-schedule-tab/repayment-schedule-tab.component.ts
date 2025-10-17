@@ -309,9 +309,9 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   /**
-   * Calculates the disbursed amount (principal - total interest on loan) for LOC receivable loans
+   * Calculates the disbursed amount for LOC receivable loans
    * Returns 0 for pre-disbursement state (creation/pending/approved)
-   * Only shows actual value when the loan is disbursed (active state)
+   * For disbursed loans on the loan view screen, uses the netDisbursalAmount field
    */
   getDisbursedAmount(item: any): number {
     if (!this.isLineOfCreditReceivable()) {
@@ -323,11 +323,20 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       return 0;
     }
 
-    // For disbursed loans, calculate the actual disbursed amount
+    // For disbursed loans, use netDisbursalAmount from loan details if available
     if (!item.principalDisbursed) {
       return 0;
     }
 
+    // Use loanData (for creation flow) or loanDetailsData (for view flow)
+    const loanInfo = this.loanData || this.loanDetailsData;
+
+    // If netDisbursalAmount is available in loan details, use it
+    if (loanInfo && loanInfo.netDisbursalAmount !== undefined && loanInfo.netDisbursalAmount !== null) {
+      return loanInfo.netDisbursalAmount;
+    }
+
+    // Fallback: calculate disbursed amount if netDisbursalAmount is not available
     const principal = item.principalDisbursed || 0;
     const totalInterest = this.repaymentScheduleDetails?.totalInterestCharged || 0;
     const totalFees = this.repaymentScheduleDetails?.totalFeeChargesCharged || 0;
