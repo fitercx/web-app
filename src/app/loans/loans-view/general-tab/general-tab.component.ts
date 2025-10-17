@@ -88,7 +88,12 @@ export class GeneralTabComponent implements OnInit {
     const isActive = this.loanDetails?.status?.id === 300;
     const disbursedAmount = isActive ? this.loanDetails?.principal || 0 : 0;
     let processingFee = this.loanDetails.summary?.feeChargesCharged || 0;
-    this.netDisbursedAmount = disbursedAmount - processingFee;
+    let netDisbursedAmount = disbursedAmount - processingFee;
+    let isLineOfCreditReceivable =
+      this.loanDetails.additionalProperties?.locProductType === 'RECEIVABLE' ? true : false;
+    this.netDisbursedAmount = isLineOfCreditReceivable
+      ? netDisbursedAmount - this.loanDetails.summary.interestCharged
+      : netDisbursedAmount;
   }
 
   /** Returns the disbursed amount based on loan status */
