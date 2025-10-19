@@ -40,7 +40,7 @@ export class TransactionsTabComponent implements OnInit {
     'interest',
     'fee',
     'penalties',
-    'taxCharges',
+    'taxes',
     'loanBalance',
     'actions'
   ];
@@ -64,7 +64,7 @@ export class TransactionsTabComponent implements OnInit {
     'h2-interest',
     'h2-fees',
     'h2-penalties',
-    'h2-tax-charges',
+    'h2-taxes',
     'h2-action'
   ];
 

@@ -284,16 +284,24 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     return locType === 'RECEIVABLE';
   }
 
+  private isLoanFactorRateEnabled(): boolean {
+    const loanAccountData = this.loanData || this.loanDetailsData;
+    if (!loanAccountData) {
+      return false;
+    }
+    return loanAccountData.factorRateEnabled;
+  }
+
   /**
    * Updates the displayed columns based on loan type
    */
   private updateDisplayedColumns(): void {
+    console.log(this.isLoanFactorRateEnabled());
     if (this.isLineOfCreditReceivable()) {
       // For LOC Receivable: remove principal-related columns and add new LOC-specific columns at the end
       const columnsToRemove = [
         'principalDue',
-        'due',
-        'emiAmount'
+        'due'
       ];
 
       // Start with base columns and remove unwanted ones
@@ -303,6 +311,10 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       // Add LOC-specific columns at the end of the schedule
       this.displayedColumns.push('disbursedAmount', 'refundAmount');
       this.displayedColumnsEdit.push('disbursedAmount', 'refundAmount');
+    } else if (this.isLoanFactorRateEnabled()) {
+      const columnsToRemove = ['interest'];
+      this.displayedColumns = [...this.baseDisplayedColumns].filter((col) => !columnsToRemove.includes(col));
+      this.displayedColumnsEdit = [...this.baseDisplayedColumnsEdit].filter((col) => !columnsToRemove.includes(col));
     } else {
       // For regular loans: use base columns as-is
       this.displayedColumns = [...this.baseDisplayedColumns];
@@ -312,16 +324,46 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
   /**
    * Calculates the disbursed amount (principal - total interest on loan) for LOC receivable loans
-   * Only shows when the loan is disbursed
+   * Returns 0 for pre-disbursement state (creation/pending/approved)
+   * Only shows actual value when the loan is disbursed (active state)
    */
   getDisbursedAmount(item: any): number {
-    if (!this.isLineOfCreditReceivable() || !item.principalDisbursed) {
+    if (!this.isLineOfCreditReceivable()) {
+      return 0;
+    }
+
+    // For pre-disbursement state, always show 0
+    if (this.isLoanPreDisbursement()) {
+      return 0;
+    }
+
+    // For disbursed loans, calculate the actual disbursed amount
+    if (!item.principalDisbursed) {
       return 0;
     }
 
     const principal = item.principalDisbursed || 0;
     const totalInterest = this.repaymentScheduleDetails?.totalInterestCharged || 0;
     return Math.max(0, principal - totalInterest);
+  }
+
+  /**
+   * Gets the outstanding amount to display for LOC receivable loans
+   * For pre-disbursement state, shows the principalDisbursed value (pending amount)
+   * For disbursed state, shows the actual outstanding amount
+   */
+  getOutstandingAmount(item: any): number {
+    if (!this.isLineOfCreditReceivable()) {
+      return item.totalOutstandingForPeriod || 0;
+    }
+
+    // For pre-disbursement state, show principalDisbursed as the outstanding amount
+    if (this.isLoanPreDisbursement()) {
+      return item.principalDisbursed || 0;
+    }
+
+    // For disbursed loans, show the actual outstanding amount
+    return item.totalOutstandingForPeriod || 0;
   }
 
   /**
@@ -341,5 +383,55 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     }
 
     return 0;
+  }
+
+  /**
+   * Determines if the schedule period is the disbursement period
+   * A disbursement period is identified by having a principalDisbursed value
+   */
+  private isDisbursementPeriod(item: any): boolean {
+    return !!(item.principalDisbursed && item.principalDisbursed > 0);
+  }
+
+  /**
+   * Checks if the loan is in a pre-disbursement state (pending approval or approved but not disbursed)
+   * Also returns true for loan creation flow (when no status exists yet)
+   */
+  private isLoanPreDisbursement(): boolean {
+    const loanInfo = this.loanData || this.loanDetailsData;
+
+    // In creation flow, loanData exists but has no status - treat as pre-disbursement
+    if (this.loanData && !this.loanData.status) {
+      return true;
+    }
+
+    if (!loanInfo || !loanInfo.status) {
+      return false;
+    }
+
+    // Check if loan is in pending approval or approved (waiting for disbursal) status
+    return loanInfo.status.pendingApproval || loanInfo.status.waitingForDisbursal;
+  }
+
+  /**
+   * Gets the display status for a schedule period
+   * For LOC Receivable loans in pending/approved status:
+   * - Disbursement period shows "PENDING DISBURSEMENT"
+   * - Other periods show "SCHEDULED"
+   * For all other cases, returns the original item status
+   */
+  getDisplayStatus(item: any): string {
+    // Only apply custom status logic for LOC Receivable loans in pre-disbursement state
+    if (this.isLineOfCreditReceivable() && this.isLoanPreDisbursement()) {
+      // Check if this is the disbursement period
+      if (this.isDisbursementPeriod(item)) {
+        return 'PENDING DISBURSAL';
+      } else {
+        return 'SCHEDULED';
+      }
+    }
+
+    // For all other cases, return the original status
+    return item.status;
   }
 }

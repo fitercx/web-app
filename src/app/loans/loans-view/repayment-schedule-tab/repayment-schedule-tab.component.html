@@ -53,7 +53,7 @@
           GRACE_PERIOD_APPLIED
         </ng-container>
         <ng-template #normalStatus>
-          {{ item.status }}
+          {{ getDisplayStatus(item) }}
         </ng-template>
       </td>
       <td mat-footer-cell *matFooterCellDef></td>
@@ -226,7 +226,7 @@
 
     <ng-container matColumnDef="outstanding">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Outstanding Amount' | translate }}</th>
-      <td mat-cell class="r-amount" *matCellDef="let item">{{ item.totalOutstandingForPeriod | formatNumber }}</td>
+      <td mat-cell class="r-amount" *matCellDef="let item">{{ getOutstandingAmount(item) | formatNumber }}</td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
         <b> {{ repaymentScheduleDetails.totalOutstanding | currency: currencyCode : 'symbol-narrow' : '1.2-2' }} </b>
       </td>

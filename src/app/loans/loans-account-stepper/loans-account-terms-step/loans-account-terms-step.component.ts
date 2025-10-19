@@ -1,6 +1,7 @@
 /** Angular Imports */
-import { Component, OnInit, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, OnInit, Input, OnChanges, SimpleChanges, OnDestroy } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, FormArray, UntypedFormControl } from '@angular/forms';
+import { Subscription } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute } from '@angular/router';
 import { LoansAccountAddCollateralDialogComponent } from 'app/loans/custom-dialog/loans-account-add-collateral-dialog/loans-account-add-collateral-dialog.component';
@@ -23,7 +24,7 @@ import { CodeName, OptionData } from 'app/shared/models/option-data.model';
   templateUrl: './loans-account-terms-step.component.html',
   styleUrls: ['./loans-account-terms-step.component.scss']
 })
-export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
+export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDestroy {
   /** Loans Product Options */
   @Input() loansProductOptions: any;
   /** Loans Account Product Template */
@@ -110,6 +111,12 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
   isProgressive = false;
   factorRateEnabled = false;
 
+  /** Subscriptions for loan term listeners */
+  private loanTermSubscriptions: Subscription[] = [];
+  private currentProductType: 'LOC' | 'STANDARD' | null = null;
+  /** Track if this is the initial load vs. subsequent updates */
+  private isInitialLoad = true;
+
   /**
    * Create Loans Account Terms Form
    * @param formBuilder FormBuilder
@@ -167,7 +174,8 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
         }
       }
 
-      this.loansAccountTermsForm.patchValue({
+      // Preserve user input values and only patch fields that haven't been modified
+      this.patchFormPreservingUserInput({
         factorRate: factorRate,
         factorRateEnabled: this.factorRateEnabled,
         principalAmount: this.loansAccountTermsData.principal,
@@ -274,6 +282,21 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
     if (changes['selectedLocId'] && this.isLocProduct()) {
       this.updateLoanTermForSelectedLoc();
     }
+
+    // Handle changes in LOC selection state
+    if (changes['locSelected']) {
+      this.handleLocProductTerms();
+    }
+
+    // Set up loan term listeners when product template changes
+    if (changes['loansAccountProductTemplate'] || changes['loansAccountTemplate']) {
+      this.setupLoanTermListeners();
+    }
+
+    // Mark initial load as complete after first ngOnChanges
+    if (this.isInitialLoad) {
+      this.isInitialLoad = false;
+    }
   }
 
   ngOnInit() {
@@ -352,7 +375,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
     this.createloansAccountTermsForm();
     this.setAdvancedPaymentStrategyControls();
     // this.setCustomValidators();
-    this.setLoanTermListener();
+    this.setupLoanTermListeners();
 
     // Update loan term if LOC is already selected during initialization
     if (this.isLocProduct() && this.selectedLocId) {
@@ -389,31 +412,133 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
     });
   }
 
-  /** Custom Listeners for the form to calculate Loan Term */
-  setLoanTermListener() {
-    this.loansAccountTermsForm.get('numberOfRepayments').valueChanges.subscribe((numberOfRepayments) => {
-      const repaymentEvery: number = this.loansAccountTermsForm.value.repaymentEvery;
-      this.calculateLoanTerm(numberOfRepayments, repaymentEvery);
-    });
+  /**
+   * Clears existing loan term listeners
+   */
+  private clearLoanTermListeners(): void {
+    this.loanTermSubscriptions.forEach((subscription) => subscription.unsubscribe());
+    this.loanTermSubscriptions = [];
+  }
 
-    this.loansAccountTermsForm.get('repaymentEvery').valueChanges.subscribe((repaymentEvery) => {
-      const numberOfRepayments: number = this.loansAccountTermsForm.value.numberOfRepayments;
-      this.calculateLoanTerm(numberOfRepayments, repaymentEvery);
-    });
+  /**
+   * Sets up loan term listeners based on the current product type
+   */
+  setupLoanTermListeners(): void {
+    this.clearLoanTermListeners();
 
-    this.loansAccountTermsForm.get('loanTermFrequencyType').valueChanges.subscribe((loanTermFrequencyType) => {
-      this.loansAccountTermsForm.patchValue({ repaymentFrequencyType: loanTermFrequencyType });
-    });
+    if (!this.loansAccountTermsForm) {
+      return;
+    }
 
-    this.loansAccountTermsForm.get('amortizationType').valueChanges.subscribe((amortizationType) => {
-      if (amortizationType === 0) {
-        // Equal Principal Payments
-        this.loansAccountTermsForm.addControl('fixedPrincipalPercentagePerInstallment', new UntypedFormControl(''));
-      } else {
-        // Equal Installments
-        this.loansAccountTermsForm.removeControl('fixedPrincipalPercentagePerInstallment');
+    const isLocProduct = this.isLocProduct();
+    const newProductType: 'LOC' | 'STANDARD' = isLocProduct ? 'LOC' : 'STANDARD';
+
+    // Only set up listeners if product type has changed or is being set for the first time
+    if (this.currentProductType === newProductType) {
+      return;
+    }
+
+    this.currentProductType = newProductType;
+    this.doSetupLoanTermListeners(isLocProduct);
+  }
+
+  /**
+   * Forces setup of loan term listeners even if product type hasn't changed
+   * This is useful when specific LOC selection changes within the same product type
+   */
+  private forceSetupLoanTermListeners(): void {
+    this.clearLoanTermListeners();
+
+    if (!this.loansAccountTermsForm) {
+      return;
+    }
+
+    const isLocProduct = this.isLocProduct();
+    this.doSetupLoanTermListeners(isLocProduct);
+  }
+
+  /**
+   * Actually sets up the loan term listeners
+   */
+  private doSetupLoanTermListeners(isLocProduct: boolean): void {
+    if (isLocProduct) {
+      // For LOC products: sync loanTermFrequency with repaymentEvery (bidirectional)
+      const loanTermSub = this.loansAccountTermsForm
+        .get('loanTermFrequency')
+        ?.valueChanges.subscribe((loanTermFrequency) => {
+          this.loansAccountTermsForm.patchValue({ repaymentEvery: loanTermFrequency }, { emitEvent: false });
+        });
+
+      const repaymentEverySub = this.loansAccountTermsForm
+        .get('repaymentEvery')
+        ?.valueChanges.subscribe((repaymentEvery) => {
+          this.loansAccountTermsForm.patchValue({ loanTermFrequency: repaymentEvery }, { emitEvent: false });
+        });
+
+      if (loanTermSub) {
+        this.loanTermSubscriptions.push(loanTermSub);
       }
-    });
+      if (repaymentEverySub) {
+        this.loanTermSubscriptions.push(repaymentEverySub);
+      }
+    } else {
+      // For standard loans: calculate loan term from number of repayments and repayment frequency
+      const numberOfRepaymentsSub = this.loansAccountTermsForm
+        .get('numberOfRepayments')
+        ?.valueChanges.subscribe((numberOfRepayments) => {
+          const repaymentEvery: number = this.loansAccountTermsForm.value.repaymentEvery;
+          this.calculateLoanTerm(numberOfRepayments, repaymentEvery);
+        });
+
+      const repaymentEverySub = this.loansAccountTermsForm
+        .get('repaymentEvery')
+        ?.valueChanges.subscribe((repaymentEvery) => {
+          const numberOfRepayments: number = this.loansAccountTermsForm.value.numberOfRepayments;
+          this.calculateLoanTerm(numberOfRepayments, repaymentEvery);
+        });
+
+      const loanTermFrequencyTypeSub = this.loansAccountTermsForm
+        .get('loanTermFrequencyType')
+        ?.valueChanges.subscribe((loanTermFrequencyType) => {
+          this.loansAccountTermsForm.patchValue(
+            { repaymentFrequencyType: loanTermFrequencyType },
+            { emitEvent: false }
+          );
+        });
+
+      const amortizationTypeSub = this.loansAccountTermsForm
+        .get('amortizationType')
+        ?.valueChanges.subscribe((amortizationType) => {
+          if (amortizationType === 0) {
+            // Equal Principal Payments
+            this.loansAccountTermsForm.addControl('fixedPrincipalPercentagePerInstallment', new UntypedFormControl(''));
+          } else {
+            // Equal Installments
+            this.loansAccountTermsForm.removeControl('fixedPrincipalPercentagePerInstallment');
+          }
+        });
+
+      // Add all subscriptions to the array
+      if (numberOfRepaymentsSub) {
+        this.loanTermSubscriptions.push(numberOfRepaymentsSub);
+      }
+      if (repaymentEverySub) {
+        this.loanTermSubscriptions.push(repaymentEverySub);
+      }
+      if (loanTermFrequencyTypeSub) {
+        this.loanTermSubscriptions.push(loanTermFrequencyTypeSub);
+      }
+      if (amortizationTypeSub) {
+        this.loanTermSubscriptions.push(amortizationTypeSub);
+      }
+    }
+  }
+
+  /**
+   * Component cleanup
+   */
+  ngOnDestroy(): void {
+    this.clearLoanTermListeners();
   }
 
   setAdvancedPaymentStrategyControls(): void {
@@ -769,8 +894,8 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
         (option: any) => option.code === 'DAYS' || option.value === 'Days'
       );
 
-      // Update the form with the new tenor days
-      this.loansAccountTermsForm.patchValue({
+      // Update the form with the new tenor days, but preserve user input if they've modified values
+      this.patchFormPreservingUserInput({
         loanTermFrequency: tenorDays,
         loanTermFrequencyType: daysFrequencyType?.id || this.loansAccountTermsForm.get('loanTermFrequencyType')?.value
       });
@@ -778,6 +903,8 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
       // Ensure fields remain enabled for LOC products (users can still edit)
       this.handleLocProductTerms();
     }
+
+    this.forceSetupLoanTermListeners();
   }
 
   /**
@@ -792,14 +919,64 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges {
         (option: any) => option.code === 'DAYS' || option.value === 'Days'
       );
       if (daysFrequencyType) {
-        this.loansAccountTermsForm.patchValue({
-          loanTermFrequencyType: daysFrequencyType.id
-        });
+        // Only set to DAYS if user hasn't specifically chosen a different frequency type
+        const currentFrequencyType = this.loansAccountTermsForm.get('loanTermFrequencyType');
+        if (currentFrequencyType && (currentFrequencyType.pristine || !currentFrequencyType.value)) {
+          this.loansAccountTermsForm.patchValue({
+            loanTermFrequencyType: daysFrequencyType.id
+          });
+        }
       }
     }
 
-    // Always ensure fields are enabled for both LOC and non-LOC products
+    // Always ensure loan term fields are enabled for both LOC and non-LOC products
     this.loansAccountTermsForm.get('loanTermFrequency')?.enable();
     this.loansAccountTermsForm.get('loanTermFrequencyType')?.enable();
+  }
+
+  /**
+   * Patches form values while preserving user input.
+   * Only updates fields that haven't been modified by the user.
+   */
+  private patchFormPreservingUserInput(newValues: any): void {
+    if (!this.loansAccountTermsForm) {
+      return;
+    }
+
+    const patchData: any = {};
+
+    // Go through each field in newValues
+    Object.keys(newValues).forEach((key) => {
+      const control = this.loansAccountTermsForm.get(key);
+      if (control) {
+        const currentValue = control.value;
+        const newValue = newValues[key];
+
+        // Preserve user input by checking if the field has been touched/modified
+        // Only patch if:
+        // 1. Form is pristine (no user interaction) OR
+        // 2. Control is pristine (this specific field not touched) OR
+        // 3. Current value is empty/null/undefined (no user input to preserve)
+        const shouldPatch =
+          this.loansAccountTermsForm.pristine ||
+          control.pristine ||
+          currentValue === null ||
+          currentValue === undefined ||
+          currentValue === '' ||
+          this.isInitialLoad;
+
+        if (shouldPatch) {
+          patchData[key] = newValue;
+        }
+      } else {
+        // If control doesn't exist, always include it
+        patchData[key] = newValues[key];
+      }
+    });
+
+    // Apply the patch
+    if (Object.keys(patchData).length > 0) {
+      this.loansAccountTermsForm.patchValue(patchData, { emitEvent: false });
+    }
   }
 }
