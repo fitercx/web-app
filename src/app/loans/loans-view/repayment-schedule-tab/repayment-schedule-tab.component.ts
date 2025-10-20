@@ -288,7 +288,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
    */
   private updateDisplayedColumns(): void {
     if (this.isLineOfCreditReceivable()) {
-      // For LOC Receivable: remove principal-related columns and add new LOC-specific columns at the end
+      // For LOC Receivable: remove principal-related columns but keep emiAmount
       const columnsToRemove = [
         'principalDue',
         'due'
@@ -309,9 +309,9 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   /**
-   * Calculates the disbursed amount (principal - total interest on loan) for LOC receivable loans
+   * Calculates the disbursed amount for LOC receivable loans
    * Returns 0 for pre-disbursement state (creation/pending/approved)
-   * Only shows actual value when the loan is disbursed (active state)
+   * For disbursed loans on the loan view screen, uses the netDisbursalAmount field
    */
   getDisbursedAmount(item: any): number {
     if (!this.isLineOfCreditReceivable()) {
@@ -323,19 +323,30 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       return 0;
     }
 
-    // For disbursed loans, calculate the actual disbursed amount
+    // For disbursed loans, use netDisbursalAmount from loan details if available
     if (!item.principalDisbursed) {
       return 0;
     }
 
+    // Use loanData (for creation flow) or loanDetailsData (for view flow)
+    const loanInfo = this.loanData || this.loanDetailsData;
+
+    // If netDisbursalAmount is available in loan details, use it
+    if (loanInfo && loanInfo.netDisbursalAmount !== undefined && loanInfo.netDisbursalAmount !== null) {
+      return loanInfo.netDisbursalAmount;
+    }
+
+    // Fallback: calculate disbursed amount if netDisbursalAmount is not available
     const principal = item.principalDisbursed || 0;
     const totalInterest = this.repaymentScheduleDetails?.totalInterestCharged || 0;
-    return Math.max(0, principal - totalInterest);
+    const totalFees = this.repaymentScheduleDetails?.totalFeeChargesCharged || 0;
+    return Math.max(0, principal - totalInterest - totalFees);
   }
 
   /**
    * Gets the outstanding amount to display for LOC receivable loans
-   * For pre-disbursement state, shows the principalDisbursed value (pending amount)
+   * For pre-disbursement state on disbursement period, shows the total of interest + fees
+   * For pre-disbursement state on schedule rows, shows 0
    * For disbursed state, shows the actual outstanding amount
    */
   getOutstandingAmount(item: any): number {
@@ -343,9 +354,16 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       return item.totalOutstandingForPeriod || 0;
     }
 
-    // For pre-disbursement state, show principalDisbursed as the outstanding amount
+    // For pre-disbursement state
     if (this.isLoanPreDisbursement()) {
-      return item.principalDisbursed || 0;
+      // On the disbursement period, show total interest + fees as outstanding
+      if (this.isDisbursementPeriod(item)) {
+        const totalInterest = this.repaymentScheduleDetails?.totalInterestCharged || 0;
+        const totalFees = this.repaymentScheduleDetails?.totalFeeChargesCharged || 0;
+        return totalInterest + totalFees;
+      }
+      // For all schedule rows (non-disbursement periods), show 0
+      return 0;
     }
 
     // For disbursed loans, show the actual outstanding amount
@@ -359,16 +377,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     if (!this.isLineOfCreditReceivable()) {
       return 0;
     }
-
-    // Check if there's an overpayment (total paid > total due)
-    const totalPaid = item.totalPaidForPeriod || 0;
-    const totalDue = item.totalDueForPeriod || 0;
-
-    if (totalPaid > totalDue) {
-      return totalPaid - totalDue;
-    }
-
-    return 0;
+    return item.principalOutstanding || 0;
   }
 
   /**
@@ -376,7 +385,24 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
    * A disbursement period is identified by having a principalDisbursed value
    */
   private isDisbursementPeriod(item: any): boolean {
-    return !!(item.principalDisbursed && item.principalDisbursed > 0);
+    // Check if it's explicitly marked as a disbursement period
+    if (item.principalDisbursed && item.principalDisbursed > 0) {
+      return true;
+    }
+
+    // For pre-disbursement/creation flow, the disbursement period is typically:
+    // - Period 0, OR
+    // - The first period in the array without a principalDue (it's the disbursement line)
+    if (item.period === 0) {
+      return true;
+    }
+
+    // Additional check: if period is 1 and there's no principalDue, it might be the disbursement
+    if (item.period === 1 && (!item.principalDue || item.principalDue === 0)) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
@@ -419,5 +445,64 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
     // For all other cases, return the original status
     return item.status;
+  }
+
+  /**
+   * Gets the interest amount to display for a schedule period
+   * For LOC Receivable loans:
+   * - Shows the TOTAL interest from the schedule on the disbursement period
+   * - Returns 0 for all other periods (installment schedules)
+   * For regular loans: shows the actual interest per period
+   */
+  getInterestAmount(item: any): number {
+    if (!this.isLineOfCreditReceivable()) {
+      return item.interestOriginalDue || 0;
+    }
+
+    // For LOC Receivable, show total interest on the disbursement period
+    if (this.isDisbursementPeriod(item)) {
+      // Return the total interest charged for the entire loan
+      return this.repaymentScheduleDetails?.totalInterestCharged || 0;
+    }
+
+    // For all other periods (installment schedules), return 0
+    return 0;
+  }
+
+  /**
+   * Gets the fees amount to display for a schedule period
+   * For LOC Receivable loans:
+   * - Shows the TOTAL fees from the schedule on the disbursement period
+   * - Returns 0 for all other periods (installment schedules)
+   * For regular loans: shows the actual fees per period
+   */
+  getFeesAmount(item: any): number {
+    if (!this.isLineOfCreditReceivable()) {
+      return item.feeChargesDue || 0;
+    }
+
+    // For LOC Receivable, show total fees on the disbursement period
+    if (this.isDisbursementPeriod(item)) {
+      // Return the total fee charges for the entire loan
+      return this.repaymentScheduleDetails?.totalFeeChargesCharged || 0;
+    }
+
+    // For all other periods (installment schedules), return 0
+    return 0;
+  }
+
+  getEmiAmount(item: any): number {
+    if (!this.isLineOfCreditReceivable()) {
+      // Regular loans: principal + interest
+      return (item.principalDue || 0) + (item.interestOriginalDue || 0);
+    }
+
+    // For LOC Receivable: EMI is not shown on disbursement period
+    if (this.isDisbursementPeriod(item)) {
+      return 0;
+    }
+
+    // For installment periods: show only principal (interest and fees are 0)
+    return item.principalDue || 0;
   }
 }

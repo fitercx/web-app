@@ -82,7 +82,7 @@
     <ng-container matColumnDef="interest">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Interest' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        {{ item.interestOriginalDue | formatNumber }}
+        {{ getInterestAmount(item) | formatNumber }}
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
         <b>
@@ -114,10 +114,10 @@
     <ng-container matColumnDef="emiAmount">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.EMI Amount' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        {{ item.principalDue + item.interestOriginalDue | formatNumber }}
+        {{ getEmiAmount(item) | formatNumber }}
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
-        <b>
+        <b *ngIf="!isLineOfCreditReceivable()">
           {{
             repaymentScheduleDetails.totalPrincipalExpected + repaymentScheduleDetails.totalInterestCharged
               | currency: currencyCode : 'symbol-narrow' : '1.2-2'
@@ -129,7 +129,7 @@
     <ng-container matColumnDef="fees">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Fees' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        {{ item.feeChargesDue | formatNumber }}
+        {{ getFeesAmount(item) | formatNumber }}
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
         <b>
@@ -289,7 +289,7 @@
 
     <ng-container matColumnDef="interest">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Interest' | translate }}</th>
-      <td mat-cell class="r-amount" *matCellDef="let item">{{ item.interestOriginalDue | formatNumber }}</td>
+      <td mat-cell class="r-amount" *matCellDef="let item">{{ getInterestAmount(item) | formatNumber }}</td>
     </ng-container>
 
     <ng-container matColumnDef="disbursedAmount">
@@ -309,13 +309,13 @@
     <ng-container matColumnDef="emiAmount">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.EMI Amount' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item">
-        {{ item.principalDue + item.interestOriginalDue | formatNumber }}
+        {{ getEmiAmount(item) | formatNumber }}
       </td>
     </ng-container>
 
     <ng-container matColumnDef="fees">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Fees' | translate }}</th>
-      <td mat-cell class="r-amount" *matCellDef="let item">{{ item.feeChargesDue | formatNumber }}</td>
+      <td mat-cell class="r-amount" *matCellDef="let item">{{ getFeesAmount(item) | formatNumber }}</td>
     </ng-container>
 
     <ng-container matColumnDef="due">
