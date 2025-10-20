@@ -377,16 +377,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     if (!this.isLineOfCreditReceivable()) {
       return 0;
     }
-
-    // Check if there's an overpayment (total paid > total due)
-    const totalPaid = item.totalPaidForPeriod || 0;
-    const totalDue = item.totalDueForPeriod || 0;
-
-    if (totalPaid > totalDue) {
-      return totalPaid - totalDue;
-    }
-
-    return 0;
+    return item.principalOutstanding || 0;
   }
 
   /**
