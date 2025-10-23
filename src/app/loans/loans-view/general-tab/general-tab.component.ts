@@ -90,9 +90,14 @@ export class GeneralTabComponent implements OnInit {
     let processingFee = this.loanDetails.summary?.feeChargesCharged || 0;
     const factorRateEnabled = this.loanDetails?.factorRateEnabled || false;
     if (factorRateEnabled) {
+      // If factor rate is enabled, processing fee is considered zero
       processingFee = 0;
     }
-    this.netDisbursedAmount = disbursedAmount - processingFee;
+    const netDisbursedAmount = disbursedAmount - processingFee;
+    const isLineOfCreditReceivable = this.loanDetails.additionalProperties?.locProductType === 'RECEIVABLE';
+    this.netDisbursedAmount = isLineOfCreditReceivable
+      ? netDisbursedAmount - this.loanDetails.summary.interestCharged
+      : netDisbursedAmount;
   }
 
   /** Returns the disbursed amount based on loan status */
