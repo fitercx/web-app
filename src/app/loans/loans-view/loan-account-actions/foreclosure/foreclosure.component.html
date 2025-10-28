@@ -42,6 +42,11 @@
           </mat-form-field>
 
           <mat-form-field>
+            <mat-label>{{ 'labels.inputs.Tax Amount' | translate }}</mat-label>
+            <input matInput formControlName="outstandingTaxChargesPortion" />
+          </mat-form-field>
+
+          <mat-form-field>
             <mat-label>{{ 'labels.inputs.Transaction Amount' | translate }}</mat-label>
             <input matInput required formControlName="transactionAmount" />
           </mat-form-field>

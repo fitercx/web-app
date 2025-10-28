@@ -212,7 +212,8 @@
         <div fxFlexFill>
           <span fxFlex="50%">{{ 'labels.inputs.Proposed Amount' | translate }}:</span>
           <span fxFlex="50%">{{
-            loanDetails.proposedPrincipal | currency: currencyCode : 'symbol-narrow' : '1.2-2'
+            (loanDetails.factorRateEnabled ? loanDetails.factorRateLoanAmount : loanDetails.proposedPrincipal)
+              | currency: currencyCode : 'symbol-narrow' : '1.2-2'
           }}</span>
         </div>
 

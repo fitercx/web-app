@@ -109,7 +109,7 @@ jobs:
 
       - name: Login to Amazon ECR - Prod Account
         uses: aws-actions/amazon-ecr-login@v2
-        
+
       - name: Push to Production ECR
         run: |
           IMAGE_TAG="${{ env.NEW_VERSION }}"

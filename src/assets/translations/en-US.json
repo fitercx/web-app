@@ -651,6 +651,7 @@
       "Progressive": "Progressive",
       "Penalty": "Penalty",
       "Fees": "Fees",
+      "Taxes": "Taxes",
       "Fee": "Fee",
       "Horizontal": "Horizontal",
       "Vertical": "Vertical",
@@ -1189,6 +1190,7 @@
       "Principal Amount": "Principal Amount"
     },
     "inputs": {
+      "Tax Amount": "Tax Amount",
       "Enable Line of Credit Receivable": "Enable Line of Credit Receivable",
       "Disbursed Amount": "Disbursed Amount",
       "Refund Amount": "Refund Amount",
@@ -1704,6 +1706,7 @@
       "Fee Frequency": "Fee Frequency",
       "Fee/Penalty": "Fee/Penalty",
       "Fees": "Fees",
+      "Taxes": "Taxes",
       "Fees Outstanding": "Fees Outstanding",
       "Fees Receivable": "Fees Receivable",
       "Field Name": "Field Name",

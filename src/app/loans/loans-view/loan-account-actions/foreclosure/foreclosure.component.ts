@@ -58,6 +58,7 @@ export class ForeclosureComponent implements OnInit {
       outstandingInterestPortion: [{ value: this.dataObject.interestPortion || 0, disabled: true }],
       outstandingFeeChargesPortion: [{ value: this.dataObject.feeChargesPortion || 0, disabled: true }],
       outstandingPenaltyChargesPortion: [{ value: this.dataObject.penaltyChargesPortion || 0, disabled: true }],
+      outstandingTaxChargesPortion: [{ value: this.dataObject.taxChargesPortion || 0, disabled: true }],
       transactionAmount: [{ value: this.dataObject.amount, disabled: true }],
       isForcedClosure: [false],
       isRestructured: [false],
@@ -91,6 +92,7 @@ export class ForeclosureComponent implements OnInit {
         outstandingInterestPortion: this.foreclosuredata.interestPortion,
         outstandingFeeChargesPortion: this.foreclosuredata.feeChargesPortion,
         outstandingPenaltyChargesPortion: this.foreclosuredata.penaltyChargesPortion,
+        outstandingTaxChargesPortion: this.foreclosuredata.taxChargesPortion,
         transactionAmount: this.foreclosuredata.amount
       });
     });

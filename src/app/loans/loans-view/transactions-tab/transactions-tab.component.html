@@ -128,6 +128,18 @@
       </td>
     </ng-container>
 
+    <ng-container matColumnDef="taxes">
+      <td
+        mat-cell
+        class="r-amount td-min-space"
+        *matCellDef="let transaction"
+        (click)="showTransactions(transaction)"
+        [ngClass]="loanTransactionColor(transaction)"
+      >
+        {{ transaction.taxChargesPortion | formatNumber }}
+      </td>
+    </ng-container>
+
     <ng-container matColumnDef="penalties">
       <td
         mat-cell
@@ -253,7 +265,7 @@
     </ng-container>
 
     <ng-container matColumnDef="h1-breakdown">
-      <th mat-header-cell *matHeaderCellDef class="center" [attr.colspan]="4">
+      <th mat-header-cell *matHeaderCellDef class="center" [attr.colspan]="5">
         {{ 'labels.inputs.Breakdown' | translate }}
       </th>
     </ng-container>
@@ -298,6 +310,12 @@
     <ng-container matColumnDef="h2-penalties">
       <th mat-header-cell class="r-amount" *matHeaderCellDef [attr.colspan]="1">
         {{ 'labels.inputs.Penalties' | translate }}
+      </th>
+    </ng-container>
+
+    <ng-container matColumnDef="h2-taxes">
+      <th mat-header-cell class="r-amount" *matHeaderCellDef [attr.colspan]="1">
+        {{ 'labels.inputs.Taxes' | translate }}
       </th>
     </ng-container>
 

@@ -49,6 +49,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     'principalDue',
     'interest',
     'fees',
+    'taxes',
     'penalties',
     'waived',
     'status',
@@ -284,6 +285,17 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   /**
+   * Checks if the loan has factor rate enabled
+   */
+  private isLoanFactorRateEnabled(): boolean {
+    const loanAccountData = this.loanData || this.loanDetailsData;
+    if (!loanAccountData) {
+      return false;
+    }
+    return loanAccountData.factorRateEnabled;
+  }
+
+  /**
    * Updates the displayed columns based on loan type
    */
   private updateDisplayedColumns(): void {
@@ -301,6 +313,10 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       // Add LOC-specific columns at the end of the schedule
       this.displayedColumns.push('disbursedAmount', 'refundAmount');
       this.displayedColumnsEdit.push('disbursedAmount', 'refundAmount');
+    } else if (this.isLoanFactorRateEnabled()) {
+      const columnsToRemove = ['interest'];
+      this.displayedColumns = [...this.baseDisplayedColumns].filter((col) => !columnsToRemove.includes(col));
+      this.displayedColumnsEdit = [...this.baseDisplayedColumnsEdit].filter((col) => !columnsToRemove.includes(col));
     } else {
       // For regular loans: use base columns as-is
       this.displayedColumns = [...this.baseDisplayedColumns];
