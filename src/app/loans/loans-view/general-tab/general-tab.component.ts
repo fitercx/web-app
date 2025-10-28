@@ -88,9 +88,13 @@ export class GeneralTabComponent implements OnInit {
     const isActive = this.loanDetails?.status?.id === 300;
     const disbursedAmount = isActive ? this.loanDetails?.principal || 0 : 0;
     let processingFee = this.loanDetails.summary?.feeChargesCharged || 0;
-    let netDisbursedAmount = disbursedAmount - processingFee;
-    let isLineOfCreditReceivable =
-      this.loanDetails.additionalProperties?.locProductType === 'RECEIVABLE' ? true : false;
+    const factorRateEnabled = this.loanDetails?.factorRateEnabled || false;
+    if (factorRateEnabled) {
+      // If factor rate is enabled, processing fee is considered zero
+      processingFee = 0;
+    }
+    const netDisbursedAmount = disbursedAmount - processingFee;
+    const isLineOfCreditReceivable = this.loanDetails.additionalProperties?.locProductType === 'RECEIVABLE';
     this.netDisbursedAmount = isLineOfCreditReceivable
       ? netDisbursedAmount - this.loanDetails.summary.interestCharged
       : netDisbursedAmount;
@@ -101,7 +105,14 @@ export class GeneralTabComponent implements OnInit {
     // Only show disbursed amount if loan is active (status 300)
     // For pending approval (100) and approved (200), show 0.00
     const isActive = this.loanDetails?.status?.id === 300;
-    return isActive ? this.loanDetails?.principal || 0 : 0;
+    if (!isActive) {
+      return 0;
+    }
+
+    if (this.loanDetails.factorRateEnabled) {
+      return this.loanDetails.factorRateLoanAmount;
+    }
+    return this.loanDetails?.principal || 0;
   }
 
   /** Returns the approved amount based on loan status */
@@ -113,6 +124,11 @@ export class GeneralTabComponent implements OnInit {
       // Submitted and pending approval
       return 0;
     }
+
+    if (this.loanDetails.factorRateEnabled) {
+      return this.loanDetails.factorRateLoanAmount;
+    }
+
     return this.loanDetails?.approvedPrincipal || 0;
   }
 
@@ -147,6 +163,16 @@ export class GeneralTabComponent implements OnInit {
         writtenOff: this.loanDetails.summary.feeChargesWrittenOff,
         outstanding: this.loanDetails.summary.feeChargesOutstanding,
         overdue: this.loanDetails.summary.feeChargesOverdue
+      },
+      {
+        property: 'Taxes',
+        original: this.loanDetails.summary.taxChargesCharged,
+        adjustment: '0',
+        paid: this.loanDetails.summary.taxChargesPaid,
+        waived: this.loanDetails.summary.taxChargesWaived,
+        writtenOff: this.loanDetails.summary.taxChargesWrittenOff,
+        outstanding: this.loanDetails.summary.taxChargesOutstanding,
+        overdue: this.loanDetails.summary.taxChargesOverdue
       },
       {
         property: 'Penalties',
@@ -191,7 +217,9 @@ export class GeneralTabComponent implements OnInit {
       },
       {
         key: 'Proposed Amount',
-        value: this.loanDetails.proposedPrincipal
+        value: this.loanDetails.factorRateEnabled
+          ? this.loanDetails.factorRateLoanAmount
+          : this.loanDetails.proposedPrincipal
       },
       {
         key: 'Approved Amount',
