@@ -20,6 +20,8 @@ export class DisburseToSavingsAccountComponent implements OnInit {
   maxDate = new Date();
   /** Disbursement Loan form. */
   disbursementForm: UntypedFormGroup;
+  /** Full Loan Details Data */
+  loanDetailsData: any;
   currency: Currency;
 
   /**
@@ -41,10 +43,17 @@ export class DisburseToSavingsAccountComponent implements OnInit {
 
   ngOnInit() {
     this.maxDate = this.settingsService.businessDate;
-    this.setDisbursementToSavingsForm();
+
     if (this.dataObject.currency) {
       this.currency = this.dataObject.currency;
     }
+
+    // Fetch loan details to check LOC status
+    const loanId = this.route.snapshot.params['loanId'];
+    this.loanService.getLoanAccountAssociationDetails(loanId).subscribe((loanDetails: any) => {
+      this.loanDetailsData = loanDetails;
+      this.setDisbursementToSavingsForm();
+    });
   }
 
   /**
@@ -68,13 +77,19 @@ export class DisburseToSavingsAccountComponent implements OnInit {
         new UntypedFormControl(this.dataObject.fixedEmiAmount, [Validators.required])
       );
     }
+
+    // Disable amount field for LOC receivable loans
+    if (this.isLineOfCreditReceivable()) {
+      this.disbursementForm.get('transactionAmount')?.disable();
+    }
   }
 
   /**
    * Submit Disburse Form.
    */
   submit() {
-    const disbursementLoanFormData = this.disbursementForm.value;
+    // Get all form values including disabled fields
+    const disbursementLoanFormData = this.disbursementForm.getRawValue();
     const locale = this.settingsService.language.code;
     const dateFormat = this.settingsService.dateFormat;
     const prevActualDisbursementDate: Date = this.disbursementForm.value.actualDisbursementDate;
@@ -94,5 +109,28 @@ export class DisburseToSavingsAccountComponent implements OnInit {
     this.loanService.loanActionButtons(loanId, 'disbursetosavings', data).subscribe((response: any) => {
       this.router.navigate(['../../general'], { relativeTo: this.route });
     });
+  }
+
+  /**
+   * Checks if the loan is a Line of Credit Receivable loan
+   */
+  isLineOfCreditReceivable(): boolean {
+    // Use loanDetailsData which has the full loan information
+    const loanInfo = this.loanDetailsData || this.dataObject;
+
+    if (!loanInfo) {
+      return false;
+    }
+
+    // Check if loan has a line of credit ID (indicating it's a LOC loan)
+    const hasLineOfCredit = !!(loanInfo.lineOfCreditId || loanInfo.additionalProperties?.lineOfCreditId);
+
+    if (!hasLineOfCredit) {
+      return false;
+    }
+
+    // Check if it's of receivable type
+    const locType = loanInfo.locType || loanInfo.additionalProperties?.locProductType;
+    return locType === 'RECEIVABLE';
   }
 }

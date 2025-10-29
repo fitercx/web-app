@@ -259,7 +259,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     return true;
   }
 
-  private isLineOfCreditReceivable(): boolean {
+  isLineOfCreditReceivable(): boolean {
     // Use loanData (for creation flow) or loanDetailsData (for view flow)
     const loanInfo = this.loanData || this.loanDetailsData;
 
