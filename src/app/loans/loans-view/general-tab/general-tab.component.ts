@@ -95,9 +95,7 @@ export class GeneralTabComponent implements OnInit {
     }
     const netDisbursedAmount = disbursedAmount - processingFee;
     const isLineOfCreditReceivable = this.loanDetails.additionalProperties?.locProductType === 'RECEIVABLE';
-    this.netDisbursedAmount = isLineOfCreditReceivable
-      ? netDisbursedAmount - this.loanDetails.summary.interestCharged
-      : netDisbursedAmount;
+    this.netDisbursedAmount = isLineOfCreditReceivable ? this.loanDetails.netDisbursalAmount : netDisbursedAmount;
   }
 
   /** Returns the disbursed amount based on loan status */

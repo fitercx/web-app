@@ -1190,7 +1190,9 @@
       "Principal Amount": "Principal Amount"
     },
     "inputs": {
+      "PreDisbursal Amount": "PreDisbursal Amount",
       "Tax Amount": "Tax Amount",
+      "Expected Interest": "Expected Interest",
       "Enable Line of Credit Receivable": "Enable Line of Credit Receivable",
       "Disbursed Amount": "Disbursed Amount",
       "Refund Amount": "Refund Amount",

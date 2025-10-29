@@ -24,6 +24,8 @@ export class ApproveLoanComponent implements OnInit {
   loanData: any = new Object();
   /** Association Data */
   associationData: any;
+  /** Full Loan Details Data */
+  loanDetailsData: any;
   /** Minimum Date allowed. */
   minDate = new Date(2000, 0, 1);
   /** Loan Id */
@@ -56,10 +58,22 @@ export class ApproveLoanComponent implements OnInit {
 
   ngOnInit() {
     this.setApproveLoanForm();
-    this.loanService.getApproveAssociationsDetails(this.loanId).subscribe((response: any) => {
-      this.associationData = response;
-      this.approveLoanForm.patchValue({
-        expectedDisbursementDate: new Date(response.timeline.expectedDisbursementDate)
+
+    // Fetch loan details to check LOC status and get association details
+    this.loanService.getLoanAccountAssociationDetails(this.loanId).subscribe((loanDetails: any) => {
+      this.loanDetailsData = loanDetails;
+
+      // Check if this is a LOC receivable and disable amount field if needed
+      if (this.isLineOfCreditReceivable()) {
+        this.approveLoanForm.get('approvedLoanAmount')?.disable();
+      }
+
+      // Now get approval association details
+      this.loanService.getApproveAssociationsDetails(this.loanId).subscribe((response: any) => {
+        this.associationData = response;
+        this.approveLoanForm.patchValue({
+          expectedDisbursementDate: new Date(response.timeline.expectedDisbursementDate)
+        });
       });
     });
   }
@@ -86,7 +100,8 @@ export class ApproveLoanComponent implements OnInit {
    * Submits Approve form.
    */
   submit() {
-    const approveLoanFormData = this.approveLoanForm.value;
+    // Get all form values including disabled fields
+    const approveLoanFormData = this.approveLoanForm.getRawValue();
     const locale = this.settingsService.language.code;
     const dateFormat = this.settingsService.dateFormat;
     const approvedOnDate = this.approveLoanForm.value.approvedOnDate;
@@ -105,5 +120,30 @@ export class ApproveLoanComponent implements OnInit {
     this.loanService.loanActionButtons(this.loanId, 'approve', data).subscribe((response: any) => {
       this.router.navigate(['../../general'], { relativeTo: this.route });
     });
+  }
+
+  /**
+   * Checks if the loan is a Line of Credit Receivable loan
+   */
+  isLineOfCreditReceivable(): boolean {
+    // Use loanDetailsData if available, fallback to loanData
+    const loanInfo = this.loanDetailsData || this.loanData;
+
+    if (!loanInfo) {
+      return false;
+    }
+
+    // Check if loan has a line of credit ID (indicating it's a LOC loan)
+    const hasLineOfCredit = !!(loanInfo.lineOfCreditId || loanInfo.additionalProperties?.lineOfCreditId);
+
+    if (!hasLineOfCredit) {
+      return false;
+    }
+
+    // Check if it's of receivable type
+    const locType = loanInfo.locType || loanInfo.additionalProperties?.locProductType;
+    const isReceivable = locType === 'RECEIVABLE';
+
+    return isReceivable;
   }
 }
