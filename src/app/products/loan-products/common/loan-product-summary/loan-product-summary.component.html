@@ -1094,6 +1094,15 @@
       >
       </mifosx-gl-account-display>
 
+      <mifosx-gl-account-display
+        fxFlex="100%"
+        *ngIf="isAccountingAccrualBased && accountingMappings.deferredIncomeAccount"
+        [accountTitle]="'Deferred Income Account'"
+        [glAccount]="accountingMappings.deferredIncomeAccount"
+        [withTitle]="'47%'"
+      >
+      </mifosx-gl-account-display>
+
       <div *ngIf="isAdvancedAccountingEnabled()" fxFlexFill fxLayout="row wrap" fxLayout.lt-md="column">
         <h3 class="mat-h3" fxFlexFill>{{ 'labels.heading.Advanced Accounting Rules' | translate }}</h3>
 

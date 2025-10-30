@@ -70,7 +70,9 @@
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
         {{ item.principalLoanBalanceOutstanding | formatNumber }}
       </td>
-      <td mat-footer-cell class="r-amount" *matFooterCellDef>&nbsp;</td>
+      <td mat-footer-cell class="r-amount" *matFooterCellDef>
+        <b>{{ getDisplayedTotalOutstanding() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}</b>
+      </td>
     </ng-container>
 
     <ng-container matColumnDef="principalDue">
@@ -116,10 +118,18 @@
     <ng-container matColumnDef="refundAmount">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Refund Amount' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        {{ getRefundAmount(item) | formatNumber }}
+        <ng-container *ngIf="isLoanOverpaid(); else normalRefund">
+          {{ item.totalOutstandingForPeriod | formatNumber }}
+        </ng-container>
+        <ng-template #normalRefund>{{ getRefundAmount(item) | formatNumber }}</ng-template>
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
-        <b>&nbsp;</b>
+        <b>
+          <ng-container *ngIf="isLoanOverpaid(); else refundFooterEmpty">
+            {{ repaymentScheduleDetails.totalOutstanding | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+          </ng-container>
+          <ng-template #refundFooterEmpty>&nbsp;</ng-template>
+        </b>
       </td>
     </ng-container>
 
@@ -252,10 +262,13 @@
 
     <ng-container matColumnDef="outstanding">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Outstanding Amount' | translate }}</th>
-      <td mat-cell class="r-amount" *matCellDef="let item">{{ item.totalOutstandingForPeriod | formatNumber }}</td>
-      <td mat-footer-cell class="r-amount" *matFooterCellDef>
-        <b> {{ repaymentScheduleDetails.totalOutstanding | currency: currencyCode : 'symbol-narrow' : '1.2-2' }} </b>
+      <td mat-cell class="r-amount" *matCellDef="let item">
+        <ng-container *ngIf="!isLoanOverpaid() && shouldShowOutstanding(item); else emptyOutstanding">
+          {{ item.totalOutstandingForPeriod | formatNumber }}
+        </ng-container>
+        <ng-template #emptyOutstanding>&nbsp;</ng-template>
       </td>
+      <td mat-footer-cell class="r-amount" *matFooterCellDef>&nbsp;</td>
     </ng-container>
 
     <ng-container matColumnDef="header">

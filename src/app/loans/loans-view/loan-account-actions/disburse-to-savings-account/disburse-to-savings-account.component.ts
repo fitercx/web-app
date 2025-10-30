@@ -44,38 +44,68 @@ export class DisburseToSavingsAccountComponent implements OnInit {
   ngOnInit() {
     this.maxDate = this.settingsService.businessDate;
 
-    if (this.dataObject.currency) {
+    if (this.dataObject?.currency) {
       this.currency = this.dataObject.currency;
     }
 
-    // Fetch loan details to check LOC status
+    // Build form once so user input isn't lost when async data arrives
+    this.setDisbursementToSavingsForm();
+
     const loanId = this.route.snapshot.params['loanId'];
     this.loanService.getLoanAccountAssociationDetails(loanId).subscribe((loanDetails: any) => {
       this.loanDetailsData = loanDetails;
-      this.setDisbursementToSavingsForm();
+      // Only perform LOC-specific adjustments; do NOT rebuild the form.
+      if (this.isLineOfCreditReceivable()) {
+        this.disbursementForm.get('transactionAmount')?.disable();
+      }
     });
   }
 
   /**
    * Set Disbursement Loan form.
+   * Preserves existing user-selected date if already chosen.
    */
   setDisbursementToSavingsForm() {
+    const existingDate = this.disbursementForm?.get('actualDisbursementDate')?.value;
+    const providedDate = this.dataObject?.actualDisbursementDate; // may come pre-populated
+
+    let initialDate: Date;
+    if (existingDate instanceof Date) {
+      initialDate = existingDate;
+    } else if (typeof existingDate === 'string' && existingDate) {
+      // attempt to parse previously entered string
+      const parsed = new Date(existingDate);
+      initialDate = isNaN(parsed.getTime()) ? new Date() : parsed;
+    } else if (providedDate) {
+      const parsedProvided = new Date(providedDate);
+      initialDate = isNaN(parsedProvided.getTime()) ? new Date() : parsedProvided;
+    } else {
+      initialDate = new Date();
+    }
+
+    const existingNote = this.disbursementForm?.get('note')?.value || '';
+
     this.disbursementForm = this.formBuilder.group({
       actualDisbursementDate: [
-        new Date(),
+        initialDate,
         Validators.required
       ],
       transactionAmount: [
-        this.dataObject.amount,
+        this.dataObject?.amount,
         Validators.required
       ],
-      note: ['']
+      note: [existingNote]
     });
-    if (this.dataObject.fixedEmiAmount) {
-      this.disbursementForm.addControl(
-        'fixedEmiAmount',
-        new UntypedFormControl(this.dataObject.fixedEmiAmount, [Validators.required])
-      );
+
+    if (this.dataObject?.fixedEmiAmount) {
+      if (!this.disbursementForm.get('fixedEmiAmount')) {
+        this.disbursementForm.addControl(
+          'fixedEmiAmount',
+          new UntypedFormControl(this.dataObject.fixedEmiAmount, [Validators.required])
+        );
+      } else {
+        this.disbursementForm.get('fixedEmiAmount')?.setValue(this.dataObject.fixedEmiAmount);
+      }
     }
 
     // Disable amount field for LOC receivable loans
@@ -92,21 +122,25 @@ export class DisburseToSavingsAccountComponent implements OnInit {
     const disbursementLoanFormData = this.disbursementForm.getRawValue();
     const locale = this.settingsService.language.code;
     const dateFormat = this.settingsService.dateFormat;
-    const prevActualDisbursementDate: Date = this.disbursementForm.value.actualDisbursementDate;
-    if (disbursementLoanFormData.actualDisbursementDate instanceof Date) {
-      disbursementLoanFormData.actualDisbursementDate = this.dateUtils.formatDate(
-        prevActualDisbursementDate,
-        dateFormat
-      );
+    let chosenDate = disbursementLoanFormData.actualDisbursementDate;
+
+    if (chosenDate && !(chosenDate instanceof Date)) {
+      chosenDate = new Date(chosenDate);
     }
+
+    if (chosenDate instanceof Date && !isNaN(chosenDate.getTime())) {
+      disbursementLoanFormData.actualDisbursementDate = this.dateUtils.formatDate(chosenDate, dateFormat);
+    }
+
     const data = {
       ...disbursementLoanFormData,
       dateFormat,
-      locale
+      locale,
+      transactionAmount: disbursementLoanFormData.transactionAmount * 1
     };
+
     const loanId = this.route.snapshot.params['loanId'];
-    data['transactionAmount'] = data['transactionAmount'] * 1;
-    this.loanService.loanActionButtons(loanId, 'disbursetosavings', data).subscribe((response: any) => {
+    this.loanService.loanActionButtons(loanId, 'disbursetosavings', data).subscribe(() => {
       this.router.navigate(['../../general'], { relativeTo: this.route });
     });
   }
@@ -115,21 +149,14 @@ export class DisburseToSavingsAccountComponent implements OnInit {
    * Checks if the loan is a Line of Credit Receivable loan
    */
   isLineOfCreditReceivable(): boolean {
-    // Use loanDetailsData which has the full loan information
     const loanInfo = this.loanDetailsData || this.dataObject;
-
     if (!loanInfo) {
       return false;
     }
-
-    // Check if loan has a line of credit ID (indicating it's a LOC loan)
     const hasLineOfCredit = !!(loanInfo.lineOfCreditId || loanInfo.additionalProperties?.lineOfCreditId);
-
     if (!hasLineOfCredit) {
       return false;
     }
-
-    // Check if it's of receivable type
     const locType = loanInfo.locType || loanInfo.additionalProperties?.locProductType;
     return locType === 'RECEIVABLE';
   }

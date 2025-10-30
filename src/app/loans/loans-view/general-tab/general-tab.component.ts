@@ -149,7 +149,7 @@ export class GeneralTabComponent implements OnInit {
         paid: this.loanDetails.summary.interestPaid,
         waived: this.loanDetails.summary.interestWaived,
         writtenOff: this.loanDetails.summary.interestWrittenOff,
-        outstanding: this.loanDetails.summary.interestOutstanding,
+        outstanding: String(this.getAdjustedInterestOutstanding()),
         overdue: this.loanDetails.summary.interestOverdue
       },
       {
@@ -189,7 +189,7 @@ export class GeneralTabComponent implements OnInit {
         paid: this.loanDetails.summary.totalRepayment,
         waived: this.loanDetails.summary.totalWaived,
         writtenOff: this.loanDetails.summary.totalWrittenOff,
-        outstanding: this.loanDetails.summary.totalOutstanding,
+        outstanding: String(this.getAdjustedTotalOutstanding()),
         overdue: this.loanDetails.summary.totalOverdue
       }
     ];
@@ -274,4 +274,46 @@ export class GeneralTabComponent implements OnInit {
     }
     return true;
   };
+
+  /** Adjust interest outstanding for LOC (receivable or payable) by subtracting overpaid amount, never below zero */
+  private getAdjustedInterestOutstanding(): number {
+    if (!this.loanDetails?.summary) {
+      return 0;
+    }
+    const interestOutstanding = this.loanDetails.summary.interestOutstanding || 0;
+    const overPaid = this.loanDetails.totalOverpaid || this.loanDetails.overPaidAmount || 0;
+    if (overPaid > 0 && this.isAnyLineOfCredit()) {
+      const adjusted = interestOutstanding - overPaid;
+      return adjusted < 0 ? 0 : adjusted;
+    }
+    return interestOutstanding;
+  }
+
+  /** Adjust total outstanding for LOC (receivable or payable) similar to interest */
+  private getAdjustedTotalOutstanding(): number {
+    if (!this.loanDetails?.summary) {
+      return 0;
+    }
+    const totalOutstanding = this.loanDetails.summary.totalOutstanding || 0;
+    const overPaid = this.loanDetails.totalOverpaid || this.loanDetails.overPaidAmount || 0;
+    if (overPaid > 0 && this.isAnyLineOfCredit()) {
+      const adjusted = totalOutstanding - overPaid;
+      return adjusted < 0 ? 0 : adjusted;
+    }
+    return totalOutstanding;
+  }
+
+  /** Any LOC (receivable or payable) */
+  private isAnyLineOfCredit(): boolean {
+    const info = this.loanDetails;
+    if (!info) {
+      return false;
+    }
+    const hasLocId = !!(info.lineOfCreditId || info.additionalProperties?.lineOfCreditId);
+    if (!hasLocId) {
+      return false;
+    }
+    const locType = info.locType || info.additionalProperties?.locProductType;
+    return locType === 'RECEIVABLE' || locType === 'PAYABLE';
+  }
 }

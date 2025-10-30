@@ -380,4 +380,32 @@ export class LoansViewComponent implements OnInit {
       .navigateByUrl(`/clients/${clientId}/loans-accounts`, { skipLocationChange: true })
       .then(() => this.router.navigate([url]));
   }
+
+  /** Returns adjusted current balance less any overpaid amount (never below zero) */
+  getAdjustedCurrentBalance(): number {
+    if (!this.loanDetailsData || !this.loanDetailsData.summary) {
+      return 0;
+    }
+    const totalOutstanding = this.loanDetailsData.summary.totalOutstanding || 0;
+    const overPaid = this.loanDetailsData.totalOverpaid || this.loanDetailsData.overPaidAmount || 0;
+    if (overPaid > 0 && this.isAnyLineOfCredit()) {
+      const adjusted = totalOutstanding - overPaid;
+      return adjusted < 0 ? 0 : adjusted;
+    }
+    return totalOutstanding;
+  }
+
+  /** Whether loan is any LOC (receivable/payable) */
+  private isAnyLineOfCredit(): boolean {
+    const info = this.loanDetailsData;
+    if (!info) {
+      return false;
+    }
+    const hasLocId = !!(info.lineOfCreditId || info.additionalProperties?.lineOfCreditId);
+    if (!hasLocId) {
+      return false;
+    }
+    const locType = info.locType || info.additionalProperties?.locProductType;
+    return locType === 'RECEIVABLE' || locType === 'PAYABLE';
+  }
 }

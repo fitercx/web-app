@@ -133,6 +133,7 @@ export interface LoanProduct {
   receivableInterestAccountId?: number;
   receivableFeeAccountId?: number;
   receivablePenaltyAccountId?: number;
+  deferredIncomeAccountId?: number;
   transfersInSuspenseAccountId?: number;
   writeOffAccountId?: number;
   // Advanced Accounting
