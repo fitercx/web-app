@@ -107,6 +107,11 @@ export class DisburseToSavingsAccountComponent implements OnInit {
         this.disbursementForm.get('fixedEmiAmount')?.setValue(this.dataObject.fixedEmiAmount);
       }
     }
+
+    // Disable amount field for LOC receivable loans
+    if (this.isLineOfCreditReceivable()) {
+      this.disbursementForm.get('transactionAmount')?.disable();
+    }
   }
 
   /**
