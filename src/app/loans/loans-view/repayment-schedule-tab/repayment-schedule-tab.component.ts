@@ -281,6 +281,25 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     return locType === 'RECEIVABLE';
   }
 
+  /** LOC payable type */
+  isLineOfCreditPayable(): boolean {
+    const loanInfo = this.loanData || this.loanDetailsData;
+    if (!loanInfo) {
+      return false;
+    }
+    const hasLineOfCredit = !!(loanInfo.lineOfCreditId || loanInfo.additionalProperties?.lineOfCreditId);
+    if (!hasLineOfCredit) {
+      return false;
+    }
+    const locType = loanInfo.locType || loanInfo.additionalProperties?.locProductType;
+    return locType === 'PAYABLE';
+  }
+
+  /** Any LOC (receivable or payable) */
+  private isAnyLineOfCredit(): boolean {
+    return this.isLineOfCreditReceivable() || this.isLineOfCreditPayable();
+  }
+
   /**
    * Checks if the loan has factor rate enabled
    */
@@ -397,5 +416,34 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
     // For all other cases, return the original status
     return item.status;
+  }
+
+  /** Determines if outstanding amount should be shown for a period */
+  shouldShowOutstanding(item: RepaymentSchedulePeriod): boolean {
+    if (!item) {
+      return false;
+    }
+    // If installment marked complete treat as paid -> hide
+    if (item.complete) {
+      return false;
+    }
+    // If backend already reports zero outstanding, hide
+    if (item.totalOutstandingForPeriod === 0) {
+      return false;
+    }
+    return true;
+  }
+
+  /** Whether loan is overpaid (status or overPaidAmount > 0) */
+  isLoanOverpaid(): boolean {
+    const loanInfo = this.loanData || this.loanDetailsData;
+    if (!loanInfo) {
+      return false;
+    }
+    // Only treat overpaid for LOC types
+    if (this.isAnyLineOfCredit() && loanInfo.overPaidAmount && loanInfo.overPaidAmount > 0) {
+      return true;
+    }
+    return false;
   }
 }

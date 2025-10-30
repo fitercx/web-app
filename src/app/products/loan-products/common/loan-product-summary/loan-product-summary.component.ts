@@ -101,8 +101,34 @@ export class LoanProductSummaryComponent implements OnInit, OnChanges {
       this.feeToIncomeAccountMappings = this.loanProduct.feeToIncomeAccountMappings || [];
       this.penaltyToIncomeAccountMappings = this.loanProduct.penaltyToIncomeAccountMappings || [];
       this.chargeOffReasonToExpenseAccountMappings = this.loanProduct.chargeOffReasonToExpenseAccountMappings || [];
+      // Fallback: some API responses embed deferred income account under key `deferredIncomeAccountId` as an object
+      // while the template expects `accountingMappings.deferredIncomeAccount`. If present, normalize it.
+      if (
+        this.accountingMappings &&
+        !this.accountingMappings.deferredIncomeAccount &&
+        this.accountingMappings.deferredIncomeAccountId &&
+        typeof this.accountingMappings.deferredIncomeAccountId === 'object' &&
+        this.accountingMappings.deferredIncomeAccountId.id
+      ) {
+        this.accountingMappings.deferredIncomeAccount = this.accountingMappings.deferredIncomeAccountId;
+      }
     } else {
       this.accountingMappings = {};
+
+      // Normalize deferred income account object key if backend supplied object under `deferredIncomeAccountId` instead of ID primitive.
+      if (
+        this.loanProduct &&
+        this.loanProduct.accountingMappings &&
+        this.loanProduct.accountingMappings.deferredIncomeAccountId &&
+        typeof this.loanProduct.accountingMappings.deferredIncomeAccountId === 'object' &&
+        this.loanProduct.accountingMappings.deferredIncomeAccountId.id &&
+        !this.loanProduct.accountingMappings.deferredIncomeAccount
+      ) {
+        // Set primitive ID expected by mapping logic and retain object for later usage.
+        this.loanProduct.deferredIncomeAccountId = this.loanProduct.accountingMappings.deferredIncomeAccountId.id;
+        this.loanProduct.accountingMappings.deferredIncomeAccount =
+          this.loanProduct.accountingMappings.deferredIncomeAccountId;
+      }
 
       if (
         (this.loanProduct.accountingRule && this.loanProduct.accountingRule > 1) ||
@@ -161,7 +187,8 @@ export class LoanProductSummaryComponent implements OnInit, OnChanges {
           overpaymentLiabilityAccount: this.glAccountLookUp(
             this.loanProduct.overpaymentLiabilityAccountId,
             liabilityAccountData
-          )
+          ),
+          deferredIncomeAccount: this.glAccountLookUp(this.loanProduct.deferredIncomeAccountId, liabilityAccountData)
         };
 
         this.paymentChannelToFundSourceMappings = [];

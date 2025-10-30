@@ -79,13 +79,25 @@ export class LoanProductAccountingStepComponent implements OnInit {
     });
 
     const accountingMappings = this.loanProductsTemplate.accountingMappings;
+    // Fallback normalization: backend may supply deferred income account under key `deferredIncomeAccountId` as object
+    // while existing form logic expects `deferredIncomeAccount`. Copy if needed.
+    if (
+      accountingMappings &&
+      !accountingMappings.deferredIncomeAccount &&
+      accountingMappings.deferredIncomeAccountId &&
+      typeof accountingMappings.deferredIncomeAccountId === 'object' &&
+      accountingMappings.deferredIncomeAccountId.id
+    ) {
+      accountingMappings.deferredIncomeAccount = accountingMappings.deferredIncomeAccountId;
+    }
     switch (this.loanProductsTemplate.accountingRule.id) {
       case 3:
       case 4:
         this.loanProductAccountingForm.patchValue({
           receivableInterestAccountId: accountingMappings.receivableInterestAccount.id,
           receivableFeeAccountId: accountingMappings.receivableFeeAccount.id,
-          receivablePenaltyAccountId: accountingMappings.receivablePenaltyAccount.id
+          receivablePenaltyAccountId: accountingMappings.receivablePenaltyAccount.id,
+          deferredIncomeAccountId: accountingMappings.deferredIncomeAccount?.id
         });
         this.loanProductAccountingForm.patchValue({
           enableAccrualActivityPosting: this.loanProductsTemplate.enableAccrualActivityPosting
@@ -319,11 +331,13 @@ export class LoanProductAccountingStepComponent implements OnInit {
           'receivablePenaltyAccountId',
           new UntypedFormControl('', Validators.required)
         );
+        this.loanProductAccountingForm.addControl('deferredIncomeAccountId', new UntypedFormControl(''));
         this.loanProductAccountingForm.addControl('enableAccrualActivityPosting', new UntypedFormControl(false));
       } else {
         this.loanProductAccountingForm.removeControl('receivableInterestAccountId');
         this.loanProductAccountingForm.removeControl('receivableFeeAccountId');
         this.loanProductAccountingForm.removeControl('receivablePenaltyAccountId');
+        this.loanProductAccountingForm.removeControl('deferredIncomeAccountId');
         this.loanProductAccountingForm.removeControl('enableAccrualActivityPosting');
       }
     });

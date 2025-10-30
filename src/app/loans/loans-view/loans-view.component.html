@@ -85,9 +85,7 @@
                   <tr>
                     <td>{{ 'labels.inputs.Current Balance' | translate }}</td>
                     <td class="r-amount">
-                      {{
-                        loanDetailsData.summary.totalOutstanding | currency: currency.code : 'symbol-narrow' : '1.2-2'
-                      }}
+                      {{ getAdjustedCurrentBalance() | currency: currency.code : 'symbol-narrow' : '1.2-2' }}
                     </td>
                   </tr>
                   <tr *ngIf="loanDisplayArrearsDelinquency < 2">

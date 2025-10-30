@@ -242,6 +242,16 @@
       >
       </mifosx-gl-account-selector>
 
+      <mifosx-gl-account-selector
+        *ngIf="isAccountingAccrualBased"
+        fxFlex="48%"
+        [inputFormControl]="loanProductAccountingForm.controls.deferredIncomeAccountId"
+        [glAccountList]="liabilityAccountData"
+        [required]="false"
+        [inputLabel]="'Deferred Income Account'"
+      >
+      </mifosx-gl-account-selector>
+
       <mat-divider fxFlex="98%"></mat-divider>
 
       <mat-checkbox fxFlex="73%" formControlName="advancedAccountingRules">{{
