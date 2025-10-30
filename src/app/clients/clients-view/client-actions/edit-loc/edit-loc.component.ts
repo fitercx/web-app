@@ -103,6 +103,20 @@ export class EditLocComponent implements OnInit {
     return '';
   }
 
+  // Currency display symbol for formatting directive
+  get selectedCurrencySymbol(): string {
+    try {
+      const code = this.selectedCurrencyCode;
+      if (!code) {
+        return '';
+      }
+      const obj = this.currencyOptions.find((c) => c.code === code);
+      return obj?.displaySymbol || obj?.symbol || '';
+    } catch (e) {
+      return '';
+    }
+  }
+
   // Savings accounts filtered by the currently selected currency code
   get filteredSavingsAccounts(): any[] {
     const code = this.selectedCurrencyCode;

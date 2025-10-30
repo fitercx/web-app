@@ -123,10 +123,13 @@ export class GeneralTabComponent {
 
   locLoanColumns: string[] = [
     'Account No',
+    'Invoice Number',
+    'Supplier/Buyer Name',
     'Loan Product',
     'Loan Amount',
     'Outstanding Balance',
     'Amount Paid',
+    'Refund Amount',
     'Actions',
     'expand'
   ];
@@ -345,7 +348,11 @@ export class GeneralTabComponent {
                 inArrears: l.inArrears,
                 status: l.status,
                 additionalProperties: l.additionalProperties,
-                timeline: l.timeline
+                timeline: l.timeline,
+                // Preserve LOC-specific loan fields from API
+                invoiceNumber: l.invoiceNumber,
+                supplierBuyerName: l.supplierBuyerName,
+                totalOverPaidDerived: l.totalOverPaidDerived
               }))
             : this.getLoansForLOC(loc.id);
 
@@ -437,7 +444,10 @@ export class GeneralTabComponent {
         inArrears: loan.inArrears,
         status: loan.status,
         additionalProperties: loan.additionalProperties,
-        timeline: loan.timeline
+        timeline: loan.timeline,
+        invoiceNumber: loan.invoiceNumber,
+        supplierBuyerName: loan.supplierBuyerName,
+        totalOverPaidDerived: loan.totalOverPaidDerived
       }));
   }
 
