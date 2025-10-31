@@ -230,8 +230,15 @@
               <div fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="20px">
                 <mat-form-field fxFlex>
                   <mat-label>Maximum Credit Limit</mat-label>
-                  <input matInput type="number" formControlName="maxCreditLimit" placeholder="0.00" required />
-                  <span matSuffix>{{ selectedCurrencyCode || '' }}</span>
+                  <!-- Reuse existing amount formatting directive (same as loan principal) -->
+                  <input
+                    matInput
+                    class="right-input"
+                    formControlName="maxCreditLimit"
+                    mifosxFormatAmount="{{ selectedCurrencyCode }}:{{ selectedCurrencySymbol }}"
+                    placeholder="0.00"
+                    required
+                  />
                   <mat-error *ngIf="locForm.get(['limitsTerms', 'maxCreditLimit'])?.hasError('required')"
                     >This field is required.</mat-error
                   >
@@ -612,11 +619,10 @@
 
               <div fxFlexFill class="preview-field">
                 <span fxFlex="40%" class="preview-label">Maximum Credit Limit</span>
-                <span fxFlex="60%">{{
-                  (previewPayload.maximumAmount || previewPayload.maxCreditLimit || '0.00') +
-                    ' ' +
-                    (selectedCurrencyCode || '')
-                }}</span>
+                <span fxFlex="60%">
+                  {{ previewPayload.maximumAmount || previewPayload.maxCreditLimit | formatNumber }}
+                  {{ selectedCurrencyCode || '' }}
+                </span>
               </div>
 
               <div fxFlexFill class="preview-field">

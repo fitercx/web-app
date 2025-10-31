@@ -100,6 +100,20 @@ export class CreateLocComponent implements OnInit {
     return '';
   }
 
+  // Currency display symbol for formatting directive
+  get selectedCurrencySymbol(): string {
+    try {
+      const code = this.selectedCurrencyCode;
+      if (!code) {
+        return '';
+      }
+      const obj = this.currencyOptions.find((c) => c.code === code);
+      return obj?.displaySymbol || obj?.symbol || '';
+    } catch (e) {
+      return '';
+    }
+  }
+
   // Get display name for cash margin type
   getCashMarginTypeDisplay(typeCode: string): string {
     const type = this.cashMarginTypeOptions.find((cmt) => cmt.code === typeCode || cmt.id === typeCode);

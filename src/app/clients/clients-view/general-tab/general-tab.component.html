@@ -223,6 +223,19 @@
                   {{ loan.accountNo }}
                 </td>
               </ng-container>
+              <ng-container matColumnDef="Invoice Number">
+                <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Invoice Number' | translate }}</th>
+                <td mat-cell *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
+                  {{ loan.invoiceNumber }}
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="Supplier/Buyer Name">
+                <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Supplier/Buyer Name' | translate }}</th>
+                <td mat-cell *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
+                  {{ loan.supplierBuyerName }}
+                </td>
+              </ng-container>
 
               <ng-container matColumnDef="Loan Product">
                 <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Loan Product' | translate }}</th>
@@ -243,7 +256,12 @@
                   {{ 'labels.inputs.Outstanding Balance' | translate }}
                 </th>
                 <td mat-cell class="r-amount" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
-                  {{ loan.loanBalance | formatNumber }}
+                  {{
+                    (loan.totalOverPaidDerived === undefined
+                      ? loan.loanBalance
+                      : loan.loanBalance - loan.totalOverPaidDerived
+                    ) | formatNumber
+                  }}
                 </td>
               </ng-container>
 
@@ -253,6 +271,14 @@
                 </th>
                 <td mat-cell class="r-amount" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
                   {{ loan.amountPaid | formatNumber }}
+                </td>
+              </ng-container>
+              <ng-container matColumnDef="Refund Amount">
+                <th mat-header-cell class="r-amount" *matHeaderCellDef>
+                  {{ 'labels.inputs.Refund Amount' | translate }}
+                </th>
+                <td mat-cell class="r-amount" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
+                  {{ loan.totalOverPaidDerived | formatNumber }}
                 </td>
               </ng-container>
 
@@ -394,7 +420,6 @@
     <tr
       mat-row
       *matRowDef="let row; columns: locColumns"
-      (click)="navigateToLOC(row.id)"
       class="select-row"
       [class.expanded-row]="expandedLOCElement === row"
     ></tr>
