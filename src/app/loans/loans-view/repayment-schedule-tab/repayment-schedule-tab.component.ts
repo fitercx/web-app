@@ -446,4 +446,37 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     }
     return false;
   }
+
+  /**
+   * Returns total outstanding amount to display in footer of Principal O/S / PreDisbursal Amount column.
+   * Logic:
+   *  - Safely handle missing schedule details.
+   *  - For overpaid loans (LOC types) if outstanding becomes negative, display 0.
+   *  - For LOC Receivable loans in pre‑disbursement state, try to show netDisbursalAmount if available.
+   *  - Fallback to schedule.totalOutstanding.
+   */
+  getDisplayedTotalOutstanding(): number {
+    const schedule = this.repaymentScheduleDetails;
+    if (!schedule) {
+      return 0;
+    }
+    const outstanding = typeof schedule.totalOutstanding === 'number' ? schedule.totalOutstanding : 0;
+
+    // Overpaid loans: hide if negative
+    if (this.isLoanOverpaid() && outstanding <= 0) {
+      return null;
+    }
+
+    // LOC Receivable pre-disbursement: show netDisbursalAmount if available and > 0, else hide
+    if (this.isLineOfCreditReceivable() && this.isLoanPreDisbursement()) {
+      const loanInfo = this.loanData || this.loanDetailsData;
+      if (loanInfo && typeof loanInfo.netDisbursalAmount === 'number' && loanInfo.netDisbursalAmount > 0) {
+        return loanInfo.netDisbursalAmount;
+      }
+      return null;
+    }
+
+    // Regular case: show positive outstanding only
+    return outstanding > 0 ? outstanding : null;
+  }
 }
