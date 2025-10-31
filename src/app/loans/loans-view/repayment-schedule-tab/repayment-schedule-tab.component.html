@@ -15,7 +15,9 @@
     <ng-container matColumnDef="days">
       <th mat-header-cell class="center" *matHeaderCellDef>{{ 'labels.inputs.Days' | translate }}</th>
       <td mat-cell class="center" *matCellDef="let item" [ngClass]="installmentStyle(item)">{{ item.daysInPeriod }}</td>
-      <td mat-footer-cell class="center" *matFooterCellDef><b> Total</b></td>
+      <td mat-footer-cell class="center" *matFooterCellDef>
+        <b *ngIf="getDisplayedTotalOutstanding() !== null"> Total</b>
+      </td>
     </ng-container>
 
     <ng-container matColumnDef="date">
@@ -71,7 +73,10 @@
         {{ item.principalLoanBalanceOutstanding | formatNumber }}
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
-        <b>{{ getDisplayedTotalOutstanding() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}</b>
+        <ng-container *ngIf="getDisplayedTotalOutstanding() !== null; else emptyOutstandingFooter">
+          <b>{{ getDisplayedTotalOutstanding() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}</b>
+        </ng-container>
+        <ng-template #emptyOutstandingFooter>&nbsp;</ng-template>
       </td>
     </ng-container>
 

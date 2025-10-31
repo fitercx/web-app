@@ -22,6 +22,11 @@ export class ForeclosureComponent implements OnInit {
   /** Maximum Date allowed. */
   maxDate = new Date();
   foreclosuredata: any;
+  /** Linked Savings Account fields (from foreclosure template additionalAttributes) */
+  linkedSavingsAccountId?: number;
+  linkedSavingsAccountAccountNo?: string;
+  linkedSavingsAccountProductName?: string;
+  linkedSavingsAccountAvailableBalance?: number;
 
   /**
    * @param {FormBuilder} formBuilder Form Builder.
@@ -46,6 +51,8 @@ export class ForeclosureComponent implements OnInit {
     this.createforeclosureForm();
     this.onChanges();
     this.setupMutualExclusion(); // 👈 Added here
+    // Capture linked account from initial resolver-provided template (dataObject)
+    this.captureLinkedAccount(this.dataObject);
   }
 
   createforeclosureForm() {
@@ -86,6 +93,8 @@ export class ForeclosureComponent implements OnInit {
     };
     this.loanService.getForeclosureData(this.loanId, data).subscribe((response: any) => {
       this.foreclosuredata = response;
+      // Capture linked account from refreshed template
+      this.captureLinkedAccount(this.foreclosuredata);
 
       this.foreclosureForm.patchValue({
         outstandingPrincipalPortion: this.foreclosuredata.principalPortion,
@@ -96,6 +105,20 @@ export class ForeclosureComponent implements OnInit {
         transactionAmount: this.foreclosuredata.amount
       });
     });
+  }
+
+  /** Extract linked savings account details (if present) from a foreclosure template source object. */
+  private captureLinkedAccount(source: any): void {
+    if (!source) {
+      return;
+    }
+    const additional = source.additionalAttributes;
+    if (additional) {
+      this.linkedSavingsAccountId = additional.linkedSavingsAccountId;
+      this.linkedSavingsAccountAccountNo = additional.linkedSavingsAccountAccountNo;
+      this.linkedSavingsAccountProductName = additional.linkedSavingsAccountProductName;
+      this.linkedSavingsAccountAvailableBalance = additional.linkedSavingsAccountAvailableBalance;
+    }
   }
 
   submit() {

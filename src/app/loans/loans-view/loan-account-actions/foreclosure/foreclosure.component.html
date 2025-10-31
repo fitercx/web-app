@@ -1,5 +1,20 @@
 <div class="container mat-elevation-z8">
   <mat-card>
+    <div class="linked-savings" *ngIf="linkedSavingsAccountAccountNo">
+      <div>
+        <div>
+          {{ 'labels.inputs.Linked Savings Account (Auto Debit Source)' | translate }} :
+          <span class="linked-savings__account-no"
+            >{{ linkedSavingsAccountAccountNo }} - {{ linkedSavingsAccountProductName }}</span
+          >
+        </div>
+        <div>
+          {{ 'labels.inputs.Available Balance' | translate }} :
+          <span class="linked-savings__account-no">{{ linkedSavingsAccountAvailableBalance | currency }}</span>
+        </div>
+      </div>
+    </div>
+
     <form [formGroup]="foreclosureForm" (ngSubmit)="submit()">
       <mat-card-content>
         <div fxLayout="column">

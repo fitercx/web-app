@@ -1190,6 +1190,7 @@
       "Principal Amount": "Principal Amount"
     },
     "inputs": {
+      "Linked Savings Account (Auto Debit Source)": "Linked Savings Account (Auto Debit Source)",
       "Invoice Number": "Invoice Number",
       "Supplier/Buyer Name": "Supplier/Buyer Name",
       "PreDisbursal Amount": "PreDisbursal Amount",
