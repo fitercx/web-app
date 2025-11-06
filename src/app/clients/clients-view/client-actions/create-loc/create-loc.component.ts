@@ -208,6 +208,15 @@ export class CreateLocComponent implements OnInit {
       this.loanOfficerOptions = resolved.loanOfficers || [];
       this.cashMarginTypeOptions = resolved.cashMarginTypeOptions || [];
       this.interestChargeTimeOptions = resolved.interestChargeTimeOptions || [];
+      // Apply template virtual account default if present and field empty
+      const templateVA = resolved?.va;
+      const vaControl = this.locForm.get([
+        'basicInfo',
+        'virtualAccount'
+      ]);
+      if (templateVA && vaControl && !vaControl.value) {
+        vaControl.setValue(templateVA);
+      }
 
       // Add custom option to review periods
       this.reviewPeriodsOptions.push({
