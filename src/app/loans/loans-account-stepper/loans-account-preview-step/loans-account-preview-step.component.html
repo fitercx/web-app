@@ -384,6 +384,7 @@
     </div>
 
     <!-- Receivable Details (only show if receivable LOC type) -->
+    <!-- Receivable sequence: Approved -> Advance % -> Amount after Advance -->
     <div
       fxFlexFill
       *ngIf="
@@ -401,7 +402,6 @@
         ) | formatNumber
       }}</span>
     </div>
-
     <div
       fxFlexFill
       *ngIf="
@@ -420,7 +420,6 @@
         }}%</span
       >
     </div>
-
     <div
       fxFlexFill
       *ngIf="
@@ -450,6 +449,24 @@
     </div>
 
     <!-- Payable Details (only show if payable LOC type) -->
+    <!-- Payable sequence: Approved Payable -> Exchange Rate -> Markup -> Facility Amount -->
+    <div
+      fxFlexFill
+      *ngIf="
+        isPayableType &&
+        ((loansAccount.approvedPayableAmount !== undefined && loansAccount.approvedPayableAmount !== null) ||
+          (loansAccount.additionalProperties?.approvedPayableAmount !== undefined &&
+            loansAccount.additionalProperties?.approvedPayableAmount !== null))
+      "
+    >
+      <span fxFlex="40%">{{ 'labels.inputs.Approved Payable Amount' | translate }}:</span>
+      <span fxFlex="60%">{{
+        (loansAccount.approvedPayableAmount !== undefined && loansAccount.approvedPayableAmount !== null
+          ? loansAccount.approvedPayableAmount
+          : loansAccount.additionalProperties?.approvedPayableAmount
+        ) | formatNumber
+      }}</span>
+    </div>
     <div
       fxFlexFill
       *ngIf="
@@ -467,7 +484,6 @@
         ) | formatNumber
       }}</span>
     </div>
-
     <div
       fxFlexFill
       *ngIf="
@@ -485,7 +501,6 @@
         ) | formatNumber
       }}</span>
     </div>
-
     <div
       fxFlexFill
       *ngIf="
@@ -500,24 +515,6 @@
         (loansAccount.amountInFacilityCurrency !== undefined && loansAccount.amountInFacilityCurrency !== null
           ? loansAccount.amountInFacilityCurrency
           : loansAccount.additionalProperties?.amountInFacilityCurrency
-        ) | formatNumber
-      }}</span>
-    </div>
-
-    <div
-      fxFlexFill
-      *ngIf="
-        isPayableType &&
-        ((loansAccount.approvedPayableAmount !== undefined && loansAccount.approvedPayableAmount !== null) ||
-          (loansAccount.additionalProperties?.approvedPayableAmount !== undefined &&
-            loansAccount.additionalProperties?.approvedPayableAmount !== null))
-      "
-    >
-      <span fxFlex="40%">{{ 'labels.inputs.Approved Payable Amount' | translate }}:</span>
-      <span fxFlex="60%">{{
-        (loansAccount.approvedPayableAmount !== undefined && loansAccount.approvedPayableAmount !== null
-          ? loansAccount.approvedPayableAmount
-          : loansAccount.additionalProperties?.approvedPayableAmount
         ) | formatNumber
       }}</span>
     </div>

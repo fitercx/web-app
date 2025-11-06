@@ -96,6 +96,13 @@
       <!-- Receivable Details Section (only show if LOC type is receivable) -->
       <div *ngIf="isReceivableType">
         <div fxLayout="row wrap" fxLayoutGap="2%" fxLayout.lt-md="column" class="form-fields">
+          <!-- Approved Receivable Amount (computed) -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Approved Receivable Amount' | translate }}</mat-label>
+            <input matInput formControlName="approvedReceivableAmount" type="number" readonly />
+            <mat-hint>{{ 'labels.heading.Approved Receivable Amount Hint' | translate }}</mat-hint>
+          </mat-form-field>
+
           <!-- Advance % -->
           <mat-form-field fxFlex="48%">
             <mat-label>{{ 'labels.inputs.Advance %' | translate }}</mat-label>
@@ -120,13 +127,6 @@
             <mat-hint>{{ 'labels.heading.Amount After Advance Hint' | translate }}</mat-hint>
           </mat-form-field>
 
-          <!-- Approved Receivable Amount (computed) -->
-          <mat-form-field fxFlex="48%">
-            <mat-label>{{ 'labels.inputs.Approved Receivable Amount' | translate }}</mat-label>
-            <input matInput formControlName="approvedReceivableAmount" type="number" readonly />
-            <mat-hint>{{ 'labels.heading.Approved Receivable Amount Hint' | translate }}</mat-hint>
-          </mat-form-field>
-
           <!-- Buyer Details -->
           <mat-form-field fxFlex="100%">
             <mat-label>{{ 'labels.inputs.Buyer Details' | translate }}</mat-label>
@@ -146,6 +146,13 @@
       <!-- Payable Details Section (only show if LOC type is payable) -->
       <div *ngIf="isPayableType">
         <div fxLayout="row wrap" fxLayoutGap="2%" fxLayout.lt-md="column" class="form-fields">
+          <!-- Approved Payable Amount (computed) -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Approved Payable Amount' | translate }}</mat-label>
+            <input matInput formControlName="approvedPayableAmount" type="number" readonly />
+            <mat-hint>{{ 'labels.heading.Approved Payable Amount Hint' | translate }}</mat-hint>
+          </mat-form-field>
+
           <!-- Exchange Rate -->
           <mat-form-field fxFlex="48%">
             <mat-label>{{ 'labels.inputs.Exchange Rate' | translate }}</mat-label>
@@ -172,18 +179,11 @@
             </mat-error>
           </mat-form-field>
 
-          <!-- Amount in Facility Currency (computed) - This becomes the Principal -->
+          <!-- Facility Amount (Principal) (computed) -->
           <mat-form-field fxFlex="48%">
             <mat-label>{{ 'labels.inputs.Facility Amount (Principal)' | translate }}</mat-label>
             <input matInput formControlName="amountInFacilityCurrency" type="number" readonly />
-            <mat-hint>Calculated as: (Markup + Exchange Rate) × Approved Amount</mat-hint>
-          </mat-form-field>
-
-          <!-- Approved Payable Amount (computed) -->
-          <mat-form-field fxFlex="48%">
-            <mat-label>{{ 'labels.inputs.Approved Payable Amount' | translate }}</mat-label>
-            <input matInput formControlName="approvedPayableAmount" type="number" readonly />
-            <mat-hint>{{ 'labels.heading.Approved Payable Amount Hint' | translate }}</mat-hint>
+            <mat-hint>Calculated as: (Markup + Exchange Rate) × Approved Payable Amount</mat-hint>
           </mat-form-field>
 
           <!-- Supplier Details -->

@@ -50,11 +50,12 @@
     </div>
   </div>
 
-  <!-- Receivable Details Section -->
+  <!-- Receivable Details Section (Reordered) -->
   <div class="loc-section" *ngIf="isReceivableType">
     <div class="mat-h3 loc-section-title">{{ 'labels.heading.Receivable Details' | translate }}</div>
     <mat-divider></mat-divider>
     <div class="margin-t">
+      <!-- Approved Receivable Amount -->
       <div
         fxLayout="row"
         fxLayout.lt-md="column"
@@ -66,7 +67,7 @@
           locDetails.approvedReceivableAmount | formatNumber
         }}</span>
       </div>
-
+      <!-- Advance % -->
       <div
         fxLayout="row"
         fxLayout.lt-md="column"
@@ -76,7 +77,7 @@
         <span fxFlex="40%" class="loc-field-label">{{ 'labels.inputs.Advance %' | translate }}:</span>
         <span fxFlex="60%" class="loc-field-value">{{ locDetails.advancePercentage }}%</span>
       </div>
-
+      <!-- Amount after Advance -->
       <div
         fxLayout="row"
         fxLayout.lt-md="column"
@@ -88,7 +89,7 @@
           locDetails.amountAfterAdvance | formatNumber
         }}</span>
       </div>
-
+      <!-- Buyer Details -->
       <div fxLayout="row" fxLayout.lt-md="column" class="loc-field-row" *ngIf="locDetails.buyerDetails">
         <span fxFlex="40%" class="loc-field-label">{{ 'labels.inputs.Buyer Details' | translate }}:</span>
         <span fxFlex="60%" class="loc-field-value">{{ getBuyerDetailsNames() }}</span>
@@ -96,43 +97,12 @@
     </div>
   </div>
 
-  <!-- Payable Details Section -->
+  <!-- Payable Details Section (Reordered) -->
   <div class="loc-section" *ngIf="isPayableType">
     <div class="mat-h3 loc-section-title">{{ 'labels.heading.Payable Details' | translate }}</div>
     <mat-divider></mat-divider>
     <div class="margin-t">
-      <div
-        fxLayout="row"
-        fxLayout.lt-md="column"
-        class="loc-field-row"
-        *ngIf="locDetails.exchangeRate !== undefined && locDetails.exchangeRate !== null"
-      >
-        <span fxFlex="40%" class="loc-field-label">{{ 'labels.inputs.Exchange Rate' | translate }}:</span>
-        <span fxFlex="60%" class="loc-field-value">{{ locDetails.exchangeRate | formatNumber }}</span>
-      </div>
-
-      <div
-        fxLayout="row"
-        fxLayout.lt-md="column"
-        class="loc-field-row"
-        *ngIf="locDetails.markup !== undefined && locDetails.markup !== null"
-      >
-        <span fxFlex="40%" class="loc-field-label">{{ 'labels.inputs.Markup' | translate }}:</span>
-        <span fxFlex="60%" class="loc-field-value">{{ locDetails.markup | formatNumber }}</span>
-      </div>
-
-      <div
-        fxLayout="row"
-        fxLayout.lt-md="column"
-        class="loc-field-row"
-        *ngIf="locDetails.amountInFacilityCurrency !== undefined && locDetails.amountInFacilityCurrency !== null"
-      >
-        <span fxFlex="40%" class="loc-field-label">{{ 'labels.inputs.Amount in Facility Currency' | translate }}:</span>
-        <span fxFlex="60%" class="loc-field-value loc-amount loc-computed-field">{{
-          locDetails.amountInFacilityCurrency | formatNumber
-        }}</span>
-      </div>
-
+      <!-- Approved Payable Amount -->
       <div
         fxLayout="row"
         fxLayout.lt-md="column"
@@ -144,7 +114,39 @@
           locDetails.approvedPayableAmount | formatNumber
         }}</span>
       </div>
-
+      <!-- Exchange Rate -->
+      <div
+        fxLayout="row"
+        fxLayout.lt-md="column"
+        class="loc-field-row"
+        *ngIf="locDetails.exchangeRate !== undefined && locDetails.exchangeRate !== null"
+      >
+        <span fxFlex="40%" class="loc-field-label">{{ 'labels.inputs.Exchange Rate' | translate }}:</span>
+        <span fxFlex="60%" class="loc-field-value">{{ locDetails.exchangeRate | formatNumber }}</span>
+      </div>
+      <!-- Markup -->
+      <div
+        fxLayout="row"
+        fxLayout.lt-md="column"
+        class="loc-field-row"
+        *ngIf="locDetails.markup !== undefined && locDetails.markup !== null"
+      >
+        <span fxFlex="40%" class="loc-field-label">{{ 'labels.inputs.Markup' | translate }}:</span>
+        <span fxFlex="60%" class="loc-field-value">{{ locDetails.markup | formatNumber }}</span>
+      </div>
+      <!-- Facility Amount -->
+      <div
+        fxLayout="row"
+        fxLayout.lt-md="column"
+        class="loc-field-row"
+        *ngIf="locDetails.amountInFacilityCurrency !== undefined && locDetails.amountInFacilityCurrency !== null"
+      >
+        <span fxFlex="40%" class="loc-field-label">{{ 'labels.inputs.Amount in Facility Currency' | translate }}:</span>
+        <span fxFlex="60%" class="loc-field-value loc-amount loc-computed-field">{{
+          locDetails.amountInFacilityCurrency | formatNumber
+        }}</span>
+      </div>
+      <!-- Supplier Details -->
       <div fxLayout="row" fxLayout.lt-md="column" class="loc-field-row" *ngIf="locDetails.supplierDetails">
         <span fxFlex="40%" class="loc-field-label">{{ 'labels.inputs.Supplier Details' | translate }}:</span>
         <span fxFlex="60%" class="loc-field-value">{{ getSupplierDetailsNames() }}</span>
