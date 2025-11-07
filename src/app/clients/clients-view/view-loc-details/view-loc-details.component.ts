@@ -163,13 +163,8 @@ export class ViewLocDetailsComponent implements OnInit {
    * Process LOC data from backend
    */
   private processLocData(data: any): void {
-    // Debug utilization calculation
-    const backendUtilization = data.utilization;
-    const calculatedUtilization = this.calculateUtilization(data);
-
     const rawStatusObj = data?.status; // keep entire backend object {id, code, value}
     const rawStatus = rawStatusObj?.code || rawStatusObj?.value || data?.status;
-    const normalizedStatus = this.normalizeStatus(rawStatus);
 
     // Access timeline data for activation date (consistent with audit trail implementation)
     const timelineData = data.timeLineData || data;
@@ -180,7 +175,6 @@ export class ViewLocDetailsComponent implements OnInit {
       name: data.name,
       type: data.productType === 'PAYABLE' ? 'LOC PAYABLE' : 'LOC RECEIVABLE',
       status: rawStatusObj || rawStatus, // retain original object for pipe consumption (expects code)
-      normalizedStatus: normalizedStatus, // separate canonical upper-case for internal logic
       activationDate: this.parseDate(timelineData.activatedOnDate),
       nextReviewDate: this.parseDate(data.interimReviewDate),
       interestRate: data.interestRateOverride,
@@ -299,107 +293,7 @@ export class ViewLocDetailsComponent implements OnInit {
    * Check if LOC is active
    */
   isActive(): boolean {
-    return this.locDetails?.normalizedStatus === 'ACTIVE';
-  }
-
-  /**
-   * Check if LOC is in a state that allows drawdowns
-   */
-  canCreateDrawdown(): boolean {
-    return this.locDetails?.normalizedStatus === 'ACTIVE';
-  }
-
-  /**
-   * Get available actions based on LOC status
-   */
-  getAvailableActions(): string[] {
-    const status = this.locDetails?.normalizedStatus;
-    switch (status) {
-      case 'SUBMITTED':
-        return [
-          'Approve',
-          'Close'
-        ];
-      case 'APPROVED':
-        return [
-          'Activate',
-          'Close'
-        ];
-      case 'ACTIVE':
-        return [
-          'Deactivate',
-          'Increase Limit',
-          'Decrease Limit'
-        ];
-      case 'INACTIVE':
-        return [
-          'Reactivate'
-        ];
-      case 'SUSPENDED':
-        return [
-          'Reactivate'
-        ];
-      case 'CLOSED':
-        return [];
-      default:
-        return [];
-    }
-  }
-
-  /**
-   * Normalize various backend status representations to canonical values.
-   */
-  private normalizeStatus(status: any): string {
-    if (!status) {
-      return '';
-    }
-    const s = String(status).trim().toLowerCase();
-    // Map possible variants to canonical constants
-    if ([
-        'submitted',
-        'status.submitted',
-        'locactivationstatus.submitted'
-      ].includes(s)) {
-      return 'SUBMITTED';
-    }
-    if ([
-        'approved',
-        'status.approved',
-        'locactivationstatus.approved'
-      ].includes(s)) {
-      return 'APPROVED';
-    }
-    if ([
-        'active',
-        'status.active',
-        'locactivationstatus.active'
-      ].includes(s)) {
-      return 'ACTIVE';
-    }
-    if ([
-        'inactive',
-        'status.inactive',
-        'locactivationstatus.inactive',
-        'deactivated',
-        'status.deactivated'
-      ].includes(s)) {
-      return 'INACTIVE';
-    }
-    if ([
-        'suspended',
-        'status.suspended',
-        'locactivationstatus.suspended'
-      ].includes(s)) {
-      return 'SUSPENDED';
-    }
-    if ([
-        'closed',
-        'status.closed',
-        'locactivationstatus.closed'
-      ].includes(s)) {
-      return 'CLOSED';
-    }
-    return status; // fallback to raw so at least something renders
+    return this.locDetails?.status?.code === 'status.active';
   }
 
   /**
@@ -827,7 +721,6 @@ export class ViewLocDetailsComponent implements OnInit {
    * Check if LOC can be edited (only when status is submitted or approved)
    */
   canEditLoc(): boolean {
-    const status = this.locDetails?.normalizedStatus;
-    return status === 'SUBMITTED' || status === 'APPROVED';
+    return this.locDetails?.status?.code === 'status.submitted' || this.locDetails?.status?.code === 'status.approved';
   }
 }

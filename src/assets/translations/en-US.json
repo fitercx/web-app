@@ -3544,6 +3544,7 @@
   },
   "not_found_subtitle": "Oops.. Looks like this page doesn't exist.",
   "tooltips": {
+    "Disburse to Savings": "Disburse to Savings",
     "New Drawdown": "New Drawdown",
     "View LOC Details": "View Line of Credit Details",
     "Enable Line of Credit Receivable functionality": "Enable Line of Credit Receivable functionality",
