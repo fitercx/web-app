@@ -214,6 +214,14 @@ export class GeneralTabComponent implements OnInit {
         key: 'External Id'
       },
       {
+        key: 'Invoice Amount',
+        value: this.loanDetails?.additionalProperties?.invoiceAmount
+      },
+      {
+        key: 'Disapproved Amount',
+        value: this.loanDetails?.additionalProperties?.disapprovedAmount
+      },
+      {
         key: 'Proposed Amount',
         value: this.loanDetails.factorRateEnabled
           ? this.loanDetails.factorRateLoanAmount

@@ -132,14 +132,19 @@
           </ng-container>
 
           <ng-container
-            *ngIf="ele.key === 'Proposed Amount' || ele.key === 'Approved Amount' || ele.key === 'Disburse Amount'"
+            *ngIf="
+              ele.key === 'Proposed Amount' ||
+              ele.key === 'Invoice Amount' ||
+              ele.key === 'Approved Amount' ||
+              ele.key === 'Disapproved Amount' ||
+              ele.key === 'Disburse Amount'
+            "
           >
-            {{ ele.value }}
+            {{ ele.value | formatNumber }}
           </ng-container>
-
           <ng-container *ngIf="ele.key === 'Net Disbursed Amount'">
             <span>
-              {{ ele.value }}
+              {{ ele.value | formatNumber }}
             </span>
           </ng-container>
         </td>
