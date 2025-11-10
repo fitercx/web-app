@@ -144,7 +144,7 @@
           </button>
         </ng-container>
 
-        <button mat-menu-item (click)="doAction('New Drawdown')" *ngIf="canCreateDrawdown()">
+        <button mat-menu-item (click)="doAction('New Drawdown')" *ngIf="isActive()">
           <mat-icon matListIcon>
             <fa-icon icon="hand-holding-usd" size="sm"></fa-icon>
           </mat-icon>
@@ -152,16 +152,16 @@
         </button>
 
         <!-- Divider for visual separation between navigation and actions -->
-        <mat-divider *ngIf="canEditLoc() || canCreateDrawdown()"></mat-divider>
+        <mat-divider *ngIf="canEditLoc() || isActive()"></mat-divider>
 
         <!-- Actions for SUBMITTED state -->
-        <button mat-menu-item (click)="doAction('Approve')" *ngIf="locDetails?.normalizedStatus === 'SUBMITTED'">
+        <button mat-menu-item (click)="doAction('Approve')" *ngIf="locDetails?.status?.code === 'status.submitted'">
           <mat-icon matListIcon>
             <fa-icon icon="check" size="sm"></fa-icon>
           </mat-icon>
           {{ 'labels.buttons.Approve' | translate }}
         </button>
-        <button mat-menu-item (click)="doAction('Close')" *ngIf="locDetails?.normalizedStatus === 'SUBMITTED'">
+        <button mat-menu-item (click)="doAction('Close')" *ngIf="locDetails?.status?.code === 'status.submitted'">
           <mat-icon matListIcon>
             <fa-icon icon="times" size="sm"></fa-icon>
           </mat-icon>
@@ -169,13 +169,13 @@
         </button>
 
         <!-- Actions for APPROVED state -->
-        <button mat-menu-item (click)="doAction('Activate')" *ngIf="locDetails?.normalizedStatus === 'APPROVED'">
+        <button mat-menu-item (click)="doAction('Activate')" *ngIf="locDetails?.status?.code === 'status.approved'">
           <mat-icon matListIcon>
             <fa-icon icon="play" size="sm"></fa-icon>
           </mat-icon>
           {{ 'labels.buttons.Activate' | translate }}
         </button>
-        <button mat-menu-item (click)="doAction('Close')" *ngIf="locDetails?.normalizedStatus === 'APPROVED'">
+        <button mat-menu-item (click)="doAction('Close')" *ngIf="locDetails?.status?.code === 'status.approved'">
           <mat-icon matListIcon>
             <fa-icon icon="times" size="sm"></fa-icon>
           </mat-icon>
@@ -183,7 +183,7 @@
         </button>
 
         <!-- Actions for ACTIVE state -->
-        <button mat-menu-item (click)="doAction('Deactivate')" *ngIf="locDetails?.normalizedStatus === 'ACTIVE'">
+        <button mat-menu-item (click)="doAction('Deactivate')" *ngIf="locDetails?.status?.code === 'status.active'">
           <mat-icon matListIcon>
             <fa-icon icon="pause" size="sm"></fa-icon>
           </mat-icon>
@@ -191,7 +191,7 @@
         </button>
 
         <!-- Actions for INACTIVE state -->
-        <button mat-menu-item (click)="doAction('Reactivate')" *ngIf="locDetails?.normalizedStatus === 'INACTIVE'">
+        <button mat-menu-item (click)="doAction('Reactivate')" *ngIf="locDetails?.status?.code === 'status.inactive'">
           <mat-icon matListIcon>
             <fa-icon icon="play" size="sm"></fa-icon>
           </mat-icon>
@@ -199,7 +199,7 @@
         </button>
 
         <!-- Actions for SUSPENDED state -->
-        <button mat-menu-item (click)="doAction('Reactivate')" *ngIf="locDetails?.normalizedStatus === 'SUSPENDED'">
+        <button mat-menu-item (click)="doAction('Reactivate')" *ngIf="locDetails?.status?.code === 'status.suspended'">
           <mat-icon matListIcon>
             <fa-icon icon="play" size="sm"></fa-icon>
           </mat-icon>
@@ -207,13 +207,13 @@
         </button>
 
         <!-- Actions for limit changes (available only for ACTIVE) -->
-        <button mat-menu-item (click)="doAction('Increase Limit')" *ngIf="locDetails?.normalizedStatus === 'ACTIVE'">
+        <button mat-menu-item (click)="doAction('Increase Limit')" *ngIf="locDetails?.status?.code === 'status.active'">
           <mat-icon matListIcon>
             <fa-icon icon="arrow-up" size="sm"></fa-icon>
           </mat-icon>
           {{ 'labels.buttons.Increase Limit' | translate }}
         </button>
-        <button mat-menu-item (click)="doAction('Decrease Limit')" *ngIf="locDetails?.normalizedStatus === 'ACTIVE'">
+        <button mat-menu-item (click)="doAction('Decrease Limit')" *ngIf="locDetails?.status?.code === 'status.active'">
           <mat-icon matListIcon>
             <fa-icon icon="arrow-down" size="sm"></fa-icon>
           </mat-icon>
@@ -224,7 +224,7 @@
         <button
           mat-menu-item
           (click)="doAction('View Details')"
-          *ngIf="locDetails?.normalizedStatus === 'CLOSED' || !locDetails?.normalizedStatus"
+          *ngIf="locDetails?.status?.code === 'status.closed' || !locDetails?.status?.code"
         >
           <mat-icon matListIcon>
             <fa-icon icon="eye" size="sm"></fa-icon>
@@ -568,7 +568,7 @@
             <div
               class="status-info"
               style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e0e0e0"
-              *ngIf="locDetails?.normalizedStatus"
+              *ngIf="locDetails?.status?.code"
             >
               <h4 style="margin: 0 0 12px 0; color: #666; font-size: 14px; font-weight: 500">Status Information</h4>
               <div class="detail-row">

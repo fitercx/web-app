@@ -5,12 +5,18 @@
       <i class="fas fa-question" matTooltip="{{ 'tooltips.Line of Credit Product Information' | translate }}"></i>
     </h3>
 
-    <mat-checkbox fxFlex="73%" labelPosition="before" formControlName="isLocEnabled" class="margin-b">
-      {{ 'labels.inputs.Enable LOC product' | translate }}
+    <mat-checkbox
+      fxFlex="73%"
+      labelPosition="before"
+      formControlName="enableLineOfCreditPayable"
+      class="margin-b"
+      (change)="checkLocSelected('enableLineOfCreditPayable')"
+    >
+      {{ 'labels.inputs.Enable Line of Credit Payable functionality' | translate }}
     </mat-checkbox>
 
     <mat-checkbox
-      *ngIf="loanProductSettingsForm.value.isLocEnabled"
+      (change)="checkLocSelected('enableLineOfCreditReceivable')"
       fxFlex="73%"
       labelPosition="before"
       matTooltip="{{ 'tooltips.Enable Line of Credit Receivable functionality' | translate }}"

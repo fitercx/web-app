@@ -120,7 +120,7 @@ export class LoanProductSettingsStepComponent implements OnInit {
       minimumGap: this.loanProductsTemplate.minimumGap,
       maximumGap: this.loanProductsTemplate.maximumGap,
       canUseForTopup: this.loanProductsTemplate.canUseForTopup,
-      isLocEnabled: this.loanProductsTemplate?.isLocEnabled || false,
+      enableLineOfCreditPayable: this.loanProductsTemplate?.enableLineOfCreditPayable || false,
       enableLineOfCreditReceivable: this.loanProductsTemplate?.enableLineOfCreditReceivable || false,
       isInterestRecalculationEnabled: this.loanProductsTemplate.isInterestRecalculationEnabled,
       holdGuaranteeFunds: this.loanProductsTemplate.holdGuaranteeFunds,
@@ -333,7 +333,7 @@ export class LoanProductSettingsStepComponent implements OnInit {
         Validators.required
       ],
       allowAccrualPostingInArrears: [false],
-      isLocEnabled: [false],
+      enableLineOfCreditPayable: [false],
       enableLineOfCreditReceivable: [false]
     });
   }
@@ -738,6 +738,31 @@ export class LoanProductSettingsStepComponent implements OnInit {
     }
     this.loanProductSettingsForm.markAsDirty();
     $event.stopPropagation();
+  }
+
+  /**
+   * Ensures mutual exclusivity between LOC Payable and LOC Receivable selections.
+   * The form should never have both `enableLineOfCreditPayable` and
+   * `enableLineOfCreditReceivable` set to true at the same time.
+   * Invoke this from the template on (change) of either checkbox.
+   * @param controlName The control that was interacted with.
+   */
+  checkLocSelected(controlName?: 'enableLineOfCreditPayable' | 'enableLineOfCreditReceivable'): void {
+    if (!controlName) {
+      return;
+    }
+    const selectedControl = this.loanProductSettingsForm.get(controlName);
+    if (!selectedControl) {
+      return;
+    }
+
+    if (selectedControl.value === true) {
+      const otherControlName =
+        controlName === 'enableLineOfCreditPayable' ? 'enableLineOfCreditReceivable' : 'enableLineOfCreditPayable';
+      if (this.loanProductSettingsForm.get(otherControlName)?.value === true) {
+        this.loanProductSettingsForm.patchValue({ [otherControlName]: false });
+      }
+    }
   }
 
   get loanProductSettings() {

@@ -216,6 +216,17 @@
           {{ 'labels.inputs.Transactions' | translate }}
         </a>
       </ng-container>
+      <ng-container *ngIf="loanDetailsData.additionalProperties && hasLocDetails()">
+        <a
+          mat-tab-link
+          [routerLink]="['./loc-details']"
+          routerLinkActive
+          #locDetails="routerLinkActive"
+          [active]="locDetails.isActive"
+        >
+          {{ 'labels.inputs.Invoice Details' | translate }}
+        </a>
+      </ng-container>
       <ng-container *ngIf="loanDetailsData.status.active">
         <a
           mat-tab-link
@@ -332,17 +343,6 @@
           [active]="standingInstruction.isActive"
         >
           {{ 'labels.inputs.Standing Instruction' | translate }}
-        </a>
-      </ng-container>
-      <ng-container *ngIf="loanDetailsData.additionalProperties && hasLocDetails()">
-        <a
-          mat-tab-link
-          [routerLink]="['./loc-details']"
-          routerLinkActive
-          #locDetails="routerLinkActive"
-          [active]="locDetails.isActive"
-        >
-          {{ 'labels.inputs.Invoice Details' | translate }}
         </a>
       </ng-container>
       <ng-container *ngIf="loanDetailsData.status.active">

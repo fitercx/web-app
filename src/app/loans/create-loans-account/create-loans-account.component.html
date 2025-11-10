@@ -90,11 +90,13 @@
       </mifosx-loans-account-schedule-step>
     </mat-step>
 
-    <mat-step *ngFor="let datatable of datatables">
-      <ng-template matStepLabel>{{ datatable.viewLabel }}</ng-template>
+    <ng-container *ngIf="datatables.length">
+      <mat-step *ngFor="let datatable of datatables">
+        <ng-template matStepLabel>{{ datatable.viewLabel }}</ng-template>
 
-      <mifosx-loans-account-datatable-step [datatableData]="datatable" #dtloan></mifosx-loans-account-datatable-step>
-    </mat-step>
+        <mifosx-loans-account-datatable-step [datatableData]="datatable" #dtloan></mifosx-loans-account-datatable-step>
+      </mat-step>
+    </ng-container>
 
     <mat-step state="preview" *ngIf="loansAccountFormValid" completed>
       <ng-template matStepLabel>{{ 'labels.inputs.PREVIEW' | translate }}</ng-template>
