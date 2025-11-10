@@ -165,7 +165,6 @@ export class CreateLoansAccountComponent {
           // Skip LOC datatable if LOC is enabled, as it's handled separately
           return;
         }
-        console.log('Datatable Registered Name:', datatable.registeredTableName);
         datatable.viewLabel = this.transformDatatableLabel(datatable);
         this.datatables.push(datatable);
       });
