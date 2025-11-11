@@ -87,12 +87,17 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
     this.noEntriesFoundLabel = this.translateService.instant('labels.text.No data found');
     this.createLoansAccountDetailsForm();
     this.maxDate = this.settingsService.maxFutureDate;
+
     this.buildDependencies();
+
     if (this.loansAccountTemplate) {
       this.productList = this.loansAccountTemplate.productOptions.sort(this.commons.dynamicSort('name'));
       if (this.loansAccountTemplate.loanProductId) {
         // Set LOC-related properties from existing loan if available
-        this.isLocEnabled = this.loansAccountTemplate.additionalProperties?.isLocEnabled || false;
+        this.isLocEnabled =
+          this.loansAccountTemplate.additionalProperties?.enableLineOfCreditPayable ||
+          this.loansAccountTemplate.additionalProperties.enableLineOfCreditReceivable ||
+          false;
         this.lineOfCreditOptions = this.loansAccountTemplate.additionalProperties?.lineOfCreditOptions || [];
 
         // Add conditional validation for line of credit in edit mode
@@ -193,6 +198,7 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
       ? this.loansAccountTemplate.clientId
       : this.loansAccountTemplate.group.id;
     const isGroup = this.loansAccountTemplate.clientId ? false : true;
+
     this.loansAccountDetailsForm.get('productId').valueChanges.subscribe((productId: string) => {
       this.loansService.getLoansAccountTemplateResource(entityId, isGroup, productId).subscribe((response: any) => {
         this.loansAccountProductTemplate.emit(response);

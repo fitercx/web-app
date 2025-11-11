@@ -23,6 +23,9 @@ export interface LoanProduct {
   currencyCode?: string;
   fundId?: number;
   fundName?: string;
+  /** Line of Credit flags (mutually exclusive). Included in create/edit preview and view summary. */
+  enableLineOfCreditPayable?: boolean;
+  enableLineOfCreditReceivable?: boolean;
   startDate?: string;
   closeDate?: string;
   description?: string;

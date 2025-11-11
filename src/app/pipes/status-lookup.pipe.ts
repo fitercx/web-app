@@ -11,6 +11,8 @@ export class StatusLookupPipe implements PipeTransform {
       Active: 'status-active',
       Block: 'status-block',
       // Generic status codes used by Credit Lines (Lines of Credit)
+      'status.submitted': 'status-pending',
+      'status.approved': 'status-approved',
       'status.active': 'status-active',
       'status.inactive': 'status-inactive',
       'status.suspended': 'status-suspended',

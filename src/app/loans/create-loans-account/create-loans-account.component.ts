@@ -154,8 +154,17 @@ export class CreateLoansAccountComponent {
   setDatatables(): void {
     this.datatables = [];
 
-    if (this.loansAccountProductTemplate.datatables) {
+    const locEnabled = this.loansAccountProductTemplate?.additionalProperties?.isLocEnabled;
+
+    if (
+      this.loansAccountProductTemplate.datatables &&
+      (this.loansAccountTemplate?.productId !== undefined || this.loansAccountTemplate?.loanProductId !== null)
+    ) {
       this.loansAccountProductTemplate.datatables.forEach((datatable: any) => {
+        if (locEnabled && datatable.registeredTableName === 'dt_loan_additional_data') {
+          // Skip LOC datatable if LOC is enabled, as it's handled separately
+          return;
+        }
         datatable.viewLabel = this.transformDatatableLabel(datatable);
         this.datatables.push(datatable);
       });
@@ -306,7 +315,12 @@ export class CreateLoansAccountComponent {
       this.loanDatatables.forEach((loanDatatable: LoansAccountDatatableStepComponent) => {
         datatables.push(loanDatatable.payload);
       });
-      payload['datatables'] = datatables;
+
+      if (this.isLocEnabled) {
+        datatables.length > 0 ? (payload['datatables'] = datatables) : delete payload['datatables'];
+      } else {
+        payload['datatables'] = datatables;
+      }
     }
 
     this.loansService.createLoansAccount(payload).subscribe((response: any) => {

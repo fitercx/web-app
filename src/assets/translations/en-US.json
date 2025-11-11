@@ -1190,13 +1190,14 @@
       "Principal Amount": "Principal Amount"
     },
     "inputs": {
+      "Enable Line of Credit Payable functionality": "Enable Line of Credit Payable functionality",
       "Linked Savings Account (Auto Debit Source)": "Linked Savings Account (Auto Debit Source)",
       "Invoice Number": "Invoice Number",
       "Supplier/Buyer Name": "Supplier/Buyer Name",
       "PreDisbursal Amount": "PreDisbursal Amount",
       "Tax Amount": "Tax Amount",
       "Expected Interest": "Expected Interest",
-      "Enable Line of Credit Receivable": "Enable Line of Credit Receivable",
+      "Enable Line of Credit Receivable functionality": "Enable Line of Credit Receivable functionality",
       "Disbursed Amount": "Disbursed Amount",
       "Refund Amount": "Refund Amount",
       "Facility Amount (Principal)": "Facility Amount (Principal)",
@@ -2789,6 +2790,7 @@
       "the Transaction Type": "the Transaction Type"
     },
     "text": {
+      "Invoice Details": "Invoice Details",
       "Create LOC": "Create Line of Credit",
       "LOC Details": "LOC Details",
       "A": "A",
@@ -3545,6 +3547,7 @@
   "not_found_subtitle": "Oops.. Looks like this page doesn't exist.",
   "tooltips": {
     "Factor Rate Penalty Grace Period": "Number of days after loan maturity date before penalty factor rate is applied.",
+    "Disburse to Savings": "Disburse to Savings",
     "New Drawdown": "New Drawdown",
     "View LOC Details": "View Line of Credit Details",
     "Enable Line of Credit Receivable functionality": "Enable Line of Credit Receivable functionality",

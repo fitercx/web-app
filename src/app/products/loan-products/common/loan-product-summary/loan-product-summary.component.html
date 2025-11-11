@@ -31,12 +31,12 @@
   </div>
 
   <div fxFlexFill>
-    <span fxFlex="47%">{{ 'labels.inputs.Enable LOC product' | translate }}:</span>
-    <span fxFlex="53%">{{ loanProduct?.isLocEnabled | yesNo }}</span>
+    <span fxFlex="47%">{{ 'labels.inputs.Enable Line of Credit Payable functionality' | translate }}:</span>
+    <span fxFlex="53%">{{ loanProduct?.enableLineOfCreditPayable | yesNo }}</span>
   </div>
 
-  <div fxFlexFill *ngIf="loanProduct?.isLocEnabled">
-    <span fxFlex="47%">{{ 'labels.inputs.Enable Line of Credit Receivable' | translate }}:</span>
+  <div fxFlexFill>
+    <span fxFlex="47%">{{ 'labels.inputs.Enable Line of Credit Receivable functionality' | translate }}:</span>
     <span fxFlex="53%">{{ loanProduct?.enableLineOfCreditReceivable | yesNo }}</span>
   </div>
 
