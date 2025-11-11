@@ -2051,6 +2051,7 @@
       "Factor Rate Product": "Factor Rate Product",
       "Factor Rate": "Factor Rate",
       "Enable Factor Rate Product": "Enable Factor Rate on this Loan Product?",
+      "Factor Rate Penalty Grace Period": "Factor Rate Penalty Grace Period",
       "Multi Row": "Multi Row",
       "Multiple Credit Entries Allowed": "Multiple Credit Entries Allowed",
       "Multiple Debit Entries Allowed": "Multiple Debit Entries Allowed",
@@ -3543,6 +3544,7 @@
   },
   "not_found_subtitle": "Oops.. Looks like this page doesn't exist.",
   "tooltips": {
+    "Factor Rate Penalty Grace Period": "Number of days after loan maturity date before penalty factor rate is applied.",
     "New Drawdown": "New Drawdown",
     "View LOC Details": "View Line of Credit Details",
     "Enable Line of Credit Receivable functionality": "Enable Line of Credit Receivable functionality",

@@ -147,6 +147,7 @@ export interface LoanProduct {
   additionalProperties?: LoanProductAdditionalProperties;
   factorRateProductEnabled?: boolean;
   factorRate?: number;
+  penaltyGracePeriod?: number;
   overAppliedCalculationType: any;
   minInterestRatePerPeriod: number;
   maxInterestRatePerPeriod: number;

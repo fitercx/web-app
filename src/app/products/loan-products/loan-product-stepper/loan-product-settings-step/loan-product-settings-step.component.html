@@ -333,6 +333,19 @@
     </h4>
 
     <div
+      *ngIf="loanProductSettingsForm.value.factorRateProductEnabled"
+      fxFlexFill
+      fxLayout="row wrap"
+      fxLayoutGap="2%"
+      fxLayout.lt-md="column"
+    >
+      <mat-form-field fxFlex="47%" matTooltip="{{ 'tooltips.Factor Rate Penalty Grace Period' | translate }}">
+        <mat-label>{{ 'labels.inputs.Factor Rate Penalty Grace Period' | translate }}</mat-label>
+        <input type="number" matInput formControlName="penaltyGracePeriod" />
+      </mat-form-field>
+    </div>
+
+    <div
       *ngIf="!loanProductSettingsForm.value.factorRateProductEnabled"
       fxFlexFill
       fxLayout="row wrap"
