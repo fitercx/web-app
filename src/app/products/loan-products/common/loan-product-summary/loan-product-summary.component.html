@@ -511,6 +511,11 @@
     <span fxFlex="53%">{{ loanProduct.graceOnInterestCharged }}</span>
   </div>
 
+  <div fxFlexFill *ngIf="loanProduct.penaltyGracePeriod">
+    <span fxFlex="47%">{{ 'labels.inputs.Factor Rate Penalty Grace Period' | translate }}: </span>
+    <span fxFlex="53%">{{ loanProduct.penaltyGracePeriod }}</span>
+  </div>
+
   <div fxFlexFill *ngIf="loanProduct.inArrearsTolerance">
     <span fxFlex="47%">{{ 'labels.inputs.Arrears tolerance' | translate }}:</span>
     <span fxFlex="53%">{{ loanProduct.inArrearsTolerance }}</span>
