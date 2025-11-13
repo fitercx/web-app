@@ -142,17 +142,102 @@ export class TableAndSmsComponent implements OnChanges {
 
   exportToXLS(): void {
     const fileName = `${this.dataObject.report.name}.xlsx`;
+
+    // Build plain objects, converting date-like cells to Date instances
     const data = this.csvData.map((object: any) => {
-      const row = {};
+      const row: any = {};
       for (let i = 0; i < this.displayedColumns.length; i++) {
-        row[this.displayedColumns[i]] = object.row[i];
+        const rawVal = object.row[i];
+        if (this.isDateColumn(i)) {
+          row[this.displayedColumns[i]] = this.parseDateValue(rawVal) || '';
+        } else {
+          row[this.displayedColumns[i]] = rawVal;
+        }
       }
       return row;
     });
+
     const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(data, { header: this.displayedColumns });
+
+    // Ensure date cells are typed & formatted for Excel/Sheets
+    for (let r = 0; r < data.length; r++) {
+      for (let c = 0; c < this.displayedColumns.length; c++) {
+        if (!this.isDateColumn(c)) continue;
+        const cellAddr = XLSX.utils.encode_cell({ r: r + 1, c }); // +1 header offset
+        const cell = ws[cellAddr];
+        if (!cell) continue;
+        const val = data[r][this.displayedColumns[c]];
+        if (val instanceof Date) {
+          cell.v = this.toExcelSerial(val);
+          cell.t = 'n';
+          cell.z = 'yyyy-mm-dd';
+        } else if (typeof val === 'string' && val) {
+          const d = this.parseDateValue(val);
+          if (d) {
+            cell.v = this.toExcelSerial(d);
+            cell.t = 'n';
+            cell.z = 'yyyy-mm-dd';
+          }
+        }
+      }
+    }
+
     const wb: XLSX.WorkBook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Report');
-    XLSX.writeFile(wb, fileName);
+    XLSX.writeFile(wb, fileName, { cellDates: true });
+  }
+
+  // Detect date columns (backend display types may be DATE / DATETIME)
+  private isDateColumn(index: number): boolean {
+    const t = (this.columnTypes[index] || '').toString().toUpperCase();
+    return t === 'DATE' || t === 'DATETIME';
+  }
+
+  // Parse supported date formats: array [Y,M,D], "Y,M,D", "Y-M-D"
+  private parseDateValue(value: any): Date | null {
+    if (!value && value !== 0) return null;
+    if (value instanceof Date) return value;
+
+    if (Array.isArray(value) && value.length >= 3) {
+      const [
+        y,
+        m,
+        d
+      ] = value;
+      if (this.validYMD(y, m, d)) return new Date(y, m - 1, d);
+      return null;
+    }
+
+    if (typeof value === 'string') {
+      const s = value.trim();
+      let m = s.match(/^(\d{4})\s*,\s*(\d{1,2})\s*,\s*(\d{1,2})$/);
+      if (m) {
+        const y = +m[1],
+          mo = +m[2],
+          da = +m[3];
+        if (this.validYMD(y, mo, da)) return new Date(y, mo - 1, da);
+        return null;
+      }
+      m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+      if (m) {
+        const y = +m[1],
+          mo = +m[2],
+          da = +m[3];
+        if (this.validYMD(y, mo, da)) return new Date(y, mo - 1, da);
+        return null;
+      }
+    }
+    return null;
+  }
+
+  private validYMD(y: number, m: number, d: number): boolean {
+    return !!y && !!m && !!d && m >= 1 && m <= 12 && d >= 1 && d <= 31;
+  }
+
+  // Excel serial number (days since 1899-12-30)
+  private toExcelSerial(date: Date): number {
+    const epoch = Date.UTC(1899, 11, 30);
+    return (Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - epoch) / 86400000;
   }
 
   /**
