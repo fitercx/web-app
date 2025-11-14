@@ -1625,6 +1625,8 @@
       "Disabled": "Disabled",
       "Disallow Expected Disbursements": "Disallow Expected Disbursements",
       "Disburse Amount": "Disburse Amount",
+      "Total Repayment Amount": "Total Repayment Amount",
+      "Penalty Grace Period": "Penalty Grace Period",
       "Net Disbursed Amount": "Net Disbursed Amount",
       "Disbursed Amount Percentage Down Payment": "Disbursed Amount Percentage Down Payment",
       "Disbursed On": "Disbursed On",
@@ -3752,5 +3754,6 @@
     "loan product will be active and available to clients": "The date that the loan product will be active and available to clients. If blank, the loan product will be active as soon as it is created.",
     "loan product will become inactive and unavailable to clients": "The date that the loan product will become inactive and unavailable to clients. If blank, the load product will never become inactive.",
     "Refund transactions where interest refund will automatically be calculated": "Refund transactions where interest refund will automatically be calculated"
-  }
+  },
+  "termFrequency.periodFrequencyType.days": "Days"
 }

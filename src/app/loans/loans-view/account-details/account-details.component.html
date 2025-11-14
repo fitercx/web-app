@@ -7,6 +7,13 @@
       <span fxFlex="50%"> {{ loanDetails.factorRate | formatNumber }}</span>
     </div>
 
+    <div fxFlexFill *ngIf="loanDetails.factorRateEnabled">
+      <span fxFlex="50%"> {{ 'labels.inputs.Loan Term ' | translate }} </span>
+      <span fxFlex="50%">
+        {{ loanDetails.termFrequency }} {{ loanDetails.termPeriodFrequencyType.code | translate }}
+      </span>
+    </div>
+
     <div fxFlexFill>
       <span fxFlex="50%">{{ 'labels.inputs.Repayment Strategy' | translate }}</span>
       <span fxFlex="50%">{{ loanDetails.transactionProcessingStrategyName | translateKey: 'catalogs' }}</span>
@@ -59,7 +66,7 @@
       <span fxFlex="50%"> {{ loanDetails.isEqualAmortization | yesNo }} </span>
     </div>
 
-    <!-- <div fxFlexFill>
+    <div *ngIf="!loanDetails.factorRateEnabled && loanDetails.interestRatePerPeriod > 0" fxFlexFill>
       <span fxFlex="50%"> {{ 'labels.inputs.Interest' | translate }} </span>
       <span fxFlex="50%">
         {{ loanDetails.annualInterestRate | formatNumber }} % {{ 'labels.text.per annum' | translate }} ({{
@@ -67,7 +74,7 @@
         }}
         %&nbsp; {{ loanDetails.interestRateFrequencyType.value | translateKey: 'catalogs' }})
       </span>
-    </div> -->
+    </div>
 
     <ng-container *ngIf="loanDetails?.additionalProperties?.loanInterestVariations?.length">
       <div fxFlexFill *ngFor="let variation of loanDetails.additionalProperties.loanInterestVariations">
