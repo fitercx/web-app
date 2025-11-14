@@ -193,6 +193,9 @@ export class GeneralTabComponent implements OnInit {
         overdue: this.loanDetails.summary.totalOverdue
       }
     ];
+    if (this.loanDetails.factorRateEnabled) {
+      this.loanSummaryTableData = this.loanSummaryTableData.filter((item) => item.property !== 'Interest');
+    }
     this.dataSource = new MatTableDataSource(this.loanSummaryTableData);
   }
 
@@ -232,7 +235,7 @@ export class GeneralTabComponent implements OnInit {
         value: this.getApprovedAmount()
       },
       {
-        key: 'Disburse Amount',
+        key: this.loanDetails.factorRateEnabled ? 'Total Repayment Amount' : 'Disburse Amount',
         value: this.getDisbursedAmount()
       },
       {
@@ -240,6 +243,12 @@ export class GeneralTabComponent implements OnInit {
         value: this.netDisbursedAmount
       }
     ];
+    if (this.loanDetails?.factorRateEnabled) {
+      this.loanDetailsTableData.push({
+        key: 'Penalty Grace Period',
+        value: this.loanDetails?.penaltyGracePeriod
+      });
+    }
     this.detailsDataSource = new MatTableDataSource(this.loanDetailsTableData);
   }
 

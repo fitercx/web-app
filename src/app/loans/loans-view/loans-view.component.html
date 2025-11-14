@@ -107,6 +107,12 @@
                       {{ loanDetailsData.totalOverpaid | currency: currency.code : 'symbol-narrow' : '1.2-2' }}
                     </td>
                   </tr>
+                  <tr *ngIf="loanDetailsData.factorRateEnabled">
+                    <td>{{ 'labels.inputs.Factor Rate' | translate }}</td>
+                    <td class="r-amount">
+                      {{ loanDetailsData.factorRate | formatNumber }}
+                    </td>
+                  </tr>
                 </tbody>
               </table>
             </div>
