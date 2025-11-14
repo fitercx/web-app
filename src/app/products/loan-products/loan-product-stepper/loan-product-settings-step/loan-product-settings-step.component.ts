@@ -100,6 +100,7 @@ export class LoanProductSettingsStepComponent implements OnInit {
       isEqualAmortization: this.loanProductsTemplate.isEqualAmortization,
       factorRateProductEnabled: this.loanProductsTemplate?.factorRateProductEnabled,
       factorRate: this.loanProductsTemplate?.factorRate,
+      penaltyGracePeriod: this.loanProductsTemplate?.penaltyGracePeriod,
       interestCalculationPeriodType: this.loanProductsTemplate.interestCalculationPeriodType.id,
       allowPartialPeriodInterestCalculation: this.loanProductsTemplate.allowPartialPeriodInterestCalculation,
       transactionProcessingStrategyCode: transactionProcessingStrategyCode,
@@ -270,6 +271,7 @@ export class LoanProductSettingsStepComponent implements OnInit {
           Validators.required
         ]
       ],
+      penaltyGracePeriod: [''],
       amortizationType: [
         '',
         Validators.required
