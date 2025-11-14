@@ -134,6 +134,14 @@ export class GeneralTabComponent {
     'expand'
   ];
 
+  /** Columns actually displayed for inner LOC loans depending on toggle (hide Refund/Actions for closed loans view) */
+  get displayedLocLoanColumns(): string[] {
+    if (this.showClosedLOCLoans) {
+      return this.locLoanColumns.filter((c) => c !== 'Refund Amount' && c !== 'Actions');
+    }
+    return this.locLoanColumns;
+  }
+
   /** Client Account Data */
   clientAccountData: any;
   /** Loan Accounts Data */
@@ -152,6 +160,8 @@ export class GeneralTabComponent {
   linesOfCredit: any[] = []; // displayed subset
   private allLinesOfCredit: any[] = []; // full list including closed
   showClosedLOCs = false; // toggle flag for viewing closed LOCs only
+  // Toggle flag for viewing closed loans inside a LOC detail
+  showClosedLOCLoans = false;
 
   /** Show Closed Loan Accounts */
   showClosedLoanAccounts = false;
@@ -418,6 +428,8 @@ export class GeneralTabComponent {
           authorizedSignatoryEmail: loc.authorizedSignatoryEmail,
           va: loc.va,
           specialConditions: loc.specialConditions,
+          // Preserve an immutable copy of original loans for filtering toggles
+          originalLoans: associatedLoans,
           loans: associatedLoans
         };
       })
@@ -510,6 +522,12 @@ export class GeneralTabComponent {
     this.applyLOCFilter();
   }
 
+  /** Toggle between active and closed loans inside Line of Credit expanded rows */
+  toggleClosedLOCLoans(): void {
+    this.showClosedLOCLoans = !this.showClosedLOCLoans;
+    this.applyLOCLoansFilter();
+  }
+
   /** Apply current LOC filter based on showClosedLOCs flag */
   private applyLOCFilter(): void {
     if (this.showClosedLOCs) {
@@ -517,5 +535,38 @@ export class GeneralTabComponent {
     } else {
       this.linesOfCredit = this.allLinesOfCredit.filter((loc) => loc.statusCode !== 'status.closed');
     }
+    // After LOC filtering also re-apply loan level filtering
+    this.applyLOCLoansFilter();
+  }
+
+  /** Apply filtering of loans inside each LOC based on showClosedLOCLoans flag */
+  private applyLOCLoansFilter(): void {
+    this.linesOfCredit.forEach((loc) => {
+      const sourceLoc = this.allLinesOfCredit.find((l) => l.id === loc.id) || loc;
+      const originalLoans = sourceLoc.originalLoans || sourceLoc.loans || [];
+      const filtered = originalLoans.filter((loan: any) =>
+        this.showClosedLOCLoans ? this.isLoanClosed(loan) : !this.isLoanClosed(loan)
+      );
+      loc.loans = filtered;
+    });
+    // If currently expanded loan row became filtered out, clear it so UI doesn't collapse unexpectedly
+    if (
+      this.expandedLOCLoanElement &&
+      !this.linesOfCredit.some((loc) => loc.loans.includes(this.expandedLOCLoanElement))
+    ) {
+      this.expandedLOCLoanElement = null;
+    }
+  }
+
+  /** Determine if a loan is closed based on status code (reuse existing logic from AccountsFilterPipe) */
+  private isLoanClosed(loan: any): boolean {
+    if (!loan?.status?.code) return false;
+    return (
+      loan.status.code === 'loanStatusType.closed.written.off' ||
+      loan.status.code === 'loanStatusType.closed.obligations.met' ||
+      loan.status.code === 'loanStatusType.closed.reschedule.outstanding.amount' ||
+      loan.status.code === 'loanStatusType.withdrawn.by.client' ||
+      loan.status.code === 'loanStatusType.rejected'
+    );
   }
 }

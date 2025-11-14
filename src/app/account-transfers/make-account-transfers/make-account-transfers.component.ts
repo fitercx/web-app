@@ -122,6 +122,16 @@ export class MakeAccountTransfersComponent implements OnInit, AfterViewInit {
    * Creates the standing instruction form.
    */
   createMakeAccountTransferForm() {
+    // Build validators for amount dynamically. For loan-origin transfers balance may be 0/undefined,
+    // which previously forced the form invalid (amount > 0 always exceeded 0). Skip balance check when
+    // balance is falsy so the submit button can enable after all fields are filled.
+    const amountValidators = [
+      Validators.required,
+      Validators.min(0.01)];
+    if (this.balance) {
+      amountValidators.push(this.amountExceedsBalanceValidator.bind(this));
+    }
+
     this.makeAccountTransferForm = this.formBuilder.group({
       toOfficeId: [
         '',
@@ -141,10 +151,7 @@ export class MakeAccountTransfersComponent implements OnInit, AfterViewInit {
       ],
       transferAmount: [
         this.accountTransferTemplateData.transferAmount,
-        [
-          Validators.required,
-          Validators.min(0.01),
-          this.amountExceedsBalanceValidator.bind(this)]
+        amountValidators
       ],
       transferDate: [
         this.settingsService.businessDate,
@@ -158,7 +165,13 @@ export class MakeAccountTransfersComponent implements OnInit, AfterViewInit {
   }
 
   createMakeAccountInterbankTransferForm(account: any) {
-    /* --> */ this.makeAccountTransferForm = this.formBuilder.group({
+    /* --> */ const amountValidators = [
+      Validators.required,
+      Validators.min(0.01)];
+    if (this.balance) {
+      amountValidators.push(this.amountExceedsBalanceValidator.bind(this));
+    }
+    this.makeAccountTransferForm = this.formBuilder.group({
       toBank: [
         { value: account.sourceFspId, disabled: true },
         Validators.required
@@ -177,10 +190,7 @@ export class MakeAccountTransfersComponent implements OnInit, AfterViewInit {
       ],
       transferAmount: [
         this.accountTransferTemplateData.transferAmount,
-        [
-          Validators.required,
-          Validators.min(0.01),
-          this.amountExceedsBalanceValidator.bind(this)]
+        amountValidators
       ],
       transferDate: [
         this.settingsService.businessDate,

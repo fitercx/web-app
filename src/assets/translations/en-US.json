@@ -302,6 +302,8 @@
       "Decrease Limit": "Decrease Limit",
       "View Closed LOC": "View Closed LOC",
       "View Active LOC": "View Active LOC",
+      "View Closed LOC Loans": "View Closed LOC Loans",
+      "View Active LOC Loans": "View Active LOC Loans",
       "New Line Of Credit": "New Line Of Credit",
       "Accept Transfer": "Accept Transfer",
       "Actions": "Actions",
@@ -805,7 +807,6 @@
       "should": "should",
       "on": "on",
       "Password validation": "Password should contain minimum {{minchar}} characters, that should income 1 uppercase, lowercase and special character and should not consists of repeated characters or white-spaces",
-      "must be greater than": "must be greater than",
       "must be less than or equal to": "must be less than or equal to"
     },
     "heading": {
@@ -2789,6 +2790,7 @@
       "the Transaction Type": "the Transaction Type"
     },
     "text": {
+      "No drawdowns/loans for this line of credit": "No drawdowns/loans for this line of credit",
       "Invoice Details": "Invoice Details",
       "Create LOC": "Create Line of Credit",
       "LOC Details": "LOC Details",
