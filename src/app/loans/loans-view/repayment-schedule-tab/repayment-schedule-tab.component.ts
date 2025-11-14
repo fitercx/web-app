@@ -325,9 +325,13 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
   getRefundAmount(item: any): number {
     // Use loanData (for creation flow) or loanDetailsData (for view flow)
+    if (item.status === 'DISBURSEMENT') {
+      return;
+    }
+
     const loanInfo = this.loanData || this.loanDetailsData;
-    if (loanInfo && loanInfo.overPaidAmount !== undefined && loanInfo.overPaidAmount !== null) {
-      return loanInfo.overPaidAmount;
+    if (loanInfo && loanInfo.totalOverpaid !== undefined && loanInfo.totalOverpaid !== null) {
+      return loanInfo.totalOverpaid;
     }
     return 0;
   }
