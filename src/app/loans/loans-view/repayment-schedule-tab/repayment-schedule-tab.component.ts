@@ -311,6 +311,27 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     return loanAccountData.factorRateEnabled;
   }
 
+  getEmiLabel(): string {
+    let repaymentFrequencyTypeId;
+    if (this.loanData) {
+      repaymentFrequencyTypeId = this.loanData.repaymentFrequencyType ?? 5;
+    } else if (this.loanDetailsData) {
+      repaymentFrequencyTypeId = this.loanDetailsData?.repaymentFrequencyType?.id ?? 5;
+    }
+    switch (repaymentFrequencyTypeId) {
+      case 0:
+        return 'labels.inputs.EDI Amount';
+      case 1:
+        return 'labels.inputs.EWI Amount';
+      case 2:
+        return 'labels.inputs.EMI Amount';
+      case 3:
+        return 'labels.inputs.EAI Amount';
+      default:
+        return 'labels.inputs.EMI Amount';
+    }
+  }
+
   getDisbursedAmount(item: any): number {
     // Use loanData (for creation flow) or loanDetailsData (for view flow)
     const loanInfo = this.loanData || this.loanDetailsData;
