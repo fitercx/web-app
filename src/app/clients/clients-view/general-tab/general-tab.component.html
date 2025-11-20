@@ -265,7 +265,7 @@
               <ng-container matColumnDef="Loan Amount">
                 <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Loan Amount' | translate }}</th>
                 <td mat-cell *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
-                  {{ loan.originalLoan | formatNumber }}
+                  {{ (loan.isFactorRateEnabled ? loan.factorRateLoanAmount : loan.originalLoan) | formatNumber }}
                 </td>
               </ng-container>
 
@@ -486,7 +486,9 @@
 
     <ng-container matColumnDef="Loan Amount">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Loan Amount' | translate }}</th>
-      <td mat-cell *matCellDef="let element">{{ element.originalLoan | formatNumber }}</td>
+      <td mat-cell *matCellDef="let element">
+        {{ (element.isFactorRateEnabled ? element.factorRateLoanAmount : element.originalLoan) | formatNumber }}
+      </td>
     </ng-container>
 
     <ng-container matColumnDef="Outstanding Balance">
@@ -674,6 +676,38 @@
                   }}
                 </span>
               </div>
+
+              <!--  Factor Rate Loan Fields  -->
+              <div class="detail-item" *ngIf="element.isFactorRateEnabled">
+                <span class="detail-label">{{ 'labels.inputs.Factor Rate' | translate }}:</span>
+                <span class="detail-value">{{ element.factorRate }}</span>
+              </div>
+
+              <div class="detail-item" *ngIf="element.isFactorRateEnabled">
+                <span class="detail-label">{{ 'labels.inputs.Total Fee Charges' | translate }}:</span>
+                <span class="detail-value">{{ element.totalFeeChargesCharged | formatNumber }}</span>
+              </div>
+              <div class="detail-item" *ngIf="element.isFactorRateEnabled">
+                <span class="detail-label">{{ 'labels.inputs.Total Tax Charges' | translate }}:</span>
+                <span class="detail-value">{{ element.totalTaxChargesCharged | formatNumber }}</span>
+              </div>
+
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.Loan Term' | translate }}:</span>
+                <span class="detail-value"
+                  >{{ element.termFrequency }} {{ element.termPeriodFrequencyType?.code | translate }}
+                </span>
+              </div>
+
+              <div class="detail-item">
+                <span class="detail-label">{{ 'labels.inputs.Maturity Date' | translate }}:</span>
+                <span class="detail-value">{{ element.actualMaturityDate | dateFormat }} </span>
+              </div>
+
+              <div class="detail-item" *ngIf="element.isFactorRateEnabled">
+                <span class="detail-label">{{ 'labels.inputs.Penalty Grace Period' | translate }}:</span>
+                <span class="detail-value">{{ element.penaltyGracePeriod }} </span>
+              </div>
             </div>
           </div>
         </div>
@@ -718,7 +752,9 @@
 
     <ng-container matColumnDef="Loan Amount">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Loan Amount' | translate }}</th>
-      <td mat-cell *matCellDef="let element">{{ element.originalLoan | formatNumber }}</td>
+      <td mat-cell *matCellDef="let element">
+        {{ (element.isFactorRateEnabled ? element.factorRateLoanAmount : element.originalLoan) | formatNumber }}
+      </td>
     </ng-container>
 
     <ng-container matColumnDef="Outstanding Balance">

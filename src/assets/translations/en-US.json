@@ -1662,6 +1662,8 @@
       "EDI Amount": "EDI Amount",
       "EWI Amount": "EWI Amount",
       "EAI Amount": "EAI Amount",
+      "Total Tax Charges": "Total Tax Charges",
+      "Total Fee Charges": "Total Fee Charges",
       "Email": "Email",
       "Email Address": "Email Address",
       "Email ID": "Email ID",
@@ -3758,5 +3760,8 @@
     "loan product will become inactive and unavailable to clients": "The date that the loan product will become inactive and unavailable to clients. If blank, the load product will never become inactive.",
     "Refund transactions where interest refund will automatically be calculated": "Refund transactions where interest refund will automatically be calculated"
   },
-  "termFrequency.periodFrequencyType.days": "Days"
+  "termFrequency.periodFrequencyType.days": "Days",
+  "termFrequency.periodFrequencyType.weeks": "Weeks",
+  "termFrequency.periodFrequencyType.months": "Months",
+  "termFrequency.periodFrequencyType.years": "Years"
 }

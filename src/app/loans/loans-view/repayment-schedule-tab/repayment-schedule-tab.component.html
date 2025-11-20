@@ -143,8 +143,8 @@
     <ng-container matColumnDef="emiAmount">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ getEmiLabel() | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        <ng-container *ngIf="isLineOfCreditReceivable(); else normalEmi">
-          {{ item.principalDue + item.interestOriginalDue + item.feeChargesDue | formatNumber }}
+        <ng-container *ngIf="isLineOfCreditReceivable() || isLoanFactorRateEnabled(); else normalEmi">
+          {{ item.principalDue + item.interestOriginalDue + item.feeChargesDue + item.taxChargesDue | formatNumber }}
         </ng-container>
         <ng-template #normalEmi>
           {{ item.principalDue + item.interestOriginalDue | formatNumber }}
