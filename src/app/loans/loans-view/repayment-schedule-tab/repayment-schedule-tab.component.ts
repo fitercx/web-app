@@ -303,7 +303,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   /**
    * Checks if the loan has factor rate enabled
    */
-  private isLoanFactorRateEnabled(): boolean {
+  isLoanFactorRateEnabled(): boolean {
     const loanAccountData = this.loanData || this.loanDetailsData;
     if (!loanAccountData) {
       return false;
