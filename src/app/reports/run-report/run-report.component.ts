@@ -63,6 +63,8 @@ export class RunReportComponent implements OnInit {
 
   isProcessing = false;
 
+  private prefillQueryParams: any = {};
+
   /**
    * Fetches report specifications from route params and retrieves report parameters data from `resolve`.
    * @param {ActivatedRoute} route ActivatedRoute.
@@ -104,6 +106,7 @@ export class RunReportComponent implements OnInit {
         }
       }
     });
+    this.prefillQueryParams = this.route.snapshot.queryParams || {};
   }
 
   isTableReport(): boolean {
@@ -159,6 +162,7 @@ export class RunReportComponent implements OnInit {
     }
     this.decimalChoice.patchValue('0');
     this.setChildControls();
+    this.applyPrefillValues(); // apply after controls created
   }
 
   /**
@@ -220,6 +224,24 @@ export class RunReportComponent implements OnInit {
       param.selectOptions = options;
       if (param.selectAll === 'Y') {
         param.selectOptions.push({ id: '-1', name: 'All' });
+      }
+      // Attempt prefill if query param matches (id or name)
+      const rawPrefill = this.prefillQueryParams[param.name];
+      if (rawPrefill != null && this.reportForm.contains(param.name) && !this.reportForm.get(param.name).value) {
+        // Try match by id first
+        let matched = param.selectOptions.find((o) => o.id?.toString() === rawPrefill?.toString());
+        if (!matched) {
+          matched = param.selectOptions.find(
+            (o) => o.name?.toString().toLowerCase() === rawPrefill?.toString().toLowerCase()
+          );
+        }
+        if (matched) {
+          if (param.displayType === 'select') {
+            this.reportForm.get(param.name).patchValue(matched);
+          } else if (param.displayType === 'multiselect') {
+            this.reportForm.get(param.name).patchValue([matched]);
+          }
+        }
       }
     });
   }
@@ -352,5 +374,61 @@ export class RunReportComponent implements OnInit {
     const wb: XLSX.WorkBook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'report');
     XLSX.writeFile(wb, fileName);
+  }
+
+  private applyPrefillValues(): void {
+    if (!this.prefillQueryParams) return;
+    Object.keys(this.prefillQueryParams).forEach((key) => {
+      const ctrl = this.reportForm.get(key);
+      if (!ctrl) return;
+      const param = this.paramData.find((p) => p.name === key);
+      if (!param) return;
+      const value = this.prefillQueryParams[key];
+      switch (param.displayType) {
+        case 'text':
+          ctrl.patchValue(value);
+          break;
+        case 'date':
+          // Accept ISO, YYYY-MM-DD, or comma form
+          const d = this.toDate(value);
+          if (d) ctrl.patchValue(d);
+          break;
+        // select / multiselect handled after options load in fetchSelectOptions
+      }
+    });
+  }
+
+  private toDate(value: any): Date | null {
+    if (!value) return null;
+    if (value instanceof Date) return value;
+    if (Array.isArray(value) && value.length >= 3) {
+      const [
+        y,
+        m,
+        d
+      ] = value;
+      if (this.validYMD(y, m, d)) return new Date(y, m - 1, d);
+      return null;
+    }
+    if (typeof value === 'string') {
+      const csv = value.match(/^(\d{4})\s*,\s*(\d{1,2})\s*,\s*(\d{1,2})$/);
+      if (csv) {
+        const y = +csv[1],
+          m = +csv[2],
+          d = +csv[3];
+        if (this.validYMD(y, m, d)) return new Date(y, m - 1, d);
+      }
+      const iso = value.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+      if (iso) {
+        const y = +iso[1],
+          m = +iso[2],
+          d = +iso[3];
+        if (this.validYMD(y, m, d)) return new Date(y, m - 1, d);
+      }
+    }
+    return null;
+  }
+  private validYMD(y: number, m: number, d: number): boolean {
+    return !!y && !!m && !!d && m >= 1 && m <= 12 && d >= 1 && d <= 31;
   }
 }
