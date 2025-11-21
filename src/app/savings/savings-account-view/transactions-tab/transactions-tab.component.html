@@ -11,8 +11,8 @@
         <mat-checkbox [formControl]="hideAccrualsParam" (click)="hideAccruals()" class="accruals">
           {{ 'labels.inputs.Hide Accruals' | translate }}</mat-checkbox
         >
-        <button mat-raised-button color="primary" [routerLink]="['export']">
-          {{ 'labels.buttons.Export' | translate }}
+        <button mat-raised-button color="primary" (click)="navigateToSavingsTransactionsReport()">
+          {{ 'labels.buttons.Generate Report' | translate }}
         </button>
       </div>
     </div>

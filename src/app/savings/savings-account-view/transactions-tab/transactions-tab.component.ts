@@ -201,6 +201,24 @@ export class TransactionsTabComponent implements OnInit {
     });
   }
 
+  navigateToSavingsTransactionsReport(): void {
+    const Client = this.route.parent.parent.snapshot.params['clientId'];
+    const Savings = this.accountId;
+    this.router.navigate(
+      [
+        '/reports/run',
+        'Savings Accounts Transactions Report'
+      ],
+      {
+        queryParams: {
+          type: 'Table',
+          Client,
+          Savings
+        }
+      }
+    );
+  }
+
   private reload() {
     const clientId = this.route.parent.parent.snapshot.params['clientId'];
     const url: string = this.router.url;
