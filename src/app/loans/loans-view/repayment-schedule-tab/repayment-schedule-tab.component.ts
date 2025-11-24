@@ -320,7 +320,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     }
     switch (repaymentFrequencyTypeId) {
       case 0:
-        return 'labels.inputs.EDI Amount';
+        return this.isAnyLineOfCredit() ? 'labels.inputs.EMI Amount' : 'labels.inputs.EDI Amount';
       case 1:
         return 'labels.inputs.EWI Amount';
       case 2:
