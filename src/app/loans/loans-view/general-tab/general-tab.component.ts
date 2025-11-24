@@ -248,6 +248,8 @@ export class GeneralTabComponent implements OnInit {
         key: 'Penalty Grace Period',
         value: this.loanDetails?.penaltyGracePeriod
       });
+      this.loanDetailsTableData = this.loanDetailsTableData.filter((item) => item.key !== 'Disapproved Amount');
+      this.loanDetailsTableData = this.loanDetailsTableData.filter((item) => item.key !== 'Invoice Amount');
     }
     this.detailsDataSource = new MatTableDataSource(this.loanDetailsTableData);
   }
