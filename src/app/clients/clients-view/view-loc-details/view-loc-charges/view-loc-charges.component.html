@@ -2,9 +2,9 @@
   <table mat-table [dataSource]="dataSource">
     <!-- Charge Definition ID Column -->
     <ng-container matColumnDef="chargeDefinitionId">
-      <th mat-header-cell *matHeaderCellDef>Charge Type</th>
+      <th mat-header-cell *matHeaderCellDef>Charge Name</th>
       <td mat-cell *matCellDef="let charge">
-        Charge #{{ charge.chargeDefinitionId }}
+        {{ charge.chargeName }}
         <span *ngIf="charge.penalty" class="penalty-badge">PENALTY</span>
       </td>
     </ng-container>
