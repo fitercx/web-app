@@ -54,6 +54,8 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
   loansAccountDetailsForm: UntypedFormGroup;
 
   loanId: any = null;
+  lineOfCreditId: any = null;
+  lineOfCreditType: String | null = null;
 
   loanProductSelected = false;
   /** Currency data. */
@@ -80,6 +82,8 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
     private commons: Commons
   ) {
     this.loanId = this.route.snapshot.params['loanId'];
+    this.lineOfCreditId = this.route.snapshot.queryParams['lineOfCreditId'];
+    this.lineOfCreditType = this.route.snapshot.queryParams['lineOfCreditType'];
   }
 
   ngOnInit() {
@@ -91,7 +95,30 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
     this.buildDependencies();
 
     if (this.loansAccountTemplate) {
-      this.productList = this.loansAccountTemplate.productOptions.sort(this.commons.dynamicSort('name'));
+      if (this.lineOfCreditId && this.lineOfCreditType) {
+        // Filter LOC-related products, constrained by LOC type (Receivable or Payable)
+        const isReceivable = String(this.lineOfCreditType).toLowerCase() === 'receivable';
+        const isPayable = String(this.lineOfCreditType).toLowerCase() === 'payable';
+
+        this.productList = (this.loansAccountTemplate.productOptions || [])
+          .filter((p: any) => {
+            const receivableEnabled = !!p.enableLineOfCreditReceivable;
+            const payableEnabled = !!p.enableLineOfCreditPayable;
+
+            if (isReceivable) return receivableEnabled;
+            if (isPayable) return payableEnabled;
+            return receivableEnabled || payableEnabled;
+          })
+          .sort(this.commons.dynamicSort('name'));
+
+        // If only one product matches, auto-select it
+        if (Array.isArray(this.productList) && this.productList.length === 1) {
+          this.loansAccountDetailsForm.get('productId')?.setValue(this.productList[0].id);
+        }
+      } else {
+        this.productList = this.loansAccountTemplate.productOptions.sort(this.commons.dynamicSort('name'));
+      }
+
       if (this.loansAccountTemplate.loanProductId) {
         // Set LOC-related properties from existing loan if available
         this.isLocEnabled =
@@ -139,7 +166,8 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
     this.filterFormCtrl.valueChanges.pipe(takeUntil(this._onDestroy)).subscribe(() => {
       this.searchItem();
     });
-    this.productData.next(this.productList.slice());
+    // Refresh the select options with filtered products
+    this.productData.next((this.productList || []).slice());
   }
 
   ngOnDestroy(): void {

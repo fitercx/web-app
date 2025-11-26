@@ -280,6 +280,20 @@ export class EditLoansAccountComponent {
       loansAccountData.invoiceDueDate = this.dateUtils.formatDate(loansAccountData.invoiceDueDate, dateFormat);
     }
 
+    if (loansAccountData.buyerDetails) {
+      // Ensure backend receives an array as expected
+      loansAccountData.buyerDetails = Array.isArray(loansAccountData.buyerDetails)
+        ? loansAccountData.buyerDetails
+        : [loansAccountData.buyerDetails];
+    }
+
+    if (loansAccountData.supplierDetails) {
+      // Ensure backend receives an array as expected
+      loansAccountData.supplierDetails = Array.isArray(loansAccountData.supplierDetails)
+        ? loansAccountData.supplierDetails
+        : [loansAccountData.supplierDetails];
+    }
+
     this.loansService.updateLoansAccount(this.loanId, loansAccountData).subscribe((response: any) => {
       this.router.navigate(['../'], { relativeTo: this.route });
     });

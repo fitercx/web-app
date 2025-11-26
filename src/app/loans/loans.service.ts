@@ -695,7 +695,10 @@ export class LoansService {
       loansAccountData.amountAfterAdvance = loansAccount.amountAfterAdvance;
     }
     if (loansAccount.buyerDetails) {
-      loansAccountData.buyerDetails = loansAccount.buyerDetails;
+      // Ensure backend receives an array as expected
+      loansAccountData.buyerDetails = Array.isArray(loansAccount.buyerDetails)
+        ? loansAccount.buyerDetails
+        : [loansAccount.buyerDetails];
     }
     if (loansAccount.exchangeRate !== undefined && loansAccount.exchangeRate !== null) {
       loansAccountData.exchangeRate = loansAccount.exchangeRate;
@@ -710,7 +713,10 @@ export class LoansService {
       loansAccountData.approvedPayableAmount = loansAccount.approvedPayableAmount;
     }
     if (loansAccount.supplierDetails) {
-      loansAccountData.supplierDetails = loansAccount.supplierDetails;
+      // Ensure backend receives an array as expected
+      loansAccountData.supplierDetails = Array.isArray(loansAccount.supplierDetails)
+        ? loansAccount.supplierDetails
+        : [loansAccount.supplierDetails];
     }
 
     return loansAccountData;

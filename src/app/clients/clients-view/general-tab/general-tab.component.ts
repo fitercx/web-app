@@ -126,7 +126,7 @@ export class GeneralTabComponent {
     'Invoice Number',
     'Supplier/Buyer Name',
     'Loan Product',
-    'Loan Amount',
+    'Disbursed Amount',
     'Outstanding Balance',
     'Amount Paid',
     'Refund Amount',
@@ -505,7 +505,11 @@ export class GeneralTabComponent {
     if (event) {
       event.stopPropagation();
     }
-    const queryParams: any = { lineOfCreditId: loc.id };
+    const queryParams: any = {
+      lineOfCreditId: loc.id,
+      lineOfCreditType: loc.type
+    };
+
     this.router.navigate(
       [
         '../',

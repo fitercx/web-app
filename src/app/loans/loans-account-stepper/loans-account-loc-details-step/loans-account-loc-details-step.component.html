@@ -130,7 +130,7 @@
           <!-- Buyer Details -->
           <mat-form-field fxFlex="100%">
             <mat-label>{{ 'labels.inputs.Buyer Details' | translate }}</mat-label>
-            <mat-select formControlName="buyerDetails" multiple required>
+            <mat-select formControlName="buyerDetails" required>
               <mat-option *ngFor="let option of buyerSupplierOptions; trackBy: trackByOptionId" [value]="option.id">
                 {{ option.name }}
               </mat-option>
@@ -189,7 +189,7 @@
           <!-- Supplier Details -->
           <mat-form-field fxFlex="100%">
             <mat-label>{{ 'labels.inputs.Supplier Details' | translate }}</mat-label>
-            <mat-select formControlName="supplierDetails" multiple required>
+            <mat-select formControlName="supplierDetails" required>
               <mat-option *ngFor="let option of buyerSupplierOptions; trackBy: trackByOptionId" [value]="option.id">
                 {{ option.name }}
               </mat-option>

@@ -262,8 +262,8 @@
                 </td>
               </ng-container>
 
-              <ng-container matColumnDef="Loan Amount">
-                <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Loan Amount' | translate }}</th>
+              <ng-container matColumnDef="Disbursed Amount">
+                <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Disbursed Amount' | translate }}</th>
                 <td mat-cell *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
                   {{ (loan.isFactorRateEnabled ? loan.factorRateLoanAmount : loan.originalLoan) | formatNumber }}
                 </td>
