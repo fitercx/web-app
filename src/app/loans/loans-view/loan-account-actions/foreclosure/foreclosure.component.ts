@@ -27,6 +27,8 @@ export class ForeclosureComponent implements OnInit {
   linkedSavingsAccountAccountNo?: string;
   linkedSavingsAccountProductName?: string;
   linkedSavingsAccountAvailableBalance?: number;
+  isReceivableLineOfCredit?: boolean = false;
+  currencySymbol?: string;
 
   /**
    * @param {FormBuilder} formBuilder Form Builder.
@@ -114,10 +116,12 @@ export class ForeclosureComponent implements OnInit {
     }
     const additional = source.additionalAttributes;
     if (additional) {
+      this.currencySymbol = source.currency?.displaySymbol;
       this.linkedSavingsAccountId = additional.linkedSavingsAccountId;
       this.linkedSavingsAccountAccountNo = additional.linkedSavingsAccountAccountNo;
       this.linkedSavingsAccountProductName = additional.linkedSavingsAccountProductName;
       this.linkedSavingsAccountAvailableBalance = additional.linkedSavingsAccountAvailableBalance;
+      this.isReceivableLineOfCredit = additional.isReceivableLineOfCredit;
     }
   }
 

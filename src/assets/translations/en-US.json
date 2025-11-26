@@ -1191,6 +1191,7 @@
       "Principal Amount": "Principal Amount"
     },
     "inputs": {
+      "Disbursal Amount": "Disbursal Amount",
       "Enable Line of Credit Payable functionality": "Enable Line of Credit Payable functionality",
       "Linked Savings Account (Auto Debit Source)": "Linked Savings Account (Auto Debit Source)",
       "Invoice Number": "Invoice Number",
@@ -1198,7 +1199,6 @@
       "PreDisbursal Amount": "PreDisbursal Amount",
       "Tax Amount": "Tax Amount",
       "Expected Interest": "Expected Interest",
-      "Enable Line of Credit Receivable functionality": "Enable Line of Credit Receivable functionality",
       "Enable Line of Credit Receivable functionality": "Enable Line of Credit Receivable functionality",
       "Disbursed Amount": "Disbursed Amount",
       "Refund Amount": "Refund Amount",
@@ -2799,6 +2799,7 @@
       "the Transaction Type": "the Transaction Type"
     },
     "text": {
+      "Edit LOC": "Edit Line of Credit",
       "No drawdowns/loans for this line of credit": "No drawdowns/loans for this line of credit",
       "Invoice Details": "Invoice Details",
       "Create LOC": "Create Line of Credit",

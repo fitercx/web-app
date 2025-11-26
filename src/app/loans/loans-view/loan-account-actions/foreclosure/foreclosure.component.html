@@ -10,7 +10,9 @@
         </div>
         <div>
           {{ 'labels.inputs.Available Balance' | translate }} :
-          <span class="linked-savings__account-no">{{ linkedSavingsAccountAvailableBalance | currency }}</span>
+          <span class="linked-savings__account-no"
+            >{{ currencySymbol }} {{ linkedSavingsAccountAvailableBalance | formatNumber }}</span
+          >
         </div>
       </div>
     </div>
@@ -37,7 +39,9 @@
           </mat-form-field>
 
           <mat-form-field>
-            <mat-label>{{ 'labels.inputs.Principal' | translate }}</mat-label>
+            <mat-label>{{
+              (isReceivableLineOfCredit ? 'labels.inputs.Disbursal Amount' : 'labels.inputs.Principal') | translate
+            }}</mat-label>
             <input matInput formControlName="outstandingPrincipalPortion" />
           </mat-form-field>
 

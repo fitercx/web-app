@@ -130,10 +130,23 @@ export class GeneralTabComponent implements OnInit {
     return this.loanDetails?.approvedPrincipal || 0;
   }
 
+  /** Returns the proposed amount based on type of Loan **/
+  getProposedAmount(): number {
+    if (this.loanDetails?.factorRateEnabled) {
+      return this.loanDetails?.factorRateLoanAmount;
+    }
+
+    if (this.isReceivableLineOfCredit()) {
+      return this.getApprovedAmount();
+    }
+
+    return this.loanDetails.proposedPrincipal;
+  }
+
   setloanSummaryTableData() {
     this.loanSummaryTableData = [
       {
-        property: 'Principal',
+        property: this.isReceivableLineOfCredit() ? 'Disbursal Amount' : 'Principal',
         original: this.loanDetails.summary.principalDisbursed,
         adjustment: this.loanDetails.summary.principalAdjustments || 0,
         paid: this.loanDetails.summary.principalPaid,
@@ -226,9 +239,7 @@ export class GeneralTabComponent implements OnInit {
       },
       {
         key: 'Proposed Amount',
-        value: this.loanDetails.factorRateEnabled
-          ? this.loanDetails.factorRateLoanAmount
-          : this.loanDetails.proposedPrincipal
+        value: this.getProposedAmount()
       },
       {
         key: 'Approved Amount',
@@ -334,5 +345,19 @@ export class GeneralTabComponent implements OnInit {
     }
     const locType = info.locType || info.additionalProperties?.locProductType;
     return locType === 'RECEIVABLE' || locType === 'PAYABLE';
+  }
+
+  /** Any LOC (receivable) */
+  private isReceivableLineOfCredit(): boolean {
+    const info = this.loanDetails;
+    if (!info) {
+      return false;
+    }
+    const hasLocId = !!(info.lineOfCreditId || info.additionalProperties?.lineOfCreditId);
+    if (!hasLocId) {
+      return false;
+    }
+    const locType = info.locType || info.additionalProperties?.locProductType;
+    return locType === 'RECEIVABLE';
   }
 }

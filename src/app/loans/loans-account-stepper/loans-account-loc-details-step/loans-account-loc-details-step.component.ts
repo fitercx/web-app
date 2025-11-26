@@ -87,6 +87,24 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
         // Parse dates if they exist as arrays [year, month, day] from backend
         const formData: any = { ...locData };
 
+        // Normalize buyerDetails / supplierDetails to single scalar (take first id if array)
+        if (Array.isArray(formData.buyerDetails)) {
+          const first = formData.buyerDetails[0];
+          formData.buyerDetails = first && typeof first === 'object' ? first.id : first;
+        } else if (formData.buyerDetails && typeof formData.buyerDetails === 'object' && formData.buyerDetails.id) {
+          formData.buyerDetails = formData.buyerDetails.id;
+        }
+        if (Array.isArray(formData.supplierDetails)) {
+          const first = formData.supplierDetails[0];
+          formData.supplierDetails = first && typeof first === 'object' ? first.id : first;
+        } else if (
+          formData.supplierDetails &&
+          typeof formData.supplierDetails === 'object' &&
+          formData.supplierDetails.id
+        ) {
+          formData.supplierDetails = formData.supplierDetails.id;
+        }
+
         if (formData.invoiceDate && Array.isArray(formData.invoiceDate)) {
           // Convert [2025, 9, 20] to Date object (month is 0-based in JavaScript)
           formData.invoiceDate = new Date(
@@ -199,16 +217,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
     }
   }
 
-  /**
-   * Custom validator for array fields (buyer/supplier details)
-   */
-  arrayRequiredValidator(control: AbstractControl): { [key: string]: any } | null {
-    const value = control.value;
-    if (!value || !Array.isArray(value) || value.length === 0) {
-      return { required: true };
-    }
-    return null;
-  }
+  // Removed arrayRequiredValidator since buyer/supplier are now single-select scalar values
 
   /**
    * Custom validator for disapproved amount - cannot be greater than invoice amount
@@ -273,7 +282,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
           Validators.max(100)]
       ],
       amountAfterAdvance: [{ value: '', disabled: true }], // Computed field
-      buyerDetails: [[]],
+      buyerDetails: [''],
 
       // Payable-specific fields
       exchangeRate: [
@@ -286,7 +295,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       ],
       amountInFacilityCurrency: [{ value: '', disabled: true }], // Computed field
       approvedPayableAmount: [{ value: '', disabled: true }], // Computed field
-      supplierDetails: [[]]
+      supplierDetails: ['']
     });
 
     // Set up value change listeners for computed fields
@@ -310,7 +319,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
         Validators.required,
         Validators.min(0),
         Validators.max(100)]);
-      this.locDetailsForm.get('buyerDetails')?.setValidators([this.arrayRequiredValidator]);
+      this.locDetailsForm.get('buyerDetails')?.setValidators([Validators.required]);
 
       // Remove payable validators but DON'T clear payable field values
       this.locDetailsForm.get('exchangeRate')?.setValidators([Validators.min(0.01)]);
@@ -328,7 +337,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       this.locDetailsForm.get('markup')?.setValidators([
         Validators.required,
         Validators.min(0)]);
-      this.locDetailsForm.get('supplierDetails')?.setValidators([this.arrayRequiredValidator]);
+      this.locDetailsForm.get('supplierDetails')?.setValidators([Validators.required]);
 
       // Remove receivable validators but DON'T clear receivable field values
       this.locDetailsForm.get('advancePercentage')?.setValidators([
@@ -654,23 +663,17 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
     const buyerDetailsControl = this.locDetailsForm.get('buyerDetails');
     const supplierDetailsControl = this.locDetailsForm.get('supplierDetails');
 
-    if (buyerDetailsControl && Array.isArray(buyerDetailsControl.value)) {
-      const currentBuyerValues = buyerDetailsControl.value;
-      const validBuyerValues = currentBuyerValues.filter((value: any) =>
-        this.buyerSupplierOptions.some((option: any) => option.id === value || option.name === value)
-      );
-      if (validBuyerValues.length !== currentBuyerValues.length) {
-        buyerDetailsControl.setValue(validBuyerValues, { emitEvent: false });
+    // If scalar value no longer valid, clear it
+    if (buyerDetailsControl) {
+      const v = buyerDetailsControl.value;
+      if (v && !this.buyerSupplierOptions.some((o: any) => o.id === v || o.name === v)) {
+        buyerDetailsControl.setValue('', { emitEvent: false });
       }
     }
-
-    if (supplierDetailsControl && Array.isArray(supplierDetailsControl.value)) {
-      const currentSupplierValues = supplierDetailsControl.value;
-      const validSupplierValues = currentSupplierValues.filter((value: any) =>
-        this.buyerSupplierOptions.some((option: any) => option.id === value || option.name === value)
-      );
-      if (validSupplierValues.length !== currentSupplierValues.length) {
-        supplierDetailsControl.setValue(validSupplierValues, { emitEvent: false });
+    if (supplierDetailsControl) {
+      const v = supplierDetailsControl.value;
+      if (v && !this.buyerSupplierOptions.some((o: any) => o.id === v || o.name === v)) {
+        supplierDetailsControl.setValue('', { emitEvent: false });
       }
     }
   }
@@ -684,76 +687,32 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
     }
 
     const buyerDetailsControl = this.locDetailsForm.get('buyerDetails');
-    const supplierDetailsControl = this.locDetailsForm.get('supplierDetails');
-
-    // Match buyer details - handle both array and single values from legacy data
     if (buyerDetailsControl?.value) {
-      let currentValues = buyerDetailsControl.value;
-
-      // Convert single value to array for consistent processing
-      if (!Array.isArray(currentValues)) {
-        currentValues = [currentValues];
+      const v = buyerDetailsControl.value;
+      let resolved = null;
+      if (v && typeof v === 'object' && v.id) {
+        resolved = v.id;
+      } else {
+        const match = this.buyerSupplierOptions.find(
+          (o: any) => o.id === v || (typeof v === 'string' && o.name?.toLowerCase() === v.toLowerCase())
+        );
+        resolved = match ? match.id : v;
       }
-
-      const matchedValues = currentValues
-        .map((currentValue: any) => {
-          // Handle object format from API: {id: X, name: "Y"}
-          if (currentValue && typeof currentValue === 'object' && currentValue.id) {
-            return currentValue.id;
-          }
-
-          // Handle direct ID/name values
-          let matchedOption = this.buyerSupplierOptions.find(
-            (option: any) => option.id === currentValue || option.name === currentValue
-          );
-
-          // If exact match not found, try to find by name comparison
-          if (!matchedOption && typeof currentValue === 'string') {
-            matchedOption = this.buyerSupplierOptions.find(
-              (option: any) => option.name?.toLowerCase() === currentValue.toLowerCase()
-            );
-          }
-
-          return matchedOption ? matchedOption.id : currentValue;
-        })
-        .filter((value: any) => value !== null && value !== undefined);
-
-      buyerDetailsControl.setValue(matchedValues, { emitEvent: false });
+      buyerDetailsControl.setValue(resolved, { emitEvent: false });
     }
-
-    // Match supplier details - handle both array and single values from legacy data
+    const supplierDetailsControl = this.locDetailsForm.get('supplierDetails');
     if (supplierDetailsControl?.value) {
-      let currentValues = supplierDetailsControl.value;
-
-      // Convert single value to array for consistent processing
-      if (!Array.isArray(currentValues)) {
-        currentValues = [currentValues];
+      const v = supplierDetailsControl.value;
+      let resolved = null;
+      if (v && typeof v === 'object' && v.id) {
+        resolved = v.id;
+      } else {
+        const match = this.buyerSupplierOptions.find(
+          (o: any) => o.id === v || (typeof v === 'string' && o.name?.toLowerCase() === v.toLowerCase())
+        );
+        resolved = match ? match.id : v;
       }
-
-      const matchedValues = currentValues
-        .map((currentValue: any) => {
-          // Handle object format from API: {id: X, name: "Y"}
-          if (currentValue && typeof currentValue === 'object' && currentValue.id) {
-            return currentValue.id;
-          }
-
-          // Handle direct ID/name values
-          let matchedOption = this.buyerSupplierOptions.find(
-            (option: any) => option.id === currentValue || option.name === currentValue
-          );
-
-          // If exact match not found, try to find by name comparison
-          if (!matchedOption && typeof currentValue === 'string') {
-            matchedOption = this.buyerSupplierOptions.find(
-              (option: any) => option.name?.toLowerCase() === currentValue.toLowerCase()
-            );
-          }
-
-          return matchedOption ? matchedOption.id : currentValue;
-        })
-        .filter((value: any) => value !== null && value !== undefined);
-
-      supplierDetailsControl.setValue(matchedValues, { emitEvent: false });
+      supplierDetailsControl.setValue(resolved, { emitEvent: false });
     }
   }
 
@@ -777,12 +736,17 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
    */
   get locDetails() {
     const formData = this.locDetailsForm.getRawValue();
+    // Ensure scalar values are returned (empty string treated as undefined)
+    const buyerDetails = formData.buyerDetails || undefined;
+    const supplierDetails = formData.supplierDetails || undefined;
 
     // Add LOC type information for proper preview display
     return {
       ...formData,
       locType: this.isReceivableType ? 'RECEIVABLE' : this.isPayableType ? 'PAYABLE' : null,
-      buyerSupplierOptions: this.buyerSupplierOptions
+      buyerSupplierOptions: this.buyerSupplierOptions,
+      buyerDetails,
+      supplierDetails
     };
   }
 }

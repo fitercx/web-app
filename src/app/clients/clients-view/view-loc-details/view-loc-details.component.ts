@@ -306,7 +306,10 @@ export class ViewLocDetailsComponent implements OnInit {
         break;
       case 'New Drawdown':
         // Navigate to loan creation page with LOC ID as query parameter
-        const queryParams: any = { lineOfCreditId: this.locId };
+        const queryParams: any = {
+          lineOfCreditId: this.locId,
+          lineOfCreditType: this.locDetails.type === 'LOC PAYABLE' ? 'Payable' : 'Receivable'
+        };
         this.router.navigate(
           [
             '../../',
