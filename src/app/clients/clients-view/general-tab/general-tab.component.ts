@@ -505,7 +505,11 @@ export class GeneralTabComponent {
     if (event) {
       event.stopPropagation();
     }
-    const queryParams: any = { lineOfCreditId: loc.id };
+    const queryParams: any = {
+      lineOfCreditId: loc.id,
+      lineOfCreditType: loc.type
+    };
+
     this.router.navigate(
       [
         '../',
