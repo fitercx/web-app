@@ -29,10 +29,14 @@ export class AddChargeSavingsAccountComponent implements OnInit {
   savingAccountId: string;
   /** charge details */
   chargeDetails: any;
+  /** Client loan accounts for linkage */
+  clientLoanAccounts: any[] = [];
+  /** Show loan account linkage field */
+  showLoanLinkage = false;
 
   /**
    * Retrieves charge template data from `resolve`
-   * @param {FormBuilder} formBuilder Form Builder
+   * @param {UntypedFormBuilder} formBuilder Form Builder
    * @param {ActivatedRoute} route Activated Route
    * @param {Router} router Router
    * @param {Dates} dateUtils Date Utils
@@ -49,6 +53,10 @@ export class AddChargeSavingsAccountComponent implements OnInit {
   ) {
     this.route.data.subscribe((data: { savingsAccountActionData: any }) => {
       this.savingsChargeOptions = data.savingsAccountActionData.chargeOptions;
+      // Extract loan accounts if available
+      if (data.savingsAccountActionData.loanAccounts) {
+        this.clientLoanAccounts = data.savingsAccountActionData.loanAccounts;
+      }
     });
     this.savingAccountId = this.route.snapshot.params['savingAccountId'];
   }
@@ -90,6 +98,14 @@ export class AddChargeSavingsAccountComponent implements OnInit {
           );
         } else {
           this.savingsChargeForm.removeControl('feeInterval');
+        }
+        // Check if charge time type is "Specified due date" to show loan linkage
+        if (data.chargeTimeType.code === 'chargeTimeType.specifiedDueDate') {
+          this.showLoanLinkage = true;
+          this.savingsChargeForm.addControl('loanAccountId', new UntypedFormControl(''));
+        } else {
+          this.showLoanLinkage = false;
+          this.savingsChargeForm.removeControl('loanAccountId');
         }
         this.savingsChargeForm.patchValue({
           amount: data.amount,

@@ -91,6 +91,15 @@
           {{ transactionData.amount | currency: transactionData.currency.code : 'symbol-narrow' : '1.2-2' }}
         </div>
 
+        <div fxFlex="50%" *ngIf="transactionData.linkedLoanData">
+          {{ 'labels.inputs.Linked Loan Account' | translate }}
+        </div>
+        <div fxFlex="50%" *ngIf="transactionData.linkedLoanData">
+          {{
+            transactionData.linkedLoanData.loanAccountNumber + ' - ' + transactionData.linkedLoanData.loanProductName
+          }}
+        </div>
+
         <div fxFlex="50%" class="mat-body-strong" *ngIf="transactionData.note">
           {{ 'labels.inputs.Note' | translate }}
         </div>

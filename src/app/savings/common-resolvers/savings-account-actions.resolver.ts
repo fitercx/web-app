@@ -3,10 +3,12 @@ import { Injectable } from '@angular/core';
 import { Resolve, ActivatedRouteSnapshot } from '@angular/router';
 
 /** rxjs Imports */
-import { Observable, forkJoin } from 'rxjs';
+import { Observable, forkJoin, of } from 'rxjs';
+import { map, switchMap } from 'rxjs/operators';
 
 /** Custom Services */
 import { SavingsService } from '../savings.service';
+import { ClientsService } from 'app/clients/clients.service';
 
 /**
  * Savings Account Actions data resolver.
@@ -14,9 +16,13 @@ import { SavingsService } from '../savings.service';
 @Injectable()
 export class SavingsAccountActionsResolver implements Resolve<Object> {
   /**
-   * @param {SavingsService} SavingsService Savings service.
+   * @param {SavingsService} savingsService Savings service.
+   * @param {ClientsService} clientsService Clients service.
    */
-  constructor(private savingsService: SavingsService) {}
+  constructor(
+    private savingsService: SavingsService,
+    private clientsService: ClientsService
+  ) {}
 
   /**
    * Returns the Savings account actions data.
@@ -31,7 +37,25 @@ export class SavingsAccountActionsResolver implements Resolve<Object> {
       case 'Assign Staff':
         return this.savingsService.getSavingsAccountAndTemplate(savingAccountId, true);
       case 'Add Charge':
-        return this.savingsService.getSavingsChargeTemplateResource(savingAccountId);
+        // Fetch savings account data first to get clientId, then fetch charge template and client accounts
+        return this.savingsService.getSavingsAccountData(savingAccountId).pipe(
+          switchMap((savingsAccountData: any) => {
+            const clientId = savingsAccountData.clientId;
+            // Fetch both charge template and client accounts data
+            return forkJoin({
+              chargeTemplate: this.savingsService.getSavingsChargeTemplateResource(savingAccountId),
+              clientAccounts: clientId ? this.clientsService.getClientAccountData(clientId) : of({ loanAccounts: [] })
+            }).pipe(
+              map((data: any) => {
+                // Combine the data with the structure expected by the component
+                return {
+                  chargeOptions: data.chargeTemplate.chargeOptions,
+                  loanAccounts: data.clientAccounts.loanAccounts || []
+                };
+              })
+            );
+          })
+        );
       case 'Withdrawal':
       case 'Deposit':
       case 'Hold Amount':

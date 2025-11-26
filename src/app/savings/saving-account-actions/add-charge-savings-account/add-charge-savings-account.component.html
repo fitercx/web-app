@@ -65,6 +65,16 @@
               </mat-error>
             </mat-form-field>
 
+            <mat-form-field *ngIf="showLoanLinkage">
+              <mat-label>{{ 'labels.inputs.Loan Account Linkage' | translate }}</mat-label>
+              <mat-select formControlName="loanAccountId">
+                <mat-option [value]="null">{{ 'labels.inputs.None' | translate }}</mat-option>
+                <mat-option *ngFor="let loan of clientLoanAccounts" [value]="loan.id">
+                  {{ loan.accountNo }} - {{ loan.productName }} - {{ loan.originalLoan | formatNumber }}
+                </mat-option>
+              </mat-select>
+            </mat-form-field>
+
             <mat-form-field *ngIf="savingsChargeForm.contains('feeOnMonthDay')" (click)="feeOnMonthDayPicker.open()">
               <mat-label>{{ 'labels.inputs.Due On' | translate }}</mat-label>
               <input
