@@ -2,15 +2,7 @@
 import { Component, OnInit, ViewChild, ChangeDetectorRef } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import {
-  FormBuilder,
-  FormGroup,
-  Validators,
-  ValidatorFn,
-  AbstractControl,
-  FormArray,
-  ValidationErrors
-} from '@angular/forms';
+import { FormBuilder, FormGroup, Validators, AbstractControl, FormArray, ValidationErrors } from '@angular/forms';
 import { MatStepper } from '@angular/material/stepper';
 import { of } from 'rxjs';
 import { delay } from 'rxjs/operators';
@@ -374,7 +366,11 @@ export class EditLocComponent implements OnInit {
           ...charge,
           // Include name and other properties from charge definition
           name: chargeDefinition?.name || 'Unknown Charge',
-          calculationType: chargeDefinition?.chargeCalculationType || {},
+          // unify to always expose both calculationType and chargeCalculationType for template/helper flexibility
+          calculationType:
+            chargeDefinition?.chargeCalculationType || charge?.calculationType || charge?.chargeCalculationType || {},
+          chargeCalculationType:
+            chargeDefinition?.chargeCalculationType || charge?.chargeCalculationType || charge?.calculationType || {},
           chargeTimeType: chargeDefinition?.chargeTimeType || {},
           penalty: chargeDefinition?.penalty || false,
           active: chargeDefinition?.active || false,
@@ -804,6 +800,10 @@ export class EditLocComponent implements OnInit {
       const c = { ...chargeSelect.value };
       // ensure editableAmount field for inline editing
       c.editableAmount = c.amount;
+      // normalize calculation type properties
+      if (!c.chargeCalculationType && c.calculationType) {
+        c.chargeCalculationType = c.calculationType;
+      }
       this.chargesDataSource = this.chargesDataSource.concat([c]);
       chargeSelect.value = '';
     }
@@ -820,13 +820,35 @@ export class EditLocComponent implements OnInit {
   startEdit(charge: any) {
     this.editingCharge = charge;
     // copy current amount to editable field if not present
-    charge.editableAmount = charge.editableAmount ?? charge.amount;
+    charge.editableAmount = charge.editableAmount ?? (charge?.percentageAmount || charge?.amount);
   }
 
   saveEdit(charge: any) {
     // apply edited value to charge.amount so it will be included in payload
-    charge.amount = charge.editableAmount;
+    const newVal = charge.editableAmount;
+    // basic numeric sanitation
+    if (newVal === '' || newVal === null || newVal === undefined) {
+      charge.amount = undefined;
+    } else {
+      const parsed = Number(newVal);
+      charge.amount = isNaN(parsed) ? newVal : parsed;
+      if (this.isPercentCharge(charge)) {
+        charge.percentageAmount = charge.amount; // keep both in sync for preview/table differences
+      }
+    }
     this.editingCharge = null;
+    // Replace the specific charge reference with a cloned object to guarantee change detection
+    const idx = this.chargesDataSource.indexOf(charge);
+    if (idx > -1) {
+      const updated = { ...charge }; // shallow clone with updated amount
+      this.chargesDataSource = this.chargesDataSource.map((c, i) => (i === idx ? updated : c));
+    } else {
+      // fallback just clone array
+      this.chargesDataSource = [...this.chargesDataSource];
+    }
+    // Trigger change detection explicitly
+    this.cdr.markForCheck();
+    this.cdr.detectChanges();
   }
 
   cancelEdit(charge: any) {
@@ -879,12 +901,6 @@ export class EditLocComponent implements OnInit {
         // Only include charges if there are any
         ...(this.chargesDataSource.length > 0 ? { charges: this.chargesDataSource } : {})
       };
-
-      // Rename JSON field maxCreditLimit -> maximumAmount for backend
-      if (payload.hasOwnProperty('maxCreditLimit')) {
-        payload.maximumAmount = payload.maxCreditLimit;
-        delete payload.maxCreditLimit;
-      }
 
       // Rename expiryDate -> endDate for backend
       if (payload.hasOwnProperty('expiryDate')) {
@@ -958,10 +974,7 @@ export class EditLocComponent implements OnInit {
     if (v.settlementSavingsAccountId) {
       payload.settlementSavingsAccountId = v.settlementSavingsAccountId;
     }
-    // Map preview fields to backend names so preview matches the eventual payload
-    if (payload.hasOwnProperty('maxCreditLimit')) {
-      payload.maximumAmount = payload.maxCreditLimit;
-    }
+
     if (payload.hasOwnProperty('expiryDate')) {
       payload.endDate = payload.expiryDate;
     }
@@ -1091,5 +1104,21 @@ export class EditLocComponent implements OnInit {
         control?.setValue(upfrontOption.id);
       }
     }
+  }
+
+  /** Determine if a charge uses percentage calculation */
+  isPercentCharge(charge: any): boolean {
+    if (!charge) return false;
+    const type = charge.chargeCalculationType || charge.calculationType;
+    if (!type) return false;
+    if (typeof type === 'string') {
+      return type.toUpperCase() === 'PERCENT';
+    }
+    return type.code === 'PERCENT' || type.id === 2;
+  }
+
+  // trackBy for table rows to avoid stale caching
+  rowTrack(index: number, item: any) {
+    return item?.id || index;
   }
 }

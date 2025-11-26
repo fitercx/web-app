@@ -453,7 +453,6 @@ export class CreateLocComponent implements OnInit {
 
       return result;
     } catch (e) {
-      console.warn('Date formatting failed', e);
       return dates;
     }
   }
