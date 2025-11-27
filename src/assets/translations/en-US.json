@@ -1191,6 +1191,9 @@
       "Principal Amount": "Principal Amount"
     },
     "inputs": {
+      "Loan Account Linkage": "Loan Account Linkage",
+      "Linked Loan Account": "Linked Loan Account",
+      "None": "None",
       "Disbursal Amount": "Disbursal Amount",
       "Enable Line of Credit Payable functionality": "Enable Line of Credit Payable functionality",
       "Linked Savings Account (Auto Debit Source)": "Linked Savings Account (Auto Debit Source)",

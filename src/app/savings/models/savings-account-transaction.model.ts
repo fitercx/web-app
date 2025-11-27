@@ -40,6 +40,7 @@ export interface SavingsAccountTransactionType {
   writtenoff: boolean;
   overdraftFee: boolean;
   withholdTax: boolean;
+  payTax: boolean;
   escheat: boolean;
   amountHold: boolean;
   amountRelease: boolean;
