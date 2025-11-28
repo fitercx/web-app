@@ -123,6 +123,10 @@ export class GeneralTabComponent implements OnInit {
       return 0;
     }
 
+    if (this.isReceivableLineOfCredit()) {
+      return this.getProposedAmount();
+    }
+
     if (this.loanDetails.factorRateEnabled) {
       return this.loanDetails.factorRateLoanAmount;
     }
@@ -134,10 +138,6 @@ export class GeneralTabComponent implements OnInit {
   getProposedAmount(): number {
     if (this.loanDetails?.factorRateEnabled) {
       return this.loanDetails?.factorRateLoanAmount;
-    }
-
-    if (this.isReceivableLineOfCredit()) {
-      return this.getApprovedAmount();
     }
 
     return this.loanDetails.proposedPrincipal;
