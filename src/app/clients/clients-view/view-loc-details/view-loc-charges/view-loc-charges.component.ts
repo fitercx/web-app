@@ -14,6 +14,7 @@ export class ViewLocChargesComponent implements OnInit {
   displayedColumns: string[] = [
     'chargeDefinitionId',
     'amount',
+    'taxAmount',
     'amountPaid',
     'amountWaived',
     'amountOutstanding',

@@ -17,6 +17,14 @@
       </td>
     </ng-container>
 
+    <!-- Amount Column -->
+    <ng-container matColumnDef="taxAmount">
+      <th mat-header-cell *matHeaderCellDef>Tax Amount</th>
+      <td mat-cell *matCellDef="let charge">
+        {{ charge.taxAmount | currency: locCurrency }}
+      </td>
+    </ng-container>
+
     <!-- Amount Paid Column -->
     <ng-container matColumnDef="amountPaid">
       <th mat-header-cell *matHeaderCellDef>Paid</th>
