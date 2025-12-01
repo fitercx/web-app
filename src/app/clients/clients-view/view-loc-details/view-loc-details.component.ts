@@ -658,12 +658,22 @@ export class ViewLocDetailsComponent implements OnInit {
     return this.locDetails.charges.reduce((total: number, charge: any) => total + (charge.amount || 0), 0);
   }
 
+  getTotalTaxesAmount(): number {
+    if (!this.locDetails?.charges) return 0;
+    return this.locDetails.charges.reduce((total: number, charge: any) => total + (charge.taxAmount || 0), 0);
+  }
+
   /**
    * Get total paid amount across all charges
    */
   getTotalPaidAmount(): number {
     if (!this.locDetails?.charges) return 0;
-    return this.locDetails.charges.reduce((total: number, charge: any) => total + (charge.amountPaid || 0), 0);
+    var total = this.locDetails.charges.reduce((total: number, charge: any) => total + (charge.amountPaid || 0), 0);
+    if (total > 0) {
+      total = total + this.getTotalTaxesAmount();
+    }
+
+    return total;
   }
 
   /**
@@ -679,7 +689,15 @@ export class ViewLocDetailsComponent implements OnInit {
    */
   getTotalOutstandingAmount(): number {
     if (!this.locDetails?.charges) return 0;
-    return this.locDetails.charges.reduce((total: number, charge: any) => total + (charge.amountOutstanding || 0), 0);
+    var total = this.locDetails.charges.reduce(
+      (total: number, charge: any) => total + (charge.amountOutstanding || 0),
+      0
+    );
+    if (total > 0) {
+      total = total + this.getTotalTaxesAmount();
+    }
+
+    return total;
   }
 
   /**
