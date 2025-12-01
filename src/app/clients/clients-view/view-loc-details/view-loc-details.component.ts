@@ -668,7 +668,7 @@ export class ViewLocDetailsComponent implements OnInit {
    */
   getTotalPaidAmount(): number {
     if (!this.locDetails?.charges) return 0;
-    var total = this.locDetails.charges.reduce((total: number, charge: any) => total + (charge.amountPaid || 0), 0);
+    let total = this.locDetails.charges.reduce((total: number, charge: any) => total + (charge.amountPaid || 0), 0);
     if (total > 0) {
       total = total + this.getTotalTaxesAmount();
     }
@@ -689,7 +689,7 @@ export class ViewLocDetailsComponent implements OnInit {
    */
   getTotalOutstandingAmount(): number {
     if (!this.locDetails?.charges) return 0;
-    var total = this.locDetails.charges.reduce(
+    let total = this.locDetails.charges.reduce(
       (total: number, charge: any) => total + (charge.amountOutstanding || 0),
       0
     );
