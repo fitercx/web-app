@@ -76,4 +76,20 @@ export class ViewLocChargesComponent implements OnInit {
     if (charge.active) return 'ACTIVE';
     return 'INACTIVE';
   }
+
+  getOutstandingAmount(charge: any): Number {
+    if (charge.amountOutstanding > 0) {
+      return charge.amountOutstanding + charge.taxAmount;
+    }
+
+    return charge.amountOutstanding;
+  }
+
+  getPaidAmount(charge: any): Number {
+    if (charge.amountPaid > 0) {
+      return charge.amountPaid + charge.taxAmount;
+    }
+
+    return charge.amountPaid;
+  }
 }

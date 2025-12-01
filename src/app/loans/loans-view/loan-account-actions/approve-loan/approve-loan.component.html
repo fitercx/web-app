@@ -36,7 +36,7 @@
             [currency]="currency"
             [isRequired]="true"
             [inputFormControl]="approveLoanForm.controls.approvedLoanAmount"
-            [inputLabel]="'Approved Amount'"
+            [inputLabel]="isLineOfCreditReceivable() ? 'Disbursal Amount' : 'Approved Amount'"
           >
           </mifosx-input-amount>
 
