@@ -92,7 +92,7 @@ export class DisburseToSavingsAccountComponent implements OnInit {
     }
 
     const existingNote = this.disbursementForm?.get('note')?.value || '';
-    const existingDestinationAccount = this.disbursementForm?.get('destinationSavingsAccountId')?.value || '';
+    const existingDestinationAccount = this.disbursementForm?.get('destinationSavingsAccountId')?.value ?? null;
 
     this.disbursementForm = this.formBuilder.group({
       actualDisbursementDate: [
@@ -193,7 +193,16 @@ export class DisburseToSavingsAccountComponent implements OnInit {
 
     // For now, we only support client loans. Group loans would need a different endpoint
     if (clientId) {
-      this.clientsService.getClientAccountData(clientId.toString()).subscribe({
+      const clientIdStr = typeof clientId === 'string' || typeof clientId === 'number' ? String(clientId) : undefined;
+
+      if (!clientIdStr) {
+        console.error('Invalid clientId type:', typeof clientId, clientId);
+        this.eligibleSavingsAccounts = [];
+        this.isLoadingSavingsAccounts = false;
+        return;
+      }
+
+      this.clientsService.getClientAccountData(clientIdStr).subscribe({
         next: (clientAccounts: any) => {
           this.eligibleSavingsAccounts = this.filterEligibleSavingsAccounts(
             clientAccounts?.savingsAccounts || [],
