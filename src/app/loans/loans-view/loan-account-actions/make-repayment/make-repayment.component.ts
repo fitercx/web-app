@@ -33,6 +33,8 @@ export class MakeRepaymentComponent implements OnInit {
   repaymentLoanForm: UntypedFormGroup;
   currency: Currency | null = null;
 
+  penaltyTemplate: Number;
+
   /**
    * @param {FormBuilder} formBuilder Form Builder.
    * @param {LoansService} loanService Loan Service.
@@ -59,9 +61,16 @@ export class MakeRepaymentComponent implements OnInit {
     this.maxDate = this.settingsService.businessDate;
     this.createRepaymentLoanForm();
     this.setRepaymentLoanDetails();
-    if (this.dataObject.currency) {
-      this.currency = this.dataObject.currency;
+    if (this.dataObject.repaymentTemplate.currency) {
+      this.currency = this.dataObject.repaymentTemplate.currency;
     }
+
+    this.repaymentLoanForm.get('transactionDate')?.valueChanges.subscribe((newDate: Date) => {
+      if (newDate) {
+        const formattedDate = this.dateUtils.formatDate(newDate, this.settingsService.dateFormat);
+        this.refreshPenaltyTemplate(formattedDate);
+      }
+    });
   }
 
   /**
@@ -84,9 +93,9 @@ export class MakeRepaymentComponent implements OnInit {
   }
 
   setRepaymentLoanDetails() {
-    this.paymentTypes = this.dataObject.paymentTypeOptions;
+    this.paymentTypes = this.dataObject.repaymentTemplate.paymentTypeOptions;
     this.repaymentLoanForm.patchValue({
-      transactionAmount: this.dataObject.amount
+      transactionAmount: this.dataObject.repaymentTemplate.amount
     });
   }
 
@@ -124,10 +133,29 @@ export class MakeRepaymentComponent implements OnInit {
       dateFormat,
       locale
     };
-    const command = this.dataObject.type.code.split('.')[1];
+    const command = this.dataObject.repaymentTemplate.type.code.split('.')[1];
     data['transactionAmount'] = data['transactionAmount'] * 1;
     this.loanService.submitLoanActionButton(this.loanId, data, command).subscribe((response: any) => {
       this.router.navigate(['../../transactions'], { relativeTo: this.route });
+    });
+  }
+
+  private refreshPenaltyTemplate(transactionDate: string): void {
+    this.loanService.getLoanPenaltiesTemplate(this.loanId, transactionDate).subscribe((template) => {
+      this.dataObject.penaltyTemplate = template;
+
+      // Calculate the total transaction amount using the correct property names
+      const principalAmount = template.principalOutstanding || 0;
+      const interestAmount = template.interestOutstanding || 0;
+      const feesAmount = this.dataObject.repaymentTemplate.feeChargesPortion || 0;
+      const penaltyAmount = template.penaltyAmountDue || 0;
+
+      const totalAmount = principalAmount + interestAmount + feesAmount + penaltyAmount;
+
+      // Update the transaction amount in the form with 2 decimal places
+      this.repaymentLoanForm.patchValue({
+        transactionAmount: Math.round(totalAmount * 100) / 100
+      });
     });
   }
 }

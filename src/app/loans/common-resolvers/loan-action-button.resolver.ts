@@ -3,7 +3,7 @@ import { Injectable } from '@angular/core';
 import { Resolve, ActivatedRouteSnapshot } from '@angular/router';
 
 /** rxjs Imports */
-import { Observable } from 'rxjs';
+import { forkJoin, Observable } from 'rxjs';
 
 /** Custom Services */
 import { LoansService } from '../loans.service';
@@ -28,7 +28,10 @@ export class LoanActionButtonResolver implements Resolve<Object> {
     if (loanActionButton === 'Assign Loan Officer' || loanActionButton === 'Change Loan Officer') {
       return this.loansService.getLoanTemplate(loanId);
     } else if (loanActionButton === 'Make Repayment') {
-      return this.loansService.getLoanActionTemplate(loanId, 'repayment');
+      return forkJoin({
+        repaymentTemplate: this.loansService.getLoanActionTemplate(loanId, 'repayment'),
+        penaltyTemplate: this.loansService.getLoanPenaltiesTemplate(loanId)
+      });
     } else if (loanActionButton === 'Goodwill Credit') {
       return this.loansService.getLoanActionTemplate(loanId, 'goodwillCredit');
     }
