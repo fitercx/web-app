@@ -5,6 +5,7 @@ import { Dates } from 'app/core/utils/dates';
 import { LoansService } from 'app/loans/loans.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { Currency } from 'app/shared/models/general.model';
+import { ClientsService } from 'app/clients/clients.service';
 
 @Component({
   selector: 'mifosx-disburse-to-savings-account',
@@ -23,6 +24,10 @@ export class DisburseToSavingsAccountComponent implements OnInit {
   /** Full Loan Details Data */
   loanDetailsData: any;
   currency: Currency;
+  /** Eligible Savings Accounts */
+  eligibleSavingsAccounts: any[] = [];
+  /** Loading state for savings accounts */
+  isLoadingSavingsAccounts = false;
 
   /**
    * Get data from `Resolver`.
@@ -38,7 +43,8 @@ export class DisburseToSavingsAccountComponent implements OnInit {
     private router: Router,
     private dateUtils: Dates,
     private loanService: LoansService,
-    private settingsService: SettingsService
+    private settingsService: SettingsService,
+    private clientsService: ClientsService
   ) {}
 
   ngOnInit() {
@@ -58,6 +64,8 @@ export class DisburseToSavingsAccountComponent implements OnInit {
       if (this.isLineOfCreditReceivable()) {
         this.disbursementForm.get('transactionAmount')?.disable();
       }
+      // Fetch and filter eligible savings accounts
+      this.fetchEligibleSavingsAccounts(loanDetails);
     });
   }
 
@@ -84,6 +92,7 @@ export class DisburseToSavingsAccountComponent implements OnInit {
     }
 
     const existingNote = this.disbursementForm?.get('note')?.value || '';
+    const existingDestinationAccount = this.disbursementForm?.get('destinationSavingsAccountId')?.value ?? null;
 
     this.disbursementForm = this.formBuilder.group({
       actualDisbursementDate: [
@@ -94,6 +103,7 @@ export class DisburseToSavingsAccountComponent implements OnInit {
         this.dataObject?.amount,
         Validators.required
       ],
+      destinationSavingsAccountId: [existingDestinationAccount],
       note: [existingNote]
     });
 
@@ -139,6 +149,11 @@ export class DisburseToSavingsAccountComponent implements OnInit {
       transactionAmount: disbursementLoanFormData.transactionAmount * 1
     };
 
+    // Only include destinationSavingsAccountId if it's provided
+    if (disbursementLoanFormData.destinationSavingsAccountId) {
+      data['destinationSavingsAccountId'] = disbursementLoanFormData.destinationSavingsAccountId;
+    }
+
     const loanId = this.route.snapshot.params['loanId'];
     this.loanService.loanActionButtons(loanId, 'disbursetosavings', data).subscribe(() => {
       this.router.navigate(['../../general'], { relativeTo: this.route });
@@ -159,5 +174,106 @@ export class DisburseToSavingsAccountComponent implements OnInit {
     }
     const locType = loanInfo.locType || loanInfo.additionalProperties?.locProductType;
     return locType === 'RECEIVABLE';
+  }
+
+  /**
+   * Fetches and filters eligible savings accounts for the borrower
+   */
+  fetchEligibleSavingsAccounts(loanDetails: any): void {
+    const clientId = loanDetails?.clientId;
+    const groupId = loanDetails?.groupId;
+
+    // Need either clientId or groupId to fetch accounts
+    if (!clientId && !groupId) {
+      this.eligibleSavingsAccounts = [];
+      return;
+    }
+
+    this.isLoadingSavingsAccounts = true;
+
+    // For now, we only support client loans. Group loans would need a different endpoint
+    if (clientId) {
+      const clientIdStr = typeof clientId === 'string' || typeof clientId === 'number' ? String(clientId) : undefined;
+
+      if (!clientIdStr) {
+        console.error('Invalid clientId type:', typeof clientId, clientId);
+        this.eligibleSavingsAccounts = [];
+        this.isLoadingSavingsAccounts = false;
+        return;
+      }
+
+      this.clientsService.getClientAccountData(clientIdStr).subscribe({
+        next: (clientAccounts: any) => {
+          this.eligibleSavingsAccounts = this.filterEligibleSavingsAccounts(
+            clientAccounts?.savingsAccounts || [],
+            loanDetails
+          );
+          this.isLoadingSavingsAccounts = false;
+
+          // Auto-select if only one eligible account
+          if (this.eligibleSavingsAccounts.length === 1) {
+            this.disbursementForm.patchValue({
+              destinationSavingsAccountId: this.eligibleSavingsAccounts[0].id
+            });
+          }
+        },
+        error: (error) => {
+          console.error('Error fetching client accounts:', error);
+          this.eligibleSavingsAccounts = [];
+          this.isLoadingSavingsAccounts = false;
+        }
+      });
+    } else {
+      // Group loans - would need groups/{groupId}/accounts endpoint if available
+      this.eligibleSavingsAccounts = [];
+      this.isLoadingSavingsAccounts = false;
+    }
+  }
+
+  /**
+   * Filters savings accounts based on eligibility criteria:
+   * - Status: Must be active
+   * - SubStatus: Must not be blocked, inactive, dormant, or escheat
+   * - Currency: Must match loan currency
+   */
+  filterEligibleSavingsAccounts(savingsAccounts: any[], loanDetails: any): any[] {
+    if (!savingsAccounts || savingsAccounts.length === 0) {
+      return [];
+    }
+
+    const loanCurrencyCode = loanDetails?.currency?.code;
+
+    return savingsAccounts.filter((account: any) => {
+      // Filter by status - must be active
+      const status = account?.status;
+      if (!status || !status.active) {
+        return false;
+      }
+
+      // Filter by subStatus - exclude blocked, inactive, dormant, or escheat accounts
+      const subStatus = account?.subStatus;
+      if (subStatus) {
+        if (
+          subStatus.block === true ||
+          subStatus.blockCredit === true ||
+          subStatus.blockDebit === true ||
+          subStatus.inactive === true ||
+          subStatus.dormant === true ||
+          subStatus.escheat === true
+        ) {
+          return false;
+        }
+      }
+
+      // Filter by currency - must match loan currency
+      if (loanCurrencyCode) {
+        const accountCurrencyCode = account?.currency?.code;
+        if (accountCurrencyCode && accountCurrencyCode !== loanCurrencyCode) {
+          return false;
+        }
+      }
+
+      return true;
+    });
   }
 }
