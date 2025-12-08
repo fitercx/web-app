@@ -174,6 +174,15 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
         }
       }
 
+      // For LOC products, override the interest rate frequency type to be per annum
+      let interestRateFrequencyType = this.loansAccountTermsData.interestRateFrequencyType.id;
+      if (this.isLocProduct()) {
+        const perAnnumFrequencyTypeId = this.getPerAnnumInterestRateFrequencyTypeId();
+        if (perAnnumFrequencyTypeId !== null) {
+          interestRateFrequencyType = perAnnumFrequencyTypeId;
+        }
+      }
+
       // Preserve user input values and only patch fields that haven't been modified
       this.patchFormPreservingUserInput({
         factorRate: factorRate,
@@ -201,7 +210,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
         transactionProcessingStrategyCode: this.loansAccountTermsData.transactionProcessingStrategyCode,
         interestRateDifferential: this.loansAccountTermsData.interestRateDifferential,
         multiDisburseLoan: this.loansAccountTermsData.multiDisburseLoan,
-        interestRateFrequencyType: this.loansAccountTermsData.interestRateFrequencyType.id,
+        interestRateFrequencyType: interestRateFrequencyType,
         balloonRepaymentAmount: this.loansAccountTermsData.balloonRepaymentAmount,
         interestRecognitionOnDisbursementDate: this.loansAccountTermsData.interestRecognitionOnDisbursementDate || false
       });
@@ -339,6 +348,16 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
       }
 
       this.factorRateEnabled = this.loansAccountProductTemplate?.product?.factorRateProductEnabled;
+
+      // For LOC products, override the interest rate frequency type to be per annum
+      let interestRateFrequencyType = this.loansAccountTermsData.interestRateFrequencyType.id;
+      if (this.isLocProduct()) {
+        const perAnnumFrequencyTypeId = this.getPerAnnumInterestRateFrequencyTypeId();
+        if (perAnnumFrequencyTypeId !== null) {
+          interestRateFrequencyType = perAnnumFrequencyTypeId;
+        }
+      }
+
       this.loansAccountTermsForm.patchValue({
         factorRate: factorRate,
         factorRateEnabled: this.factorRateEnabled,
@@ -364,7 +383,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
         transactionProcessingStrategyCode: this.loansAccountTermsData.transactionProcessingStrategyCode,
         interestRateDifferential: this.loansAccountTermsData.interestRateDifferential,
         multiDisburseLoan: this.loansAccountTermsData.multiDisburseLoan,
-        interestRateFrequencyType: this.loansAccountTermsData.interestRateFrequencyType.id,
+        interestRateFrequencyType: interestRateFrequencyType,
         balloonRepaymentAmount: this.loansAccountTermsData.balloonRepaymentAmount,
         interestRecognitionOnDisbursementDate: this.loansAccountTermsData.interestRecognitionOnDisbursementDate || false
       });
@@ -556,9 +575,29 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
           new UntypedFormControl(this.loansAccountTermsData.product.fixedLength)
         );
       } else {
+        // For LOC products, use the LOC-specific interest rate if available
+        let interestRateValue = this.loansAccountTermsData.interestRatePerPeriod;
+        let frequencyTypeId = this.loansAccountTermsData.interestRateFrequencyType.id;
+
+        if (this.isLocProduct()) {
+          const locInterestRate = this.getInterestRateForLoc();
+          if (locInterestRate !== null) {
+            interestRateValue = locInterestRate;
+          }
+
+          const perAnnumFrequencyTypeId = this.getPerAnnumInterestRateFrequencyTypeId();
+          if (perAnnumFrequencyTypeId !== null) {
+            frequencyTypeId = perAnnumFrequencyTypeId;
+          }
+        }
         this.loansAccountTermsForm.addControl(
           'interestRatePerPeriod',
-          new UntypedFormControl(this.loansAccountTermsData.interestRatePerPeriod, Validators.required)
+          new UntypedFormControl(interestRateValue, Validators.required)
+        );
+
+        this.loansAccountTermsForm.addControl(
+          'interestRateFrequencyType',
+          new UntypedFormControl(frequencyTypeId, Validators.required)
         );
       }
     }
@@ -840,6 +879,38 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
   }
 
   /**
+   * Gets interest rate for LOC products from additionalProperties
+   */
+  private getInterestRateForLoc(): number | null {
+    if (!this.locOptions || this.locOptions.length === 0 || !this.selectedLocId) {
+      return null;
+    }
+
+    // Use loose equality to handle potential string/number mismatches
+    const selectedLoc = this.locOptions.find((loc: any) => loc.id == this.selectedLocId);
+    return selectedLoc?.interestRate !== undefined ? selectedLoc.interestRate : null;
+  }
+
+  /**
+   * Gets the "Per Year" (annual) interest rate frequency type ID
+   */
+  private getPerAnnumInterestRateFrequencyTypeId(): number | null {
+    const frequencyTypeOptions =
+      this.loansAccountProductTemplate?.interestRateFrequencyTypeOptions ||
+      this.loansAccountTermsData?.interestRateFrequencyTypeOptions;
+
+    if (!frequencyTypeOptions) {
+      return null;
+    }
+    // Find the "Per Year" option (typically code 'PER_YEAR' or value 'Per year' or id 3)
+    const perYearOption = frequencyTypeOptions.find(
+      (option: any) => option.code === 'interestRateFrequency.periodFrequencyType.years'
+    );
+
+    return perYearOption?.id || null;
+  }
+
+  /**
    * Gets tenor days for LOC products from additional properties or selected LOC
    */
   private getTenorDaysForLoc(): number | null {
@@ -875,7 +946,8 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
       return null;
     }
 
-    const selectedLoc = this.locOptions.find((loc: any) => loc.id === this.selectedLocId);
+    // Use loose equality to handle potential string/number mismatches
+    const selectedLoc = this.locOptions.find((loc: any) => loc.id == this.selectedLocId);
     return selectedLoc?.tenorDays || null;
   }
 
@@ -899,10 +971,10 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
         loanTermFrequency: tenorDays,
         loanTermFrequencyType: daysFrequencyType?.id || this.loansAccountTermsForm.get('loanTermFrequencyType')?.value
       });
-
-      // Ensure fields remain enabled for LOC products (users can still edit)
-      this.handleLocProductTerms();
     }
+
+    // Ensure fields remain enabled for LOC products (users can still edit)
+    this.handleLocProductTerms();
 
     this.forceSetupLoanTermListeners();
   }

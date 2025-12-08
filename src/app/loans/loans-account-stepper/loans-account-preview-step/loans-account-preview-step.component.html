@@ -144,7 +144,8 @@
     <span fxFlex="40%">{{ 'labels.inputs.Nominal interest rate' | translate }}:</span>
     <span fxFlex="60%"
       >{{ loansAccount.interestRatePerPeriod }}&nbsp;&nbsp;{{
-        loansAccountProductTemplate.interestRateFrequencyType.value
+        loansAccount.interestRateFrequencyType
+          | find: loansAccountProductTemplate.interestRateFrequencyTypeOptions : 'id' : 'value'
       }}</span
     >
   </div>
