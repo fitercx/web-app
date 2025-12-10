@@ -1621,6 +1621,7 @@
       "Destination": "Destination",
       "Destination Group": "Destination Group",
       "Destination Group Details": "Destination Group Details",
+      "Destination Savings Account": "Destination Savings Account",
       "Details": "Details",
       "Determines if passwords do not expire": "Determines if passwords do not expire for this user even if global configuration for password expiry is enabled",
       "Differential Rate": "Differential Rate",

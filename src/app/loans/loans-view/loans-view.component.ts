@@ -136,7 +136,7 @@ export class LoansViewComponent implements OnInit {
           taskPermissionName: 'DISBURSE_LOAN'
         });
       }
-      if (this.loanDetailsData.canDisburse) {
+      if (this.loanDetailsData.canDisburse || this.loanDetailsData.multiDisburseLoan) {
         this.buttonConfig.addButton({
           name: 'Disburse to Savings',
           icon: 'piggy-bank',
