@@ -682,8 +682,18 @@ export class CreateLocComponent implements OnInit {
   addCharge(chargeSelect: any) {
     if (chargeSelect && chargeSelect.value) {
       const c = { ...chargeSelect.value };
+      // Set chargeDefinitionId from the charge definition id for backend consistency
+      c.chargeDefinitionId = c.id;
       // ensure editableAmount field for inline editing
       c.editableAmount = c.amount;
+      // normalize calculation type properties
+      if (!c.chargeCalculationType && c.calculationType) {
+        c.chargeCalculationType = c.calculationType;
+      }
+      // For percent charges, set percentageAmount so it displays correctly in the table
+      if (this.isPercentCharge(c)) {
+        c.percentageAmount = c.amount;
+      }
       this.chargesDataSource = this.chargesDataSource.concat([c]);
       chargeSelect.value = '';
     }
@@ -752,6 +762,20 @@ export class CreateLocComponent implements OnInit {
       const cleanBasicInfo = this.removeEmptyValues(value.basicInfo);
       const cleanLimitsTerms = this.removeEmptyValues(value.limitsTerms);
 
+      // Simplify charges payload to only include chargeDefinitionId and editableAmount
+      const simplifiedCharges = this.chargesDataSource.map((charge: any) => {
+        const simplified: any = {
+          chargeDefinitionId: charge.chargeDefinitionId || charge.id
+        };
+        // Use editableAmount if set, otherwise use amount
+        if (charge.editableAmount !== undefined && charge.editableAmount !== null && charge.editableAmount !== '') {
+          simplified.editableAmount = Number(charge.editableAmount);
+        } else if (charge.amount !== undefined) {
+          simplified.editableAmount = charge.amount;
+        }
+        return simplified;
+      });
+
       const payload = {
         ...cleanBasicInfo,
         ...cleanLimitsTerms,
@@ -764,8 +788,8 @@ export class CreateLocComponent implements OnInit {
           : {}),
         // include settlement account if selected
         ...(value.settlementSavingsAccountId ? { settlementSavingsAccountId: value.settlementSavingsAccountId } : {}),
-        // Only include charges if there are any
-        ...(this.chargesDataSource.length > 0 ? { charges: this.chargesDataSource } : {})
+        // Only include simplified charges if there are any
+        ...(simplifiedCharges.length > 0 ? { charges: simplifiedCharges } : {})
       };
 
       if (payload.hasOwnProperty('expiryDate')) {
@@ -944,5 +968,16 @@ export class CreateLocComponent implements OnInit {
       // Trigger validation update
       this.locForm.get('approvedBuyersSection')?.updateValueAndValidity();
     }
+  }
+
+  /** Determine if a charge uses percentage calculation */
+  isPercentCharge(charge: any): boolean {
+    if (!charge) return false;
+    const type = charge.chargeCalculationType || charge.calculationType;
+    if (!type) return false;
+    if (typeof type === 'string') {
+      return type.toUpperCase() === 'PERCENT';
+    }
+    return type.code === 'PERCENT' || type.id === 2;
   }
 }
