@@ -275,9 +275,11 @@
                 </th>
                 <td mat-cell class="r-amount" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
                   {{
-                    (loan.totalOverPaidDerived === undefined
-                      ? loan.loanBalance
-                      : loan.loanBalance - loan.totalOverPaidDerived
+                    (loan.status?.overpaid
+                      ? 0
+                      : loan.totalOverPaidDerived === undefined
+                        ? loan.loanBalance
+                        : loan.loanBalance - loan.totalOverPaidDerived
                     ) | formatNumber
                   }}
                 </td>
@@ -406,7 +408,9 @@
                         </div>
                         <div class="detail-item">
                           <span class="detail-label">{{ 'labels.inputs.Outstanding Balance' | translate }}:</span>
-                          <span class="detail-value">{{ loan.loanBalance | formatNumber }}</span>
+                          <span class="detail-value">{{
+                            (loan.status?.overpaid ? 0 : loan.loanBalance) | formatNumber
+                          }}</span>
                         </div>
                         <div class="detail-item">
                           <span class="detail-label">{{ 'labels.inputs.Issued Date' | translate }}:</span>
