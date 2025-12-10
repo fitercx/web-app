@@ -29,7 +29,9 @@
                         : ('labels.status.' + loanDetailsData.status.value | translate)
                   "
                   [ngClass]="
-                    loanDetailsData.inArrears ? 'status-active-overdue' : (iconLoanStatusColor() | statusLookup)
+                    loanDetailsData.status?.active && loanDetailsData.inArrears
+                      ? 'status-active-overdue'
+                      : (iconLoanStatusColor() | statusLookup)
                   "
                 ></i>
                 <span class="m-r-5">{{ 'labels.heading.Loan Product' | translate }} :</span>
