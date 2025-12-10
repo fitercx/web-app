@@ -5,7 +5,9 @@
       <td mat-cell *matCellDef="let element">
         <i
           class="fa fa-stop"
-          [ngClass]="element.inArrears ? 'status-active-overdue' : (element.status.code | statusLookup)"
+          [ngClass]="
+            element.status?.active && element.inArrears ? 'status-active-overdue' : (element.status.code | statusLookup)
+          "
         ></i>
         <mifosx-account-number accountNo="{{ element.accountNo }}"></mifosx-account-number>
       </td>

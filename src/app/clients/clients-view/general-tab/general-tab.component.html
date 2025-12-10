@@ -236,7 +236,11 @@
                 <td mat-cell *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
                   <i
                     class="fa fa-stop"
-                    [ngClass]="loan.inArrears ? 'status-active-overdue' : (loan.status.code | statusLookup)"
+                    [ngClass]="
+                      loan.status?.active && loan.inArrears
+                        ? 'status-active-overdue'
+                        : (loan.status.code | statusLookup)
+                    "
                   ></i>
                   {{ loan.accountNo }}
                 </td>
@@ -471,7 +475,9 @@
       <td mat-cell *matCellDef="let element">
         <i
           class="fa fa-stop"
-          [ngClass]="element.inArrears ? 'status-active-overdue' : (element.status.code | statusLookup)"
+          [ngClass]="
+            element.status?.active && element.inArrears ? 'status-active-overdue' : (element.status.code | statusLookup)
+          "
         ></i>
         <mifosx-account-number accountNo="{{ element.accountNo }}"></mifosx-account-number>
       </td>
@@ -737,7 +743,9 @@
       <td mat-cell *matCellDef="let element">
         <i
           class="fa fa-stop"
-          [ngClass]="element.inArrears ? 'status-active-overdue' : (element.status.code | statusLookup)"
+          [ngClass]="
+            element.status?.active && element.inArrears ? 'status-active-overdue' : (element.status.code | statusLookup)
+          "
         ></i>
         <mifosx-account-number accountNo="{{ element.accountNo }}"></mifosx-account-number>
       </td>
