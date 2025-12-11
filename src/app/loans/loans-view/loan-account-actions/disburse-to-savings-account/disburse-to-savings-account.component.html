@@ -29,7 +29,7 @@
           >
           </mifosx-input-amount>
 
-          <mat-form-field>
+          <mat-form-field *ngIf="false">
             <mat-label>{{ 'labels.inputs.Destination Savings Account' | translate }}</mat-label>
             <mat-select formControlName="destinationSavingsAccountId">
               <mat-option [value]="null">{{ 'labels.inputs.None' | translate }}</mat-option>
