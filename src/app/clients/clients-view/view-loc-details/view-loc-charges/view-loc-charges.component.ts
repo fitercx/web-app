@@ -73,7 +73,7 @@ export class ViewLocChargesComponent implements OnInit {
   getChargeStatus(charge: any): string {
     if (charge.paid) return 'PAID';
     if (charge.waived) return 'WAIVED';
-    if (charge.active) return 'ACTIVE';
+    if (charge.active) return 'PENDING';
     return 'INACTIVE';
   }
 

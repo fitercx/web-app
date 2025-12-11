@@ -279,9 +279,11 @@
                 </th>
                 <td mat-cell class="r-amount" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
                   {{
-                    (loan.totalOverPaidDerived === undefined
-                      ? loan.loanBalance
-                      : loan.loanBalance - loan.totalOverPaidDerived
+                    (loan.status?.overpaid
+                      ? 0
+                      : loan.totalOverPaidDerived === undefined
+                        ? loan.loanBalance
+                        : loan.loanBalance - loan.totalOverPaidDerived
                     ) | formatNumber
                   }}
                 </td>
@@ -385,16 +387,34 @@
                           <span class="detail-value">{{ loan.status?.value || loan.status?.code || '-' }}</span>
                         </div>
                         <div class="detail-item">
-                          <span class="detail-label">{{ 'labels.inputs.Amount' | translate }}:</span>
-                          <span class="detail-value">{{ loan.originalLoan | formatNumber }}</span>
+                          <span class="detail-label">{{ 'labels.inputs.Invoice Amount' | translate }}:</span>
+                          <span class="detail-value">{{
+                            loan?.additionalProperties?.invoiceAmount | formatNumber
+                          }}</span>
                         </div>
                         <div class="detail-item">
-                          <span class="detail-label">{{ 'labels.inputs.Outstanding Balance' | translate }}:</span>
-                          <span class="detail-value">{{ loan.loanBalance | formatNumber }}</span>
+                          <span class="detail-label">{{ 'labels.inputs.Approved Amount' | translate }}:</span>
+                          <span class="detail-value">{{ getApprovedAmount(loan) | formatNumber }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">{{ 'labels.inputs.Amount After Advance' | translate }}:</span>
+                          <span class="detail-value">{{
+                            loan?.additionalProperties?.amountAfterAdvance | formatNumber
+                          }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">{{ 'labels.inputs.Disbursed Amount' | translate }}:</span>
+                          <span class="detail-value">{{ loan.originalLoan | formatNumber }}</span>
                         </div>
                         <div class="detail-item">
                           <span class="detail-label">{{ 'labels.inputs.Amount Paid' | translate }}:</span>
                           <span class="detail-value">{{ loan.amountPaid | formatNumber }}</span>
+                        </div>
+                        <div class="detail-item">
+                          <span class="detail-label">{{ 'labels.inputs.Outstanding Balance' | translate }}:</span>
+                          <span class="detail-value">{{
+                            (loan.status?.overpaid ? 0 : loan.loanBalance) | formatNumber
+                          }}</span>
                         </div>
                         <div class="detail-item">
                           <span class="detail-label">{{ 'labels.inputs.Issued Date' | translate }}:</span>

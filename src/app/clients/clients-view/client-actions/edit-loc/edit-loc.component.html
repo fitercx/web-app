@@ -688,8 +688,8 @@
                 <span fxFlex="40%">{{ c.name }}</span>
                 <span fxFlex="60%">{{
                   isPercentCharge(c)
-                    ? c.amount !== undefined && c.amount !== null
-                      ? c.amount + '%'
+                    ? c.percentageAmount !== undefined && c.percentageAmount !== null
+                      ? c.percentageAmount + '%'
                       : '—'
                     : c.amount !== undefined && c.amount !== null
                       ? c.amount + ' ' + (selectedCurrencyCode || '')

@@ -573,4 +573,10 @@ export class GeneralTabComponent {
       loan.status.code === 'loanStatusType.rejected'
     );
   }
+
+  getApprovedAmount(loan: any): number {
+    return loan?.productType === 'RECEIVABLE'
+      ? loan?.additionalProperties?.approvedReceivableAmount
+      : loan?.additionalProperties?.approvedPayableAmount;
+  }
 }

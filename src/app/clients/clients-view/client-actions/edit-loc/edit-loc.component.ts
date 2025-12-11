@@ -798,11 +798,17 @@ export class EditLocComponent implements OnInit {
   addCharge(chargeSelect: any) {
     if (chargeSelect && chargeSelect.value) {
       const c = { ...chargeSelect.value };
+      // Set chargeDefinitionId from the charge definition id for backend consistency
+      c.chargeDefinitionId = c.id;
       // ensure editableAmount field for inline editing
       c.editableAmount = c.amount;
       // normalize calculation type properties
       if (!c.chargeCalculationType && c.calculationType) {
         c.chargeCalculationType = c.calculationType;
+      }
+      // For percent charges, set percentageAmount so it displays correctly in the table
+      if (this.isPercentCharge(c)) {
+        c.percentageAmount = c.amount;
       }
       this.chargesDataSource = this.chargesDataSource.concat([c]);
       chargeSelect.value = '';
@@ -819,21 +825,33 @@ export class EditLocComponent implements OnInit {
 
   startEdit(charge: any) {
     this.editingCharge = charge;
-    // copy current amount to editable field if not present
-    charge.editableAmount = charge.editableAmount ?? (charge?.percentageAmount || charge?.amount);
+    // For percent charges, use percentageAmount; otherwise use amount
+    if (this.isPercentCharge(charge)) {
+      charge.editableAmount = charge.percentageAmount ?? charge.amount;
+    } else {
+      charge.editableAmount = charge.amount;
+    }
   }
 
   saveEdit(charge: any) {
-    // apply edited value to charge.amount so it will be included in payload
+    // apply edited value - for percent charges update percentageAmount, for flat charges update amount
     const newVal = charge.editableAmount;
     // basic numeric sanitation
     if (newVal === '' || newVal === null || newVal === undefined) {
-      charge.amount = undefined;
+      if (this.isPercentCharge(charge)) {
+        charge.percentageAmount = undefined;
+      } else {
+        charge.amount = undefined;
+      }
     } else {
       const parsed = Number(newVal);
-      charge.amount = isNaN(parsed) ? newVal : parsed;
+      const parsedValue = isNaN(parsed) ? newVal : parsed;
       if (this.isPercentCharge(charge)) {
-        charge.percentageAmount = charge.amount; // keep both in sync for preview/table differences
+        charge.percentageAmount = parsedValue;
+        // Also update amount for backend payload consistency
+        charge.amount = parsedValue;
+      } else {
+        charge.amount = parsedValue;
       }
     }
     this.editingCharge = null;
@@ -852,8 +870,12 @@ export class EditLocComponent implements OnInit {
   }
 
   cancelEdit(charge: any) {
-    // discard edits
-    charge.editableAmount = charge.amount;
+    // discard edits - for percent charges, restore percentageAmount; otherwise restore amount
+    if (this.isPercentCharge(charge)) {
+      charge.editableAmount = charge.percentageAmount;
+    } else {
+      charge.editableAmount = charge.amount;
+    }
     this.editingCharge = null;
   }
 
@@ -886,6 +908,22 @@ export class EditLocComponent implements OnInit {
       const cleanBasicInfo = this.removeEmptyValues(value.basicInfo);
       const cleanLimitsTerms = this.removeEmptyValues(value.limitsTerms);
 
+      // Simplify charges payload to only include chargeDefinitionId and editableAmount
+      const simplifiedCharges = this.chargesDataSource.map((charge: any) => {
+        const simplified: any = {
+          chargeDefinitionId: charge.chargeDefinitionId
+        };
+        // Use editableAmount if set, otherwise use percentageAmount for percent charges or amount for flat charges
+        if (charge.editableAmount !== undefined && charge.editableAmount !== null && charge.editableAmount !== '') {
+          simplified.editableAmount = Number(charge.editableAmount);
+        } else if (this.isPercentCharge(charge) && charge.percentageAmount !== undefined) {
+          simplified.editableAmount = charge.percentageAmount;
+        } else if (charge.amount !== undefined) {
+          simplified.editableAmount = charge.amount;
+        }
+        return simplified;
+      });
+
       const payload = {
         ...cleanBasicInfo,
         ...cleanLimitsTerms,
@@ -898,8 +936,8 @@ export class EditLocComponent implements OnInit {
           : {}),
         // include settlement account if selected
         ...(value.settlementSavingsAccountId ? { settlementSavingsAccountId: value.settlementSavingsAccountId } : {}),
-        // Only include charges if there are any
-        ...(this.chargesDataSource.length > 0 ? { charges: this.chargesDataSource } : {})
+        // Only include simplified charges if there are any
+        ...(simplifiedCharges.length > 0 ? { charges: simplifiedCharges } : {})
       };
 
       // Rename expiryDate -> endDate for backend
