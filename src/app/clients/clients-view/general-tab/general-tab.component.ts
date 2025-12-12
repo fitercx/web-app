@@ -574,8 +574,9 @@ export class GeneralTabComponent {
     );
   }
 
-  getApprovedAmount(loan: any): number {
-    return loan?.productType === 'RECEIVABLE'
+  getApprovedAmount(loan: any, lineOfCredit: any): number {
+    const productType = lineOfCredit?.type?.toUpperCase() ?? '';
+    return productType === 'RECEIVABLE'
       ? loan?.additionalProperties?.approvedReceivableAmount
       : loan?.additionalProperties?.approvedPayableAmount;
   }
