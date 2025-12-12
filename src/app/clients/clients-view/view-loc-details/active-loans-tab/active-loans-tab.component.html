@@ -28,15 +28,7 @@
     <ng-container matColumnDef="Outstanding Balance">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Outstanding Balance' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let element">
-        {{
-          (element.status?.overpaid
-            ? 0
-            : element.totalOverPaidDerived === undefined
-              ? (element.loanBalance ?? element.summary?.totalOutstanding ?? element.summary?.principalOutstanding)
-              : (element.loanBalance ?? element.summary?.totalOutstanding ?? element.summary?.principalOutstanding) -
-                element.totalOverPaidDerived
-          ) | currency: locCurrency
-        }}
+        {{ getOutstandingBalance(element) | currency: locCurrency }}
       </td>
     </ng-container>
 
