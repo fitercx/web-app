@@ -85,4 +85,36 @@ export class ActiveLoansTabComponent implements OnInit {
       }
     );
   }
+
+  /**
+   * Gets the loan balance from the element, checking multiple possible fields.
+   * Returns the total outstanding balance (principal + interest + fees).
+   * @param element The loan account element
+   * @returns The loan balance amount
+   */
+  private getLoanBalance(element: any): number {
+    return element.loanBalance ?? element.summary?.totalOutstanding ?? element.summary?.principalOutstanding ?? 0;
+  }
+
+  /**
+   * Calculates the outstanding balance for a loan account.
+   * Handles overpaid loans and totalOverPaidDerived adjustments.
+   * @param element The loan account element
+   * @returns The outstanding balance amount
+   */
+  getOutstandingBalance(element: any): number {
+    // If loan is overpaid, show 0
+    if (element.status?.overpaid) {
+      return 0;
+    }
+
+    const loanBalance = this.getLoanBalance(element);
+
+    // If totalOverPaidDerived exists, subtract it from the balance
+    if (element.totalOverPaidDerived !== undefined) {
+      return loanBalance - element.totalOverPaidDerived;
+    }
+
+    return loanBalance;
+  }
 }
