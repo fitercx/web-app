@@ -80,30 +80,17 @@ export class GeneralTabComponent implements OnInit {
       this.setloanNonDetailsTableData();
     }
   }
-
-  /** Calculates the Net Disbursed Amount = Disbursed Amount - Processing Fee (if processing fee is not found, assumes zero.) */
+  /** Calculate Net Disbursed Amount from loan details */
   calculateNetDisbursedAmount() {
-    // Only show disbursed amount if loan is active (status 300)
-    // For pending approval (100) and approved (200), show 0.00
-    const isActive = this.loanDetails?.status?.id === 300;
-    const disbursedAmount = isActive ? this.loanDetails?.principal || 0 : 0;
-    let processingFee = this.loanDetails.summary?.feeChargesCharged || 0;
-    const factorRateEnabled = this.loanDetails?.factorRateEnabled || false;
-    if (factorRateEnabled) {
-      // If factor rate is enabled, processing fee is considered zero
-      processingFee = 0;
-    }
-    const netDisbursedAmount = disbursedAmount - processingFee;
-    const isLineOfCreditReceivable = this.loanDetails.additionalProperties?.locProductType === 'RECEIVABLE';
-    this.netDisbursedAmount = isLineOfCreditReceivable ? this.loanDetails.netDisbursalAmount : netDisbursedAmount;
+    this.netDisbursedAmount = this.loanDetails.netDisbursalAmount;
   }
 
   /** Returns the disbursed amount based on loan status */
   getDisbursedAmount(): number {
-    // Only show disbursed amount if loan is active (status 300)
+    // Only show disbursed amount if loan status is 300 (active) or higher (e.g., active, overpaid, closed, etc.)
     // For pending approval (100) and approved (200), show 0.00
-    const isActive = this.loanDetails?.status?.id === 300;
-    if (!isActive) {
+    const isDisbursed = this.loanDetails?.status?.id >= 300;
+    if (!isDisbursed) {
       return 0;
     }
 
