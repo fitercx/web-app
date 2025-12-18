@@ -207,13 +207,20 @@ export class LoanTrancheDetailsComponent implements OnInit {
   editDisbursementData() {
     const disbursementData: any = [];
     this.disbursementDataSource.forEach((item: any) => {
-      disbursementData.push({
+      const disbursementEntry: any = {
         expectedDisbursementDate: this.dateUtils.formatDate(
           item.expectedDisbursementDate,
           this.settingsService.dateFormat
         ),
         principal: item.principal
-      });
+      };
+      // Include disbursementId for existing disbursements (can be null for new disbursements)
+      if (item.id !== undefined && item.id !== null) {
+        disbursementEntry.disbursementId = item.id;
+      } else {
+        disbursementEntry.disbursementId = null;
+      }
+      disbursementData.push(disbursementEntry);
     });
 
     const payload = {
