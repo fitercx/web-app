@@ -1,0 +1,90 @@
+<h2 mat-dialog-title>
+  {{ 'labels.heading.Adjust Installment Date' | translate }}
+</h2>
+
+<mat-dialog-content>
+  <form [formGroup]="adjustDateForm" fxLayout="column" fxLayoutGap="16px">
+    <mat-form-field fxFlex="100%" appearance="outline">
+      <mat-label>{{ 'labels.inputs.Select Installment' | translate }} *</mat-label>
+      <mat-select formControlName="installmentNumber" required>
+        <mat-option [value]="null">{{ 'labels.inputs.Select Installment' | translate }}</mat-option>
+        <mat-option *ngFor="let installment of adjustableInstallments" [value]="installment.period">
+          #{{ installment.period }} - {{ installment.dueDate | dateFormat }}
+        </mat-option>
+      </mat-select>
+      <mat-error *ngIf="adjustDateForm.get('installmentNumber')?.hasError('required')">
+        {{ 'labels.inputs.Select Installment' | translate }} {{ 'validation.is required' | translate }}
+      </mat-error>
+    </mat-form-field>
+
+    <div *ngIf="selectedInstallment" class="m-b-10">
+      <p class="installment-info">
+        <strong>{{ 'labels.text.Current Due Date' | translate }}:</strong> {{ selectedInstallment.dueDate | dateFormat
+        }}<br />
+        <strong>{{ 'labels.text.EMI Amount' | translate }}:</strong>
+        {{ selectedInstallment.totalDueForPeriod | currency: data.currencyCode : 'symbol-narrow' : '1.2-2' }}
+      </p>
+    </div>
+
+    <mat-form-field fxFlex="100%" appearance="outline">
+      <mat-label>{{ 'labels.inputs.New Due Date' | translate }} *</mat-label>
+      <input
+        matInput
+        [min]="minDate"
+        [max]="maxDate"
+        [matDatepicker]="newDueDatePicker"
+        formControlName="newDueDate"
+        [disabled]="!adjustDateForm.get('installmentNumber')?.value"
+        required
+      />
+      <mat-datepicker-toggle matSuffix [for]="newDueDatePicker"></mat-datepicker-toggle>
+      <mat-datepicker #newDueDatePicker></mat-datepicker>
+      <mat-error *ngIf="adjustDateForm.get('newDueDate')?.hasError('required')">
+        {{ 'labels.inputs.New Due Date' | translate }} {{ 'validation.is required' | translate }}
+      </mat-error>
+    </mat-form-field>
+
+    <mat-form-field fxFlex="100%" appearance="outline">
+      <mat-label>{{ 'labels.inputs.Adjustment Date' | translate }} *</mat-label>
+      <input
+        matInput
+        [min]="minDate"
+        [max]="maxDate"
+        [matDatepicker]="adjustmentDatePicker"
+        formControlName="adjustmentDate"
+        required
+      />
+      <mat-datepicker-toggle matSuffix [for]="adjustmentDatePicker"></mat-datepicker-toggle>
+      <mat-datepicker #adjustmentDatePicker></mat-datepicker>
+      <mat-error *ngIf="adjustDateForm.get('adjustmentDate')?.hasError('required')">
+        {{ 'labels.inputs.Adjustment Date' | translate }} {{ 'validation.is required' | translate }}
+      </mat-error>
+    </mat-form-field>
+
+    <div class="info-box m-t-10">
+      <mat-icon class="info-icon">info</mat-icon>
+      <p class="info-text">
+        {{ 'labels.text.adjust installment date note' | translate }}
+        <br />
+        <small>
+          •
+          {{
+            'labels.text.When you adjust an installment date, all subsequent installments will be automatically shifted by the same number of days'
+              | translate
+          }}<br />
+          • {{ 'labels.text.emi amount unchanged' | translate }}<br />
+          • {{ 'labels.text.overdue charges preserved' | translate }}
+        </small>
+      </p>
+    </div>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions fxLayout="row" fxLayoutAlign="center">
+  <button mat-raised-button mat-dialog-close class="m-r-10">
+    {{ 'labels.buttons.Cancel' | translate }}
+  </button>
+  <button mat-raised-button color="primary" [disabled]="!adjustDateForm.valid" (click)="submit()">
+    {{ 'labels.buttons.Adjust Date' | translate }}
+  </button>
+</mat-dialog-actions>

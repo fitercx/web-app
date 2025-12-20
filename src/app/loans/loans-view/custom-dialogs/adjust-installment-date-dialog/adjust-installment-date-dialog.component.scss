@@ -1,0 +1,33 @@
+.info-box {
+  display: flex;
+  align-items: flex-start;
+  padding: 12px;
+  background-color: #e3f2fd;
+  border-radius: 4px;
+  border-left: 4px solid #2196f3;
+}
+
+.info-icon {
+  color: #2196f3;
+  margin-right: 12px;
+  margin-top: 2px;
+}
+
+.info-text {
+  margin: 0;
+  font-size: 14px;
+  color: #1565c0;
+
+  small {
+    color: #424242;
+    line-height: 1.6;
+  }
+}
+
+.installment-info {
+  margin: 0;
+  padding: 8px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  font-size: 14px;
+}

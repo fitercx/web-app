@@ -1,5 +1,18 @@
 <div class="container">
-  <div fxLayout="row" class="m-t-20" fxLayoutAlign="end center" *ngIf="!forEditing">
+  <div fxLayout="row" class="m-t-20" fxLayoutAlign="space-between center" *ngIf="!forEditing">
+    <div fxLayout="row" fxLayoutGap="12px" fxLayoutAlign="start center">
+      <button
+        *ngIf="canAdjustAnyInstallment()"
+        mat-raised-button
+        color="primary"
+        (click)="openAdjustInstallmentDateDialog()"
+        matTooltip="{{ 'tooltips.Adjust Date' | translate }}"
+      >
+        <mat-icon>event</mat-icon>
+        {{ 'labels.buttons.Adjust Installment Date' | translate }}
+      </button>
+    </div>
+
     <button mat-raised-button color="primary" (click)="exportToPDF()">
       <fa-icon icon="download" class="m-r-10"></fa-icon>Export to PDF
     </button>
@@ -295,7 +308,7 @@
     </ng-container>
 
     <ng-container matColumnDef="header-installment-totals">
-      <th mat-header-cell class="center" *matHeaderCellDef [attr.colspan]="6">
+      <th mat-header-cell class="center" *matHeaderCellDef [attr.colspan]="7">
         {{ 'labels.inputs.Installment Totals' | translate }}
       </th>
     </ng-container>

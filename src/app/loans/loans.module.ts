@@ -78,6 +78,8 @@ import { ExternalAssetOwnerTabComponent } from './loans-view/external-asset-owne
 import { ExternalAssetTransferComponent } from './loans-view/external-asset-owner-tab/external-asset-transfer/external-asset-transfer.component';
 import { TranslateModule } from '@ngx-translate/core';
 import { LoanDelinquencyActionDialogComponent } from './custom-dialog/loan-delinquency-action-dialog/loan-delinquency-action-dialog.component';
+import { AdjustInstallmentDateDialogComponent } from './loans-view/custom-dialogs/adjust-installment-date-dialog/adjust-installment-date-dialog.component';
+import { BulkRemoveChargesDialogComponent } from './loans-view/custom-dialogs/bulk-remove-charges-dialog/bulk-remove-charges-dialog.component';
 import { LoanReagingComponent } from './loans-view/loan-account-actions/loan-reaging/loan-reaging.component';
 import { LoanReamortizeComponent } from './loans-view/loan-account-actions/loan-reamortize/loan-reamortize.component';
 import { LoanTermVariationsTabComponent } from './loans-view/loan-term-variations-tab/loan-term-variations-tab.component';
@@ -169,7 +171,9 @@ import { LoansActiveClientMembersComponent } from './loans-account-stepper/loans
     LoanReamortizeComponent,
     LoanTermVariationsTabComponent,
     AddInterestPauseComponent,
-    LoansActiveClientMembersComponent
+    LoansActiveClientMembersComponent,
+    AdjustInstallmentDateDialogComponent,
+    BulkRemoveChargesDialogComponent
   ],
   providers: []
 })
