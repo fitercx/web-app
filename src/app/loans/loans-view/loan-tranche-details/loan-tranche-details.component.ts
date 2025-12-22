@@ -214,11 +214,11 @@ export class LoanTrancheDetailsComponent implements OnInit {
         ),
         principal: item.principal
       };
-      // Include disbursementId for existing disbursements (can be null for new disbursements)
+      // Backend expects `id` for existing disbursements (can be null for new disbursements)
       if (item.id !== undefined && item.id !== null) {
-        disbursementEntry.disbursementId = item.id;
+        disbursementEntry.id = item.id;
       } else {
-        disbursementEntry.disbursementId = null;
+        disbursementEntry.id = null;
       }
       disbursementData.push(disbursementEntry);
     });
