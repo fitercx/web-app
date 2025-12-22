@@ -15,6 +15,7 @@ import { FormfieldBase } from 'app/shared/form-dialog/formfield/model/formfield-
 import { InputBase } from 'app/shared/form-dialog/formfield/model/input-base';
 import { Currency } from 'app/shared/models/general.model';
 import { CodeName, OptionData } from 'app/shared/models/option-data.model';
+import { AlertService } from 'app/core/alert/alert.service';
 
 /**
  * Create Loans Account Terms Step
@@ -128,7 +129,8 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
     private formBuilder: UntypedFormBuilder,
     private settingsService: SettingsService,
     private route: ActivatedRoute,
-    public dialog: MatDialog
+    public dialog: MatDialog,
+    private alertService: AlertService
   ) {
     this.loanId = this.route.snapshot.params['loanId'];
     this.createloansAccountTermsForm();
@@ -733,6 +735,11 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
           this.totalMultiDisbursed += principal;
           this.isMultiDisbursedCompleted = this.totalMultiDisbursed === currentPrincipalAmount;
           this.pristine = false;
+        } else {
+          this.alertService.alert({
+            type: 'BusinessRule',
+            message: `Total disbursement amount cannot exceed the approved principal of ${currentPrincipalAmount}.`
+          });
         }
       }
     });
