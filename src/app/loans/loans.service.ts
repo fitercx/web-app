@@ -522,8 +522,7 @@ export class LoansService {
    * @returns {Observable<any>}
    */
   adjustInstallmentDate(accountId: string, data: any): Observable<any> {
-    const httpParams = new HttpParams().set('command', 'adjustInstallmentDate');
-    return this.http.post(`/loans/${accountId}`, data, { params: httpParams });
+    return this.http.post(`/loan-adjust-installment/${accountId}`, data);
   }
 
   /**
