@@ -154,7 +154,7 @@ export class GeneralTabComponent implements OnInit {
       },
       {
         property: 'Fees',
-        original: this.loanDetails.summary.feeChargesCharged,
+        original: this.loanDetails.summary.feeChargesPaid,
         adjustment: '0',
         paid: this.loanDetails.summary.feeChargesPaid,
         waived: this.loanDetails.summary.feeChargesWaived,
