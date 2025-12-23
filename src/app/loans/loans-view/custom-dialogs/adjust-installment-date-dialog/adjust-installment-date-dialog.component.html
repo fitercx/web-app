@@ -5,15 +5,15 @@
 <mat-dialog-content>
   <form [formGroup]="adjustDateForm" fxLayout="column" fxLayoutGap="16px">
     <mat-form-field fxFlex="100%" appearance="outline">
-      <mat-label>{{ 'labels.inputs.Select Installment' | translate }} *</mat-label>
+      <mat-label>{{ 'Select Installment' | translate }} *</mat-label>
       <mat-select formControlName="installmentNumber" required>
-        <mat-option [value]="null">{{ 'labels.inputs.Select Installment' | translate }}</mat-option>
+        <mat-option [value]="null">{{ 'Select Installment' | translate }}</mat-option>
         <mat-option *ngFor="let installment of adjustableInstallments" [value]="installment.period">
           #{{ installment.period }} - {{ installment.dueDate | dateFormat }}
         </mat-option>
       </mat-select>
       <mat-error *ngIf="adjustDateForm.get('installmentNumber')?.hasError('required')">
-        {{ 'labels.inputs.Select Installment' | translate }} {{ 'validation.is required' | translate }}
+        {{ 'Select Installment' | translate }} {{ 'validation.is required' | translate }}
       </mat-error>
     </mat-form-field>
 
@@ -27,7 +27,7 @@
     </div>
 
     <mat-form-field fxFlex="100%" appearance="outline">
-      <mat-label>{{ 'labels.inputs.New Due Date' | translate }} *</mat-label>
+      <mat-label>{{ 'New Due Date' | translate }} *</mat-label>
       <input
         matInput
         [min]="minDate"
@@ -36,16 +36,17 @@
         formControlName="newDueDate"
         [disabled]="!adjustDateForm.get('installmentNumber')?.value"
         required
+        placeholder=""
       />
       <mat-datepicker-toggle matSuffix [for]="newDueDatePicker"></mat-datepicker-toggle>
       <mat-datepicker #newDueDatePicker></mat-datepicker>
       <mat-error *ngIf="adjustDateForm.get('newDueDate')?.hasError('required')">
-        {{ 'labels.inputs.New Due Date' | translate }} {{ 'validation.is required' | translate }}
+        {{ 'New Due Date' | translate }} {{ 'validation.is required' | translate }}
       </mat-error>
     </mat-form-field>
 
     <mat-form-field fxFlex="100%" appearance="outline">
-      <mat-label>{{ 'labels.inputs.Adjustment Date' | translate }} *</mat-label>
+      <mat-label>{{ 'Adjustment Date' | translate }} *</mat-label>
       <input
         matInput
         [min]="minDate"
@@ -53,11 +54,12 @@
         [matDatepicker]="adjustmentDatePicker"
         formControlName="adjustmentDate"
         required
+        placeholder=""
       />
       <mat-datepicker-toggle matSuffix [for]="adjustmentDatePicker"></mat-datepicker-toggle>
       <mat-datepicker #adjustmentDatePicker></mat-datepicker>
       <mat-error *ngIf="adjustDateForm.get('adjustmentDate')?.hasError('required')">
-        {{ 'labels.inputs.Adjustment Date' | translate }} {{ 'validation.is required' | translate }}
+        {{ 'Adjustment Date' | translate }} {{ 'validation.is required' | translate }}
       </mat-error>
     </mat-form-field>
 

@@ -31,3 +31,27 @@
   border-radius: 4px;
   font-size: 14px;
 }
+
+// Ensure labels are always visible and readable
+::ng-deep .mat-form-field-appearance-outline {
+  .mat-form-field-label {
+    color: rgb(0 0 0 / 87%) !important;
+    font-weight: 500;
+  }
+
+  .mat-form-field-label-wrapper {
+    top: -0.5em;
+  }
+
+  .mat-form-field-outline-thick .mat-form-field-label {
+    color: rgb(0 0 0 / 87%) !important;
+  }
+
+  &.mat-focused .mat-form-field-label {
+    color: rgb(0 0 0 / 87%) !important;
+  }
+
+  .mat-form-field-infix {
+    padding: 0.75em 0;
+  }
+}

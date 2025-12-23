@@ -5,7 +5,7 @@
 <mat-dialog-content>
   <form [formGroup]="bulkRemoveForm" fxLayout="column" fxLayoutGap="16px">
     <mat-checkbox formControlName="removeAll" class="remove-all-checkbox">
-      {{ 'labels.inputs.Remove All Overdue Charges' | translate }}
+      {{ 'Remove All Overdue Charges' | translate }}
     </mat-checkbox>
 
     <div *ngIf="!bulkRemoveForm.get('removeAll')?.value" fxLayout="column" fxLayoutGap="16px">
@@ -14,29 +14,31 @@
       </p>
 
       <mat-form-field fxFlex="100%" appearance="outline">
-        <mat-label>{{ 'labels.inputs.Start Date' | translate }} *</mat-label>
+        <mat-label>{{ 'Start Date' | translate }} *</mat-label>
         <input
           matInput
           [min]="minDate"
           [max]="bulkRemoveForm.get('endDate')?.value || maxDate"
           [matDatepicker]="startDatePicker"
           formControlName="startDate"
+          placeholder=""
         />
         <mat-datepicker-toggle matSuffix [for]="startDatePicker"></mat-datepicker-toggle>
         <mat-datepicker #startDatePicker></mat-datepicker>
         <mat-error *ngIf="bulkRemoveForm.get('startDate')?.hasError('required')">
-          {{ 'labels.inputs.Start Date' | translate }} {{ 'validation.is required' | translate }}
+          {{ 'Start Date' | translate }} {{ 'validation.is required' | translate }}
         </mat-error>
       </mat-form-field>
 
       <mat-form-field fxFlex="100%" appearance="outline">
-        <mat-label>{{ 'labels.inputs.End Date' | translate }}</mat-label>
+        <mat-label>{{ 'End Date' | translate }}</mat-label>
         <input
           matInput
           [min]="bulkRemoveForm.get('startDate')?.value || minDate"
           [max]="maxDate"
           [matDatepicker]="endDatePicker"
           formControlName="endDate"
+          placeholder=""
         />
         <mat-datepicker-toggle matSuffix [for]="endDatePicker"></mat-datepicker-toggle>
         <mat-datepicker #endDatePicker></mat-datepicker>
