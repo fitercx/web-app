@@ -1,6 +1,6 @@
 import { Component, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Dates } from 'app/core/utils/dates';
 import { LoansService } from 'app/loans/loans.service';
 import { SettingsService } from 'app/settings/settings.service';
@@ -46,6 +46,7 @@ export class LoanTrancheDetailsComponent implements OnInit {
    */
   constructor(
     private route: ActivatedRoute,
+    private router: Router,
     public dialog: MatDialog,
     private loanServices: LoansService,
     private settingsService: SettingsService,
@@ -228,11 +229,28 @@ export class LoanTrancheDetailsComponent implements OnInit {
       dateFormat: this.settingsService.dateFormat,
       locale: this.settingsService.language.code
     };
-    this.loanServices
-      .editDisbursements(this.loanId, payload)
-      .toPromise()
-      .then((result) => {
-        this.pristine = true;
-      });
+    this.loanServices.editDisbursements(this.loanId, payload).subscribe(() => {
+      this.pristine = true;
+      this.reload();
+    });
+  }
+
+  /**
+   * Refetches loan data so all tabs (including repayment schedule) see updated tranches.
+   * Keeps the user on the same loan view URL.
+   */
+  private reload() {
+    const clientId = this.loanDetails?.clientId;
+    const url: string = this.router.url;
+
+    if (!clientId) {
+      // Fallback: just refresh current URL to rerun resolvers
+      this.router.navigateByUrl(url, { skipLocationChange: true }).then(() => this.router.navigate([url]));
+      return;
+    }
+
+    this.router
+      .navigateByUrl(`/clients/${clientId}/loans-accounts`, { skipLocationChange: true })
+      .then(() => this.router.navigate([url]));
   }
 }
