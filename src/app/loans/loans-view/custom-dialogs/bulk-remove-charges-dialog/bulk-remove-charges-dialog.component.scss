@@ -1,0 +1,67 @@
+.info-box {
+  display: flex;
+  align-items: flex-start;
+  padding: 12px;
+  background-color: #e3f2fd;
+  border-radius: 4px;
+  margin-top: 8px;
+}
+
+.info-icon {
+  color: #1976d2;
+  margin-right: 8px;
+  margin-top: 2px;
+}
+
+.info-text {
+  margin: 0;
+  font-size: 14px;
+  color: #424242;
+  line-height: 1.5;
+}
+
+mat-dialog-content {
+  min-width: 400px;
+  max-width: 500px;
+}
+
+mat-dialog-actions {
+  margin-top: 16px;
+}
+
+// Ensure labels are always visible and readable
+::ng-deep .mat-form-field-appearance-outline {
+  .mat-form-field-label {
+    color: rgb(0 0 0 / 87%) !important;
+    font-weight: 500;
+  }
+
+  .mat-form-field-label-wrapper {
+    top: -0.5em;
+  }
+
+  .mat-form-field-outline-thick .mat-form-field-label {
+    color: rgb(0 0 0 / 87%) !important;
+  }
+
+  &.mat-focused .mat-form-field-label {
+    color: rgb(0 0 0 / 87%) !important;
+  }
+
+  .mat-form-field-infix {
+    padding: 0.75em 0;
+  }
+}
+
+::ng-deep .mat-datepicker-popup {
+  z-index: 10000 !important;
+}
+
+::ng-deep .cdk-overlay-container {
+  z-index: 10000 !important;
+}
+
+.remove-all-checkbox {
+  margin-bottom: 8px;
+  font-weight: 500;
+}

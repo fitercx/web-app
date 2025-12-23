@@ -1,0 +1,84 @@
+<h2 mat-dialog-title>
+  {{ 'labels.heading.Bulk Remove Overdue Charges' | translate }}
+</h2>
+
+<mat-dialog-content>
+  <form [formGroup]="bulkRemoveForm" fxLayout="column" fxLayoutGap="16px">
+    <mat-checkbox formControlName="removeAll" class="remove-all-checkbox">
+      {{ 'Remove All Overdue Charges' | translate }}
+    </mat-checkbox>
+
+    <div *ngIf="!bulkRemoveForm.get('removeAll')?.value" fxLayout="column" fxLayoutGap="16px">
+      <p class="info-text">
+        {{ 'labels.text.Select a date range to remove all overdue charges within that period' | translate }}
+      </p>
+
+      <mat-form-field fxFlex="100%" appearance="outline">
+        <mat-label>{{ 'Start Date' | translate }} *</mat-label>
+        <input
+          matInput
+          [min]="minDate"
+          [max]="bulkRemoveForm.get('endDate')?.value || maxDate"
+          [matDatepicker]="startDatePicker"
+          formControlName="startDate"
+          placeholder=""
+        />
+        <mat-datepicker-toggle matSuffix [for]="startDatePicker"></mat-datepicker-toggle>
+        <mat-datepicker #startDatePicker></mat-datepicker>
+        <mat-error *ngIf="bulkRemoveForm.get('startDate')?.hasError('required')">
+          {{ 'Start Date' | translate }} {{ 'validation.is required' | translate }}
+        </mat-error>
+      </mat-form-field>
+
+      <mat-form-field fxFlex="100%" appearance="outline">
+        <mat-label>{{ 'End Date' | translate }}</mat-label>
+        <input
+          matInput
+          [min]="bulkRemoveForm.get('startDate')?.value || minDate"
+          [max]="maxDate"
+          [matDatepicker]="endDatePicker"
+          formControlName="endDate"
+          placeholder=""
+        />
+        <mat-datepicker-toggle matSuffix [for]="endDatePicker"></mat-datepicker-toggle>
+        <mat-datepicker #endDatePicker></mat-datepicker>
+        <mat-hint>{{
+          'labels.hints.Select end date to remove charges within a range, or leave empty to remove from start date onwards'
+            | translate
+        }}</mat-hint>
+      </mat-form-field>
+    </div>
+
+    <div class="info-box">
+      <mat-icon class="info-icon">info</mat-icon>
+      <p class="info-text">
+        <small *ngIf="bulkRemoveForm.get('removeAll')?.value">
+          • {{ 'labels.text.All overdue charges will be permanently deactivated' | translate }}<br />
+          • {{ 'labels.text.This action cannot be undone' | translate }}
+        </small>
+        <small *ngIf="!bulkRemoveForm.get('removeAll')?.value">
+          • {{ 'labels.text.All overdue charges with due date on or after the start date will be removed' | translate
+          }}<br />
+          • {{ 'labels.text.If end date is provided, only charges within the date range will be removed' | translate
+          }}<br />
+          • {{ 'labels.text.This action cannot be undone' | translate }}
+        </small>
+      </p>
+    </div>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions fxLayout="row" fxLayoutAlign="center">
+  <button mat-raised-button mat-dialog-close class="m-r-10">
+    {{ 'labels.buttons.Cancel' | translate }}
+  </button>
+  <button
+    mat-raised-button
+    color="warn"
+    [disabled]="!bulkRemoveForm.get('removeAll')?.value && !bulkRemoveForm.get('startDate')?.valid"
+    (click)="submit()"
+  >
+    <mat-icon>delete_sweep</mat-icon>
+    {{ 'labels.buttons.Bulk Remove Charges' | translate }}
+  </button>
+</mat-dialog-actions>

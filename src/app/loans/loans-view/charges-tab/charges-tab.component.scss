@@ -1,63 +1,54 @@
+.bulk-actions-toolbar {
+  padding: 16px;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+  margin-bottom: 16px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 500;
+  color: #424242;
+}
+
+.charge-count {
+  font-size: 14px;
+  color: #757575;
+  font-weight: normal;
+}
+
+.account-action-button {
+  margin: 0 4px;
+  min-width: 36px;
+  padding: 0 8px;
+}
+
 .tab-container {
-  padding: 1%;
-  margin: 1%;
+  padding: 16px;
+}
 
-  h3 {
-    margin: 1% auto;
-  }
+::ng-deep .mat-form-field-appearance-outline .mat-form-field-infix {
+  padding: 0.75em 0;
+}
 
-  table {
-    width: 100%;
-    margin-top: 3%;
+::ng-deep .mat-form-field-appearance-outline .mat-form-field-label {
+  top: 1.6em;
+}
 
-    .account-action-button {
-      min-width: 26px;
-      padding: 0 6px;
-      margin: 4px;
-      line-height: 25px;
-    }
+::ng-deep .mat-form-field-appearance-outline.mat-focused .mat-form-field-label,
+::ng-deep .mat-form-field-appearance-outline.mat-form-field-should-float .mat-form-field-label {
+  top: 1.4em;
+}
 
-    .select-row:hover {
-      cursor: pointer;
-    }
+::ng-deep .mat-datepicker-popup {
+  z-index: 10000 !important;
+}
 
-    // Ensure proper table alignment
-    .mat-header-cell,
-    .mat-cell {
-      padding: 8px 8px 8px 0;
-      text-align: left;
-    }
+::ng-deep .cdk-overlay-container {
+  z-index: 10000 !important;
+}
 
-    // Ensure consistent column widths
-    .mat-column-name {
-      min-width: 120px;
-    }
-
-    .mat-column-feepenalty {
-      min-width: 80px;
-    }
-
-    .mat-column-paymentdueat {
-      min-width: 120px;
-    }
-
-    .mat-column-dueDate {
-      min-width: 100px;
-    }
-
-    .mat-column-calculationtype {
-      min-width: 120px;
-    }
-
-    .mat-column-due,
-    .mat-column-paid,
-    .mat-column-waived,
-    .mat-column-outstanding {
-      min-width: 100px;
-    }
-
-    .mat-column-actions {
-      min-width: 120px;
-    }
-  }
+::ng-deep .mat-datepicker-content {
+  z-index: 10000 !important;
 }

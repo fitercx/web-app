@@ -1,6 +1,6 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
-import { ActivatedRoute } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import { Dates } from 'app/core/utils/dates';
 import { RepaymentSchedulePeriod } from 'app/loans/models/loan-account.model';
 import { SettingsService } from 'app/settings/settings.service';
@@ -8,6 +8,8 @@ import { FormDialogComponent } from 'app/shared/form-dialog/form-dialog.componen
 import { DatepickerBase } from 'app/shared/form-dialog/formfield/model/datepicker-base';
 import { FormfieldBase } from 'app/shared/form-dialog/formfield/model/formfield-base';
 import { InputBase } from 'app/shared/form-dialog/formfield/model/input-base';
+import { AdjustInstallmentDateDialogComponent } from '../custom-dialogs/adjust-installment-date-dialog/adjust-installment-date-dialog.component';
+import { LoansService } from 'app/loans/loans.service';
 
 import { jsPDF, jsPDFOptions } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -91,7 +93,9 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     private route: ActivatedRoute,
     private settingsService: SettingsService,
     private dateUtils: Dates,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private loansService: LoansService,
+    private router: Router
   ) {
     this.route.parent.data.subscribe((data: { loanDetailsData: any }) => {
       if (data.loanDetailsData) {
@@ -503,5 +507,147 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
     // Regular case: show positive outstanding only
     return outstanding > 0 ? outstanding : null;
+  }
+
+  /**
+   * Opens dialog to adjust installment date
+   * @param {any} installment Installment
+   */
+  adjustInstallmentDate(installment: any) {
+    if (!installment.period || installment.period === 0) {
+      return; // Don't allow adjusting disbursement row
+    }
+
+    const dialogRef = this.dialog.open(AdjustInstallmentDateDialogComponent, {
+      width: '500px',
+      data: {
+        installmentNumber: installment.period,
+        currentDueDate: installment.dueDate,
+        emiAmount: installment.totalDueForPeriod,
+        currencyCode: this.currencyCode,
+        disbursementDate: this.loanDetailsData?.timeline?.actualDisbursementDate
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((result: any) => {
+      if (result) {
+        const locale = this.settingsService.language.code;
+        const dateFormat = this.settingsService.dateFormat;
+        const payload = {
+          installmentNumber: installment.period,
+          newDueDate: this.dateUtils.formatDate(result.newDueDate, dateFormat),
+          adjustmentDate: this.dateUtils.formatDate(result.adjustmentDate, dateFormat),
+          dateFormat,
+          locale
+        };
+
+        this.loansService.adjustInstallmentDate(this.loanDetailsData.id, payload).subscribe({
+          next: () => {
+            this.reload();
+          },
+          error: (error) => {
+            console.error('Error adjusting installment date:', error);
+          }
+        });
+      }
+    });
+  }
+
+  /**
+   * Checks if installment can be adjusted
+   * @param {any} installment Installment
+   * @returns {boolean}
+   */
+  canAdjustInstallment(installment: any): boolean {
+    if (!installment.period || installment.period === 0) {
+      return false; // Disbursement row
+    }
+    if (installment.complete || installment.obligationsMetOnDate) {
+      return false; // Already paid
+    }
+    if (this.loanDetailsData?.status?.value !== 'Active') {
+      return false; // Loan not active
+    }
+    return true;
+  }
+
+  /**
+   * Checks if any installment can be adjusted
+   * @returns {boolean}
+   */
+  canAdjustAnyInstallment(): boolean {
+    if (!this.repaymentScheduleDetails || !this.repaymentScheduleDetails.periods) {
+      return false;
+    }
+    if (this.loanDetailsData?.status?.value !== 'Active') {
+      return false;
+    }
+    return this.repaymentScheduleDetails.periods.some((period: any) => this.canAdjustInstallment(period));
+  }
+
+  /**
+   * Gets list of installments that can be adjusted
+   * @returns {any[]}
+   */
+  getAdjustableInstallments(): any[] {
+    if (!this.repaymentScheduleDetails || !this.repaymentScheduleDetails.periods) {
+      return [];
+    }
+    return this.repaymentScheduleDetails.periods.filter((period: any) => this.canAdjustInstallment(period));
+  }
+
+  /**
+   * Opens the adjust installment date dialog
+   */
+  openAdjustInstallmentDateDialog() {
+    const adjustableInstallments = this.getAdjustableInstallments();
+
+    const dialogRef = this.dialog.open(AdjustInstallmentDateDialogComponent, {
+      width: '500px',
+      data: {
+        adjustableInstallments: adjustableInstallments,
+        currencyCode: this.currencyCode,
+        disbursementDate: this.loanDetailsData?.timeline?.actualDisbursementDate
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((result: any) => {
+      if (result) {
+        const locale = this.settingsService.language.code;
+        const dateFormat = this.settingsService.dateFormat;
+        const payload = {
+          installmentNumber: result.installmentNumber,
+          newDueDate: this.dateUtils.formatDate(result.newDueDate, dateFormat),
+          adjustmentDate: this.dateUtils.formatDate(result.adjustmentDate, dateFormat),
+          dateFormat,
+          locale
+        };
+
+        this.loansService.adjustInstallmentDate(this.loanDetailsData.id, payload).subscribe({
+          next: () => {
+            this.reload();
+          },
+          error: (error) => {
+            console.error('Error adjusting installment date:', error);
+          }
+        });
+      }
+    });
+  }
+
+  /**
+   * Reloads the page to refresh data
+   */
+  private reload() {
+    if (!this.loanDetailsData || !this.loanDetailsData.clientId) {
+      // Fallback: reload current route if clientId is not available
+      window.location.reload();
+      return;
+    }
+    const clientId = this.loanDetailsData.clientId;
+    const url: string = this.router.url;
+    this.router
+      .navigateByUrl(`/clients/${clientId}/loans-accounts`, { skipLocationChange: true })
+      .then(() => this.router.navigate([url]));
   }
 }

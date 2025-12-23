@@ -517,6 +517,25 @@ export class LoansService {
   }
 
   /**
+   * @param {string} accountId Loans Account Id
+   * @param {any} data Adjust Installment Date Data
+   * @returns {Observable<any>}
+   */
+  adjustInstallmentDate(accountId: string, data: any): Observable<any> {
+    return this.http.post(`/loan-adjust-installment/${accountId}`, data);
+  }
+
+  /**
+   * @param {string} accountId Loans Account Id
+   * @param {any} data Deactivate Overdue Charges Data (with dueDate)
+   * @returns {Observable<any>}
+   */
+  deactivateOverdueCharges(accountId: string, data: any): Observable<any> {
+    const httpParams = new HttpParams().set('command', 'deactivateOverdue');
+    return this.http.post(`/loans/${accountId}/charges`, data, { params: httpParams });
+  }
+
+  /**
    * @param {string} loanId Loans Account Id
    * @param {string} command Schedule command
    * @returns {Observable<any>}

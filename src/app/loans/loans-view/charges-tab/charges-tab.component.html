@@ -1,4 +1,28 @@
 <div class="tab-container">
+  <!-- Bulk Actions Toolbar -->
+  <div class="bulk-actions-toolbar" fxLayout="row" fxLayoutAlign="space-between center" fxLayoutGap="16px">
+    <div fxLayout="row" fxLayoutGap="16px" fxLayoutAlign="start center">
+      <h3 class="section-title">{{ 'labels.heading.Charges' | translate }}</h3>
+      <span class="charge-count" *ngIf="dataSource">
+        ({{ dataSource.data.length }} {{ 'labels.text.total' | translate }})
+      </span>
+    </div>
+
+    <div fxLayout="row" fxLayoutAlign="end center" *ngIf="hasOverdueCharges()">
+      <button
+        mat-raised-button
+        color="warn"
+        (click)="openBulkRemoveDialog()"
+        matTooltip="{{ 'tooltips.Bulk Remove Overdue Charges' | translate }}"
+      >
+        <mat-icon>delete_sweep</mat-icon>
+        {{ 'labels.buttons.Bulk Remove Charges' | translate }}
+      </button>
+    </div>
+  </div>
+
+  <mat-divider class="m-t-10 m-b-20"></mat-divider>
+
   <table mat-table [dataSource]="dataSource" matSort>
     <ng-container matColumnDef="name">
       <th mat-header-cell *matHeaderCellDef mat-sort-header>{{ 'labels.inputs.name' | translate }}</th>

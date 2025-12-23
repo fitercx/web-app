@@ -14,6 +14,7 @@ import { SettingsService } from 'app/settings/settings.service';
 import { FormDialogComponent } from 'app/shared/form-dialog/form-dialog.component';
 import { DeleteDialogComponent } from 'app/shared/delete-dialog/delete-dialog.component';
 import { ConfirmationDialogComponent } from 'app/shared/confirmation-dialog/confirmation-dialog.component';
+import { BulkRemoveChargesDialogComponent } from '../custom-dialogs/bulk-remove-charges-dialog/bulk-remove-charges-dialog.component';
 
 /** Custom Models */
 import { FormfieldBase } from 'app/shared/form-dialog/formfield/model/formfield-base';
@@ -242,6 +243,156 @@ export class ChargesTabComponent implements OnInit {
    */
   routeEdit($event: MouseEvent) {
     $event.stopPropagation();
+  }
+
+  /**
+   * Checks if there are any overdue charges
+   * @returns {boolean}
+   */
+  hasOverdueCharges(): boolean {
+    if (!this.chargesData || this.chargesData.length === 0) {
+      return false;
+    }
+    return this.chargesData.some(
+      (charge: any) =>
+        charge.chargeTimeType?.value?.toLowerCase().includes('overdue') &&
+        charge.amountOutstanding > 0 &&
+        !charge.paid &&
+        !charge.waived
+    );
+  }
+
+  /**
+   * Opens the bulk remove charges dialog
+   */
+  openBulkRemoveDialog() {
+    const dialogRef = this.dialog.open(BulkRemoveChargesDialogComponent, {
+      width: '500px',
+      data: {}
+    });
+
+    dialogRef.afterClosed().subscribe((result: any) => {
+      if (result && result.confirm) {
+        if (result.removeAll) {
+          this.bulkDeactivateAllOverdueCharges();
+        } else {
+          this.bulkDeactivateOverdueCharges(result.startDate, result.endDate);
+        }
+      }
+    });
+  }
+
+  /**
+   * Bulk deactivates overdue charges from the selected date range
+   */
+  bulkDeactivateOverdueCharges(startDate: Date, endDate?: Date) {
+    if (!startDate) {
+      return;
+    }
+
+    const locale = this.settingsService.language.code;
+    const dateFormat = this.settingsService.dateFormat;
+    const startDateStr = this.dateUtils.formatDate(startDate, 'dd MMMM yyyy');
+
+    let dialogContext: string;
+    let additionalNotes: string;
+
+    if (endDate) {
+      // Date range
+      const endDateStr = this.dateUtils.formatDate(endDate, 'dd MMMM yyyy');
+      dialogContext =
+        this.translateService.instant(
+          'labels.dialogContext.Are you sure you want to deactivate all overdue charges with due dates between'
+        ) + ` ${startDateStr} ${this.translateService.instant('labels.text.and')} ${endDateStr}?`;
+      additionalNotes = this.translateService.instant(
+        'labels.text.This action will permanently deactivate all overdue charges with due dates within the selected date range. This action cannot be undone.'
+      );
+    } else {
+      // Single date or from date onwards
+      dialogContext =
+        this.translateService.instant(
+          'labels.dialogContext.Are you sure you want to deactivate all overdue charges with due date on or after'
+        ) + ` ${startDateStr}?`;
+      additionalNotes = this.translateService.instant(
+        'labels.text.This action will permanently deactivate all overdue charges with due date on or after the selected date. This action cannot be undone.'
+      );
+    }
+
+    const confirmDialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      data: {
+        heading: this.translateService.instant('labels.heading.Bulk Remove Overdue Charges'),
+        dialogContext: dialogContext,
+        type: 'Dangerous',
+        additionalNotes: additionalNotes
+      }
+    });
+
+    confirmDialogRef.afterClosed().subscribe((response: any) => {
+      if (response.confirm) {
+        const payload: any = {
+          dueDate: this.dateUtils.formatDate(startDate, dateFormat),
+          dateFormat,
+          locale
+        };
+
+        // Add end date if provided
+        if (endDate) {
+          payload.toDueDate = this.dateUtils.formatDate(endDate, dateFormat);
+        }
+
+        this.loansService.deactivateOverdueCharges(this.loanDetails.id, payload).subscribe({
+          next: () => {
+            this.reload();
+          },
+          error: (error) => {
+            console.error('Error deactivating overdue charges:', error);
+          }
+        });
+      }
+    });
+  }
+
+  /**
+   * Bulk deactivates all overdue charges (no date filter)
+   */
+  bulkDeactivateAllOverdueCharges() {
+    const dialogContext = this.translateService.instant(
+      'labels.dialogContext.Are you sure you want to deactivate all overdue charges for this loan?'
+    );
+    const additionalNotes = this.translateService.instant(
+      'labels.text.This action will permanently deactivate all overdue charges. This action cannot be undone.'
+    );
+
+    const confirmDialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      data: {
+        heading: this.translateService.instant('labels.heading.Bulk Remove Overdue Charges'),
+        dialogContext: dialogContext,
+        type: 'Dangerous',
+        additionalNotes: additionalNotes
+      }
+    });
+
+    confirmDialogRef.afterClosed().subscribe((response: any) => {
+      if (response.confirm) {
+        const locale = this.settingsService.language.code;
+        const dateFormat = this.settingsService.dateFormat;
+
+        // Send empty payload or null dates to indicate "remove all"
+        const payload: any = {
+          dateFormat,
+          locale
+        };
+
+        this.loansService.deactivateOverdueCharges(this.loanDetails.id, payload).subscribe({
+          next: () => {
+            this.reload();
+          },
+          error: (error) => {
+            console.error('Error deactivating overdue charges:', error);
+          }
+        });
+      }
+    });
   }
 
   /**

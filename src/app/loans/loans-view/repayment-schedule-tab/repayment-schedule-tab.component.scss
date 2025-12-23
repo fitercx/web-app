@@ -44,3 +44,39 @@ table {
 .status {
   padding-right: 10px;
 }
+
+.adjust-date-form {
+  flex-wrap: wrap;
+
+  .installment-select-field {
+    width: 220px;
+    min-width: 200px;
+  }
+
+  .date-field {
+    width: 180px;
+    min-width: 160px;
+  }
+}
+
+.info-box {
+  display: flex;
+  align-items: flex-start;
+  padding: 12px;
+  background-color: #e3f2fd;
+  border-radius: 4px;
+  margin-top: 8px;
+}
+
+.info-icon {
+  color: #1976d2;
+  margin-right: 8px;
+  margin-top: 2px;
+}
+
+.info-text {
+  margin: 0;
+  font-size: 14px;
+  color: #424242;
+  line-height: 1.5;
+}
