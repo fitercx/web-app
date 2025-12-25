@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
+import { AlertService } from 'app/core/alert/alert.service';
 import { Dates } from 'app/core/utils/dates';
 import { LoansService } from 'app/loans/loans.service';
 import { SettingsService } from 'app/settings/settings.service';
@@ -33,8 +34,8 @@ export class LoanTrancheDetailsComponent implements OnInit {
 
   loanId: number;
   currentPrincipalAmount: number;
-  minDate = new Date(2000, 0, 1);
-  maxDate = new Date(2100, 0, 1);
+  minDate: Date;
+  maxDate: Date;
   disbursementDataSource: {}[] = [];
   totalMultiDisbursed: number = null;
   disallowExpectedDisbursements = false;
@@ -50,7 +51,8 @@ export class LoanTrancheDetailsComponent implements OnInit {
     public dialog: MatDialog,
     private loanServices: LoansService,
     private settingsService: SettingsService,
-    private dateUtils: Dates
+    private dateUtils: Dates,
+    private alertService: AlertService
   ) {
     this.route.parent.data.subscribe((data: { loanDetailsData: any }) => {
       this.loanId = data.loanDetailsData.id;
@@ -62,6 +64,7 @@ export class LoanTrancheDetailsComponent implements OnInit {
   }
 
   ngOnInit() {
+    this.minDate = this.settingsService.minAllowedDate;
     this.maxDate = this.settingsService.maxFutureDate;
     this.status = this.loanDetails.status.value;
   }
@@ -158,6 +161,11 @@ export class LoanTrancheDetailsComponent implements OnInit {
         if (this.totalMultiDisbursed + principal <= this.currentPrincipalAmount) {
           this.disbursementDataSource = this.disbursementDataSource.concat(response.data.value);
           this.pristine = false;
+        } else {
+          this.alertService.alert({
+            type: 'BusinessRule',
+            message: `Total disbursement amount cannot exceed the approved principal of ${this.currentPrincipalAmount}.`
+          });
         }
       }
     });
@@ -180,11 +188,17 @@ export class LoanTrancheDetailsComponent implements OnInit {
     const disbursementDialogRef = this.dialog.open(FormDialogComponent, { data });
     disbursementDialogRef.afterClosed().subscribe((response: any) => {
       if (response.data) {
+        this.calculateTotalDisbursedAmount();
         const newPrincipal = response.data.value.principal * 1;
         if (this.totalMultiDisbursed - principal + newPrincipal <= this.currentPrincipalAmount) {
           this.disbursementDataSource[index]['principal'] = newPrincipal;
           this.disbursementDataSource[index]['expectedDisbursementDate'] = response.data.value.expectedDisbursementDate;
           this.pristine = false;
+        } else {
+          this.alertService.alert({
+            type: 'BusinessRule',
+            message: `Total disbursement amount cannot exceed the approved principal of ${this.currentPrincipalAmount}.`
+          });
         }
       }
     });
