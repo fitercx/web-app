@@ -567,21 +567,32 @@ export class EditLocComponent implements OnInit {
       if (obj.hasOwnProperty(key)) {
         const value = obj[key];
         // Only include non-empty values
+        // Special handling for Date objects - they should always be included if they're valid dates
+        const isDate = value instanceof Date;
+        const isValidDate = isDate && !isNaN(value.getTime());
+
         if (
           value !== null &&
           value !== undefined &&
           value !== '' &&
           !(Array.isArray(value) && value.length === 0) &&
-          !(typeof value === 'object' && Object.keys(value).length === 0)
+          !(typeof value === 'object' && !isDate && Object.keys(value).length === 0)
         ) {
-          // For objects, recursively clean them
-          if (typeof value === 'object' && !Array.isArray(value) && value !== null) {
+          // For objects, recursively clean them (but skip Date objects)
+          if (typeof value === 'object' && !Array.isArray(value) && value !== null && !isDate) {
             const cleanedNested = this.removeEmptyValues(value);
             if (Object.keys(cleanedNested).length > 0) {
               cleaned[key] = cleanedNested;
             }
           } else {
-            cleaned[key] = value;
+            // Include Date objects if they're valid, otherwise include other values
+            if (isDate) {
+              if (isValidDate) {
+                cleaned[key] = value;
+              }
+            } else {
+              cleaned[key] = value;
+            }
           }
         }
       }
@@ -946,6 +957,8 @@ export class EditLocComponent implements OnInit {
         delete payload.expiryDate;
       }
 
+      // Note: startDate is kept as-is (backend expects 'startDate', not 'activationDate')
+
       // Handle custom review period
       if (payload.reviewPeriod === 'custom') {
         delete payload.reviewPeriod;
@@ -957,6 +970,9 @@ export class EditLocComponent implements OnInit {
         const locale = this.settingsService.language?.code || this.settingsService.languageCode || 'en';
 
         // Clean up empty dates first
+        if (!payload.startDate) {
+          delete payload.startDate;
+        }
         if (!payload.endDate) {
           delete payload.endDate;
         }
