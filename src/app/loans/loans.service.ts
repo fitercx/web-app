@@ -752,4 +752,21 @@ export class LoansService {
 
     return loansAccountData;
   }
+
+  /**
+   * Adds a new buyer or supplier to an existing LOC
+   * @param locId - The LOC ID
+   * @param entityData - The buyer/supplier data to add
+   */
+  addBuyerSupplierToLoc(locId: number, entityData: any): Observable<any> {
+    return this.http.post(`/loans/${locId}/buyers-suppliers`, entityData);
+  }
+
+  /**
+   * Gets LOC by ID with updated buyer/supplier list
+   * @param locId - The LOC ID
+   */
+  getLocById(locId: number): Observable<any> {
+    return this.http.get(`/loans/${locId}`);
+  }
 }

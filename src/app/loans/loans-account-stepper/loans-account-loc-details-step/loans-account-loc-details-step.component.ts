@@ -1,9 +1,14 @@
 /** Angular Imports */
 import { Component, OnInit, Input, OnChanges, SimpleChanges } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, AbstractControl } from '@angular/forms';
+import { MatDialog } from '@angular/material/dialog';
 
 /** Custom Services */
 import { SettingsService } from 'app/settings/settings.service';
+import { LoansService } from 'app/loans/loans.service';
+
+/** Custom Components */
+import { AddBuyerSupplierDialogComponent } from './add-buyer-supplier-dialog/add-buyer-supplier-dialog.component';
 
 /**
  * Loans Account LOC Details Step
@@ -53,10 +58,14 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
   /**
    * @param {UntypedFormBuilder} formBuilder Form Builder
    * @param {SettingsService} settingsService Settings Service
+   * @param {MatDialog} dialog Material Dialog
+   * @param {LoansService} loansService Loans Service
    */
   constructor(
     private formBuilder: UntypedFormBuilder,
-    private settingsService: SettingsService
+    private settingsService: SettingsService,
+    private dialog: MatDialog,
+    private loansService: LoansService
   ) {
     this.createLocDetailsForm();
   }
@@ -748,5 +757,67 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       buyerDetails,
       supplierDetails
     };
+  }
+
+  /**
+   * Opens dialog to add new buyer or supplier
+   * @param type - 'buyer' or 'supplier'
+   */
+  openAddBuyerSupplierDialog(type: 'buyer' | 'supplier'): void {
+    const locId = this.resolvedSelectedLocId;
+    if (!locId) {
+      // You might want to show a snackbar message here
+      console.warn('LOC must be selected first');
+      return;
+    }
+
+    const dialogRef = this.dialog.open(AddBuyerSupplierDialogComponent, {
+      width: '500px',
+      data: {
+        locId: locId,
+        type: type
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((result) => {
+      if (result) {
+        // Refresh the buyer/supplier list
+        this.refreshBuyerSupplierList(locId);
+
+        // Auto-select the newly added buyer/supplier
+        if (type === 'buyer') {
+          this.locDetailsForm.patchValue({
+            buyerDetails: result.id
+          });
+        } else {
+          this.locDetailsForm.patchValue({
+            supplierDetails: result.id
+          });
+        }
+      }
+    });
+  }
+
+  /**
+   * Refreshes the buyer/supplier list after adding new entity
+   * @param locId - The LOC ID
+   */
+  private refreshBuyerSupplierList(locId: number): void {
+    // Call API to get updated LOC data with new buyer/supplier
+    this.loansService.getLocById(locId).subscribe({
+      next: (locData) => {
+        // Update the specific LOC in locOptions array
+        const locIndex = this.locOptions.findIndex((loc: any) => loc.id === locId);
+        if (locIndex !== -1) {
+          this.locOptions[locIndex] = locData;
+        }
+        // Refresh buyer/supplier options
+        this.updateBuyerSupplierOptions();
+      },
+      error: (error) => {
+        console.error('Error refreshing buyer/supplier list:', error);
+        // You might want to show an error message here
+      }
+    });
   }
 }

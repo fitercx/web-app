@@ -39,6 +39,7 @@ import { LoansAccountTermsStepComponent } from './loans-account-stepper/loans-ac
 import { LoansAccountChargesStepComponent } from './loans-account-stepper/loans-account-charges-step/loans-account-charges-step.component';
 import { LoansAccountPreviewStepComponent } from './loans-account-stepper/loans-account-preview-step/loans-account-preview-step.component';
 import { LoansAccountLocDetailsStepComponent } from './loans-account-stepper/loans-account-loc-details-step/loans-account-loc-details-step.component';
+import { AddBuyerSupplierDialogComponent } from './loans-account-stepper/loans-account-loc-details-step/add-buyer-supplier-dialog/add-buyer-supplier-dialog.component';
 import { RecoveryRepaymentComponent } from './loans-view/loan-account-actions/recovery-repayment/recovery-repayment.component';
 import { ViewGuarantorsComponent } from './loans-view/loan-account-actions/view-guarantors/view-guarantors.component';
 import { CreateGuarantorComponent } from './loans-view/loan-account-actions/create-guarantor/create-guarantor.component';
@@ -131,6 +132,7 @@ import { LoansActiveClientMembersComponent } from './loans-account-stepper/loans
     LoansAccountChargesStepComponent,
     LoansAccountPreviewStepComponent,
     LoansAccountLocDetailsStepComponent,
+    AddBuyerSupplierDialogComponent,
     LoansAccountAddCollateralDialogComponent,
     RecoveryRepaymentComponent,
     ViewGuarantorsComponent,

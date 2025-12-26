@@ -127,19 +127,32 @@
             <mat-hint>{{ 'labels.heading.Amount After Advance Hint' | translate }}</mat-hint>
           </mat-form-field>
 
-          <!-- Buyer Details -->
-          <mat-form-field fxFlex="100%">
-            <mat-label>{{ 'labels.inputs.Buyer Details' | translate }}</mat-label>
-            <mat-select formControlName="buyerDetails" required>
-              <mat-option *ngFor="let option of buyerSupplierOptions; trackBy: trackByOptionId" [value]="option.id">
-                {{ option.name }}
-              </mat-option>
-            </mat-select>
-            <mat-hint>Available options: {{ buyerSupplierOptions.length }}</mat-hint>
-            <mat-error *ngIf="locDetailsForm.get('buyerDetails')?.hasError('required')">
-              {{ 'labels.inputs.Buyer Details' | translate }} {{ 'labels.commons.is required' | translate }}
-            </mat-error>
-          </mat-form-field>
+          <!-- Buyer Details with Add Button -->
+          <div fxFlex="100%" fxLayout="row" fxLayoutAlign="start center" fxLayoutGap="1%">
+            <mat-form-field fxFlex="90%">
+              <mat-label>{{ 'labels.inputs.Buyer Details' | translate }}</mat-label>
+              <mat-select formControlName="buyerDetails" required>
+                <mat-option *ngFor="let option of buyerSupplierOptions; trackBy: trackByOptionId" [value]="option.id">
+                  {{ option.name }}
+                </mat-option>
+              </mat-select>
+              <mat-hint>Available options: {{ buyerSupplierOptions.length }}</mat-hint>
+              <mat-error *ngIf="locDetailsForm.get('buyerDetails')?.hasError('required')">
+                {{ 'labels.inputs.Buyer Details' | translate }} {{ 'labels.commons.is required' | translate }}
+              </mat-error>
+            </mat-form-field>
+            <button
+              mat-icon-button
+              type="button"
+              color="primary"
+              (click)="openAddBuyerSupplierDialog('buyer')"
+              matTooltip="Add New Buyer"
+              fxFlex="8%"
+              [disabled]="!resolvedSelectedLocId"
+            >
+              <fa-icon icon="plus"></fa-icon>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -187,18 +200,32 @@
           </mat-form-field>
 
           <!-- Supplier Details -->
-          <mat-form-field fxFlex="100%">
-            <mat-label>{{ 'labels.inputs.Supplier Details' | translate }}</mat-label>
-            <mat-select formControlName="supplierDetails" required>
-              <mat-option *ngFor="let option of buyerSupplierOptions; trackBy: trackByOptionId" [value]="option.id">
-                {{ option.name }}
-              </mat-option>
-            </mat-select>
-            <mat-hint>Available options: {{ buyerSupplierOptions.length }}</mat-hint>
-            <mat-error *ngIf="locDetailsForm.get('supplierDetails')?.hasError('required')">
-              {{ 'labels.inputs.Supplier Details' | translate }} {{ 'labels.commons.is required' | translate }}
-            </mat-error>
-          </mat-form-field>
+          <!-- Supplier Details with Add Button -->
+          <div fxFlex="100%" fxLayout="row" fxLayoutAlign="start center" fxLayoutGap="1%">
+            <mat-form-field fxFlex="90%">
+              <mat-label>{{ 'labels.inputs.Supplier Details' | translate }}</mat-label>
+              <mat-select formControlName="supplierDetails" required>
+                <mat-option *ngFor="let option of buyerSupplierOptions; trackBy: trackByOptionId" [value]="option.id">
+                  {{ option.name }}
+                </mat-option>
+              </mat-select>
+              <mat-hint>Available options: {{ buyerSupplierOptions.length }}</mat-hint>
+              <mat-error *ngIf="locDetailsForm.get('supplierDetails')?.hasError('required')">
+                {{ 'labels.inputs.Supplier Details' | translate }} {{ 'labels.commons.is required' | translate }}
+              </mat-error>
+            </mat-form-field>
+            <button
+              mat-icon-button
+              type="button"
+              color="primary"
+              (click)="openAddBuyerSupplierDialog('supplier')"
+              matTooltip="Add New Supplier"
+              fxFlex="8%"
+              [disabled]="!resolvedSelectedLocId"
+            >
+              <fa-icon icon="plus"></fa-icon>
+            </button>
+          </div>
         </div>
       </div>
     </div>
