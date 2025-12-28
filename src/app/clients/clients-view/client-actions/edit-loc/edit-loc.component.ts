@@ -491,19 +491,31 @@ export class EditLocComponent implements OnInit {
     if (!dateValue) return '';
 
     // Handle backend date arrays [YYYY, M, D]
+    // Format directly from array to avoid timezone conversion issues with toISOString()
     if (Array.isArray(dateValue) && dateValue.length >= 3) {
       const [
         y,
         m,
         d
       ] = dateValue;
-      return new Date(y, (m as number) - 1, d).toISOString().slice(0, 10);
+      // Format as YYYY-MM-DD directly from array values to avoid timezone issues
+      const year = String(y).padStart(4, '0');
+      const month = String(m).padStart(2, '0');
+      const day = String(d).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     }
 
     // Handle ISO strings or Date objects
     try {
       const date = new Date(dateValue);
-      return isNaN(date.getTime()) ? '' : date.toISOString().slice(0, 10);
+      if (isNaN(date.getTime())) {
+        return '';
+      }
+      // For Date objects, use UTC methods to avoid timezone shifts
+      const year = date.getUTCFullYear();
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(date.getUTCDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
     } catch (e) {
       return '';
     }
