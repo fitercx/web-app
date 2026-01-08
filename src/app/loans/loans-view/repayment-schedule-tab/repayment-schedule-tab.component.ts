@@ -85,6 +85,12 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
   businessDate: Date = new Date();
 
+  /** Tolerance threshold for floating-point comparison when matching principal amounts */
+  private static readonly PRINCIPAL_COMPARISON_TOLERANCE = 0.01;
+
+  /** Code for loan disbursement transaction type */
+  private static readonly LOAN_TRANSACTION_TYPE_DISBURSEMENT = 'loanTransactionType.disbursement';
+
   /**
    * Retrieves the loans with associations data from `resolve`.
    * @param {ActivatedRoute} route Activated Route.
@@ -479,7 +485,8 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
         const datesMatch = this.areDateArraysEqual(disbExpectedDate, periodDueDate);
 
         // Compare principal amounts (with small tolerance for floating point)
-        const principalMatch = Math.abs(disbPrincipal - periodPrincipal) < 0.01;
+        const principalMatch =
+          Math.abs(disbPrincipal - periodPrincipal) < RepaymentScheduleTabComponent.PRINCIPAL_COMPARISON_TOLERANCE;
 
         return datesMatch && principalMatch;
       });
@@ -510,10 +517,13 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
         // Check if it's a disbursement transaction
         const isDisbursement =
-          trans.type && (trans.type.disbursement === true || trans.type.code === 'loanTransactionType.disbursement');
+          trans.type &&
+          (trans.type.disbursement === true ||
+            trans.type.code === RepaymentScheduleTabComponent.LOAN_TRANSACTION_TYPE_DISBURSEMENT);
 
         // Compare amounts (with tolerance)
-        const amountMatch = Math.abs(transAmount - periodPrincipal) < 0.01;
+        const amountMatch =
+          Math.abs(transAmount - periodPrincipal) < RepaymentScheduleTabComponent.PRINCIPAL_COMPARISON_TOLERANCE;
 
         return datesMatch && isDisbursement && amountMatch;
       });
