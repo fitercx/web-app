@@ -432,6 +432,95 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     return loanInfo.status.pendingApproval || loanInfo.status.waitingForDisbursal;
   }
 
+  /**
+   * Checks if a disbursement period has actually been disbursed
+   * by matching with disbursementDetails that have an actualDisbursementDate
+   * Falls back to checking transactions or fee charges paid if disbursementDetails not available
+   */
+  private isDisbursementActualDisbursed(item: any): boolean {
+    if (!item.status || item.status !== 'DISBURSEMENT') {
+      return false;
+    }
+
+    const loanInfo = this.loanData || this.loanDetailsData;
+    if (!loanInfo) {
+      return false;
+    }
+
+    // Primary check: Use disbursementDetails if available
+    if (loanInfo.disbursementDetails && Array.isArray(loanInfo.disbursementDetails)) {
+      const periodDueDate = item.dueDate;
+      const periodPrincipal = item.principalDisbursed || 0;
+
+      // Find matching disbursementDetail
+      const matchingDisbursement = loanInfo.disbursementDetails.find((disb: any) => {
+        const disbExpectedDate = disb.expectedDisbursementDate;
+        const disbPrincipal = disb.principal || 0;
+
+        // Compare dates (format: [year, month, day])
+        const datesMatch =
+          disbExpectedDate &&
+          periodDueDate &&
+          disbExpectedDate.length === 3 &&
+          periodDueDate.length === 3 &&
+          disbExpectedDate[0] === periodDueDate[0] &&
+          disbExpectedDate[1] === periodDueDate[1] &&
+          disbExpectedDate[2] === periodDueDate[2];
+
+        // Compare principal amounts (with small tolerance for floating point)
+        const principalMatch = Math.abs(disbPrincipal - periodPrincipal) < 0.01;
+
+        return datesMatch && principalMatch;
+      });
+
+      // If found and has actualDisbursementDate, it's been disbursed
+      if (matchingDisbursement) {
+        return !!matchingDisbursement.actualDisbursementDate;
+      }
+    }
+
+    // Fallback: Check if fees were paid (indicates disbursement occurred)
+    // If feeChargesPaid > 0, it's likely been disbursed
+    if (item.feeChargesPaid && item.feeChargesPaid > 0) {
+      return true;
+    }
+
+    // Fallback: Check transactions for disbursement on this date
+    if (loanInfo.transactions && Array.isArray(loanInfo.transactions)) {
+      const periodDueDate = item.dueDate;
+      const periodPrincipal = item.principalDisbursed || 0;
+
+      const matchingTransaction = loanInfo.transactions.find((trans: any) => {
+        const transDate = trans.date;
+        const transAmount = trans.amount || 0;
+
+        // Compare dates
+        const datesMatch =
+          transDate &&
+          periodDueDate &&
+          transDate.length === 3 &&
+          periodDueDate.length === 3 &&
+          transDate[0] === periodDueDate[0] &&
+          transDate[1] === periodDueDate[1] &&
+          transDate[2] === periodDueDate[2];
+
+        // Check if it's a disbursement transaction
+        const isDisbursement =
+          trans.type && (trans.type.disbursement === true || trans.type.code === 'loanTransactionType.disbursement');
+
+        // Compare amounts (with tolerance)
+        const amountMatch = Math.abs(transAmount - periodPrincipal) < 0.01;
+
+        return datesMatch && isDisbursement && amountMatch;
+      });
+
+      return !!matchingTransaction;
+    }
+
+    // Default: assume not disbursed if we can't determine
+    return false;
+  }
+
   getDisplayStatus(item: any): string {
     // Only apply custom status logic for LOC Receivable loans in pre-disbursement state
     if (this.isLineOfCreditReceivable() && this.isLoanPreDisbursement()) {
@@ -441,6 +530,14 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       } else {
         return 'SCHEDULED';
       }
+    }
+
+    // For DISBURSEMENT status, check if it has actually been disbursed
+    if (item.status === 'DISBURSEMENT') {
+      if (!this.isDisbursementActualDisbursed(item)) {
+        return 'AWAITING DISBURSEMENT';
+      }
+      return item.status;
     }
 
     // For all other cases, return the original status
