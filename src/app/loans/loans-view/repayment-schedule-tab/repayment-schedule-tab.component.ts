@@ -85,6 +85,12 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
   businessDate: Date = new Date();
 
+  /** Tolerance threshold for floating-point comparison when matching principal amounts */
+  private static readonly PRINCIPAL_COMPARISON_TOLERANCE = 0.01;
+
+  /** Code for loan disbursement transaction type */
+  private static readonly LOAN_TRANSACTION_TYPE_DISBURSEMENT = 'loanTransactionType.disbursement';
+
   /**
    * Retrieves the loans with associations data from `resolve`.
    * @param {ActivatedRoute} route Activated Route.
@@ -391,7 +397,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
    * Determines if the schedule period is the disbursement period
    * A disbursement period is identified by having a principalDisbursed value
    */
-  private isDisbursementPeriod(item: any): boolean {
+  private isDisbursementPeriod(item: RepaymentSchedulePeriod): boolean {
     // Check if it's explicitly marked as a disbursement period
     if (item.principalDisbursed && item.principalDisbursed > 0) {
       return true;
@@ -432,7 +438,104 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     return loanInfo.status.pendingApproval || loanInfo.status.waitingForDisbursal;
   }
 
-  getDisplayStatus(item: any): string {
+  /**
+   * Compares two date arrays in the format [year, month, day]
+   * @param date1 First date array
+   * @param date2 Second date array
+   * @returns true if both dates are valid arrays of length 3 and have the same year, month, and day
+   */
+  private areDateArraysEqual(date1: number[] | undefined | null, date2: number[] | undefined | null): boolean {
+    return (
+      !!date1 &&
+      !!date2 &&
+      date1.length === 3 &&
+      date2.length === 3 &&
+      date1[0] === date2[0] &&
+      date1[1] === date2[1] &&
+      date1[2] === date2[2]
+    );
+  }
+
+  /**
+   * Checks if a disbursement period has actually been disbursed
+   * by matching with disbursementDetails that have an actualDisbursementDate
+   * Falls back to checking transactions or fee charges paid if disbursementDetails not available
+   */
+  private isDisbursementActualDisbursed(item: RepaymentSchedulePeriod): boolean {
+    if (!item.status || item.status !== 'DISBURSEMENT') {
+      return false;
+    }
+
+    const loanInfo = this.loanData || this.loanDetailsData;
+    if (!loanInfo) {
+      return false;
+    }
+
+    // Primary check: Use disbursementDetails if available
+    if (loanInfo.disbursementDetails && Array.isArray(loanInfo.disbursementDetails)) {
+      const periodDueDate = item.dueDate;
+      const periodPrincipal = item.principalDisbursed || 0;
+
+      // Find matching disbursementDetail
+      const matchingDisbursement = loanInfo.disbursementDetails.find((disb: any) => {
+        const disbExpectedDate = disb.expectedDisbursementDate;
+        const disbPrincipal = disb.principal || 0;
+
+        // Compare dates (format: [year, month, day])
+        const datesMatch = this.areDateArraysEqual(disbExpectedDate, periodDueDate);
+
+        // Compare principal amounts (with small tolerance for floating point)
+        const principalMatch =
+          Math.abs(disbPrincipal - periodPrincipal) < RepaymentScheduleTabComponent.PRINCIPAL_COMPARISON_TOLERANCE;
+
+        return datesMatch && principalMatch;
+      });
+
+      // If found and has actualDisbursementDate, it's been disbursed
+      if (matchingDisbursement) {
+        return !!matchingDisbursement.actualDisbursementDate;
+      }
+    }
+
+    // Fallback: Check if fees were paid (indicates disbursement occurred)
+    // If feeChargesPaid > 0, it's likely been disbursed
+    if (item.feeChargesPaid && item.feeChargesPaid > 0) {
+      return true;
+    }
+
+    // Fallback: Check transactions for disbursement on this date
+    if (loanInfo.transactions && Array.isArray(loanInfo.transactions)) {
+      const periodDueDate = item.dueDate;
+      const periodPrincipal = item.principalDisbursed || 0;
+
+      const matchingTransaction = loanInfo.transactions.find((trans: any) => {
+        const transDate = trans.date;
+        const transAmount = trans.amount || 0;
+
+        // Compare dates
+        const datesMatch = this.areDateArraysEqual(transDate, periodDueDate);
+
+        // Check if it's a disbursement transaction
+        const isDisbursement =
+          trans.type &&
+          (trans.type.disbursement === true ||
+            trans.type.code === RepaymentScheduleTabComponent.LOAN_TRANSACTION_TYPE_DISBURSEMENT);
+
+        // Compare amounts (with tolerance)
+        const amountMatch =
+          Math.abs(transAmount - periodPrincipal) < RepaymentScheduleTabComponent.PRINCIPAL_COMPARISON_TOLERANCE;
+
+        return datesMatch && isDisbursement && amountMatch;
+      });
+
+      return !!matchingTransaction;
+    }
+
+    // Default: assume not disbursed if we can't determine
+    return false;
+  }
+
+  getDisplayStatus(item: RepaymentSchedulePeriod): string {
     // Only apply custom status logic for LOC Receivable loans in pre-disbursement state
     if (this.isLineOfCreditReceivable() && this.isLoanPreDisbursement()) {
       // Check if this is the disbursement period
@@ -441,6 +544,14 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       } else {
         return 'SCHEDULED';
       }
+    }
+
+    // For DISBURSEMENT status, check if it has actually been disbursed
+    if (item.status === 'DISBURSEMENT') {
+      if (!this.isDisbursementActualDisbursed(item)) {
+        return 'AWAITING DISBURSEMENT';
+      }
+      return item.status;
     }
 
     // For all other cases, return the original status
