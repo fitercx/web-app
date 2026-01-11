@@ -156,7 +156,7 @@ export class GeneralTabComponent implements OnInit {
         property: 'Fees',
         original: this.loanDetails.summary.feeChargesCharged,
         adjustment: '0',
-        paid: this.loanDetails.multiDisburseLoan ? this.loanDetails.summary.feeChargesPaid : 0,
+        paid: this.loanDetails.summary.feeChargesPaid,
         waived: this.loanDetails.summary.feeChargesWaived,
         writtenOff: this.loanDetails.summary.feeChargesWrittenOff,
         outstanding: this.loanDetails.summary.feeChargesOutstanding,
