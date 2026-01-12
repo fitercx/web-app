@@ -131,6 +131,27 @@ export class GeneralTabComponent implements OnInit {
   }
 
   setloanSummaryTableData() {
+    // For multi-disbursal loans, calculate fees based only on disbursed tranches
+    const disbursedFees = this.loanDetails?.multiDisburseLoan ? this.getDisbursedTrancheFees() : null;
+
+    const feesData = disbursedFees
+      ? {
+          feeChargesCharged: disbursedFees.feeChargesCharged,
+          feeChargesPaid: disbursedFees.feeChargesPaid,
+          feeChargesWaived: disbursedFees.feeChargesWaived,
+          feeChargesWrittenOff: disbursedFees.feeChargesWrittenOff,
+          feeChargesOutstanding: disbursedFees.feeChargesOutstanding,
+          feeChargesOverdue: disbursedFees.feeChargesOverdue
+        }
+      : {
+          feeChargesCharged: this.loanDetails.summary.feeChargesCharged,
+          feeChargesPaid: this.loanDetails.summary.feeChargesPaid,
+          feeChargesWaived: this.loanDetails.summary.feeChargesWaived,
+          feeChargesWrittenOff: this.loanDetails.summary.feeChargesWrittenOff,
+          feeChargesOutstanding: this.loanDetails.summary.feeChargesOutstanding,
+          feeChargesOverdue: this.loanDetails.summary.feeChargesOverdue
+        };
+
     this.loanSummaryTableData = [
       {
         property: this.isReceivableLineOfCredit() ? 'Disbursal Amount' : 'Principal',
@@ -154,13 +175,13 @@ export class GeneralTabComponent implements OnInit {
       },
       {
         property: 'Fees',
-        original: this.loanDetails.summary.feeChargesCharged,
+        original: feesData.feeChargesCharged,
         adjustment: '0',
-        paid: this.loanDetails.multiDisburseLoan ? this.loanDetails.summary.feeChargesPaid : 0,
-        waived: this.loanDetails.summary.feeChargesWaived,
-        writtenOff: this.loanDetails.summary.feeChargesWrittenOff,
-        outstanding: this.loanDetails.summary.feeChargesOutstanding,
-        overdue: this.loanDetails.summary.feeChargesOverdue
+        paid: feesData.feeChargesPaid,
+        waived: feesData.feeChargesWaived,
+        writtenOff: feesData.feeChargesWrittenOff,
+        outstanding: feesData.feeChargesOutstanding,
+        overdue: feesData.feeChargesOverdue
       },
       {
         property: 'Taxes',
@@ -346,5 +367,117 @@ export class GeneralTabComponent implements OnInit {
     }
     const locType = info.locType || info.additionalProperties?.locProductType;
     return locType === 'RECEIVABLE';
+  }
+
+  /**
+   * Checks if two date arrays are equal
+   * Date format: [year, month, day]
+   */
+  private areDateArraysEqual(date1: number[] | undefined | null, date2: number[] | undefined | null): boolean {
+    if (!date1 || !date2 || date1.length !== 3 || date2.length !== 3) {
+      return false;
+    }
+    return date1[0] === date2[0] && date1[1] === date2[1] && date1[2] === date2[2];
+  }
+
+  /**
+   * Checks if a disbursement period has actually been disbursed
+   * by matching with disbursementDetails that have an actualDisbursementDate
+   * Falls back to checking feeChargesPaid if disbursementDetails not available
+   */
+  private isDisbursementPeriodDisbursed(period: any): boolean {
+    if (!period.status || period.status !== 'DISBURSEMENT') {
+      return false;
+    }
+
+    if (!this.loanDetails) {
+      return false;
+    }
+
+    // Primary check: Use disbursementDetails if available
+    if (this.loanDetails.disbursementDetails && Array.isArray(this.loanDetails.disbursementDetails)) {
+      const periodDueDate = period.dueDate;
+      const periodPrincipal = period.principalDisbursed || 0;
+
+      // Find matching disbursementDetail
+      const matchingDisbursement = this.loanDetails.disbursementDetails.find((disb: any) => {
+        const disbExpectedDate = disb.expectedDisbursementDate;
+        const disbPrincipal = disb.principal || 0;
+
+        // Compare dates
+        const datesMatch = this.areDateArraysEqual(disbExpectedDate, periodDueDate);
+
+        // Compare principal amounts (with small tolerance for floating point)
+        const principalMatch = Math.abs(disbPrincipal - periodPrincipal) < 0.01;
+
+        return datesMatch && principalMatch;
+      });
+
+      // If found and has actualDisbursementDate, it's been disbursed
+      if (matchingDisbursement) {
+        return !!matchingDisbursement.actualDisbursementDate;
+      }
+    }
+
+    // Fallback: Check if fees were paid (indicates disbursement occurred)
+    // If feeChargesPaid > 0, it's likely been disbursed
+    if (period.feeChargesPaid && period.feeChargesPaid > 0) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Calculates fees for multi-disbursal loans based only on disbursed tranches
+   * Returns an object with feeChargesCharged, feeChargesPaid, feeChargesOutstanding, feeChargesWaived, feeChargesWrittenOff, feeChargesOverdue
+   */
+  private getDisbursedTrancheFees(): {
+    feeChargesCharged: number;
+    feeChargesPaid: number;
+    feeChargesOutstanding: number;
+    feeChargesWaived: number;
+    feeChargesWrittenOff: number;
+    feeChargesOverdue: number;
+  } {
+    const result = {
+      feeChargesCharged: 0,
+      feeChargesPaid: 0,
+      feeChargesOutstanding: 0,
+      feeChargesWaived: 0,
+      feeChargesWrittenOff: 0,
+      feeChargesOverdue: 0
+    };
+
+    // Only process if it's a multi-disbursal loan with repayment schedule
+    if (!this.loanDetails?.multiDisburseLoan || !this.loanDetails?.repaymentSchedule?.periods) {
+      return result;
+    }
+
+    const periods = this.loanDetails.repaymentSchedule.periods;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Iterate through periods and sum fees only for disbursed tranches
+    periods.forEach((period: any) => {
+      if (this.isDisbursementPeriodDisbursed(period)) {
+        result.feeChargesCharged += period.feeChargesDue || 0;
+        result.feeChargesPaid += period.feeChargesPaid || 0;
+        result.feeChargesOutstanding += period.feeChargesOutstanding || 0;
+        result.feeChargesWaived += period.feeChargesWaived || 0;
+        result.feeChargesWrittenOff += period.feeChargesWrittenOff || 0;
+
+        // Calculate overdue: if period has outstanding fees and due date has passed
+        if (period.feeChargesOutstanding && period.feeChargesOutstanding > 0 && period.dueDate) {
+          const dueDate = new Date(period.dueDate[0], period.dueDate[1] - 1, period.dueDate[2]);
+          dueDate.setHours(0, 0, 0, 0);
+          if (dueDate < today) {
+            result.feeChargesOverdue += period.feeChargesOutstanding || 0;
+          }
+        }
+      }
+    });
+
+    return result;
   }
 }
