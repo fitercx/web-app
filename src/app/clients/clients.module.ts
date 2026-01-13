@@ -63,6 +63,7 @@ import { ActiveLoansTabComponent } from './clients-view/view-loc-details/active-
 import { TransactionHistoryTabComponent } from './clients-view/view-loc-details/transaction-history-tab/transaction-history-tab.component';
 import { ViewLocChargesComponent } from './clients-view/view-loc-details/view-loc-charges/view-loc-charges.component';
 import { AuditTrailTabComponent } from './clients-view/view-loc-details/audit-trail-tab/audit-trail-tab.component';
+import { ManageApprovedBuyersDialogComponent } from './clients-view/manage-approved-buyers-dialog/manage-approved-buyers-dialog.component';
 
 /**
  * Clients Module
@@ -131,7 +132,8 @@ import { AuditTrailTabComponent } from './clients-view/view-loc-details/audit-tr
     ActiveLoansTabComponent,
     TransactionHistoryTabComponent,
     ViewLocChargesComponent,
-    AuditTrailTabComponent
+    AuditTrailTabComponent,
+    ManageApprovedBuyersDialogComponent
   ],
   providers: []
 })

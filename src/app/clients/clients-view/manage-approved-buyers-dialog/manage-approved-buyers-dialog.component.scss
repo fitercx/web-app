@@ -1,0 +1,199 @@
+/** Manage Approved Buyers Dialog Styles */
+
+.mat-dialog-container-content {
+  max-width: 800px;
+  width: 100%;
+
+  h2 {
+    margin-bottom: 8px;
+    color: #424242;
+
+    .dialog-subtitle {
+      display: block;
+      font-size: 14px;
+      font-weight: 400;
+      color: #666;
+      margin-top: 4px;
+    }
+  }
+}
+
+.manage-buyers-form {
+  .error-container {
+    background-color: #ffebee;
+    border: 1px solid #e57373;
+    border-radius: 4px;
+    padding: 12px;
+    margin-bottom: 16px;
+
+    .error-message {
+      display: block;
+      margin-bottom: 4px;
+
+      &:last-child {
+        margin-bottom: 0;
+      }
+    }
+  }
+
+  .instructions {
+    display: flex;
+    align-items: center;
+    background-color: #fff3e0;
+    border: 1px solid #ffb74d;
+    border-radius: 4px;
+    padding: 12px;
+    margin-bottom: 16px;
+    color: #d84315;
+
+    .warning-icon {
+      margin-right: 8px;
+      color: #ff9800;
+    }
+
+    span {
+      font-size: 14px;
+    }
+  }
+}
+
+/** Focus styles for accessibility */
+.add-buyer-btn:focus {
+  outline: 2px solid #1976d2;
+  outline-offset: 2px;
+}
+
+.remove-buyer-btn:focus {
+  outline: 2px solid #1976d2;
+  outline-offset: 2px;
+}
+
+/** General mat-icon styles */
+.mat-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  margin-bottom: 16px;
+  color: #ccc;
+}
+
+/** Animation for adding/removing buyers */
+.buyer-form-row {
+  animation: slide-in 0.3s ease-in-out;
+}
+
+.buyers-form-array {
+  .buyers-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+
+    h3 {
+      margin: 0;
+      color: #424242;
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    .add-buyer-btn {
+      width: 32px;
+      height: 32px;
+
+      .mat-icon {
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+      }
+    }
+  }
+
+  .buyer-form-row {
+    margin-bottom: 16px;
+    padding: 16px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    background-color: #fafafa;
+
+    &:hover {
+      background-color: #f5f5f5;
+    }
+
+    .buyer-form-fields {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1px)) auto;
+      gap: 16px;
+      align-items: start;
+
+      @media (width <= 768px) {
+        grid-template-columns: minmax(0, 1px);
+        gap: 12px;
+      }
+
+      .buyer-field {
+        width: 100%;
+
+        .mat-form-field-wrapper {
+          padding-bottom: 8px;
+        }
+      }
+
+      .remove-buyer-btn {
+        margin-top: 8px;
+
+        @media (width <= 768px) {
+          justify-self: end;
+          margin-top: 0;
+        }
+      }
+    }
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #999;
+
+    p {
+      margin: 0 0 20px;
+      font-size: 16px;
+    }
+  }
+}
+
+.mat-dialog-actions {
+  padding: 16px 24px;
+  border-top: 1px solid #e0e0e0;
+
+  .loading-spinner {
+    margin-right: 8px;
+  }
+}
+
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/** Responsive adjustments */
+@media (width <= 600px) {
+  .mat-dialog-container-content {
+    max-width: 95vw;
+    width: 95vw;
+  }
+
+  .buyer-form-fields {
+    grid-template-columns: minmax(0, 1px);
+
+    .remove-buyer-btn {
+      justify-self: center;
+    }
+  }
+}

@@ -519,13 +519,28 @@
           </mat-card-header>
           <mat-card-content>
             <div class="approved-buyers-section">
-              <h4 style="margin: 0 0 12px 0; color: #666; font-size: 14px; font-weight: 500">
-                {{ locDetails?.type === 'LOC PAYABLE' ? 'Approved Suppliers List' : 'Approved Buyers List' }}
-                <span style="font-size: 11px; color: #999"
-                  >({{ locDetails?.approvedBuyersList?.length || 0 }}
-                  {{ locDetails?.type === 'LOC PAYABLE' ? 'suppliers' : 'buyers' }})</span
+              <div
+                class="buyers-section-header"
+                style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px"
+              >
+                <h4 style="margin: 0; color: #666; font-size: 14px; font-weight: 500">
+                  {{ locDetails?.type === 'LOC PAYABLE' ? 'Approved Suppliers List' : 'Approved Buyers List' }}
+                  <span style="font-size: 11px; color: #999"
+                    >({{ locDetails?.approvedBuyersList?.length || 0 }}
+                    {{ locDetails?.type === 'LOC PAYABLE' ? 'suppliers' : 'buyers' }})</span
+                  >
+                </h4>
+                <button
+                  mat-mini-fab
+                  color="primary"
+                  (click)="openManageApprovedBuyersDialog()"
+                  matTooltip="Manage {{ locDetails?.type === 'LOC PAYABLE' ? 'Suppliers' : 'Buyers' }}"
+                  class="manage-buyers-btn"
+                  style="width: 32px; height: 32px"
                 >
-              </h4>
+                  <mat-icon style="font-size: 18px">edit</mat-icon>
+                </button>
+              </div>
               <div *ngIf="locDetails?.approvedBuyersList?.length; else noBuyersSuppliers">
                 <div
                   class="buyers-grid"
@@ -562,6 +577,15 @@
                   <span style="font-style: italic; font-size: 13px"
                     >No approved {{ locDetails?.type === 'LOC PAYABLE' ? 'suppliers' : 'buyers' }} configured</span
                   >
+                  <br />
+                  <button
+                    mat-raised-button
+                    color="primary"
+                    (click)="openManageApprovedBuyersDialog()"
+                    style="margin-top: 12px; font-size: 12px; padding: 0 16px; height: 32px"
+                  >
+                    Add {{ locDetails?.type === 'LOC PAYABLE' ? 'Suppliers' : 'Buyers' }}
+                  </button>
                 </div>
               </ng-template>
             </div>

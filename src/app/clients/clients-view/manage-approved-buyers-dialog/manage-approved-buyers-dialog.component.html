@@ -1,0 +1,128 @@
+<div class="mat-dialog-container-content">
+  <h2 mat-dialog-title>
+    Manage Approved {{ getBuyersLabel() }}
+    <span class="dialog-subtitle">
+      Update the list of approved {{ getBuyersLabel().toLowerCase() }} for this Line of Credit
+    </span>
+  </h2>
+
+  <mat-dialog-content>
+    <form [formGroup]="manageApprovedBuyersForm" class="manage-buyers-form">
+      <!-- Error Messages -->
+      <div class="error-container" *ngIf="errors.length > 0">
+        <mat-error *ngFor="let error of errors" class="error-message">
+          {{ error }}
+        </mat-error>
+      </div>
+
+      <!-- Instructions -->
+      <div class="instructions" *ngIf="!data.isActive">
+        <mat-icon class="warning-icon">warning</mat-icon>
+        <span>
+          This Line of Credit is not active. You can manage approved {{ getBuyersLabel().toLowerCase() }}
+          but changes will only take effect when the LOC becomes active.
+        </span>
+      </div>
+
+      <!-- Approved Buyers/Suppliers Form Array -->
+      <div formArrayName="approvedBuyers" class="buyers-form-array">
+        <div class="buyers-header">
+          <h3>{{ getBuyersLabel() }} List</h3>
+          <button
+            type="button"
+            mat-mini-fab
+            color="primary"
+            (click)="addBuyer()"
+            matTooltip="Add {{ getBuyerLabel() }}"
+            class="add-buyer-btn"
+          >
+            <mat-icon>add</mat-icon>
+          </button>
+        </div>
+
+        <div
+          *ngFor="let buyerControl of approvedBuyersFormArray.controls; let i = index"
+          [formGroupName]="i"
+          class="buyer-form-row"
+        >
+          <div class="buyer-form-fields">
+            <!-- Code Field -->
+            <mat-form-field class="buyer-field" appearance="outline">
+              <mat-label>{{ getBuyerLabel() }} Code *</mat-label>
+              <input matInput formControlName="code" placeholder="Enter unique code" maxlength="100" />
+              <mat-error *ngIf="buyerControl.get('code')?.hasError('required')">
+                {{ getBuyerLabel() }} code is required
+              </mat-error>
+              <mat-error *ngIf="buyerControl.get('code')?.hasError('maxlength')">
+                Code cannot exceed 100 characters
+              </mat-error>
+            </mat-form-field>
+
+            <!-- Name Field -->
+            <mat-form-field class="buyer-field" appearance="outline">
+              <mat-label>{{ getBuyerLabel() }} Name *</mat-label>
+              <input
+                matInput
+                formControlName="name"
+                placeholder="Enter {{ getBuyerLabel().toLowerCase() }} name"
+                maxlength="100"
+              />
+              <mat-error *ngIf="buyerControl.get('name')?.hasError('required')">
+                {{ getBuyerLabel() }} name is required
+              </mat-error>
+              <mat-error *ngIf="buyerControl.get('name')?.hasError('maxlength')">
+                Name cannot exceed 100 characters
+              </mat-error>
+            </mat-form-field>
+
+            <!-- External ID Field -->
+            <mat-form-field class="buyer-field" appearance="outline">
+              <mat-label>External ID</mat-label>
+              <input matInput formControlName="externalId" placeholder="Optional external reference" maxlength="100" />
+              <mat-error *ngIf="buyerControl.get('externalId')?.hasError('maxlength')">
+                External ID cannot exceed 100 characters
+              </mat-error>
+            </mat-form-field>
+
+            <!-- Remove Button -->
+            <button
+              type="button"
+              mat-icon-button
+              color="warn"
+              (click)="removeBuyer(i)"
+              matTooltip="Remove {{ getBuyerLabel() }}"
+              class="remove-buyer-btn"
+              [disabled]="approvedBuyersFormArray.length === 1"
+            >
+              <mat-icon>delete</mat-icon>
+            </button>
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div class="empty-state" *ngIf="approvedBuyersFormArray.length === 0">
+          <mat-icon>info</mat-icon>
+          <p>No {{ getBuyersLabel().toLowerCase() }} configured</p>
+          <button type="button" mat-raised-button color="primary" (click)="addBuyer()">
+            Add First {{ getBuyerLabel() }}
+          </button>
+        </div>
+      </div>
+    </form>
+  </mat-dialog-content>
+
+  <mat-dialog-actions align="end">
+    <button type="button" mat-button (click)="cancel()" [disabled]="isLoading">Cancel</button>
+    <button
+      type="button"
+      mat-raised-button
+      color="primary"
+      (click)="save()"
+      [disabled]="isLoading || manageApprovedBuyersForm.invalid"
+    >
+      <mat-spinner *ngIf="isLoading" diameter="18" class="loading-spinner"></mat-spinner>
+      <span *ngIf="!isLoading">Save Changes</span>
+      <span *ngIf="isLoading">Saving...</span>
+    </button>
+  </mat-dialog-actions>
+</div>
