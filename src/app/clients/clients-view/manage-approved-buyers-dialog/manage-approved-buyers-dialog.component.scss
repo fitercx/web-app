@@ -121,12 +121,12 @@
 
     .buyer-form-fields {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1px)) auto;
+      grid-template-columns: minmax(200px, 100%) auto;
       gap: 16px;
       align-items: start;
 
       @media (width <= 768px) {
-        grid-template-columns: minmax(0, 1px);
+        grid-template-columns: minmax(200px, 100%);
         gap: 12px;
       }
 
@@ -190,7 +190,7 @@
   }
 
   .buyer-form-fields {
-    grid-template-columns: minmax(0, 1px);
+    grid-template-columns: minmax(200px, 100%);
 
     .remove-buyer-btn {
       justify-self: center;

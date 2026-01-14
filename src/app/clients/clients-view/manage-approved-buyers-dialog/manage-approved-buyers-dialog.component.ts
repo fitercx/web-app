@@ -90,21 +90,12 @@ export class ManageApprovedBuyersDialogComponent implements OnInit {
    */
   createBuyerFormGroup(buyer?: ApprovedBuyer): UntypedFormGroup {
     return this.formBuilder.group({
-      code: [
-        buyer?.code || '',
-        [
-          Validators.required,
-          Validators.maxLength(100)]
-      ],
       name: [
         buyer?.name || '',
         [
           Validators.required,
           Validators.maxLength(100)]
-      ],
-      externalId: [
-        buyer?.externalId || '',
-        Validators.maxLength(100)]
+      ]
     });
   }
 
@@ -178,9 +169,7 @@ export class ManageApprovedBuyersDialogComponent implements OnInit {
 
     // Prepare the approved buyers data
     const approvedBuyers: ApprovedBuyer[] = this.approvedBuyersFormArray.value.map((buyer: any) => ({
-      code: buyer.code?.trim(),
-      name: buyer.name?.trim(),
-      externalId: buyer.externalId?.trim() || undefined
+      name: buyer.name?.trim()
     }));
 
     this.isLoading = true;

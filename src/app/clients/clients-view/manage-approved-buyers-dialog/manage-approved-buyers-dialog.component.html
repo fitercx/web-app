@@ -46,18 +46,6 @@
           class="buyer-form-row"
         >
           <div class="buyer-form-fields">
-            <!-- Code Field -->
-            <mat-form-field class="buyer-field" appearance="outline">
-              <mat-label>{{ getBuyerLabel() }} Code *</mat-label>
-              <input matInput formControlName="code" placeholder="Enter unique code" maxlength="100" />
-              <mat-error *ngIf="buyerControl.get('code')?.hasError('required')">
-                {{ getBuyerLabel() }} code is required
-              </mat-error>
-              <mat-error *ngIf="buyerControl.get('code')?.hasError('maxlength')">
-                Code cannot exceed 100 characters
-              </mat-error>
-            </mat-form-field>
-
             <!-- Name Field -->
             <mat-form-field class="buyer-field" appearance="outline">
               <mat-label>{{ getBuyerLabel() }} Name *</mat-label>
@@ -75,15 +63,6 @@
               </mat-error>
             </mat-form-field>
 
-            <!-- External ID Field -->
-            <mat-form-field class="buyer-field" appearance="outline">
-              <mat-label>External ID</mat-label>
-              <input matInput formControlName="externalId" placeholder="Optional external reference" maxlength="100" />
-              <mat-error *ngIf="buyerControl.get('externalId')?.hasError('maxlength')">
-                External ID cannot exceed 100 characters
-              </mat-error>
-            </mat-form-field>
-
             <!-- Remove Button -->
             <button
               type="button"
@@ -94,7 +73,7 @@
               class="remove-buyer-btn"
               [disabled]="approvedBuyersFormArray.length === 1"
             >
-              <mat-icon>delete</mat-icon>
+              <fa-icon icon="trash"></fa-icon>
             </button>
           </div>
         </div>

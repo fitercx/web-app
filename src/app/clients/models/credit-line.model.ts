@@ -105,8 +105,8 @@ export interface ProcessedLoanData {
  * Interface for approved buyers/suppliers in Line of Credit
  */
 export interface ApprovedBuyer {
-  code: string; // Required: Unique identifier for the buyer/supplier
   name: string; // Required: Display name of the buyer/supplier
+  code?: string; // Optional: Unique identifier for the buyer/supplier
   externalId?: string; // Optional: External system reference
 }
 
