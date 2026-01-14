@@ -128,23 +128,19 @@ export class ManageApprovedBuyersDialogComponent implements OnInit {
     }
 
     // Check for required fields and duplicates
-    const codes: string[] = [];
+    const names: string[] = [];
     buyersFormArray.controls.forEach((buyerControl, index) => {
       const buyer = buyerControl.value;
 
-      if (buyer.code?.trim() === '') {
-        errors.push(`Row ${index + 1}: Code is required`);
-      } else {
-        const code = buyer.code.trim().toLowerCase();
-        if (codes.includes(code)) {
-          errors.push(`Row ${index + 1}: Code "${buyer.code}" is already used`);
-        } else {
-          codes.push(code);
-        }
-      }
-
       if (!buyer.name?.trim()) {
         errors.push(`Row ${index + 1}: Name is required`);
+      } else {
+        const name = buyer.name.trim().toLowerCase();
+        if (names.includes(name)) {
+          errors.push(`Row ${index + 1}: Name "${buyer.name}" is already used`);
+        } else {
+          names.push(name);
+        }
       }
     });
 

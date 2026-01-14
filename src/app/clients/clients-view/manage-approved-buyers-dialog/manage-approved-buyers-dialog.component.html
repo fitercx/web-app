@@ -95,7 +95,7 @@
     <button
       type="button"
       mat-raised-button
-      color="primary"
+      [color]="isLoading || manageApprovedBuyersForm.invalid ? null : 'primary'"
       (click)="save()"
       [disabled]="isLoading || manageApprovedBuyersForm.invalid"
     >
