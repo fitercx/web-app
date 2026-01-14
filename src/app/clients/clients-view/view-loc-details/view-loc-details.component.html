@@ -536,9 +536,9 @@
                   (click)="openManageApprovedBuyersDialog()"
                   matTooltip="Manage {{ locDetails?.type === 'LOC PAYABLE' ? 'Suppliers' : 'Buyers' }}"
                   class="manage-buyers-btn"
-                  style="width: 32px; height: 32px"
+                  style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center"
                 >
-                  <mat-icon style="font-size: 18px">edit</mat-icon>
+                  <fa-icon icon="edit" size="sm" style="font-size: 14px"></fa-icon>
                 </button>
               </div>
               <div *ngIf="locDetails?.approvedBuyersList?.length; else noBuyersSuppliers">
