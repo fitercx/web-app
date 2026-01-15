@@ -290,7 +290,7 @@ export class TransactionsTabComponent implements OnInit {
             transactionAmount: 0,
             dateFormat,
             locale,
-            note: comment
+            comment
           };
         }
         let transactionId = transaction.id;
