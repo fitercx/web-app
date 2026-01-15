@@ -33,6 +33,8 @@ export class ViewTransactionComponent implements OnInit {
   /** Transaction data. */
   transactionData: any;
   transactionType: LoanTransactionType;
+  /** Transaction comment (if any) associated with this transaction */
+  transactionComment?: string;
   /** Is Editable */
   allowEdition = true;
   /** Is Undoable */
@@ -84,6 +86,10 @@ export class ViewTransactionComponent implements OnInit {
       this.allowUndo = this.allowUndoTransaction(this.transactionData.manuallyReversed, this.transactionType);
       this.allowChargeback =
         this.allowChargebackTransaction(this.transactionType) && !this.transactionData.manuallyReversed;
+      // Try to read notes from parent route's resolved loan details and find note linked to this transaction
+      const loanDetailsAssociationData = this.route.parent?.snapshot?.data?.['loanDetailsAssociationData'];
+      const notes: any[] = loanDetailsAssociationData?.notes || [];
+      this.transactionComment = this.getLatestTransactionComment(notes, this.transactionData.id);
       let transactionsChargebackRelated = false;
       if (this.transactionData.transactionRelations) {
         this.transactionRelations.data = this.transactionData.transactionRelations;
@@ -158,6 +164,32 @@ export class ViewTransactionComponent implements OnInit {
       return false;
     }
     return true;
+  }
+
+  /**
+   * Returns the latest comment text linked to a given transaction from the loan notes list.
+   * Sort priority: createdOn (desc), then id (desc). Returns undefined if none matched.
+   */
+  private getLatestTransactionComment(notes: any[], transactionId: number): string | undefined {
+    const matchedNotes = notes.filter((n: any) => n && n.loanTransactionId === transactionId && n.note);
+    if (!matchedNotes.length) {
+      return undefined;
+    }
+    const getTime = (n: any) => {
+      const t = n && n.createdOn ? new Date(n.createdOn).getTime() : NaN;
+      return isFinite(t) ? t : 0;
+    };
+    matchedNotes.sort((a: any, b: any) => {
+      const tb = getTime(b);
+      const ta = getTime(a);
+      if (tb !== ta) {
+        return tb - ta; // newer first
+      }
+      const ib = Number(b?.id) || 0;
+      const ia = Number(a?.id) || 0;
+      return ib - ia; // higher id first
+    });
+    return matchedNotes[0].note;
   }
 
   /**

@@ -85,6 +85,7 @@ import { LoanReamortizeComponent } from './loans-view/loan-account-actions/loan-
 import { LoanTermVariationsTabComponent } from './loans-view/loan-term-variations-tab/loan-term-variations-tab.component';
 import { AddInterestPauseComponent } from './loans-view/loan-account-actions/add-interest-pause/add-interest-pause.component';
 import { LoansActiveClientMembersComponent } from './loans-account-stepper/loans-active-client-members/loans-active-client-members.component';
+import { LoanUndoTransactionDialogComponent } from './loans-view/custom-dialogs/loan-undo-transaction-dialog/loan-undo-transaction-dialog.component';
 
 /**
  * Loans Module
@@ -173,7 +174,8 @@ import { LoansActiveClientMembersComponent } from './loans-account-stepper/loans
     AddInterestPauseComponent,
     LoansActiveClientMembersComponent,
     AdjustInstallmentDateDialogComponent,
-    BulkRemoveChargesDialogComponent
+    BulkRemoveChargesDialogComponent,
+    LoanUndoTransactionDialogComponent
   ],
   providers: []
 })

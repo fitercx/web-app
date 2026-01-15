@@ -3,7 +3,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Dates } from 'app/core/utils/dates';
 import { ReleaseAmountDialogComponent } from 'app/savings/savings-account-view/custom-dialogs/release-amount-dialog/release-amount-dialog.component';
-import { UndoTransactionDialogComponent } from 'app/savings/savings-account-view/custom-dialogs/undo-transaction-dialog/undo-transaction-dialog.component';
+import { SavingsUndoTransactionDialogComponent } from 'app/savings/savings-account-view/custom-dialogs/savings-undo-transaction-dialog/savings-undo-transaction-dialog.component';
 import { SavingsService } from 'app/savings/savings.service';
 import { SettingsService } from 'app/settings/settings.service';
 
@@ -53,11 +53,15 @@ export class SavingsTransactionGeneralTabComponent {
   }
 
   undoTransaction(): void {
-    const undoTransactionAccountDialogRef = this.dialog.open(UndoTransactionDialogComponent);
+    const undoTransactionAccountDialogRef = this.dialog.open(SavingsUndoTransactionDialogComponent);
     undoTransactionAccountDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.confirm) {
+      if (response && response.confirm) {
         const locale = this.settingsService.language.code;
         const dateFormat = this.settingsService.dateFormat;
+        const comment = (response.comment || '').trim();
+        if (!comment) {
+          return;
+        }
         const data = {
           transactionDate: this.dateUtils.formatDate(
             this.transactionData.date && new Date(this.transactionData.date),
@@ -65,7 +69,8 @@ export class SavingsTransactionGeneralTabComponent {
           ),
           transactionAmount: 0,
           dateFormat,
-          locale
+          locale,
+          comment
         };
         this.savingsService
           .executeSavingsAccountTransactionsCommand(this.accountId, 'undo', data, this.transactionData.id)

@@ -51,9 +51,13 @@ export class ViewTransactionComponent {
   undoTransaction(): void {
     const undoTransactionAccountDialogRef = this.dialog.open(UndoTransactionDialogComponent);
     undoTransactionAccountDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.confirm) {
+      if (response && response.confirm) {
         const locale = this.settingsService.language.code;
         const dateFormat = this.settingsService.dateFormat;
+        const comment = (response.comment || '').trim();
+        if (!comment) {
+          return;
+        }
         const data = {
           transactionDate: this.dateUtils.formatDate(
             this.transactionData.date && new Date(this.transactionData.date),
@@ -61,7 +65,8 @@ export class ViewTransactionComponent {
           ),
           transactionAmount: 0,
           dateFormat,
-          locale
+          locale,
+          comment
         };
         this.savingsService
           .executeSavingsAccountTransactionsCommand(this.accountId, 'undo', data, this.transactionData.id)
