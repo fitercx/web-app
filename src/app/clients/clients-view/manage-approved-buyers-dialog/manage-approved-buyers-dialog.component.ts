@@ -27,6 +27,9 @@ export class ManageApprovedBuyersDialogComponent implements OnInit {
   /** Validation errors */
   errors: string[] = [];
 
+  /** Original form state for rollback on API failure */
+  private originalFormState: any[] = [];
+
   /**
    * @param {MatDialogRef} dialogRef Component reference to dialog.
    * @param {ManageApprovedBuyersDialogData} data Dialog data.
@@ -83,6 +86,9 @@ export class ManageApprovedBuyersDialogComponent implements OnInit {
       // Add one empty buyer if none exist
       this.addBuyer();
     }
+
+    // Capture the initial state for rollback purposes
+    this.captureOriginalFormState();
   }
 
   /**
@@ -184,9 +190,19 @@ export class ManageApprovedBuyersDialogComponent implements OnInit {
         this.isLoading = false;
         console.error('Error managing approved buyers:', error);
 
-        // Handle API errors
-        if (error.error?.userMessage) {
+        // Restore original form state on API failure
+        this.restoreFormState();
+
+        // Handle API errors - prioritize user-friendly messages
+        if (error.error?.defaultUserMessage) {
+          this.errors = [error.error.defaultUserMessage];
+        } else if (error.error?.userMessage) {
           this.errors = [error.error.userMessage];
+        } else if (error.error?.errors && error.error.errors.length > 0) {
+          // Handle errors array with individual error messages
+          this.errors = error.error.errors.map(
+            (err: any) => err.defaultUserMessage || err.userMessage || err.developerMessage
+          );
         } else if (error.error?.developerMessage) {
           this.errors = [error.error.developerMessage];
         } else {
@@ -201,6 +217,32 @@ export class ManageApprovedBuyersDialogComponent implements OnInit {
    */
   cancel() {
     this.dialogRef.close({ success: false });
+  }
+
+  /**
+   * Capture original form state for rollback purposes
+   */
+  private captureOriginalFormState() {
+    this.originalFormState = this.approvedBuyersFormArray.value.map((buyer: any) => ({ ...buyer }));
+  }
+
+  /**
+   * Restore form state to original values (used when API call fails)
+   */
+  private restoreFormState() {
+    if (this.originalFormState.length === 0) {
+      return;
+    }
+
+    // Clear existing form array
+    while (this.approvedBuyersFormArray.length !== 0) {
+      this.approvedBuyersFormArray.removeAt(0);
+    }
+
+    // Restore original buyers
+    this.originalFormState.forEach((buyer: any) => {
+      this.approvedBuyersFormArray.push(this.createBuyerFormGroup(buyer));
+    });
   }
 
   /**
