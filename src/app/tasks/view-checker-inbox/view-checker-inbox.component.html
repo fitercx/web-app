@@ -52,6 +52,11 @@
           <span fxFlex="60%">{{ checkerInboxDetail.resourceId }}</span>
         </div>
 
+        <div fxFlexFill *ngIf="clientName">
+          <span fxFlex="40%">{{ 'labels.inputs.Client Name' | translate }}:</span>
+          <span fxFlex="60%">{{ clientName }}</span>
+        </div>
+
         <div fxFlexFill>
           <span fxFlex="40%">{{ 'labels.inputs.Date' | translate }}:</span>
           <span fxFlex="60%">{{ checkerInboxDetail.madeOnDate | dateFormat }}</span>

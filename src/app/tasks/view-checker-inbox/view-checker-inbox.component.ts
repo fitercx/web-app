@@ -23,6 +23,8 @@ export class ViewCheckerInboxComponent {
   jsondata: any;
   /** Checks if there is any object or not in jsondata */
   displayJSONData = false;
+  /** Optional client name passed from list page */
+  clientName?: string;
 
   /**
    * Retrieves the maker checker id data from `resolve`.
@@ -43,6 +45,7 @@ export class ViewCheckerInboxComponent {
       this.jsondata = JSON.parse(this.checkerInboxDetail.commandAsJson);
       this.displayJSONData = !_.isEmpty(this.jsondata);
     });
+    this.clientName = this.route.snapshot.queryParamMap.get('clientName') || undefined;
   }
 
   /**
