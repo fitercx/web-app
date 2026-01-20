@@ -70,8 +70,17 @@ export class ErrorHandlerInterceptor implements HttpInterceptor {
         type: 'Internal Server Error',
         message: 'Internal Server Error. Please try again later.'
       });
+    } else if (status === 503) {
+      // Service Unavailable - extract meaningful error message from errors array
+      this.alertService.alert({
+        type: 'Service Unavailable',
+        message: errorMessage || 'The server is currently unable to handle the request. Please try again later.'
+      });
     } else {
-      this.alertService.alert({ type: 'Unknown Error', message: 'Unknown Error. Please try again later.' });
+      this.alertService.alert({
+        type: 'Unknown Error',
+        message: errorMessage || 'Unknown Error. Please try again later.'
+      });
     }
 
     throw response;

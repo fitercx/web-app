@@ -536,4 +536,22 @@ export class ClientsService {
     }
     return this.http.post(`/v2/clients/search`, request);
   }
+
+  /**
+   * Manage approved buyers/suppliers for a Line of Credit
+   * POST /api/v1/clients/{clientId}/creditlines/{lineOfCreditId}/manageapprovedbuyers
+   * @param clientId Client ID who owns the Line of Credit
+   * @param lineOfCreditId Line of Credit ID to manage buyers for
+   * @param approvedBuyers Array of approved buyers/suppliers
+   * @returns Observable of the API response
+   */
+  manageApprovedBuyers(clientId: string, lineOfCreditId: string, approvedBuyers: any[]): Observable<any> {
+    const requestBody = {
+      approvedBuyers: approvedBuyers,
+      locale: 'en',
+      dateFormat: 'yyyy-MM-dd'
+    };
+
+    return this.http.post(`/clients/${clientId}/creditlines/${lineOfCreditId}/manageapprovedbuyers`, requestBody);
+  }
 }

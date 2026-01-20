@@ -100,3 +100,52 @@ export interface ProcessedLoanData {
   activatedOnDate?: number[];
   nextRepaymentDate?: number[];
 }
+
+/**
+ * Interface for approved buyers/suppliers in Line of Credit
+ */
+export interface ApprovedBuyer {
+  name: string; // Required: Display name of the buyer/supplier
+  code?: string; // Optional: Unique identifier for the buyer/supplier
+  externalId?: string; // Optional: External system reference
+}
+
+/**
+ * Request interface for managing approved buyers API
+ */
+export interface ManageApprovedBuyersRequest {
+  approvedBuyers: ApprovedBuyer[];
+  locale: string; // e.g., "en"
+  dateFormat: string; // e.g., "yyyy-MM-dd"
+}
+
+/**
+ * Response interface from managing approved buyers API
+ */
+export interface ManageApprovedBuyersResponse {
+  resourceId: number; // The Line of Credit ID
+  changes: {
+    approvedBuyers: ApprovedBuyer[]; // The new list of approved buyers
+  };
+}
+
+/**
+ * Error response interface from API
+ */
+export interface ApiErrorResponse {
+  developerMessage: string;
+  userMessage: string;
+  httpStatusCode?: number;
+  defaultUserMessage?: string;
+}
+
+/**
+ * Dialog data interface for ManageApprovedBuyersDialog
+ */
+export interface ManageApprovedBuyersDialogData {
+  clientId: string;
+  lineOfCreditId: string;
+  currentBuyers: ApprovedBuyer[];
+  locType: 'RECEIVABLE' | 'PAYABLE';
+  isActive: boolean;
+}
