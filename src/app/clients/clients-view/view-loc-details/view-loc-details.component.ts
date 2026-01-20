@@ -9,6 +9,10 @@ import { SettingsService } from 'app/settings/settings.service';
 
 /** Custom Components */
 import { FormDialogComponent } from 'app/shared/form-dialog/form-dialog.component';
+import { ManageApprovedBuyersDialogComponent } from '../manage-approved-buyers-dialog/manage-approved-buyers-dialog.component';
+
+/** Custom Models */
+import { ApprovedBuyer } from '../../models/credit-line.model';
 
 /** Form Field Models */
 import { DatepickerBase } from 'app/shared/form-dialog/formfield/model/datepicker-base';
@@ -341,6 +345,72 @@ export class ViewLocDetailsComponent implements OnInit {
         this.openLimitActionDialog('decreasecreditlimit');
         break;
       default:
+    }
+  }
+
+  /**
+   * Open manage approved buyers dialog
+   */
+  openManageApprovedBuyersDialog(): void {
+    const dialogData = {
+      clientId: this.clientId,
+      lineOfCreditId: this.locId,
+      currentBuyers: this.extractCurrentBuyersAsObjects(),
+      locType: this.locDetails?.type === 'LOC PAYABLE' ? 'PAYABLE' : 'RECEIVABLE',
+      isActive: this.isActive()
+    };
+
+    const dialogRef = this.dialog.open(ManageApprovedBuyersDialogComponent, {
+      width: '800px',
+      maxHeight: '90vh',
+      data: dialogData,
+      disableClose: true
+    });
+
+    dialogRef.afterClosed().subscribe((result) => {
+      if (result && result.success) {
+        // Update the current buyers list in the component
+        this.locDetails.approvedBuyersList = result.approvedBuyers.map((buyer: ApprovedBuyer) => buyer.name);
+
+        // Show success message (you can replace this with your preferred notification system)
+        console.log('Approved buyers updated successfully');
+
+        // Optionally, refresh the LOC data from the server
+        this.refreshLocData();
+      }
+    });
+  }
+
+  /**
+   * Extract current buyers as objects for the dialog
+   */
+  private extractCurrentBuyersAsObjects(): ApprovedBuyer[] {
+    if (!this.locDetails?.approvedBuyersList || !Array.isArray(this.locDetails.approvedBuyersList)) {
+      return [];
+    }
+
+    // For now, we only have names, so we'll create objects with name as both code and name
+    // In the future, if the backend provides full objects, this can be updated
+    return this.locDetails.approvedBuyersList.map((name: string, index: number) => ({
+      code: name.replace(/\s+/g, '_').toUpperCase(), // Generate a code from name
+      name: name,
+      externalId: '' // Empty for now
+    }));
+  }
+
+  /**
+   * Refresh LOC data from server
+   */
+  private refreshLocData(): void {
+    if (this.clientsService && this.locId) {
+      this.clientsService.getClientCreditLine(this.clientId, this.locId).subscribe(
+        (data: any) => {
+          this.processLocData(data);
+        },
+        (err) => {
+          console.error('Failed to refresh LOC details:', err);
+        }
+      );
     }
   }
 
