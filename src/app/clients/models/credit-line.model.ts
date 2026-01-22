@@ -102,7 +102,19 @@ export interface ProcessedLoanData {
 }
 
 /**
- * Interface for approved buyers/suppliers in Line of Credit
+ * Interface for vendors in Line of Credit (new API structure)
+ */
+export interface Vendor {
+  id?: number; // Vendor ID (present in responses, not in create requests)
+  name: string; // Required: Display name of the vendor/buyer/supplier
+  creditLimit?: number; // Optional: Credit limit for this vendor (defaults to 0)
+  losExternalId?: string; // Optional: External ID from LOS system
+  lineOfCreditId?: number; // Line of Credit ID this vendor belongs to (in responses)
+}
+
+/**
+ * Legacy interface for approved buyers/suppliers (for backward compatibility)
+ * @deprecated Use Vendor interface instead
  */
 export interface ApprovedBuyer {
   name: string; // Required: Display name of the buyer/supplier
@@ -111,7 +123,24 @@ export interface ApprovedBuyer {
 }
 
 /**
- * Request interface for managing approved buyers API
+ * Request interface for creating a vendor
+ */
+export interface CreateVendorRequest {
+  name: string; // Required: Vendor name
+  creditLimit?: number; // Optional: Credit limit
+  losExternalId?: string; // Optional: LOS external ID
+}
+
+/**
+ * Request interface for updating a vendor (only name can be updated)
+ */
+export interface UpdateVendorRequest {
+  name: string; // Required: New vendor name
+}
+
+/**
+ * Legacy request interface for managing approved buyers API
+ * @deprecated Use individual vendor endpoints instead
  */
 export interface ManageApprovedBuyersRequest {
   approvedBuyers: ApprovedBuyer[];
@@ -140,9 +169,21 @@ export interface ApiErrorResponse {
 }
 
 /**
- * Dialog data interface for ManageApprovedBuyersDialog
+ * Dialog data interface for ManageApprovedBuyersDialog (updated for new vendor APIs)
  */
 export interface ManageApprovedBuyersDialogData {
+  clientId: string;
+  lineOfCreditId: string;
+  currentVendors: Vendor[]; // Updated to use Vendor instead of ApprovedBuyer
+  locType: 'RECEIVABLE' | 'PAYABLE';
+  isActive: boolean;
+}
+
+/**
+ * Legacy dialog data interface (for backward compatibility)
+ * @deprecated Use ManageApprovedBuyersDialogData with currentVendors instead
+ */
+export interface LegacyManageApprovedBuyersDialogData {
   clientId: string;
   lineOfCreditId: string;
   currentBuyers: ApprovedBuyer[];
