@@ -504,20 +504,28 @@ export class GeneralTabComponent implements OnInit {
 
   /**
    * Calculates interest charged for multi-tranche loans based only on disbursed tranches
+   * Note: Interest accrues in scheduled repayment periods (not disbursement periods).
+   * For multi-tranche loans, we sum interest from all scheduled periods since interest is calculated
+   * based on the total disbursed principal balance.
    */
   private getDisbursedTrancheInterest(): number {
     if (!this.loanDetails?.multiDisburseLoan || !this.loanDetails?.repaymentSchedule?.periods) {
       return this.loanDetails?.summary?.interestCharged || 0;
     }
 
+    // Interest appears in scheduled periods, not disbursement periods
+    // For multi-tranche loans, sum interest from all scheduled periods
+    // (the backend calculates interest based on disbursed principal, so all scheduled interest is valid)
     let totalInterest = 0;
     this.loanDetails.repaymentSchedule.periods.forEach((period: any) => {
-      if (this.isDisbursementPeriodDisbursed(period)) {
+      // Sum interest from scheduled periods (where interest actually accrues)
+      if (period.status === 'SCHEDULED' || period.status === 'COMPLETED') {
         totalInterest += period.interestOriginalDue || period.interestDue || 0;
       }
     });
 
-    return totalInterest;
+    // If no period-level interest data, fall back to summary
+    return totalInterest > 0 ? totalInterest : this.loanDetails?.summary?.interestCharged || 0;
   }
 
   /**
