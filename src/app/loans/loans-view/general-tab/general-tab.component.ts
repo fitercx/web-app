@@ -459,6 +459,7 @@ export class GeneralTabComponent implements OnInit {
   /**
    * Calculates the total disbursed principal amount for multi-tranche loans
    * Returns the sum of principal amounts from disbursementDetails that have been actually disbursed
+   * Uses repaymentSchedule.totalPrincipalDisbursed if available (calculated by backend), otherwise calculates from disbursementDetails
    */
   private getTotalDisbursedPrincipal(): number {
     // If not a multi-disbursal loan, return the standard principalDisbursed value
@@ -466,7 +467,14 @@ export class GeneralTabComponent implements OnInit {
       return this.loanDetails?.summary?.principalDisbursed || 0;
     }
 
-    // For multi-disbursal loans, calculate total from disbursementDetails
+    // For multi-disbursal loans, prefer repaymentSchedule.totalPrincipalDisbursed (calculated by backend)
+    // This is more reliable as it's based on actual period data
+    // Accept 0 as a valid value (e.g., loan with zero principal disbursed initially)
+    if (this.loanDetails?.repaymentSchedule?.totalPrincipalDisbursed != null) {
+      return this.loanDetails.repaymentSchedule.totalPrincipalDisbursed;
+    }
+
+    // Fallback: calculate from disbursementDetails if repaymentSchedule total is not available
     if (!this.loanDetails?.disbursementDetails || !Array.isArray(this.loanDetails.disbursementDetails)) {
       return this.loanDetails?.summary?.principalDisbursed || 0;
     }
@@ -504,28 +512,23 @@ export class GeneralTabComponent implements OnInit {
 
   /**
    * Calculates interest charged for multi-tranche loans based only on disbursed tranches
-   * Note: Interest accrues in scheduled repayment periods (not disbursement periods).
-   * For multi-tranche loans, we sum interest from all scheduled periods since interest is calculated
-   * based on the total disbursed principal balance.
+   * Uses repaymentSchedule.totalInterestCharged (calculated by backend) which is based on disbursed principal
+   * This is more reliable than manually summing periods since the backend handles all edge cases
    */
   private getDisbursedTrancheInterest(): number {
-    if (!this.loanDetails?.multiDisburseLoan || !this.loanDetails?.repaymentSchedule?.periods) {
+    if (!this.loanDetails?.multiDisburseLoan) {
       return this.loanDetails?.summary?.interestCharged || 0;
     }
 
-    // Interest appears in scheduled periods, not disbursement periods
-    // For multi-tranche loans, sum interest from all scheduled periods
-    // (the backend calculates interest based on disbursed principal, so all scheduled interest is valid)
-    let totalInterest = 0;
-    this.loanDetails.repaymentSchedule.periods.forEach((period: any) => {
-      // Sum interest from scheduled periods (where interest actually accrues)
-      if (period.status === 'SCHEDULED' || period.status === 'COMPLETED') {
-        totalInterest += period.interestOriginalDue || period.interestDue || 0;
-      }
-    });
+    // For multi-tranche loans, use repaymentSchedule.totalInterestCharged
+    // The backend calculates this based on actual disbursed principal, so it's accurate
+    // Accept 0 as a valid value (e.g., loan with zero interest charged)
+    if (this.loanDetails?.repaymentSchedule?.totalInterestCharged != null) {
+      return this.loanDetails.repaymentSchedule.totalInterestCharged;
+    }
 
-    // If no period-level interest data, fall back to summary
-    return totalInterest > 0 ? totalInterest : this.loanDetails?.summary?.interestCharged || 0;
+    // Fallback to summary if repaymentSchedule total is not available
+    return this.loanDetails?.summary?.interestCharged || 0;
   }
 
   /**
@@ -545,13 +548,15 @@ export class GeneralTabComponent implements OnInit {
       }
     });
 
-    // If no period-level tax data, fall back to summary (may be calculated differently)
-    return totalTaxes > 0 ? totalTaxes : this.loanDetails?.summary?.taxChargesCharged || 0;
+    // Return calculated total (0 is valid - means no taxes on disbursed tranches)
+    // Do not fall back to summary.taxChargesCharged as it may include taxes from undisbursed tranches
+    return totalTaxes;
   }
 
   /**
    * Calculates penalty charges for multi-tranche loans based only on disbursed tranches
    * Uses original values (penaltyChargesOriginalDue) when available, falling back to current values (penaltyChargesDue)
+   * Note: For consistency with fees and taxes, only includes penalties from disbursement periods that have been disbursed
    */
   private getDisbursedTranchePenalties(): number {
     if (!this.loanDetails?.multiDisburseLoan || !this.loanDetails?.repaymentSchedule?.periods) {
@@ -560,6 +565,8 @@ export class GeneralTabComponent implements OnInit {
 
     let totalPenalties = 0;
     this.loanDetails.repaymentSchedule.periods.forEach((period: any) => {
+      // For consistency with getDisbursedTrancheFees() and getDisbursedTrancheTaxes(),
+      // only include penalties from disbursement periods that have been actually disbursed
       if (this.isDisbursementPeriodDisbursed(period)) {
         // Use original value when available, fall back to current value
         totalPenalties += period.penaltyChargesOriginalDue || period.penaltyChargesDue || 0;
