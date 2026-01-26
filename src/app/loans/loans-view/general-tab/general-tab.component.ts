@@ -152,20 +152,32 @@ export class GeneralTabComponent implements OnInit {
           feeChargesOverdue: this.loanDetails.summary.feeChargesOverdue
         };
 
+    // For multi-tranche loans, use only the disbursed amount as the principal
+    const principalOriginal: string = String(this.getTotalDisbursedPrincipal());
+
+    // For multi-tranche loans, calculate principal outstanding based on disbursed amount
+    const principalOutstanding = this.loanDetails?.multiDisburseLoan
+      ? this.getPrincipalOutstandingForMultiTranche()
+      : this.loanDetails.summary.principalOutstanding;
+
     this.loanSummaryTableData = [
       {
         property: this.isReceivableLineOfCredit() ? 'Disbursal Amount' : 'Principal',
-        original: this.loanDetails.summary.principalDisbursed,
+        original: principalOriginal,
         adjustment: this.loanDetails.summary.principalAdjustments || 0,
         paid: this.loanDetails.summary.principalPaid,
         waived: this.loanDetails.summary.principalWaived || 0,
         writtenOff: this.loanDetails.summary.principalWrittenOff,
-        outstanding: this.loanDetails.summary.principalOutstanding,
+        outstanding: String(principalOutstanding),
         overdue: this.loanDetails.summary.principalOverdue
       },
       {
         property: 'Interest',
-        original: this.loanDetails.summary.interestCharged,
+        original: String(
+          this.loanDetails?.multiDisburseLoan
+            ? this.getDisbursedTrancheInterest()
+            : this.loanDetails.summary.interestCharged
+        ),
         adjustment: '0',
         paid: this.loanDetails.summary.interestPaid,
         waived: this.loanDetails.summary.interestWaived,
@@ -185,7 +197,11 @@ export class GeneralTabComponent implements OnInit {
       },
       {
         property: 'Taxes',
-        original: this.loanDetails.summary.taxChargesCharged,
+        original: String(
+          this.loanDetails?.multiDisburseLoan
+            ? this.getDisbursedTrancheTaxes()
+            : this.loanDetails.summary.taxChargesCharged
+        ),
         adjustment: '0',
         paid: this.loanDetails.summary.taxChargesPaid,
         waived: this.loanDetails.summary.taxChargesWaived,
@@ -195,7 +211,11 @@ export class GeneralTabComponent implements OnInit {
       },
       {
         property: 'Penalties',
-        original: this.loanDetails.summary.penaltyChargesCharged,
+        original: String(
+          this.loanDetails?.multiDisburseLoan
+            ? this.getDisbursedTranchePenalties()
+            : this.loanDetails.summary.penaltyChargesCharged
+        ),
         adjustment: '0',
         paid: this.loanDetails.summary.penaltyChargesPaid,
         waived: this.loanDetails.summary.penaltyChargesWaived,
@@ -205,12 +225,20 @@ export class GeneralTabComponent implements OnInit {
       },
       {
         property: 'Total',
-        original: this.loanDetails.summary.totalExpectedRepayment,
+        original: String(
+          this.loanDetails?.multiDisburseLoan
+            ? this.getTotalOriginalForMultiTranche()
+            : this.loanDetails.summary.totalExpectedRepayment
+        ),
         adjustment: this.loanDetails.summary.principalAdjustments || 0,
         paid: this.loanDetails.summary.totalRepayment,
         waived: this.loanDetails.summary.totalWaived,
         writtenOff: this.loanDetails.summary.totalWrittenOff,
-        outstanding: String(this.getAdjustedTotalOutstanding()),
+        outstanding: String(
+          this.loanDetails?.multiDisburseLoan
+            ? this.getTotalOutstandingForMultiTranche()
+            : this.getAdjustedTotalOutstanding()
+        ),
         overdue: this.loanDetails.summary.totalOverdue
       }
     ];
@@ -429,6 +457,158 @@ export class GeneralTabComponent implements OnInit {
   }
 
   /**
+   * Calculates the total disbursed principal amount for multi-tranche loans
+   * Returns the sum of principal amounts from disbursementDetails that have been actually disbursed
+   */
+  private getTotalDisbursedPrincipal(): number {
+    // If not a multi-disbursal loan, return the standard principalDisbursed value
+    if (!this.loanDetails?.multiDisburseLoan) {
+      return this.loanDetails?.summary?.principalDisbursed || 0;
+    }
+
+    // For multi-disbursal loans, calculate total from disbursementDetails
+    if (!this.loanDetails?.disbursementDetails || !Array.isArray(this.loanDetails.disbursementDetails)) {
+      return this.loanDetails?.summary?.principalDisbursed || 0;
+    }
+
+    // Sum principal amounts only for disbursements that have been actually disbursed
+    let totalDisbursed = 0;
+    this.loanDetails.disbursementDetails.forEach((disbursement: any) => {
+      // Only count disbursements that have an actualDisbursementDate
+      // Check for null/undefined (not truthiness) to allow zero-principal disbursements
+      if (disbursement.actualDisbursementDate && disbursement.principal != null) {
+        totalDisbursed += disbursement.principal * 1;
+      }
+    });
+
+    return totalDisbursed;
+  }
+
+  /**
+   * Calculates principal outstanding for multi-tranche loans
+   * Returns: disbursed principal - paid - waived - written off
+   */
+  private getPrincipalOutstandingForMultiTranche(): number {
+    if (!this.loanDetails?.multiDisburseLoan || !this.loanDetails?.summary) {
+      return this.loanDetails?.summary?.principalOutstanding || 0;
+    }
+
+    const disbursedPrincipal = this.getTotalDisbursedPrincipal();
+    const paid = this.loanDetails.summary.principalPaid || 0;
+    const waived = this.loanDetails.summary.principalWaived || 0;
+    const writtenOff = this.loanDetails.summary.principalWrittenOff || 0;
+
+    const outstanding = disbursedPrincipal - paid - waived - writtenOff;
+    return Math.max(0, outstanding); // Ensure non-negative
+  }
+
+  /**
+   * Calculates interest charged for multi-tranche loans based only on disbursed tranches
+   */
+  private getDisbursedTrancheInterest(): number {
+    if (!this.loanDetails?.multiDisburseLoan || !this.loanDetails?.repaymentSchedule?.periods) {
+      return this.loanDetails?.summary?.interestCharged || 0;
+    }
+
+    let totalInterest = 0;
+    this.loanDetails.repaymentSchedule.periods.forEach((period: any) => {
+      if (this.isDisbursementPeriodDisbursed(period)) {
+        totalInterest += period.interestOriginalDue || period.interestDue || 0;
+      }
+    });
+
+    return totalInterest;
+  }
+
+  /**
+   * Calculates tax charges for multi-tranche loans based only on disbursed tranches
+   * Uses original values (taxChargesOriginalDue) when available, falling back to current values (taxChargesDue)
+   */
+  private getDisbursedTrancheTaxes(): number {
+    if (!this.loanDetails?.multiDisburseLoan || !this.loanDetails?.repaymentSchedule?.periods) {
+      return this.loanDetails?.summary?.taxChargesCharged || 0;
+    }
+
+    let totalTaxes = 0;
+    this.loanDetails.repaymentSchedule.periods.forEach((period: any) => {
+      if (this.isDisbursementPeriodDisbursed(period)) {
+        // Use original value when available, fall back to current value
+        totalTaxes += period.taxChargesOriginalDue || period.taxChargesDue || 0;
+      }
+    });
+
+    // If no period-level tax data, fall back to summary (may be calculated differently)
+    return totalTaxes > 0 ? totalTaxes : this.loanDetails?.summary?.taxChargesCharged || 0;
+  }
+
+  /**
+   * Calculates penalty charges for multi-tranche loans based only on disbursed tranches
+   * Uses original values (penaltyChargesOriginalDue) when available, falling back to current values (penaltyChargesDue)
+   */
+  private getDisbursedTranchePenalties(): number {
+    if (!this.loanDetails?.multiDisburseLoan || !this.loanDetails?.repaymentSchedule?.periods) {
+      return this.loanDetails?.summary?.penaltyChargesCharged || 0;
+    }
+
+    let totalPenalties = 0;
+    this.loanDetails.repaymentSchedule.periods.forEach((period: any) => {
+      if (this.isDisbursementPeriodDisbursed(period)) {
+        // Use original value when available, fall back to current value
+        totalPenalties += period.penaltyChargesOriginalDue || period.penaltyChargesDue || 0;
+      }
+    });
+
+    return totalPenalties;
+  }
+
+  /**
+   * Calculates total original for multi-tranche loans
+   * Returns: disbursed principal + interest + fees + taxes + penalties (all based on disbursed tranches only)
+   */
+  private getTotalOriginalForMultiTranche(): number {
+    if (!this.loanDetails?.multiDisburseLoan || !this.loanDetails?.summary) {
+      return this.loanDetails?.summary?.totalExpectedRepayment || 0;
+    }
+
+    const disbursedPrincipal = this.getTotalDisbursedPrincipal();
+    const interest = this.getDisbursedTrancheInterest();
+    const fees = this.getDisbursedTrancheFees().feeChargesCharged;
+    const taxes = this.getDisbursedTrancheTaxes();
+    const penalties = this.getDisbursedTranchePenalties();
+
+    return disbursedPrincipal + interest + fees + taxes + penalties;
+  }
+
+  /**
+   * Calculates total outstanding for multi-tranche loans
+   * Returns: sum of all outstanding amounts (principal + interest + fees + taxes + penalties)
+   * For LOC loans, applies overpayment adjustment to the total outstanding
+   */
+  private getTotalOutstandingForMultiTranche(): number {
+    if (!this.loanDetails?.multiDisburseLoan || !this.loanDetails?.summary) {
+      return this.getAdjustedTotalOutstanding();
+    }
+
+    const principalOutstanding = this.getPrincipalOutstandingForMultiTranche();
+    // Use unadjusted interest outstanding, we'll apply overpayment to total
+    const interestOutstanding = this.loanDetails.summary.interestOutstanding || 0;
+    const feesOutstanding = this.getDisbursedTrancheFees().feeChargesOutstanding;
+    const taxesOutstanding = this.loanDetails.summary.taxChargesOutstanding || 0;
+    const penaltiesOutstanding = this.loanDetails.summary.penaltyChargesOutstanding || 0;
+
+    let totalOutstanding =
+      principalOutstanding + interestOutstanding + feesOutstanding + taxesOutstanding + penaltiesOutstanding;
+
+    // Apply overpayment adjustment for LOC loans (similar to getAdjustedTotalOutstanding)
+    const overPaid = this.loanDetails.totalOverpaid || this.loanDetails.overPaidAmount || 0;
+    if (overPaid > 0 && this.isAnyLineOfCredit()) {
+      totalOutstanding = totalOutstanding - overPaid;
+    }
+
+    return Math.max(0, totalOutstanding); // Ensure non-negative
+  }
+
+  /**
    * Calculates fees for multi-disbursal loans based only on disbursed tranches
    * Returns an object with feeChargesCharged, feeChargesPaid, feeChargesOutstanding, feeChargesWaived, feeChargesWrittenOff, feeChargesOverdue
    */
@@ -461,7 +641,8 @@ export class GeneralTabComponent implements OnInit {
     // Iterate through periods and sum fees only for disbursed tranches
     periods.forEach((period: any) => {
       if (this.isDisbursementPeriodDisbursed(period)) {
-        result.feeChargesCharged += period.feeChargesDue || 0;
+        // Use original value when available, fall back to current value (for "Original" column consistency)
+        result.feeChargesCharged += period.feeChargesOriginalDue || period.feeChargesDue || 0;
         result.feeChargesPaid += period.feeChargesPaid || 0;
         result.feeChargesOutstanding += period.feeChargesOutstanding || 0;
         result.feeChargesWaived += period.feeChargesWaived || 0;
