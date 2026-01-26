@@ -17,6 +17,7 @@ export class SettingsService {
   public static businessDateConfigName = 'enable-business-date';
   public static businessDateType = 'BUSINESS_DATE';
   public static cobDateType = 'COB_DATE';
+  public static DEFAULT_DECIMALS_TO_DISPLAY = '3';
   minAllowedDate = new Date(1950, 0, 1);
   maxAllowedDate = new Date(2100, 0, 1);
 
@@ -138,7 +139,7 @@ export class SettingsService {
    */
   get decimals() {
     if (!localStorage.getItem('mifosXDecimalsToDisplay')) {
-      return '3';
+      return SettingsService.DEFAULT_DECIMALS_TO_DISPLAY;
     }
     return localStorage.getItem('mifosXDecimalsToDisplay');
   }
