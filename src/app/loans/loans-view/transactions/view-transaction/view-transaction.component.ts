@@ -19,6 +19,7 @@ import { AlertService } from 'app/core/alert/alert.service';
 import { TranslateService } from '@ngx-translate/core';
 
 /** Custom Dialogs */
+import { LoanUndoTransactionDialogComponent } from 'app/loans/loans-view/custom-dialogs/loan-undo-transaction-dialog/loan-undo-transaction-dialog.component';
 
 /**
  * View Transaction Component.
@@ -33,6 +34,8 @@ export class ViewTransactionComponent implements OnInit {
   /** Transaction data. */
   transactionData: any;
   transactionType: LoanTransactionType;
+  /** Transaction comment (if any) associated with this transaction */
+  transactionComment?: string;
   /** Is Editable */
   allowEdition = true;
   /** Is Undoable */
@@ -84,6 +87,10 @@ export class ViewTransactionComponent implements OnInit {
       this.allowUndo = this.allowUndoTransaction(this.transactionData.manuallyReversed, this.transactionType);
       this.allowChargeback =
         this.allowChargebackTransaction(this.transactionType) && !this.transactionData.manuallyReversed;
+      // Try to read notes from parent route's resolved loan details and find note linked to this transaction
+      const loanDetailsAssociationData = this.route.parent?.snapshot?.data?.['loanDetailsAssociationData'];
+      const notes: any[] = loanDetailsAssociationData?.notes || [];
+      this.transactionComment = this.getLatestTransactionComment(notes, this.transactionData.id);
       let transactionsChargebackRelated = false;
       if (this.transactionData.transactionRelations) {
         this.transactionRelations.data = this.transactionData.transactionRelations;
@@ -161,33 +168,68 @@ export class ViewTransactionComponent implements OnInit {
   }
 
   /**
+   * Returns the latest comment text linked to a given transaction from the loan notes list.
+   * Sort priority: createdOn (desc), then id (desc). Returns undefined if none matched.
+   */
+  private getLatestTransactionComment(notes: any[], transactionId: number): string | undefined {
+    const matchedNotes = notes.filter((n: any) => n && n.loanTransactionId === transactionId && n.note);
+    if (!matchedNotes.length) {
+      return undefined;
+    }
+    const getTime = (n: any) => {
+      const t = n && n.createdOn ? new Date(n.createdOn).getTime() : NaN;
+      return isFinite(t) ? t : 0;
+    };
+    matchedNotes.sort((a: any, b: any) => {
+      const tb = getTime(b);
+      const ta = getTime(a);
+      if (tb !== ta) {
+        return tb - ta; // newer first
+      }
+      const ib = Number(b?.id) || 0;
+      const ia = Number(a?.id) || 0;
+      return ib - ia; // higher id first
+    });
+    return matchedNotes[0].note;
+  }
+
+  /**
    * Undo the loans transaction
    */
   undoTransaction() {
     const accountId = this.route.snapshot.params['loanId'];
-    const undoTransactionAccountDialogRef = this.dialog.open(ConfirmationDialogComponent, {
-      data: {
-        heading: this.translateService.instant('labels.heading.Undo Transaction'),
-        dialogContext:
-          this.translateService.instant('labels.dialogContext.Are you sure you want undo the transaction') +
-          `${this.transactionData.id}`
-      }
-    });
-    undoTransactionAccountDialogRef.afterClosed().subscribe((response: { confirm: any }) => {
-      if (response.confirm) {
+    const undoTransactionAccountDialogRef = this.dialog.open(LoanUndoTransactionDialogComponent);
+    undoTransactionAccountDialogRef.afterClosed().subscribe((response: { confirm: any; comment?: string }) => {
+      if (response && response.confirm) {
+        const comment = (response.comment || '').trim();
+        if (!comment) {
+          return;
+        }
         const locale = this.settingsService.language.code;
         const dateFormat = this.settingsService.dateFormat;
-        const data = {
-          transactionDate: this.dateUtils.formatDate(
-            this.transactionData.date && new Date(this.transactionData.date),
-            dateFormat
-          ),
-          transactionAmount: 0,
-          dateFormat,
-          locale
-        };
+        let command = 'undo';
+        let payload: any;
+        let transactionId: number | null = this.transactionData.id;
+        const isChargeOff =
+          this.transactionType?.chargeoff || this.transactionType?.code === 'loanTransactionType.chargeOff';
+        if (isChargeOff) {
+          command = 'undo-charge-off';
+          payload = { comment };
+          transactionId = null;
+        } else {
+          payload = {
+            transactionDate: this.dateUtils.formatDate(
+              this.transactionData.date && new Date(this.transactionData.date),
+              dateFormat
+            ),
+            transactionAmount: 0,
+            dateFormat,
+            locale,
+            comment
+          };
+        }
         this.loansService
-          .executeLoansAccountTransactionsCommand(accountId, 'undo', data, this.transactionData.id)
+          .executeLoansAccountTransactionsCommand(accountId, command, payload, transactionId)
           .subscribe(() => {
             this.router.navigate(['../'], { relativeTo: this.route });
           });

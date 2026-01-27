@@ -9,6 +9,7 @@ import { LoansService } from 'app/loans/loans.service';
 import { MatDialog } from '@angular/material/dialog';
 import { SettingsService } from 'app/settings/settings.service';
 import { ConfirmationDialogComponent } from 'app/shared/confirmation-dialog/confirmation-dialog.component';
+import { LoanUndoTransactionDialogComponent } from '../custom-dialogs/loan-undo-transaction-dialog/loan-undo-transaction-dialog.component';
 import { TranslateService } from '@ngx-translate/core';
 import { LoanTransaction } from 'app/products/loan-products/models/loan-account.model';
 import { LoanTransactionType } from 'app/loans/models/loan-transaction-type.model';
@@ -259,7 +260,7 @@ export class TransactionsTabComponent implements OnInit {
     const loanId = this.route.parent.parent.snapshot.params['loanId'];
     let command = 'undo';
     let operationDate = this.dateUtils.parseDate(transaction.date);
-    let payload = {};
+    let payload: any = {};
     if (this.isChargeOff(transaction.type)) {
       command = 'undo-charge-off';
       operationDate = this.settingsService.businessDate;
@@ -273,18 +274,25 @@ export class TransactionsTabComponent implements OnInit {
       };
     }
 
-    const undoTransactionAccountDialogRef = this.dialog.open(ConfirmationDialogComponent, {
-      data: {
-        heading: this.translateService.instant('labels.heading.Undo Transaction'),
-        dialogContext:
-          this.translateService.instant('labels.dialogContext.Are you sure you want undo the transaction type') +
-          `${transaction.type.value}` +
-          this.translateService.instant('labels.dialogContext.with id') +
-          `${transaction.id}`
-      }
-    });
-    undoTransactionAccountDialogRef.afterClosed().subscribe((response: { confirm: any }) => {
-      if (response.confirm) {
+    const undoTransactionAccountDialogRef = this.dialog.open(LoanUndoTransactionDialogComponent);
+    undoTransactionAccountDialogRef.afterClosed().subscribe((response: { confirm: any; comment?: string }) => {
+      if (response && response.confirm) {
+        const comment = (response.comment || '').trim();
+        if (!comment) {
+          return;
+        }
+        // Build payload with required comment
+        if (this.isChargeOff(transaction.type)) {
+          payload = { comment };
+        } else {
+          payload = {
+            transactionDate: this.dateUtils.formatDate(operationDate && new Date(operationDate), dateFormat),
+            transactionAmount: 0,
+            dateFormat,
+            locale,
+            comment
+          };
+        }
         let transactionId = transaction.id;
         if (this.isChargeOff(transaction.type)) {
           transactionId = null;
@@ -301,21 +309,19 @@ export class TransactionsTabComponent implements OnInit {
 
   undoReAgeOrReAmortize(transaction: LoanTransaction): void {
     const actionName = transaction.type.reAmortize ? 'Re-Amortize' : 'Re-Age';
-    const undoTransactionAccountDialogRef = this.dialog.open(ConfirmationDialogComponent, {
-      data: {
-        heading: this.translateService.instant('labels.heading.Undo Transaction'),
-        dialogContext:
-          this.translateService.instant('labels.dialogContext.Are you sure you want undo the transaction type') +
-          ' ' +
-          this.translateService.instant('labels.menus.' + actionName)
-      }
-    });
-    undoTransactionAccountDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.confirm) {
+    const undoTransactionAccountDialogRef = this.dialog.open(LoanUndoTransactionDialogComponent);
+    undoTransactionAccountDialogRef.afterClosed().subscribe((response: { confirm: any; comment?: string }) => {
+      if (response && response.confirm) {
+        const comment = (response.comment || '').trim();
+        if (!comment) {
+          return;
+        }
         const undoCommand = actionName === 'Re-Age' ? 'undoReAge' : 'undoReAmortize';
-        this.loansService.executeLoansAccountTransactionsCommand(String(this.loanId), undoCommand, {}).subscribe(() => {
-          this.reload();
-        });
+        this.loansService
+          .executeLoansAccountTransactionsCommand(String(this.loanId), undoCommand, { comment })
+          .subscribe(() => {
+            this.reload();
+          });
       }
     });
   }

@@ -1,0 +1,29 @@
+<h1 mat-dialog-title>{{ 'labels.heading.Undo Transaction' | translate }}</h1>
+<div mat-dialog-content>
+  <p>{{ 'labels.dialogContext.Are you sure you want to undo this transaction ?' | translate }}</p>
+  <mat-form-field appearance="fill" class="w-100">
+    <mat-label>{{ 'labels.inputs.Comments' | translate }}</mat-label>
+    <textarea
+      matInput
+      rows="3"
+      [formControl]="commentControl"
+      (input)="onCommentInput()"
+      placeholder="{{ 'labels.inputs.Comments' | translate }}"
+      required
+    ></textarea>
+    <mat-error *ngIf="commentControl.invalid && commentControl.touched">
+      {{ 'errors.validation.msg.loanaccount.undoTransaction' | translate }}
+    </mat-error>
+  </mat-form-field>
+</div>
+<mat-dialog-actions align="end">
+  <button mat-raised-button mat-dialog-close>{{ 'labels.buttons.Cancel' | translate }}</button>
+  <button
+    mat-raised-button
+    color="warn"
+    [disabled]="commentControl.invalid"
+    [mat-dialog-close]="{ confirm: true, comment: commentControl.value }"
+  >
+    {{ 'labels.buttons.Confirm' | translate }}
+  </button>
+</mat-dialog-actions>

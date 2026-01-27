@@ -12,7 +12,7 @@ import {
 } from 'app/savings/models/savings-account-transaction.model';
 import { SavingsService } from 'app/savings/savings.service';
 import { SettingsService } from 'app/settings/settings.service';
-import { UndoTransactionDialogComponent } from '../custom-dialogs/undo-transaction-dialog/undo-transaction-dialog.component';
+import { SavingsUndoTransactionDialogComponent } from '../custom-dialogs/savings-undo-transaction-dialog/savings-undo-transaction-dialog.component';
 import { MatDialog } from '@angular/material/dialog';
 
 /**
@@ -182,16 +182,21 @@ export class TransactionsTabComponent implements OnInit {
   }
 
   undoTransaction(transactionData: SavingsAccountTransaction): void {
-    const undoTransactionAccountDialogRef = this.dialog.open(UndoTransactionDialogComponent);
+    const undoTransactionAccountDialogRef = this.dialog.open(SavingsUndoTransactionDialogComponent);
     undoTransactionAccountDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.confirm) {
+      if (response && response.confirm) {
         const locale = this.settingsService.language.code;
         const dateFormat = this.settingsService.dateFormat;
+        const comment = (response.comment || '').trim();
+        if (!comment) {
+          return;
+        }
         const data = {
           transactionDate: this.dateUtils.parseDate(transactionData.date),
           transactionAmount: 0,
           dateFormat,
-          locale
+          locale,
+          comment
         };
         this.savingsService
           .executeSavingsAccountTransactionsCommand(this.accountId, 'undo', data, transactionData.id)
