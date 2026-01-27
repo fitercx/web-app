@@ -11,6 +11,12 @@ import { MatDialogRef } from '@angular/material/dialog';
   templateUrl: './savings-undo-transaction-dialog.component.html',
   styleUrls: ['./savings-undo-transaction-dialog.component.scss']
 })
+/**
+ * Dialog component used to undo a savings transaction.
+ * Captures a mandatory, non-whitespace comment before confirming the undo
+ * operation, and uses the injected {@link MatDialogRef} to control the
+ * dialog instance (e.g. closing it with the user’s action).
+ */
 export class SavingsUndoTransactionDialogComponent {
   /** Comment control (required, trims whitespace) */
   commentControl = new UntypedFormControl('', [this.nonWhitespaceRequired()]);
