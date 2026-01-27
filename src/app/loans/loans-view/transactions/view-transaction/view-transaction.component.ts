@@ -19,6 +19,7 @@ import { AlertService } from 'app/core/alert/alert.service';
 import { TranslateService } from '@ngx-translate/core';
 
 /** Custom Dialogs */
+import { LoanUndoTransactionDialogComponent } from 'app/loans/loans-view/custom-dialogs/loan-undo-transaction-dialog/loan-undo-transaction-dialog.component';
 
 /**
  * View Transaction Component.
@@ -197,29 +198,38 @@ export class ViewTransactionComponent implements OnInit {
    */
   undoTransaction() {
     const accountId = this.route.snapshot.params['loanId'];
-    const undoTransactionAccountDialogRef = this.dialog.open(ConfirmationDialogComponent, {
-      data: {
-        heading: this.translateService.instant('labels.heading.Undo Transaction'),
-        dialogContext:
-          this.translateService.instant('labels.dialogContext.Are you sure you want undo the transaction') +
-          `${this.transactionData.id}`
-      }
-    });
-    undoTransactionAccountDialogRef.afterClosed().subscribe((response: { confirm: any }) => {
-      if (response.confirm) {
+    const undoTransactionAccountDialogRef = this.dialog.open(LoanUndoTransactionDialogComponent);
+    undoTransactionAccountDialogRef.afterClosed().subscribe((response: { confirm: any; comment?: string }) => {
+      if (response && response.confirm) {
+        const comment = (response.comment || '').trim();
+        if (!comment) {
+          return;
+        }
         const locale = this.settingsService.language.code;
         const dateFormat = this.settingsService.dateFormat;
-        const data = {
-          transactionDate: this.dateUtils.formatDate(
-            this.transactionData.date && new Date(this.transactionData.date),
-            dateFormat
-          ),
-          transactionAmount: 0,
-          dateFormat,
-          locale
-        };
+        let command = 'undo';
+        let payload: any;
+        let transactionId: number | null = this.transactionData.id;
+        const isChargeOff =
+          this.transactionType?.chargeoff || this.transactionType?.code === 'loanTransactionType.chargeOff';
+        if (isChargeOff) {
+          command = 'undo-charge-off';
+          payload = { comment };
+          transactionId = null;
+        } else {
+          payload = {
+            transactionDate: this.dateUtils.formatDate(
+              this.transactionData.date && new Date(this.transactionData.date),
+              dateFormat
+            ),
+            transactionAmount: 0,
+            dateFormat,
+            locale,
+            comment
+          };
+        }
         this.loansService
-          .executeLoansAccountTransactionsCommand(accountId, 'undo', data, this.transactionData.id)
+          .executeLoansAccountTransactionsCommand(accountId, command, payload, transactionId)
           .subscribe(() => {
             this.router.navigate(['../'], { relativeTo: this.route });
           });
