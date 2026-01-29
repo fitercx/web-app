@@ -3,7 +3,7 @@ import { NgModule } from '@angular/core';
 import { Routes, RouterModule } from '@angular/router';
 
 /** Custom Components */
-import { LoansViewComponent } from './loans-view/loans-view.component';
+import LoansViewComponent from './loans-view/loans-view.component';
 import { GeneralTabComponent } from './loans-view/general-tab/general-tab.component';
 import { AccountDetailsComponent } from './loans-view/account-details/account-details.component';
 import { NotesTabComponent } from './loans-view/notes-tab/notes-tab.component';
