@@ -14,15 +14,20 @@ import { MatTableDataSource } from '@angular/material/table';
 export class ActiveLoansTabComponent implements OnInit {
   displayedColumns: string[] = [
     'Account No',
+    'Invoice Number',
+    'Supplier/Buyer Name',
     'Loan Account',
-    'Loan Amount',
+    'Disbursed Amount',
     'Outstanding Balance',
     'Amount Paid',
+    'Refund Amount',
     'Actions'
   ];
   loanAccounts: MatTableDataSource<any>;
   totalRecords = 0;
   locCurrency: string = '';
+  private locData: any;
+  private extrasById: Map<number, any> = new Map<number, any>();
 
   @ViewChild(MatPaginator) paginator: MatPaginator;
 
@@ -40,15 +45,28 @@ export class ActiveLoansTabComponent implements OnInit {
 
   ngOnInit(): void {
     this.loanAccounts = new MatTableDataSource([]);
-    this.loadLocCurrencyFromResolver();
+    this.loadLocContextFromResolver();
     this.getLoans();
   }
 
-  private loadLocCurrencyFromResolver(): void {
-    // Get LOC data from parent component's resolver instead of making another API call
-    const locData = this.route.parent.snapshot.data['locData'];
-    if (locData) {
-      this.locCurrency = locData.currency || '';
+  private loadLocContextFromResolver(): void {
+    // Cache LOC resolver data and build extras map once
+    this.locData = this.route.parent.snapshot.data['locData'] || {};
+    if (this.locData) {
+      this.locCurrency = this.locData.currency || '';
+      const resolverLoans: any[] = Array.isArray(this.locData.activeLoansList)
+        ? this.locData.activeLoansList
+        : Array.isArray(this.locData.activeLoans)
+          ? this.locData.activeLoans
+          : Array.isArray((this.locData as any).loans)
+            ? (this.locData as any).loans
+            : [];
+      this.extrasById = new Map<number, any>(
+        resolverLoans.map((l: any) => [
+          l.id,
+          l
+        ])
+      );
     }
   }
 
@@ -59,10 +77,42 @@ export class ActiveLoansTabComponent implements OnInit {
       .getLoans(this.clientId.toString(), this.locId.toString(), offset, limit)
       .subscribe((data: any) => {
         if (data.pageItems) {
-          this.loanAccounts.data = data.pageItems;
+          // Merge extra LOC-specific fields from resolver data when available
+          const merged = data.pageItems.map((item: any) => this.normalizeLoanItem(item, this.extrasById.get(item.id)));
+
+          this.loanAccounts.data = merged;
           this.totalRecords = data.totalFilteredRecords;
         }
       });
+  }
+
+  private normalizeLoanItem(item: any, extra?: any): any {
+    const out = { ...item };
+    const ap = out.additionalProperties || {};
+
+    if (extra) {
+      out.invoiceNumber =
+        out.invoiceNumber ?? extra.invoiceNumber ?? extra.invoiceNo ?? ap.invoiceNumber ?? ap.invoiceNo;
+      out.supplierBuyerName = out.supplierBuyerName ?? extra.supplierBuyerName ?? ap.supplierBuyerName;
+      out.originalLoan = out.originalLoan ?? extra.originalLoan ?? out.principal;
+      const refundSource =
+        out.totalOverPaidDerived !== undefined
+          ? out.totalOverPaidDerived
+          : extra.totalOverPaidDerived !== undefined
+            ? extra.totalOverPaidDerived
+            : out.summary?.totalOverpayment;
+      out.totalOverPaidDerived = refundSource;
+    } else {
+      out.originalLoan = out.originalLoan ?? out.principal;
+      out.invoiceNumber = out.invoiceNumber ?? ap.invoiceNumber ?? ap.invoiceNo;
+      out.supplierBuyerName = out.supplierBuyerName ?? ap.supplierBuyerName;
+      out.totalOverPaidDerived =
+        out.totalOverPaidDerived !== undefined ? out.totalOverPaidDerived : out.summary?.totalOverpayment;
+    }
+    // Common fallbacks
+    out.amountPaid = out.amountPaid ?? out.summary?.totalRepayment ?? out.summary?.totalRepaymentDerived;
+    out.loanProductName = out.loanProductName ?? out.productName;
+    return out;
   }
 
   routeEdit($event: MouseEvent) {
