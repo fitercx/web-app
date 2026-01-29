@@ -538,20 +538,60 @@ export class ClientsService {
   }
 
   /**
-   * Manage approved buyers/suppliers for a Line of Credit
-   * POST /api/v1/clients/{clientId}/creditlines/{lineOfCreditId}/manageapprovedbuyers
+   * Get all vendors for a Line of Credit
+   * GET /api/v1/clients/{clientId}/creditlines/{lineOfCreditId}/vendors
    * @param clientId Client ID who owns the Line of Credit
-   * @param lineOfCreditId Line of Credit ID to manage buyers for
-   * @param approvedBuyers Array of approved buyers/suppliers
+   * @param lineOfCreditId Line of Credit ID to get vendors for
+   * @returns Observable of vendors array
+   */
+  getVendors(clientId: string, lineOfCreditId: string): Observable<any> {
+    return this.http.get(`/clients/${clientId}/creditlines/${lineOfCreditId}/vendors`);
+  }
+
+  /**
+   * Create a new vendor for a Line of Credit
+   * POST /api/v1/clients/{clientId}/creditlines/{lineOfCreditId}/vendors
+   * @param clientId Client ID who owns the Line of Credit
+   * @param lineOfCreditId Line of Credit ID to create vendor for
+   * @param vendorData Vendor data (name, creditLimit, losExternalId)
    * @returns Observable of the API response
    */
-  manageApprovedBuyers(clientId: string, lineOfCreditId: string, approvedBuyers: any[]): Observable<any> {
-    const requestBody = {
-      approvedBuyers: approvedBuyers,
-      locale: 'en',
-      dateFormat: 'yyyy-MM-dd'
-    };
+  createVendor(clientId: string, lineOfCreditId: string, vendorData: any): Observable<any> {
+    return this.http.post(`/clients/${clientId}/creditlines/${lineOfCreditId}/vendors`, vendorData);
+  }
 
-    return this.http.post(`/clients/${clientId}/creditlines/${lineOfCreditId}/manageapprovedbuyers`, requestBody);
+  /**
+   * Update an existing vendor
+   * PUT /api/v1/clients/{clientId}/creditlines/{lineOfCreditId}/vendors/{vendorId}
+   * @param clientId Client ID who owns the Line of Credit
+   * @param lineOfCreditId Line of Credit ID
+   * @param vendorId Vendor ID to update
+   * @param vendorData Updated vendor data (only name can be updated)
+   * @returns Observable of the API response
+   */
+  updateVendor(clientId: string, lineOfCreditId: string, vendorId: string, vendorData: any): Observable<any> {
+    return this.http.put(`/clients/${clientId}/creditlines/${lineOfCreditId}/vendors/${vendorId}`, vendorData);
+  }
+
+  /**
+   * Delete a vendor
+   * DELETE /api/v1/clients/{clientId}/creditlines/{lineOfCreditId}/vendors/{vendorId}
+   * @param clientId Client ID who owns the Line of Credit
+   * @param lineOfCreditId Line of Credit ID
+   * @param vendorId Vendor ID to delete
+   * @returns Observable of the API response
+   */
+  deleteVendor(clientId: string, lineOfCreditId: string, vendorId: string): Observable<any> {
+    return this.http.delete(`/clients/${clientId}/creditlines/${lineOfCreditId}/vendors/${vendorId}`);
+  }
+
+  /**
+   * Get vendor by LOS external ID
+   * GET /api/v1/clients/vendors/los-external-id/{losExternalId}
+   * @param losExternalId LOS external ID to search for
+   * @returns Observable of vendor data
+   */
+  getVendorByLosExternalId(losExternalId: string): Observable<any> {
+    return this.http.get(`/clients/vendors/los-external-id/${losExternalId}`);
   }
 }

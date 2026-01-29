@@ -1,13 +1,16 @@
 /** Angular Imports */
 import { Component, Inject, OnInit } from '@angular/core';
-import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
+import { MatDialogRef, MAT_DIALOG_DATA, MatDialog } from '@angular/material/dialog';
 import { UntypedFormArray, UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 
 /** Custom Services */
 import { ClientsService } from '../../clients.service';
 
+/** Custom Components */
+import { DeleteDialogComponent } from 'app/shared/delete-dialog/delete-dialog.component';
+
 /** Custom Models */
-import { ApprovedBuyer, ManageApprovedBuyersDialogData } from '../../models/credit-line.model';
+import { Vendor, ApprovedBuyer, ManageApprovedBuyersDialogData } from '../../models/credit-line.model';
 
 /**
  * Manage Approved Buyers Dialog Component
@@ -30,24 +33,46 @@ export class ManageApprovedBuyersDialogComponent implements OnInit {
   /** Original form state for rollback on API failure */
   private originalFormState: any[] = [];
 
+  /** Current vendors from the API */
+  private currentVendors: Vendor[] = [];
+
+  /** Vendors to be deleted (for batch deletion at save time) */
+  private vendorsToDelete: Vendor[] = [];
+
+  /** Track if any changes were made (for triggering parent refresh) */
+  private hasChanges = false;
+
+  /** Operations tracking */
+  private pendingOperations: {
+    create: Vendor[];
+    update: { vendor: Vendor; originalName: string }[];
+    delete: Vendor[];
+  } = {
+    create: [],
+    update: [],
+    delete: []
+  };
+
   /**
    * @param {MatDialogRef} dialogRef Component reference to dialog.
    * @param {ManageApprovedBuyersDialogData} data Dialog data.
    * @param {UntypedFormBuilder} formBuilder Form Builder.
    * @param {ClientsService} clientsService Clients Service.
+   * @param {MatDialog} dialog Material Dialog Service.
    */
   constructor(
     public dialogRef: MatDialogRef<ManageApprovedBuyersDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: ManageApprovedBuyersDialogData,
     private readonly formBuilder: UntypedFormBuilder,
-    private readonly clientsService: ClientsService
+    private readonly clientsService: ClientsService,
+    private readonly dialog: MatDialog
   ) {
     this.createManageApprovedBuyersForm();
   }
 
   ngOnInit() {
-    // Initialize form with current buyers
-    this.initializeFormWithCurrentBuyers();
+    // Load current vendors from API instead of using dialog data
+    this.loadCurrentVendors();
   }
 
   /**
@@ -67,23 +92,41 @@ export class ManageApprovedBuyersDialogComponent implements OnInit {
   }
 
   /**
-   * Initialize form with current buyers
+   * Load current vendors from API
    */
-  initializeFormWithCurrentBuyers() {
-    const buyersArray = this.approvedBuyersFormArray;
+  loadCurrentVendors() {
+    this.clientsService.getVendors(this.data.clientId, this.data.lineOfCreditId).subscribe({
+      next: (vendors: Vendor[]) => {
+        this.currentVendors = vendors || [];
+        this.initializeFormWithCurrentVendors();
+      },
+      error: (error) => {
+        console.error('Error loading vendors:', error);
+        this.errors = ['Failed to load current vendors'];
+        // Initialize with empty form as fallback
+        this.initializeFormWithCurrentVendors();
+      }
+    });
+  }
+
+  /**
+   * Initialize form with current vendors
+   */
+  initializeFormWithCurrentVendors() {
+    const vendorsArray = this.approvedBuyersFormArray;
 
     // Clear existing form array
-    while (buyersArray.length !== 0) {
-      buyersArray.removeAt(0);
+    while (vendorsArray.length !== 0) {
+      vendorsArray.removeAt(0);
     }
 
-    // Add current buyers to form
-    if (this.data.currentBuyers && this.data.currentBuyers.length > 0) {
-      this.data.currentBuyers.forEach((buyer: ApprovedBuyer) => {
-        buyersArray.push(this.createBuyerFormGroup(buyer));
+    // Add current vendors to form
+    if (this.currentVendors && this.currentVendors.length > 0) {
+      this.currentVendors.forEach((vendor: Vendor) => {
+        vendorsArray.push(this.createVendorFormGroup(vendor));
       });
     } else {
-      // Add one empty buyer if none exist
+      // Add one empty vendor if none exist
       this.addBuyer();
     }
 
@@ -92,17 +135,27 @@ export class ManageApprovedBuyersDialogComponent implements OnInit {
   }
 
   /**
-   * Create a form group for a single buyer
+   * Create a form group for a single vendor
    */
-  createBuyerFormGroup(buyer?: ApprovedBuyer): UntypedFormGroup {
+  createVendorFormGroup(vendor?: Vendor): UntypedFormGroup {
     return this.formBuilder.group({
+      id: [vendor?.id || null], // Store vendor ID for updates/deletes
       name: [
-        buyer?.name || '',
+        vendor?.name || '',
         [
           Validators.required,
           Validators.maxLength(100)]
-      ]
+      ],
+      isNew: [!vendor?.id] // Track if this is a new vendor
     });
+  }
+
+  /**
+   * Legacy method for backward compatibility
+   * @deprecated Use createVendorFormGroup instead
+   */
+  createBuyerFormGroup(buyer?: ApprovedBuyer | Vendor): UntypedFormGroup {
+    return this.createVendorFormGroup(buyer as Vendor);
   }
 
   /**
@@ -114,11 +167,69 @@ export class ManageApprovedBuyersDialogComponent implements OnInit {
   }
 
   /**
-   * Remove a buyer from the form array
+   * Remove a buyer from the form array or delete from backend if it exists
    */
   removeBuyer(index: number) {
-    this.approvedBuyersFormArray.removeAt(index);
-    this.errors = []; // Clear errors when user makes changes
+    const buyerControl = this.approvedBuyersFormArray.at(index);
+    const vendorId = buyerControl.get('id')?.value;
+    const vendorName = buyerControl.get('name')?.value;
+    const isNew = buyerControl.get('isNew')?.value;
+
+    // If it's a new vendor (not saved yet), just remove from form
+    if (isNew || !vendorId) {
+      this.approvedBuyersFormArray.removeAt(index);
+      this.errors = [];
+      return;
+    }
+
+    // For existing vendors, show confirmation dialog and make API call
+    const deleteVendorDialogRef = this.dialog.open(DeleteDialogComponent, {
+      data: { deleteContext: `${this.getBuyerLabel()} "${vendorName}"` }
+    });
+
+    deleteVendorDialogRef.afterClosed().subscribe((response: any) => {
+      if (response && response.delete) {
+        // Show loading state
+        this.isLoading = true;
+        this.errors = [];
+
+        // Make delete API call
+        this.clientsService.deleteVendor(this.data.clientId, this.data.lineOfCreditId, vendorId.toString()).subscribe({
+          next: () => {
+            this.isLoading = false;
+            // Remove from form array
+            this.approvedBuyersFormArray.removeAt(index);
+            // Update current vendors list
+            this.currentVendors = this.currentVendors.filter((v) => v.id !== vendorId);
+            // Update original form state
+            this.captureOriginalFormState();
+            // Clear errors
+            this.errors = [];
+            // Mark that changes were made
+            this.hasChanges = true;
+          },
+          error: (error) => {
+            this.isLoading = false;
+            console.error('Error deleting vendor:', error);
+
+            // Handle API errors - prioritize user-friendly messages
+            if (error.error?.defaultUserMessage) {
+              this.errors = [error.error.defaultUserMessage];
+            } else if (error.error?.userMessage) {
+              this.errors = [error.error.userMessage];
+            } else if (error.error?.errors && error.error.errors.length > 0) {
+              this.errors = error.error.errors.map(
+                (err: any) => err.defaultUserMessage || err.userMessage || err.developerMessage
+              );
+            } else if (error.error?.developerMessage) {
+              this.errors = [error.error.developerMessage];
+            } else {
+              this.errors = ['An error occurred while deleting the vendor. Please try again.'];
+            }
+          }
+        });
+      }
+    });
   }
 
   /**
@@ -154,7 +265,7 @@ export class ManageApprovedBuyersDialogComponent implements OnInit {
   }
 
   /**
-   * Save the approved buyers
+   * Save the vendors using individual CRUD operations
    */
   save() {
     this.errors = [];
@@ -169,54 +280,160 @@ export class ManageApprovedBuyersDialogComponent implements OnInit {
       return;
     }
 
-    // Prepare the approved buyers data
-    const approvedBuyers: ApprovedBuyer[] = this.approvedBuyersFormArray.value.map((buyer: any) => ({
-      name: buyer.name?.trim()
-    }));
-
     this.isLoading = true;
 
-    // Call the API to manage approved buyers
-    this.clientsService.manageApprovedBuyers(this.data.clientId, this.data.lineOfCreditId, approvedBuyers).subscribe({
-      next: (response) => {
-        this.isLoading = false;
-        // Close dialog and return the updated buyers list
-        this.dialogRef.close({
-          success: true,
-          approvedBuyers: approvedBuyers
+    // Analyze changes and prepare operations
+    this.analyzeChanges();
+
+    // Execute operations sequentially
+    this.executeOperations();
+  }
+
+  /**
+   * Analyze form changes to determine what CRUD operations are needed
+   * Note: Delete operations are handled immediately when user clicks delete button
+   */
+  private analyzeChanges() {
+    this.pendingOperations = { create: [], update: [], delete: [] };
+
+    const currentFormValues = this.approvedBuyersFormArray.value;
+
+    // Find vendors to create (new vendors without ID)
+    currentFormValues.forEach((formValue: any) => {
+      if (formValue.isNew && formValue.name?.trim()) {
+        this.pendingOperations.create.push({
+          name: formValue.name.trim()
         });
-      },
-      error: (error) => {
-        this.isLoading = false;
-        console.error('Error managing approved buyers:', error);
-
-        // Restore original form state on API failure
-        this.restoreFormState();
-
-        // Handle API errors - prioritize user-friendly messages
-        if (error.error?.defaultUserMessage) {
-          this.errors = [error.error.defaultUserMessage];
-        } else if (error.error?.userMessage) {
-          this.errors = [error.error.userMessage];
-        } else if (error.error?.errors && error.error.errors.length > 0) {
-          // Handle errors array with individual error messages
-          this.errors = error.error.errors.map(
-            (err: any) => err.defaultUserMessage || err.userMessage || err.developerMessage
-          );
-        } else if (error.error?.developerMessage) {
-          this.errors = [error.error.developerMessage];
-        } else {
-          this.errors = ['An error occurred while updating approved buyers. Please try again.'];
-        }
       }
     });
+
+    // Find vendors to update (existing vendors with name changes)
+    this.currentVendors.forEach((originalVendor: Vendor) => {
+      const formValue = currentFormValues.find((fv: any) => fv.id === originalVendor.id);
+      if (formValue && formValue.name?.trim() !== originalVendor.name) {
+        this.pendingOperations.update.push({
+          vendor: { ...originalVendor, name: formValue.name.trim() },
+          originalName: originalVendor.name
+        });
+      }
+    });
+
+    // No need to find vendors to delete - they're deleted immediately via removeBuyer method
+  }
+
+  /**
+   * Execute all pending operations sequentially
+   * Note: Delete operations are already handled immediately
+   */
+  private executeOperations() {
+    // Start with update operations
+    if (this.pendingOperations.update.length > 0) {
+      this.executeUpdateOperations();
+    } else if (this.pendingOperations.create.length > 0) {
+      this.executeCreateOperations();
+    } else {
+      // No changes detected
+      this.isLoading = false;
+      this.dialogRef.close({ success: true, vendors: this.currentVendors });
+    }
+  }
+
+  /**
+   * Execute update operations
+   */
+  private executeUpdateOperations() {
+    const updateOperation = this.pendingOperations.update.shift();
+    if (!updateOperation) {
+      // Move to create operations
+      if (this.pendingOperations.create.length > 0) {
+        this.executeCreateOperations();
+      } else {
+        this.operationsComplete();
+      }
+      return;
+    }
+
+    this.clientsService
+      .updateVendor(this.data.clientId, this.data.lineOfCreditId, updateOperation.vendor.id!.toString(), {
+        name: updateOperation.vendor.name
+      })
+      .subscribe({
+        next: () => {
+          // Continue with remaining updates
+          this.executeUpdateOperations();
+        },
+        error: (error) => {
+          this.handleOperationError(error);
+        }
+      });
+  }
+
+  /**
+   * Execute create operations
+   */
+  private executeCreateOperations() {
+    const vendorToCreate = this.pendingOperations.create.shift();
+    if (!vendorToCreate) {
+      this.operationsComplete();
+      return;
+    }
+
+    this.clientsService.createVendor(this.data.clientId, this.data.lineOfCreditId, vendorToCreate).subscribe({
+      next: () => {
+        // Continue with remaining creations
+        this.executeCreateOperations();
+      },
+      error: (error) => {
+        this.handleOperationError(error);
+      }
+    });
+  }
+
+  /**
+   * Handle operation completion
+   */
+  private operationsComplete() {
+    this.isLoading = false;
+    // Mark that changes were made
+    this.hasChanges = true;
+    // Reload vendors to get the latest state
+    this.loadCurrentVendors();
+    this.dialogRef.close({ success: true, vendors: this.currentVendors });
+  }
+
+  /**
+   * Handle operation errors
+   */
+  private handleOperationError(error: any) {
+    this.isLoading = false;
+    console.error('Error in vendor operation:', error);
+
+    // Restore original form state on API failure
+    this.restoreFormState();
+
+    // Handle API errors - prioritize user-friendly messages
+    if (error.error?.defaultUserMessage) {
+      this.errors = [error.error.defaultUserMessage];
+    } else if (error.error?.userMessage) {
+      this.errors = [error.error.userMessage];
+    } else if (error.error?.errors && error.error.errors.length > 0) {
+      // Handle errors array with individual error messages
+      this.errors = error.error.errors.map(
+        (err: any) => err.defaultUserMessage || err.userMessage || err.developerMessage
+      );
+    } else if (error.error?.developerMessage) {
+      this.errors = [error.error.developerMessage];
+    } else {
+      this.errors = ['An error occurred while updating vendors. Please try again.'];
+    }
   }
 
   /**
    * Cancel and close the dialog
    */
   cancel() {
-    this.dialogRef.close({ success: false });
+    // If changes were made (e.g., immediate deletes), signal success so parent refreshes
+    this.dialogRef.close({ success: this.hasChanges });
   }
 
   /**

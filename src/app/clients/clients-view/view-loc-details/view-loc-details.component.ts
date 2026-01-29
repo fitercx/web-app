@@ -12,7 +12,7 @@ import { FormDialogComponent } from 'app/shared/form-dialog/form-dialog.componen
 import { ManageApprovedBuyersDialogComponent } from '../manage-approved-buyers-dialog/manage-approved-buyers-dialog.component';
 
 /** Custom Models */
-import { ApprovedBuyer } from '../../models/credit-line.model';
+import { ApprovedBuyer, ManageApprovedBuyersDialogData } from '../../models/credit-line.model';
 
 /** Form Field Models */
 import { DatepickerBase } from 'app/shared/form-dialog/formfield/model/datepicker-base';
@@ -352,10 +352,10 @@ export class ViewLocDetailsComponent implements OnInit {
    * Open manage approved buyers dialog
    */
   openManageApprovedBuyersDialog(): void {
-    const dialogData = {
+    const dialogData: ManageApprovedBuyersDialogData = {
       clientId: this.clientId,
       lineOfCreditId: this.locId,
-      currentBuyers: this.extractCurrentBuyersAsObjects(),
+      currentVendors: [], // Will be loaded from API in the dialog
       locType: this.locDetails?.type === 'LOC PAYABLE' ? 'PAYABLE' : 'RECEIVABLE',
       isActive: this.isActive()
     };
@@ -369,14 +369,11 @@ export class ViewLocDetailsComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe((result) => {
       if (result && result.success) {
-        // Update the current buyers list in the component
-        this.locDetails.approvedBuyersList = result.approvedBuyers.map((buyer: ApprovedBuyer) => buyer.name);
-
-        // Show success message (you can replace this with your preferred notification system)
-        console.log('Approved buyers updated successfully');
-
-        // Optionally, refresh the LOC data from the server
+        // Refresh the LOC data from the server to get updated vendor list
         this.refreshLocData();
+
+        // Show success message
+        console.log('Vendors updated successfully');
       }
     });
   }
