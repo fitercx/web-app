@@ -23,7 +23,7 @@ import { LoanTransaction } from 'app/products/loan-products/models/loan-account.
   templateUrl: './loans-view.component.html',
   styleUrls: ['./loans-view.component.scss']
 })
-export class LoansViewComponent implements OnInit {
+class LoansViewComponent implements OnInit {
   /** Loan Details Data */
   loanDetailsData: any;
   /** Loan Datatables */
@@ -386,6 +386,10 @@ export class LoansViewComponent implements OnInit {
     if (!this.loanDetailsData || !this.loanDetailsData.summary) {
       return 0;
     }
+    if (this.loanDetailsData?.multiDisburseLoan) {
+      return this.getTotalOutstandingForMultiTranche();
+    }
+
     const totalOutstanding = this.loanDetailsData.summary.totalOutstanding || 0;
     const overPaid = this.loanDetailsData.totalOverpaid || this.loanDetailsData.overPaidAmount || 0;
     if (overPaid > 0 && this.isAnyLineOfCredit()) {
@@ -408,4 +412,159 @@ export class LoansViewComponent implements OnInit {
     const locType = info.locType || info.additionalProperties?.locProductType;
     return locType === 'RECEIVABLE' || locType === 'PAYABLE';
   }
+
+  private getTotalOutstandingForMultiTranche(): number {
+    const principalOutstanding = this.getPrincipalOutstandingForMultiTranche();
+    // Use unadjusted interest outstanding, we'll apply overpayment to total
+    const interestOutstanding = this.loanDetailsData.summary.interestOutstanding || 0;
+    const feesOutstanding = this.getDisbursedTrancheFees().feeChargesOutstanding;
+    const taxesOutstanding = this.loanDetailsData.summary.taxChargesOutstanding || 0;
+    const penaltiesOutstanding = this.loanDetailsData.summary.penaltyChargesOutstanding || 0;
+
+    let totalOutstanding =
+      principalOutstanding + interestOutstanding + feesOutstanding + taxesOutstanding + penaltiesOutstanding;
+
+    // Apply overpayment adjustment for LOC loans (similar to getAdjustedTotalOutstanding)
+    const overPaid = this.loanDetailsData.totalOverpaid || this.loanDetailsData.overPaidAmount || 0;
+    if (overPaid > 0 && this.isAnyLineOfCredit()) {
+      totalOutstanding = totalOutstanding - overPaid;
+    }
+
+    return Math.max(0, totalOutstanding); // Ensure non-negative
+  }
+
+  private getPrincipalOutstandingForMultiTranche(): number {
+    if (!this.loanDetailsData?.multiDisburseLoan || !this.loanDetailsData?.summary) {
+      return this.loanDetailsData?.summary?.principalOutstanding || 0;
+    }
+
+    const disbursedPrincipal = this.getTotalDisbursedPrincipal();
+    const paid = this.loanDetailsData.summary.principalPaid || 0;
+    const waived = this.loanDetailsData.summary.principalWaived || 0;
+    const writtenOff = this.loanDetailsData.summary.principalWrittenOff || 0;
+
+    const outstanding = disbursedPrincipal - paid - waived - writtenOff;
+    return Math.max(0, outstanding); // Ensure non-negative
+  }
+  private getTotalDisbursedPrincipal(): number {
+    // If not a multi-disbursal loan, return the standard principalDisbursed value
+    if (!this.loanDetailsData?.multiDisburseLoan) {
+      return this.loanDetailsData?.summary?.principalDisbursed || 0;
+    }
+
+    // For multi-disbursal loans, prefer repaymentSchedule.totalPrincipalDisbursed (calculated by backend)
+    // This is more reliable as it's based on actual period data
+    // Accept 0 as a valid value (e.g., loan with zero principal disbursed initially)
+    if (this.loanDetailsData?.repaymentSchedule?.totalPrincipalDisbursed != null) {
+      return this.loanDetailsData.repaymentSchedule.totalPrincipalDisbursed;
+    }
+
+    // Fallback: calculate from disbursementDetails if repaymentSchedule total is not available
+    if (!this.loanDetailsData?.disbursementDetails || !Array.isArray(this.loanDetailsData.disbursementDetails)) {
+      return this.loanDetailsData?.summary?.principalDisbursed || 0;
+    }
+
+    // Sum principal amounts only for disbursements that have been actually disbursed
+    let totalDisbursed = 0;
+    this.loanDetailsData.disbursementDetails.forEach((disbursement: any) => {
+      // Only count disbursements that have an actualDisbursementDate
+      // Check for null/undefined (not truthiness) to allow zero-principal disbursements
+      if (disbursement.actualDisbursementDate && disbursement.principal != null) {
+        totalDisbursed += disbursement.principal * 1;
+      }
+    });
+
+    return totalDisbursed;
+  }
+
+  private getDisbursedTrancheFees(): {
+    feeChargesCharged: number;
+    feeChargesPaid: number;
+    feeChargesOutstanding: number;
+    feeChargesWaived: number;
+    feeChargesWrittenOff: number;
+    feeChargesOverdue: number;
+  } {
+    const result = {
+      feeChargesCharged: 0,
+      feeChargesPaid: 0,
+      feeChargesOutstanding: 0,
+      feeChargesWaived: 0,
+      feeChargesWrittenOff: 0,
+      feeChargesOverdue: 0
+    };
+    // Only process if it's a multi-disbursal loan with repayment schedule
+    if (!this.loanDetailsData?.multiDisburseLoan || !this.loanDetailsData?.repaymentSchedule?.periods) {
+      return result;
+    }
+    const periods = this.loanDetailsData.repaymentSchedule.periods;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    // Iterate through periods and sum fees only for disbursed tranches
+    periods.forEach((period: any) => {
+      if (this.isDisbursementPeriodDisbursed(period)) {
+        // Use original value when available, fall back to current value (for "Original" column consistency)
+        result.feeChargesCharged += period.feeChargesOriginalDue || period.feeChargesDue || 0;
+        result.feeChargesPaid += period.feeChargesPaid || 0;
+        result.feeChargesOutstanding += period.feeChargesOutstanding || 0;
+        result.feeChargesWaived += period.feeChargesWaived || 0;
+        result.feeChargesWrittenOff += period.feeChargesWrittenOff || 0;
+
+        // Calculate overdue: if period has outstanding fees and due date has passed
+        if (period.feeChargesOutstanding && period.feeChargesOutstanding > 0 && period.dueDate) {
+          const dueDate = new Date(period.dueDate[0], period.dueDate[1] - 1, period.dueDate[2]);
+          dueDate.setHours(0, 0, 0, 0);
+          if (dueDate < today) {
+            result.feeChargesOverdue += period.feeChargesOutstanding || 0;
+          }
+        }
+      }
+    });
+    return result;
+  }
+
+  private isDisbursementPeriodDisbursed(period: any): boolean {
+    if (!period.status || period.status !== 'DISBURSEMENT') {
+      return false;
+    }
+
+    if (!this.loanDetailsData) {
+      return false;
+    }
+
+    // Primary check: Use disbursementDetails if available
+    if (this.loanDetailsData.disbursementDetails && Array.isArray(this.loanDetailsData.disbursementDetails)) {
+      const periodDueDate = period.dueDate;
+      const periodPrincipal = period.principalDisbursed || 0;
+
+      // Find matching disbursementDetail
+      const matchingDisbursement = this.loanDetailsData.disbursementDetails.find((disb: any) => {
+        const disbursementExpectedDate = disb.expectedDisbursementDate;
+        const disbursementPrincipal = disb.principal || 0;
+        // Compare dates
+        const datesMatch = this.areDateArraysEqual(disbursementExpectedDate, periodDueDate);
+        // Compare principal amounts (with small tolerance for floating point)
+        const principalMatch = Math.abs(disbursementPrincipal - periodPrincipal) < 0.01;
+        return datesMatch && principalMatch;
+      });
+
+      // If found and has actualDisbursementDate, it's been disbursed
+      if (matchingDisbursement) {
+        return !!matchingDisbursement.actualDisbursementDate;
+      }
+    }
+
+    // Fallback: Check if fees were paid (indicates disbursement occurred)
+    // If feeChargesPaid > 0, it's likely been disbursed
+    return period.feeChargesPaid && period.feeChargesPaid > 0;
+  }
+
+  private areDateArraysEqual(date1: number[] | undefined | null, date2: number[] | undefined | null): boolean {
+    if (!date1 || !date2 || date1.length !== 3 || date2.length !== 3) {
+      return false;
+    }
+    return date1[0] === date2[0] && date1[1] === date2[1] && date1[2] === date2[2];
+  }
 }
+
+export default LoansViewComponent;
