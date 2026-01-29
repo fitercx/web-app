@@ -1,16 +1,7 @@
 <div class="container">
   <div fxLayout="row" class="m-t-20" fxLayoutAlign="space-between center" *ngIf="!forEditing">
     <div fxLayout="row" fxLayoutGap="12px" fxLayoutAlign="start center">
-      <button
-        *ngIf="canAdjustAnyInstallment()"
-        mat-raised-button
-        color="primary"
-        (click)="openAdjustInstallmentDateDialog()"
-        matTooltip="{{ 'tooltips.Adjust Date' | translate }}"
-      >
-        <mat-icon>event</mat-icon>
-        {{ 'labels.buttons.Adjust Installment Date' | translate }}
-      </button>
+      <!-- Adjust Installment Date button moved to More menu -->
     </div>
 
     <button mat-raised-button color="primary" (click)="exportToPDF()">
@@ -185,7 +176,15 @@
     <ng-container matColumnDef="fees">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Fees' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        {{ item.feeChargesDue | formatNumber }}
+        <ng-container *ngIf="item.feeChargesReversed && item.feeChargesReversed > 0; else normalFees">
+          <span class="reversed-amount">
+            <fa-icon icon="undo" class="m-r-5" [matTooltip]="'tooltips.Reversed Paid Charge' | translate"></fa-icon>
+            {{ item.feeChargesReversed | formatNumber }}
+          </span>
+        </ng-container>
+        <ng-template #normalFees>
+          {{ item.feeChargesDue | formatNumber }}
+        </ng-template>
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
         <b>
@@ -209,7 +208,17 @@
     <ng-container matColumnDef="penalties">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Overdue Interest' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        {{ item.penaltyChargesDue | formatNumber }}
+        <ng-container *ngIf="item.reversedPenaltyChargesDue && item.reversedPenaltyChargesDue > 0; else normalPenalty">
+          <span class="reversed-amount">
+            <fa-icon icon="undo" class="m-r-5" [matTooltip]="'tooltips.Reversed Paid Charge' | translate"></fa-icon>
+            {{ item.reversedPenaltyChargesDue | formatNumber }}
+          </span>
+        </ng-container>
+        <ng-template #normalPenalty>
+          <ng-container *ngIf="item.penaltyChargesDue > 0">
+            {{ item.penaltyChargesDue | formatNumber }}
+          </ng-container>
+        </ng-template>
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
         <b>

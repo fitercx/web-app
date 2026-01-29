@@ -109,6 +109,7 @@ export interface RepaymentSchedulePeriod {
   penaltyChargesWaived?: number;
   penaltyChargesWrittenOff?: number;
   penaltyChargesOutstanding?: number;
+  reversedPenaltyChargesDue?: number;
   totalPaidInAdvanceForPeriod?: number;
   totalPaidLateForPeriod?: number;
   totalWaivedForPeriod?: number;

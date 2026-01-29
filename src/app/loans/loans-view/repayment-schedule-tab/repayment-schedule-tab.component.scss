@@ -80,3 +80,32 @@ table {
   color: #424242;
   line-height: 1.5;
 }
+
+.warning-box {
+  display: flex;
+  align-items: flex-start;
+  padding: 12px;
+  background-color: #fff3e0;
+  border-radius: 4px;
+  border-left: 4px solid #f57c00;
+}
+
+.warning-icon {
+  color: #f57c00;
+  margin-right: 8px;
+  margin-top: 2px;
+}
+
+.warning-text {
+  margin: 0;
+  font-size: 14px;
+  color: #e65100;
+  line-height: 1.5;
+}
+
+.reversed-amount {
+  color: #f44336;
+  font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+}

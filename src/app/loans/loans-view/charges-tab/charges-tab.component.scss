@@ -52,3 +52,17 @@
 ::ng-deep .mat-datepicker-content {
   z-index: 10000 !important;
 }
+
+.reversed-amount {
+  color: #f44336;
+  font-weight: 500;
+}
+
+::ng-deep .success-snackbar {
+  background-color: #4caf50 !important;
+  color: white !important;
+
+  .mat-simple-snackbar-action {
+    color: white !important;
+  }
+}
