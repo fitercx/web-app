@@ -133,6 +133,7 @@ export class GeneralTabComponent implements OnInit {
   setloanSummaryTableData() {
     // For multi-disbursal loans, calculate fees based only on disbursed tranches
     const disbursedFees = this.loanDetails?.multiDisburseLoan ? this.getDisbursedTrancheFees() : null;
+    console.log('Disbursed Fees:', disbursedFees);
 
     const feesData = disbursedFees
       ? {
