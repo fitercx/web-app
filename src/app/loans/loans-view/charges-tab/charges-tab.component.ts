@@ -5,6 +5,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 /** Custom Services */
 import { LoansService } from 'app/loans/loans.service';
@@ -73,7 +74,8 @@ export class ChargesTabComponent implements OnInit {
     private translateService: TranslateService,
     public dialog: MatDialog,
     private settingsService: SettingsService,
-    private systemService: SystemService
+    private systemService: SystemService,
+    private snackBar: MatSnackBar
   ) {
     this.route.parent.data.subscribe((data: { loanDetailsData: any }) => {
       this.loanDetails = data.loanDetailsData;
@@ -86,17 +88,28 @@ export class ChargesTabComponent implements OnInit {
     });
     this.chargesData = this.loanDetails.charges;
     this.status = this.loanDetails.status.value;
+    const loanStatusAllowsChargeActions = this.status === 'Active' || this.status === 'Overpaid';
     let actionFlag;
     this.chargesData.forEach((element: any) => {
       if (element.chargeTimeType.value === 'Disbursement') {
         element.dueDate = this.loanDetails.timeline.actualDisbursementDate;
       }
       element.dueDate = this.dateUtils.parseDate(element.dueDate);
+      // Check if charge is reversed: has amountPaid > 0 but paid = false and outstanding = 0
+      // This indicates a reversed charge where we preserved the original paid amount for display
+      const isReversed =
+        !element.paid &&
+        !element.waived &&
+        element.amountPaid > 0 &&
+        element.amountOutstanding === 0 &&
+        element.amountWrittenOff === 0;
+      element.isReversed = isReversed;
       if (
+        isReversed ||
         element.paid ||
         element.waived ||
         element.chargeTimeType.value === 'Disbursement' ||
-        this.loanDetails.status.value !== 'Active'
+        !loanStatusAllowsChargeActions
       ) {
         actionFlag = true;
       } else {
@@ -233,6 +246,80 @@ export class ChargesTabComponent implements OnInit {
         this.loansService.deleteLoansAccountCharge(this.loanDetails.id, chargeId).subscribe(() => {
           this.reload();
         });
+      }
+    });
+  }
+
+  /**
+   * Undoes a paid charge
+   * @param {any} charge Charge object
+   */
+  undoPaidCharge(charge: any) {
+    const undoChargeDialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      data: {
+        heading: this.translateService.instant('labels.heading.Undo Paid Charge'),
+        dialogContext:
+          this.translateService.instant('labels.dialogContext.Are you sure you want to undo the paid charge') +
+          ` "${charge.name}" (ID: ${charge.id})?`,
+        type: 'Dangerous',
+        additionalNotes: this.translateService.instant(
+          'labels.text.This action will reverse the payment transaction and GL entries for this charge. The charge will be reset to unpaid status. This action will be recorded in the audit trail.'
+        )
+      }
+    });
+
+    undoChargeDialogRef.afterClosed().subscribe((response: any) => {
+      if (response.confirm) {
+        const locale = this.settingsService.language.code;
+        const dateFormat = this.settingsService.dateFormat;
+        const dataObject = {
+          note: `Reversed paid charge: ${charge.name}`,
+          dateFormat,
+          locale
+        };
+
+        this.loansService
+          .executeLoansAccountChargesCommand(this.loanDetails.id, 'reversePaid', dataObject, charge.id)
+          .subscribe({
+            next: (response: any) => {
+              // Debug: Log the response to see its structure
+              console.log('Reverse charge response:', response);
+
+              // Get savings account number from response or loan details
+              let savingsAccountNo = '';
+
+              // Try multiple ways to get the account number from response
+              if (response?.changes?.savingsAccountNo) {
+                savingsAccountNo = response.changes.savingsAccountNo;
+              } else if (response?.savingsAccountNo) {
+                savingsAccountNo = response.savingsAccountNo;
+              } else if (this.loanDetails.additionalAttributes?.linkedSavingsAccountAccountNo) {
+                savingsAccountNo = this.loanDetails.additionalAttributes.linkedSavingsAccountAccountNo;
+              }
+
+              console.log('Savings account number found:', savingsAccountNo);
+
+              // Show success message
+              let message = 'Charge reversed to the associated savings accounts';
+              if (savingsAccountNo) {
+                message += `: ${savingsAccountNo}`;
+              } else {
+                message += '.';
+              }
+
+              this.snackBar.open(message, 'Close', {
+                duration: 7000,
+                horizontalPosition: 'right',
+                verticalPosition: 'top',
+                panelClass: ['success-snackbar']
+              });
+
+              this.reload();
+            },
+            error: (error) => {
+              console.error('Error undoing paid charge:', error);
+            }
+          });
       }
     });
   }

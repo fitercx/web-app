@@ -15,6 +15,8 @@ export class AdjustInstallmentDateDialogComponent implements OnInit {
   maxDate: Date;
   adjustableInstallments: any[] = [];
   selectedInstallment: any = null;
+  selectedInstallmentHasOverdueCharges = false;
+  private businessDate: Date;
 
   constructor(
     public dialogRef: MatDialogRef<AdjustInstallmentDateDialogComponent>,
@@ -27,6 +29,7 @@ export class AdjustInstallmentDateDialogComponent implements OnInit {
     this.maxDate = new Date();
     this.maxDate.setFullYear(this.maxDate.getFullYear() + 10);
     this.adjustableInstallments = data.adjustableInstallments || [];
+    this.businessDate = this.settingsService.businessDate;
   }
 
   ngOnInit() {
@@ -37,10 +40,6 @@ export class AdjustInstallmentDateDialogComponent implements OnInit {
       ],
       newDueDate: [
         '',
-        Validators.required
-      ],
-      adjustmentDate: [
-        this.settingsService.businessDate,
         Validators.required
       ]
     });
@@ -54,8 +53,10 @@ export class AdjustInstallmentDateDialogComponent implements OnInit {
             newDueDate: new Date(this.selectedInstallment.dueDate)
           });
         }
+        this.selectedInstallmentHasOverdueCharges = this.hasOverdueChargesForInstallment(this.selectedInstallment);
       } else {
         this.selectedInstallment = null;
+        this.selectedInstallmentHasOverdueCharges = false;
         this.adjustDateForm.patchValue({ newDueDate: '' });
       }
     });
@@ -66,9 +67,24 @@ export class AdjustInstallmentDateDialogComponent implements OnInit {
       const formValue = this.adjustDateForm.value;
       this.dialogRef.close({
         installmentNumber: formValue.installmentNumber,
-        newDueDate: formValue.newDueDate,
-        adjustmentDate: formValue.adjustmentDate
+        newDueDate: formValue.newDueDate
       });
     }
+  }
+
+  isInstallmentSelectionDisabled(installment: any): boolean {
+    return this.hasOverdueChargesForInstallment(installment);
+  }
+
+  private hasOverdueChargesForInstallment(installment: any): boolean {
+    if (!installment) {
+      return false;
+    }
+    if (installment.hasOverdueCharges !== undefined) {
+      return installment.hasOverdueCharges;
+    }
+    // Block adjustment if Overdue Interest > 0.0
+    const overdueInterest = Number(installment.totalOverdue ?? 0);
+    return overdueInterest > 0.0;
   }
 }

@@ -239,6 +239,12 @@ class LoansViewComponent implements OnInit {
           queryParams: queryParams
         });
         break;
+      case 'Adjust Installment Date':
+        this.router.navigate(['./repayment-schedule'], {
+          relativeTo: this.route,
+          queryParams: { openAdjustDialog: 'true' }
+        });
+        break;
       case 'Undo Re-Age':
       case 'Undo Re-Amortize':
       case 'Undo Charge-Off':

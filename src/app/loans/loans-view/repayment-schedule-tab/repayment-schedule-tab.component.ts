@@ -120,6 +120,21 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     this.isWaived = this.repaymentScheduleDetails.totalWaived > 0;
     this.updateDisplayedColumns();
     this.updateEditCache();
+
+    // Check if dialog should be opened from query parameter
+    this.route.queryParams.subscribe((params) => {
+      if (params['openAdjustDialog'] === 'true') {
+        setTimeout(() => {
+          this.openAdjustInstallmentDateDialog();
+          // Remove query parameter after opening dialog
+          this.router.navigate([], {
+            relativeTo: this.route,
+            queryParams: {},
+            replaceUrl: true
+          });
+        }, 100);
+      }
+    });
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -628,15 +643,20 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     if (!installment.period || installment.period === 0) {
       return; // Don't allow adjusting disbursement row
     }
+    const installmentData = {
+      ...installment,
+      hasOverdueCharges: this.isInstallmentBlockedByOverdueCharges(installment)
+    };
 
     const dialogRef = this.dialog.open(AdjustInstallmentDateDialogComponent, {
       width: '500px',
       data: {
-        installmentNumber: installment.period,
-        currentDueDate: installment.dueDate,
-        emiAmount: installment.totalDueForPeriod,
+        installmentNumber: installmentData.period,
+        currentDueDate: installmentData.dueDate,
+        emiAmount: installmentData.totalDueForPeriod,
         currencyCode: this.currencyCode,
-        disbursementDate: this.loanDetailsData?.timeline?.actualDisbursementDate
+        disbursementDate: this.loanDetailsData?.timeline?.actualDisbursementDate,
+        adjustableInstallments: [installmentData]
       }
     });
 
@@ -647,7 +667,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
         const payload = {
           installmentNumber: installment.period,
           newDueDate: this.dateUtils.formatDate(result.newDueDate, dateFormat),
-          adjustmentDate: this.dateUtils.formatDate(result.adjustmentDate, dateFormat),
+          adjustmentDate: this.dateUtils.formatDate(this.settingsService.businessDate, dateFormat),
           dateFormat,
           locale
         };
@@ -693,7 +713,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     if (this.loanDetailsData?.status?.value !== 'Active') {
       return false;
     }
-    return this.repaymentScheduleDetails.periods.some((period: any) => this.canAdjustInstallment(period));
+    return this.getAdjustableInstallments().some((period: any) => !period.hasOverdueCharges);
   }
 
   /**
@@ -704,7 +724,22 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     if (!this.repaymentScheduleDetails || !this.repaymentScheduleDetails.periods) {
       return [];
     }
-    return this.repaymentScheduleDetails.periods.filter((period: any) => this.canAdjustInstallment(period));
+    return this.repaymentScheduleDetails.periods
+      .filter((period: any) => this.canAdjustInstallment(period))
+      .map((period: any) => ({
+        ...period,
+        hasOverdueCharges: this.isInstallmentBlockedByOverdueCharges(period)
+      }));
+  }
+
+  hasOverdueInstallmentsForAdjustment(): boolean {
+    return this.getAdjustableInstallments().some((period: any) => period.hasOverdueCharges);
+  }
+
+  private isInstallmentBlockedByOverdueCharges(installment: any): boolean {
+    // Block adjustment if Overdue Interest > 0.0
+    const overdueInterest = Number(installment.totalOverdue ?? 0);
+    return overdueInterest > 0.0;
   }
 
   /**
@@ -729,7 +764,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
         const payload = {
           installmentNumber: result.installmentNumber,
           newDueDate: this.dateUtils.formatDate(result.newDueDate, dateFormat),
-          adjustmentDate: this.dateUtils.formatDate(result.adjustmentDate, dateFormat),
+          adjustmentDate: this.dateUtils.formatDate(this.settingsService.businessDate, dateFormat),
           dateFormat,
           locale
         };

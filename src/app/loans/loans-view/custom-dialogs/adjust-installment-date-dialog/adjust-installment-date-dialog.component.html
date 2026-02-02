@@ -4,18 +4,27 @@
 
 <mat-dialog-content>
   <form [formGroup]="adjustDateForm" fxLayout="column" fxLayoutGap="16px">
-    <mat-form-field fxFlex="100%" appearance="outline">
-      <mat-label>{{ 'Select Installment' | translate }} *</mat-label>
-      <mat-select formControlName="installmentNumber" required>
-        <mat-option [value]="null">{{ 'Select Installment' | translate }}</mat-option>
-        <mat-option *ngFor="let installment of adjustableInstallments" [value]="installment.period">
-          #{{ installment.period }} - {{ installment.dueDate | dateFormat }}
-        </mat-option>
-      </mat-select>
-      <mat-error *ngIf="adjustDateForm.get('installmentNumber')?.hasError('required')">
-        {{ 'Select Installment' | translate }} {{ 'validation.is required' | translate }}
-      </mat-error>
-    </mat-form-field>
+    <div class="date-field-wrapper">
+      <label class="date-field-label">{{ 'Select Installment' | translate }} *</label>
+      <mat-form-field fxFlex="100%" appearance="outline">
+        <mat-select formControlName="installmentNumber" required>
+          <mat-option [value]="null">{{ 'Select Installment' | translate }}</mat-option>
+          <mat-option
+            *ngFor="let installment of adjustableInstallments"
+            [value]="installment.period"
+            [disabled]="isInstallmentSelectionDisabled(installment)"
+          >
+            #{{ installment.period }} - {{ installment.dueDate | dateFormat }}
+            <span *ngIf="isInstallmentSelectionDisabled(installment)" class="overdue-label">
+              ({{ 'labels.text.overdue charges exist short' | translate }})
+            </span>
+          </mat-option>
+        </mat-select>
+        <mat-error *ngIf="adjustDateForm.get('installmentNumber')?.hasError('required')">
+          Please select an installment
+        </mat-error>
+      </mat-form-field>
+    </div>
 
     <div *ngIf="selectedInstallment" class="m-b-10">
       <p class="installment-info">
@@ -26,42 +35,33 @@
       </p>
     </div>
 
-    <mat-form-field fxFlex="100%" appearance="outline">
-      <mat-label>{{ 'New Due Date' | translate }} *</mat-label>
-      <input
-        matInput
-        [min]="minDate"
-        [max]="maxDate"
-        [matDatepicker]="newDueDatePicker"
-        formControlName="newDueDate"
-        [disabled]="!adjustDateForm.get('installmentNumber')?.value"
-        required
-        placeholder=""
-      />
-      <mat-datepicker-toggle matSuffix [for]="newDueDatePicker"></mat-datepicker-toggle>
-      <mat-datepicker #newDueDatePicker></mat-datepicker>
-      <mat-error *ngIf="adjustDateForm.get('newDueDate')?.hasError('required')">
-        {{ 'New Due Date' | translate }} {{ 'validation.is required' | translate }}
-      </mat-error>
-    </mat-form-field>
+    <div *ngIf="selectedInstallmentHasOverdueCharges" class="warning-box m-b-10">
+      <mat-icon class="warning-icon">warning</mat-icon>
+      <p class="warning-text">
+        {{ 'labels.text.overdue charges adjust restriction' | translate }}
+      </p>
+    </div>
 
-    <mat-form-field fxFlex="100%" appearance="outline">
-      <mat-label>{{ 'Adjustment Date' | translate }} *</mat-label>
-      <input
-        matInput
-        [min]="minDate"
-        [max]="maxDate"
-        [matDatepicker]="adjustmentDatePicker"
-        formControlName="adjustmentDate"
-        required
-        placeholder=""
-      />
-      <mat-datepicker-toggle matSuffix [for]="adjustmentDatePicker"></mat-datepicker-toggle>
-      <mat-datepicker #adjustmentDatePicker></mat-datepicker>
-      <mat-error *ngIf="adjustDateForm.get('adjustmentDate')?.hasError('required')">
-        {{ 'Adjustment Date' | translate }} {{ 'validation.is required' | translate }}
-      </mat-error>
-    </mat-form-field>
+    <div class="date-field-wrapper">
+      <label class="date-field-label">{{ 'New Due Date' | translate }} *</label>
+      <mat-form-field fxFlex="100%" appearance="outline">
+        <input
+          matInput
+          [min]="minDate"
+          [max]="maxDate"
+          [matDatepicker]="newDueDatePicker"
+          formControlName="newDueDate"
+          [disabled]="!adjustDateForm.get('installmentNumber')?.value"
+          required
+          placeholder=""
+        />
+        <mat-datepicker-toggle matSuffix [for]="newDueDatePicker"></mat-datepicker-toggle>
+        <mat-datepicker #newDueDatePicker></mat-datepicker>
+        <mat-error *ngIf="adjustDateForm.get('newDueDate')?.hasError('required')">
+          Please select a new due date
+        </mat-error>
+      </mat-form-field>
+    </div>
 
     <div class="info-box m-t-10">
       <mat-icon class="info-icon">info</mat-icon>
@@ -74,8 +74,7 @@
             'labels.text.When you adjust an installment date, all subsequent installments will be automatically shifted by the same number of days'
               | translate
           }}<br />
-          • {{ 'labels.text.emi amount unchanged' | translate }}<br />
-          • {{ 'labels.text.overdue charges preserved' | translate }}
+          • {{ 'labels.text.emi amount unchanged' | translate }}
         </small>
       </p>
     </div>
@@ -86,7 +85,12 @@
   <button mat-raised-button mat-dialog-close class="m-r-10">
     {{ 'labels.buttons.Cancel' | translate }}
   </button>
-  <button mat-raised-button color="primary" [disabled]="!adjustDateForm.valid" (click)="submit()">
+  <button
+    mat-raised-button
+    color="primary"
+    [disabled]="!adjustDateForm.valid || selectedInstallmentHasOverdueCharges"
+    (click)="submit()"
+  >
     {{ 'labels.buttons.Adjust Date' | translate }}
   </button>
 </mat-dialog-actions>
