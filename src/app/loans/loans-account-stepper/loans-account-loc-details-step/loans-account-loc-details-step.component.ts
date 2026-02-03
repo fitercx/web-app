@@ -293,9 +293,21 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
         0,
         [Validators.min(0)]
       ],
-      amountInFacilityCurrency: [{ value: '', disabled: true }], // Computed field
-      approvedPayableAmount: [{ value: '', disabled: true }], // Computed field
-      supplierDetails: ['']
+      amountInFacilityCurrency: [{ value: '', disabled: true }], // Computed field - Funded Amount in AED (lowest of amountAfterAdvanceInAED, requestedAmountInAED, availableLimit)
+      approvedPayableAmount: [{ value: '', disabled: true }], // Computed field - Approved Invoice Amount in invoice currency
+      supplierDetails: [''],
+
+      // Additional Payable calculated fields
+      invoiceAmountInAED: [{ value: '', disabled: true }], // Computed: Invoice Amount × Exchange Rate
+      disapprovedAmountInAED: [{ value: '', disabled: true }], // Computed: Disapproved Amount × Exchange Rate
+      approvedInvoiceAmountInAED: [{ value: '', disabled: true }], // Computed: Approved Payable Amount × Exchange Rate
+      amountAfterAdvanceInAED: [{ value: '', disabled: true }], // Computed: Approved Invoice Amount in AED × (Advance % / 100)
+      requestedAmount: [
+        '',
+        [Validators.min(0)]
+      ], // Editable field - Requested Amount in invoice currency
+      requestedAmountInAED: [{ value: '', disabled: true }], // Computed: Requested Amount × Exchange Rate
+      fundedAmountInInvoiceCurrency: [{ value: '', disabled: true }] // Computed: Funded Amount in AED ÷ Exchange Rate
     });
 
     // Set up value change listeners for computed fields
@@ -319,6 +331,8 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
         Validators.required,
         Validators.min(0),
         Validators.max(100)]);
+      // For Receivable type, advancePercentage is editable
+      this.locDetailsForm.get('advancePercentage')?.enable({ emitEvent: false });
       this.locDetailsForm.get('buyerDetails')?.setValidators([Validators.required]);
 
       // Remove payable validators but DON'T clear payable field values
@@ -339,10 +353,9 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
         Validators.min(0)]);
       this.locDetailsForm.get('supplierDetails')?.setValidators([Validators.required]);
 
-      // Remove receivable validators but DON'T clear receivable field values
-      this.locDetailsForm.get('advancePercentage')?.setValidators([
-        Validators.min(0),
-        Validators.max(100)]);
+      // For Payable type, advancePercentage is always 100% and readonly
+      this.locDetailsForm.get('advancePercentage')?.setValue(100, { emitEvent: false });
+      this.locDetailsForm.get('advancePercentage')?.disable({ emitEvent: false });
       this.locDetailsForm.get('buyerDetails')?.setValidators([]);
     } else {
       // Remove all required validators for other LOC types
@@ -434,6 +447,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       if (value !== null && value !== undefined && value !== '') {
         this.updateApprovedReceivableAmount();
         this.updateApprovedPayableAmount();
+        this.updateInvoiceAmountInAED();
         // Re-validate disapproved amount when invoice amount changes
         this.locDetailsForm.get('disapprovedAmount')?.updateValueAndValidity({ emitEvent: false });
       }
@@ -444,6 +458,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       // Do not interfere with other fields like principal or invoice amount
       this.updateApprovedReceivableAmount();
       this.updateApprovedPayableAmount();
+      this.updateDisapprovedAmountInAED();
     });
 
     // Listen to approved receivable amount and advance percentage changes to compute amount after advance
@@ -458,12 +473,30 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
     this.locDetailsForm.get('exchangeRate')?.valueChanges.subscribe((value: any) => {
       // Only trigger calculations if the value is meaningful
       if (value !== null && value !== undefined && value !== '') {
-        this.updateAmountInFacilityCurrency();
+        // Update AED conversions
+        this.updateInvoiceAmountInAED();
+        this.updateDisapprovedAmountInAED();
+        this.updateApprovedInvoiceAmountInAED();
+        // Note: updateApprovedInvoiceAmountInAED will call updateAmountAfterAdvanceInAED
+        // which will call updateFundedAmountInAED which will call updateFundedAmountInInvoiceCurrency
+        this.updateRequestedAmountInAED();
       }
     });
 
     this.locDetailsForm.get('markup')?.valueChanges.subscribe((value: any) => {
-      this.updateAmountInFacilityCurrency();
+      // Markup is now part of the AED conversion formula: value * (exchangeRate + markup)
+      // Update all AED conversions when markup changes
+      if (value !== null && value !== undefined && value !== '') {
+        this.updateInvoiceAmountInAED();
+        this.updateDisapprovedAmountInAED();
+        this.updateApprovedInvoiceAmountInAED();
+        this.updateRequestedAmountInAED();
+      }
+    });
+
+    // Listen to requested amount changes for AED conversion
+    this.locDetailsForm.get('requestedAmount')?.valueChanges.subscribe((value: any) => {
+      this.updateRequestedAmountInAED();
     });
   }
 
@@ -503,8 +536,12 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
       if (currentApprovedAmount !== approvedAmount) {
         this.locDetailsForm.get('approvedPayableAmount')?.setValue(approvedAmount, { emitEvent: false });
 
-        // Update facility amount when approved payable amount changes
-        this.updateAmountInFacilityCurrency();
+        // Update the approved invoice amount in AED
+        this.updateApprovedInvoiceAmountInAED();
+        // Then update amount after advance in AED (depends on approvedInvoiceAmountInAED)
+        this.updateAmountAfterAdvanceInAED();
+        // Finally update funded amount in AED (depends on amountAfterAdvanceInAED)
+        this.updateFundedAmountInAED();
       }
     } else {
       this.locDetailsForm.get('approvedPayableAmount')?.setValue(undefined, { emitEvent: false });
@@ -527,21 +564,158 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
   }
 
   /**
-   * Updates the amount in facility currency (Approved Amount * (Exchange Rate + Markup))
-   * This becomes the facility amount (principal) for payable LOCs
+   * Updates invoice amount in AED (Invoice Amount * (Exchange Rate + Markup))
    */
-  updateAmountInFacilityCurrency() {
-    const approvedAmount = this.locDetailsForm.get('approvedPayableAmount')?.value || 0;
+  updateInvoiceAmountInAED() {
+    if (!this.isPayableType) return;
+
+    const invoiceAmount = Math.max(0, this.locDetailsForm.get('invoiceAmount')?.value || 0);
     const exchangeRate = Math.max(0, this.locDetailsForm.get('exchangeRate')?.value || 0);
     const markup = Math.max(0, this.locDetailsForm.get('markup')?.value || 0);
+    const invoiceAmountInAED = invoiceAmount * (exchangeRate + markup);
 
-    // Facility amount calculation: (markup + exchange rate) * approved amount
-    const facilityAmount = (markup + exchangeRate) * Math.max(0, approvedAmount);
+    const current = this.locDetailsForm.get('invoiceAmountInAED')?.value;
+    if (current !== invoiceAmountInAED) {
+      this.locDetailsForm.get('invoiceAmountInAED')?.setValue(invoiceAmountInAED, { emitEvent: false });
+    }
+  }
 
-    // Only update if the facility amount is actually different from current value
-    const currentAmountInFacilityCurrency = this.locDetailsForm.get('amountInFacilityCurrency')?.value;
-    if (currentAmountInFacilityCurrency !== facilityAmount) {
-      this.locDetailsForm.get('amountInFacilityCurrency')?.setValue(facilityAmount, { emitEvent: false });
+  /**
+   * Updates disapproved amount in AED (Disapproved Amount * (Exchange Rate + Markup))
+   */
+  updateDisapprovedAmountInAED() {
+    if (!this.isPayableType) return;
+
+    const disapprovedAmount = Math.max(0, this.locDetailsForm.get('disapprovedAmount')?.value || 0);
+    const exchangeRate = Math.max(0, this.locDetailsForm.get('exchangeRate')?.value || 0);
+    const markup = Math.max(0, this.locDetailsForm.get('markup')?.value || 0);
+    const disapprovedAmountInAED = disapprovedAmount * (exchangeRate + markup);
+
+    const current = this.locDetailsForm.get('disapprovedAmountInAED')?.value;
+    if (current !== disapprovedAmountInAED) {
+      this.locDetailsForm.get('disapprovedAmountInAED')?.setValue(disapprovedAmountInAED, { emitEvent: false });
+    }
+  }
+
+  /**
+   * Updates approved invoice amount in AED (Approved Payable Amount * (Exchange Rate + Markup))
+   */
+  updateApprovedInvoiceAmountInAED() {
+    if (!this.isPayableType) return;
+
+    const approvedPayableAmount = Math.max(0, this.locDetailsForm.get('approvedPayableAmount')?.value || 0);
+    const exchangeRate = Math.max(0, this.locDetailsForm.get('exchangeRate')?.value || 0);
+    const markup = Math.max(0, this.locDetailsForm.get('markup')?.value || 0);
+    const approvedInvoiceAmountInAED = approvedPayableAmount * (exchangeRate + markup);
+
+    const current = this.locDetailsForm.get('approvedInvoiceAmountInAED')?.value;
+    if (current !== approvedInvoiceAmountInAED) {
+      this.locDetailsForm.get('approvedInvoiceAmountInAED')?.setValue(approvedInvoiceAmountInAED, { emitEvent: false });
+      // Also update amount after advance in AED when approved invoice amount changes
+      this.updateAmountAfterAdvanceInAED();
+    }
+  }
+
+  /**
+   * Updates amount after advance in AED (Approved Invoice Amount in AED * (Advance % / 100))
+   * For Payable type, advance % is always 100%, so this equals Approved Invoice Amount in AED
+   */
+  updateAmountAfterAdvanceInAED() {
+    if (!this.isPayableType) return;
+
+    const approvedInvoiceAmountInAED = Math.max(0, this.locDetailsForm.get('approvedInvoiceAmountInAED')?.value || 0);
+    const advancePercentage = Math.max(0, this.locDetailsForm.get('advancePercentage')?.value || 100); // Default 100% for payable
+    const amountAfterAdvanceInAED = (approvedInvoiceAmountInAED * advancePercentage) / 100;
+
+    const current = this.locDetailsForm.get('amountAfterAdvanceInAED')?.value;
+    if (current !== amountAfterAdvanceInAED) {
+      this.locDetailsForm.get('amountAfterAdvanceInAED')?.setValue(amountAfterAdvanceInAED, { emitEvent: false });
+      // Update funded amount when amount after advance changes
+      this.updateFundedAmountInAED();
+    }
+  }
+
+  /**
+   * Updates requested amount in AED (Requested Amount * (Exchange Rate + Markup))
+   */
+  updateRequestedAmountInAED() {
+    if (!this.isPayableType) return;
+
+    const requestedAmount = Math.max(0, this.locDetailsForm.get('requestedAmount')?.value || 0);
+    const exchangeRate = Math.max(0, this.locDetailsForm.get('exchangeRate')?.value || 0);
+    const markup = Math.max(0, this.locDetailsForm.get('markup')?.value || 0);
+    const requestedAmountInAED = requestedAmount * (exchangeRate + markup);
+
+    const current = this.locDetailsForm.get('requestedAmountInAED')?.value;
+    if (current !== requestedAmountInAED) {
+      this.locDetailsForm.get('requestedAmountInAED')?.setValue(requestedAmountInAED, { emitEvent: false });
+      // Update funded amount when requested amount in AED changes
+      this.updateFundedAmountInAED();
+    }
+  }
+
+  /**
+   * Updates Funded Amount in AED (amountInFacilityCurrency)
+   * Funded Amount = lowest value of:
+   * - Amount after Advance% in AED
+   * - Requested Amount in AED
+   * - Available Limit (from LOC)
+   */
+  updateFundedAmountInAED() {
+    if (!this.isPayableType) return;
+
+    const amountAfterAdvanceInAED = Math.max(0, this.locDetailsForm.get('amountAfterAdvanceInAED')?.value || 0);
+    const requestedAmountInAED = Math.max(0, this.locDetailsForm.get('requestedAmountInAED')?.value || 0);
+
+    // Get available limit from the selected LOC
+    let availableLimit = Infinity;
+    const locId = this.resolvedSelectedLocId;
+    if (this.locOptions && locId) {
+      const selectedLoc = this.locOptions.find((loc: any) => loc.id === locId);
+      if (selectedLoc && selectedLoc.availableLimit !== undefined) {
+        availableLimit = Math.max(0, selectedLoc.availableLimit);
+      }
+    }
+
+    // Funded amount is the lowest of the three values
+    // If requestedAmountInAED is 0 or not set, use amountAfterAdvanceInAED as the comparison base
+    const candidateValues = [amountAfterAdvanceInAED];
+    if (requestedAmountInAED > 0) {
+      candidateValues.push(requestedAmountInAED);
+    }
+    if (availableLimit !== Infinity) {
+      candidateValues.push(availableLimit);
+    }
+
+    const fundedAmountInAED = Math.min(...candidateValues);
+
+    const current = this.locDetailsForm.get('amountInFacilityCurrency')?.value;
+    if (current !== fundedAmountInAED) {
+      this.locDetailsForm.get('amountInFacilityCurrency')?.setValue(fundedAmountInAED, { emitEvent: false });
+      // Also update funded amount in invoice currency
+      this.updateFundedAmountInInvoiceCurrency();
+    }
+  }
+
+  /**
+   * Updates funded amount in invoice currency (Funded Amount in AED / (Exchange Rate + Markup))
+   */
+  updateFundedAmountInInvoiceCurrency() {
+    if (!this.isPayableType) return;
+
+    const fundedAmountInAED = Math.max(0, this.locDetailsForm.get('amountInFacilityCurrency')?.value || 0);
+    const exchangeRate = Math.max(0, this.locDetailsForm.get('exchangeRate')?.value || 0);
+    const markup = Math.max(0, this.locDetailsForm.get('markup')?.value || 0);
+    const effectiveRate = exchangeRate + markup;
+
+    // Funded amount in invoice currency = Funded Amount in AED / (Exchange Rate + Markup)
+    const fundedAmountInInvoiceCurrency = effectiveRate > 0 ? fundedAmountInAED / effectiveRate : 0;
+
+    const current = this.locDetailsForm.get('fundedAmountInInvoiceCurrency')?.value;
+    if (current !== fundedAmountInInvoiceCurrency) {
+      this.locDetailsForm
+        .get('fundedAmountInInvoiceCurrency')
+        ?.setValue(fundedAmountInInvoiceCurrency, { emitEvent: false });
     }
   }
 
@@ -552,7 +726,13 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
     this.updateApprovedReceivableAmount();
     this.updateApprovedPayableAmount();
     this.updateAmountAfterAdvance();
-    this.updateAmountInFacilityCurrency();
+    this.updateInvoiceAmountInAED();
+    this.updateDisapprovedAmountInAED();
+    this.updateApprovedInvoiceAmountInAED();
+    this.updateAmountAfterAdvanceInAED();
+    this.updateRequestedAmountInAED();
+    this.updateFundedAmountInAED();
+    this.updateFundedAmountInInvoiceCurrency();
   }
 
   /**
@@ -612,6 +792,20 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
     }
 
     return false;
+  }
+
+  /**
+   * Gets the selected invoice currency code for display in labels
+   */
+  get selectedInvoiceCurrency(): string {
+    return this.locDetailsForm?.get('invoiceCurrency')?.value || '';
+  }
+
+  /**
+   * Gets the facility currency code (AED for payable LOCs)
+   */
+  get facilityCurrency(): string {
+    return 'AED';
   }
 
   /** Prefill advancePercentage control from selected LOC (advancePercentage field) if available and control empty */
