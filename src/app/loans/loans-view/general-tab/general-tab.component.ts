@@ -131,27 +131,16 @@ export class GeneralTabComponent implements OnInit {
   }
 
   setloanSummaryTableData() {
-    // For multi-disbursal loans, calculate fees based only on disbursed tranches
-    const disbursedFees = this.loanDetails?.multiDisburseLoan ? this.getDisbursedTrancheFees() : null;
-    console.log('Disbursed Fees:', disbursedFees);
-
-    const feesData = disbursedFees
-      ? {
-          feeChargesCharged: disbursedFees.feeChargesCharged,
-          feeChargesPaid: disbursedFees.feeChargesPaid,
-          feeChargesWaived: disbursedFees.feeChargesWaived,
-          feeChargesWrittenOff: disbursedFees.feeChargesWrittenOff,
-          feeChargesOutstanding: disbursedFees.feeChargesOutstanding,
-          feeChargesOverdue: disbursedFees.feeChargesOverdue
-        }
-      : {
-          feeChargesCharged: this.loanDetails.summary.feeChargesCharged,
-          feeChargesPaid: this.loanDetails.summary.feeChargesPaid,
-          feeChargesWaived: this.loanDetails.summary.feeChargesWaived,
-          feeChargesWrittenOff: this.loanDetails.summary.feeChargesWrittenOff,
-          feeChargesOutstanding: this.loanDetails.summary.feeChargesOutstanding,
-          feeChargesOverdue: this.loanDetails.summary.feeChargesOverdue
-        };
+    // Use summary for Fees row so fee/tax split from backend is shown (e.g. fee 800 + tax 44)
+    // and Total Paid equals sum of components (Principal + Interest + Fees + Taxes + Penalties)
+    const feesData = {
+      feeChargesCharged: this.loanDetails.summary.feeChargesCharged,
+      feeChargesPaid: this.loanDetails.summary.feeChargesPaid,
+      feeChargesWaived: this.loanDetails.summary.feeChargesWaived,
+      feeChargesWrittenOff: this.loanDetails.summary.feeChargesWrittenOff,
+      feeChargesOutstanding: this.loanDetails.summary.feeChargesOutstanding,
+      feeChargesOverdue: this.loanDetails.summary.feeChargesOverdue
+    };
 
     // For multi-tranche loans, use only the disbursed amount as the principal
     const principalOriginal: string = String(this.getTotalDisbursedPrincipal());
@@ -549,9 +538,9 @@ export class GeneralTabComponent implements OnInit {
       }
     });
 
-    // Return calculated total (0 is valid - means no taxes on disbursed tranches)
-    // Do not fall back to summary.taxChargesCharged as it may include taxes from undisbursed tranches
-    return totalTaxes;
+    // When schedule has no tax in disbursement periods (e.g. VAT at disbursement not in period breakdown),
+    // use summary.taxChargesCharged so backend-provided VAT is displayed
+    return totalTaxes > 0 ? totalTaxes : this.loanDetails?.summary?.taxChargesCharged || 0;
   }
 
   /**
@@ -588,9 +577,10 @@ export class GeneralTabComponent implements OnInit {
 
     const disbursedPrincipal = this.getTotalDisbursedPrincipal();
     const interest = this.getDisbursedTrancheInterest();
-    const fees = this.getDisbursedTrancheFees().feeChargesCharged;
-    const taxes = this.getDisbursedTrancheTaxes();
-    const penalties = this.getDisbursedTranchePenalties();
+    // Use summary for fee/tax so Total Original matches row sum (no double-count when backend splits fee vs VAT)
+    const fees = this.loanDetails.summary.feeChargesCharged || 0;
+    const taxes = this.loanDetails.summary.taxChargesCharged || 0;
+    const penalties = this.loanDetails.summary.penaltyChargesCharged || 0;
 
     return disbursedPrincipal + interest + fees + taxes + penalties;
   }
@@ -608,7 +598,7 @@ export class GeneralTabComponent implements OnInit {
     const principalOutstanding = this.getPrincipalOutstandingForMultiTranche();
     // Use unadjusted interest outstanding, we'll apply overpayment to total
     const interestOutstanding = this.loanDetails.summary.interestOutstanding || 0;
-    const feesOutstanding = this.getDisbursedTrancheFees().feeChargesOutstanding;
+    const feesOutstanding = this.loanDetails.summary.feeChargesOutstanding || 0;
     const taxesOutstanding = this.loanDetails.summary.taxChargesOutstanding || 0;
     const penaltiesOutstanding = this.loanDetails.summary.penaltyChargesOutstanding || 0;
 

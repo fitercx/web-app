@@ -148,7 +148,10 @@
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ getEmiLabel() | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
         <ng-container *ngIf="isLineOfCreditReceivable() || isLoanFactorRateEnabled(); else normalEmi">
-          {{ item.principalDue + item.interestOriginalDue + item.feeChargesDue + item.taxChargesDue | formatNumber }}
+          {{
+            item.principalDue + item.interestOriginalDue + getDisplayFeeForPeriod(item) + getDisplayTaxForPeriod(item)
+              | formatNumber
+          }}
         </ng-container>
         <ng-template #normalEmi>
           {{ item.principalDue + item.interestOriginalDue | formatNumber }}
@@ -160,7 +163,8 @@
             {{
               repaymentScheduleDetails.totalPrincipalExpected +
                 repaymentScheduleDetails.totalInterestCharged +
-                repaymentScheduleDetails.totalFeeChargesCharged | currency: currencyCode : 'symbol-narrow' : '1.2-2'
+                getDisplayTotalFees() +
+                getDisplayTotalTaxes() | currency: currencyCode : 'symbol-narrow' : '1.2-2'
             }}
           </ng-container>
           <ng-template #normalEmiTotal>
@@ -183,12 +187,12 @@
           </span>
         </ng-container>
         <ng-template #normalFees>
-          {{ item.feeChargesDue | formatNumber }}
+          {{ getDisplayFeeForPeriod(item) | formatNumber }}
         </ng-template>
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
         <b>
-          {{ repaymentScheduleDetails.totalFeeChargesCharged | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+          {{ getDisplayTotalFees() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
         </b>
       </td>
     </ng-container>
@@ -196,11 +200,11 @@
     <ng-container matColumnDef="taxes">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Taxes' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        {{ item.taxChargesDue | formatNumber }}
+        {{ getDisplayTaxForPeriod(item) | formatNumber }}
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
         <b>
-          {{ repaymentScheduleDetails.totalTaxChargesCharged | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+          {{ getDisplayTotalTaxes() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
         </b>
       </td>
     </ng-container>
@@ -402,7 +406,10 @@
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.EMI Amount' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item">
         <ng-container *ngIf="isLineOfCreditReceivable(); else normalEmiEdit">
-          {{ item.principalDue + item.interestOriginalDue + item.feeChargesDue | formatNumber }}
+          {{
+            item.principalDue + item.interestOriginalDue + getDisplayFeeForPeriod(item) + getDisplayTaxForPeriod(item)
+              | formatNumber
+          }}
         </ng-container>
         <ng-template #normalEmiEdit>
           {{ item.principalDue + item.interestOriginalDue | formatNumber }}
@@ -412,12 +419,12 @@
 
     <ng-container matColumnDef="fees">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Fees' | translate }}</th>
-      <td mat-cell class="r-amount" *matCellDef="let item">{{ item.feeChargesDue | formatNumber }}</td>
+      <td mat-cell class="r-amount" *matCellDef="let item">{{ getDisplayFeeForPeriod(item) | formatNumber }}</td>
     </ng-container>
 
     <ng-container matColumnDef="taxes">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Taxes' | translate }}</th>
-      <td mat-cell class="r-amount" *matCellDef="let item">{{ item.taxChargesDue | formatNumber }}</td>
+      <td mat-cell class="r-amount" *matCellDef="let item">{{ getDisplayTaxForPeriod(item) | formatNumber }}</td>
     </ng-container>
 
     <ng-container matColumnDef="due">
