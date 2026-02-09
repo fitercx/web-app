@@ -636,6 +636,71 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   /**
+   * When backend summary has fee/tax split (e.g. fee 800 + tax 44) but schedule has combined fee (844) and tax 0,
+   * returns the fee to display for this period so schedule matches General tab.
+   */
+  getDisplayFeeForPeriod(item: any): number {
+    const summary = this.loanDetailsData?.summary;
+    if (!summary || item.status !== 'DISBURSEMENT' || !(item.feeChargesDue > 0)) {
+      return item.feeChargesDue ?? 0;
+    }
+    const summaryFee = summary.feeChargesCharged ?? 0;
+    const summaryTax = summary.taxChargesCharged ?? 0;
+    const combined = summaryFee + summaryTax;
+    if (summaryTax > 0 && Math.abs(combined - (item.feeChargesDue ?? 0)) < 0.02) {
+      return summaryFee;
+    }
+    return item.feeChargesDue ?? 0;
+  }
+
+  /**
+   * When backend summary has fee/tax split but schedule has tax 0, returns the tax to display for this period.
+   */
+  getDisplayTaxForPeriod(item: any): number {
+    const summary = this.loanDetailsData?.summary;
+    if (!summary || item.status !== 'DISBURSEMENT') {
+      return item.taxChargesDue ?? 0;
+    }
+    const summaryFee = summary.feeChargesCharged ?? 0;
+    const summaryTax = summary.taxChargesCharged ?? 0;
+    const combined = summaryFee + summaryTax;
+    if (summaryTax > 0 && Math.abs(combined - (item.feeChargesDue ?? 0)) < 0.02) {
+      return summaryTax;
+    }
+    return item.taxChargesDue ?? 0;
+  }
+
+  /**
+   * Total fees to display in schedule footer. Uses summary when backend splits fee/tax and schedule does not.
+   */
+  getDisplayTotalFees(): number {
+    const schedule = this.repaymentScheduleDetails;
+    const summary = this.loanDetailsData?.summary;
+    if (!schedule) {
+      return 0;
+    }
+    if (summary?.taxChargesCharged > 0 && (schedule.totalTaxChargesCharged ?? 0) === 0) {
+      return summary.feeChargesCharged ?? schedule.totalFeeChargesCharged ?? 0;
+    }
+    return schedule.totalFeeChargesCharged ?? 0;
+  }
+
+  /**
+   * Total taxes to display in schedule footer. Uses summary when backend has tax and schedule shows 0.
+   */
+  getDisplayTotalTaxes(): number {
+    const schedule = this.repaymentScheduleDetails;
+    const summary = this.loanDetailsData?.summary;
+    if (!schedule) {
+      return 0;
+    }
+    if (summary?.taxChargesCharged != null && summary.taxChargesCharged > 0) {
+      return summary.taxChargesCharged;
+    }
+    return schedule.totalTaxChargesCharged ?? 0;
+  }
+
+  /**
    * Opens dialog to adjust installment date
    * @param {any} installment Installment
    */
