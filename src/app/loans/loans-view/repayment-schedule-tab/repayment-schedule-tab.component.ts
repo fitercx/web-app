@@ -636,20 +636,91 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   /**
+   * Allocates summary tax amount across actually disbursed periods.
+   * Backend does not provide tax per schedule period for disbursement rows (taxCharges* are 0),
+   * but it does provide a split at summary level (feeChargesCharged + taxChargesCharged)
+   * and the combined amount in schedule feeChargesDue for each disbursement period.
+   *
+   * Strategy:
+   * - Consider only DISBURSEMENT periods that have actually been disbursed.
+   * - Let totalCombined = sum(feeChargesDue) for those periods.
+   * - Let totalTax = summary.taxChargesCharged.
+   * - Allocate tax proportionally: periodTax = feeChargesDue * (totalTax / totalCombined).
+   *
+   * This keeps:
+   * - Sum of allocated tax equal to summary tax.
+   * - Per‑row fee + tax equal to original schedule feeChargesDue.
+   * - No tax shown for future (not‑yet‑disbursed) tranches.
+   */
+  private getAllocatedTaxForDisbursementPeriod(item: any): number {
+    const summary = this.loanDetailsData?.summary;
+    const schedule = this.repaymentScheduleDetails;
+
+    if (!summary || !schedule || item.status !== 'DISBURSEMENT') {
+      return 0;
+    }
+
+    const totalTax: number = summary.taxChargesCharged ?? 0;
+    if (!totalTax || totalTax <= 0) {
+      return 0;
+    }
+
+    const periods: any[] = Array.isArray(schedule.periods) ? schedule.periods : [];
+
+    // Only include periods that are both DISBURSEMENT and actually disbursed
+    const disbursedDisbursementPeriods = periods.filter(
+      (p) => p.status === 'DISBURSEMENT' && this.isDisbursementActualDisbursed(p)
+    );
+
+    if (!disbursedDisbursementPeriods.length) {
+      return 0;
+    }
+
+    const totalCombinedFees = disbursedDisbursementPeriods.reduce((sum, p) => {
+      const fee = p.feeChargesDue ?? 0;
+      return sum + (typeof fee === 'number' ? fee : 0);
+    }, 0);
+
+    if (!totalCombinedFees || totalCombinedFees <= 0) {
+      return 0;
+    }
+
+    // Only allocate tax to periods that have actually been disbursed
+    if (!this.isDisbursementActualDisbursed(item)) {
+      return 0;
+    }
+
+    const itemFee = item.feeChargesDue ?? 0;
+    if (!itemFee || itemFee <= 0) {
+      return 0;
+    }
+
+    return (itemFee * totalTax) / totalCombinedFees;
+  }
+
+  /**
    * When backend summary has fee/tax split (e.g. fee 800 + tax 44) but schedule has combined fee (844) and tax 0,
-   * returns the fee to display for this period so schedule matches General tab.
+   * returns the fee to display for this period so schedule matches General tab while keeping:
+   *   feeDisplayed + taxDisplayed = original schedule feeChargesDue (for disbursed tranches)
    */
   getDisplayFeeForPeriod(item: any): number {
     const summary = this.loanDetailsData?.summary;
     if (!summary || item.status !== 'DISBURSEMENT' || !(item.feeChargesDue > 0)) {
       return item.feeChargesDue ?? 0;
     }
-    const summaryFee = summary.feeChargesCharged ?? 0;
-    const summaryTax = summary.taxChargesCharged ?? 0;
-    const combined = summaryFee + summaryTax;
-    if (summaryTax > 0 && Math.abs(combined - (item.feeChargesDue ?? 0)) < 0.02) {
-      return summaryFee;
+
+    // If backend already sends per‑period tax, trust it and derive fee as feeDue - taxDue.
+    const scheduleTax = item.taxChargesDue ?? 0;
+    if (scheduleTax > 0) {
+      return (item.feeChargesDue ?? 0) - scheduleTax;
     }
+
+    // Otherwise, allocate tax for actually disbursed periods and subtract from combined fee
+    const allocatedTax = this.getAllocatedTaxForDisbursementPeriod(item);
+    if (allocatedTax > 0) {
+      return (item.feeChargesDue ?? 0) - allocatedTax;
+    }
+
     return item.feeChargesDue ?? 0;
   }
 
@@ -658,15 +729,22 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
    */
   getDisplayTaxForPeriod(item: any): number {
     const summary = this.loanDetailsData?.summary;
+    // If no summary or not a disbursement row, just show schedule tax as‑is.
     if (!summary || item.status !== 'DISBURSEMENT') {
       return item.taxChargesDue ?? 0;
     }
-    const summaryFee = summary.feeChargesCharged ?? 0;
-    const summaryTax = summary.taxChargesCharged ?? 0;
-    const combined = summaryFee + summaryTax;
-    if (summaryTax > 0 && Math.abs(combined - (item.feeChargesDue ?? 0)) < 0.02) {
-      return summaryTax;
+
+    // If backend already provides a non‑zero tax per period, trust it.
+    if (item.taxChargesDue && item.taxChargesDue > 0) {
+      return item.taxChargesDue;
     }
+
+    // Otherwise, derive allocated tax for actually disbursed tranches.
+    const allocatedTax = this.getAllocatedTaxForDisbursementPeriod(item);
+    if (allocatedTax > 0) {
+      return allocatedTax;
+    }
+
     return item.taxChargesDue ?? 0;
   }
 
