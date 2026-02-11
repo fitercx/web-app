@@ -89,6 +89,12 @@ export class LoanProducts {
       }
     });
 
+    // Do not send Factor Rate–specific fields when product is not configured as Factor Rate
+    if (!loanProduct.factorRateProductEnabled) {
+      delete loanProduct.factorRate;
+      delete loanProduct.penaltyGracePeriod;
+    }
+
     return loanProduct;
   }
 
