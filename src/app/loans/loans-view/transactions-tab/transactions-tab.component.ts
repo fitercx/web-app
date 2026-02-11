@@ -142,7 +142,9 @@ export class TransactionsTabComponent implements OnInit {
 
     if (hideAccrual || hideReversed) {
       transactions = this.transactionsData.filter((t: LoanTransaction) => {
-        return !(hideReversed && t.manuallyReversed) && !(hideAccrual && t.type.accrual);
+        // Treat both manually reversed and backend-reversed transactions as "reversed"
+        const isReversed = this.isTransactionReversed(t);
+        return !(hideReversed && isReversed) && !(hideAccrual && t.type.accrual);
       });
     }
     this.dataSource = new MatTableDataSource(transactions);
@@ -217,7 +219,8 @@ export class TransactionsTabComponent implements OnInit {
   }
 
   loanTransactionColor(transaction: LoanTransaction): string {
-    if (transaction.manuallyReversed) {
+    // Strike through any transaction that has been reversed (manual undo or system reversal)
+    if (this.isTransactionReversed(transaction)) {
       return 'strike';
     }
     if (transaction.transactionRelations && transaction.transactionRelations.length > 0) {
@@ -348,6 +351,16 @@ export class TransactionsTabComponent implements OnInit {
 
   private isReAgoeOrReAmortize(transactionType: LoanTransactionType): boolean {
     return this.isReAmortize(transactionType) || this.isReAge(transactionType);
+  }
+
+  /**
+   * Returns true if a transaction is reversed.
+   * We consider both:
+   * - `manuallyReversed` (explicit undo from UI)
+   * - `reversed` flag coming directly from the backend
+   */
+  private isTransactionReversed(transaction: LoanTransaction): boolean {
+    return !!transaction.manuallyReversed || !!transaction.reversed;
   }
 
   viewJournalEntry(transactionType: LoanTransactionType): boolean {
