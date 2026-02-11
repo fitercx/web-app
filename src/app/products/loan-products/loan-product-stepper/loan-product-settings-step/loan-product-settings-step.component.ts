@@ -253,11 +253,17 @@ export class LoanProductSettingsStepComponent implements OnInit {
       });
     }
     this.loanProductSettingsForm.get('factorRate').clearValidators();
-    this.loanProductSettingsForm.get('factorRate').addValidators([
-      Validators.required,
-      Validators.min(1.001),
-      Validators.max(this.loanProductsTemplate?.maximumProductFactorRate)]);
-    this.loanProductSettingsForm.get('factorRate').updateValueAndValidity();
+    if (this.loanProductsTemplate?.factorRateProductEnabled) {
+      this.loanProductSettingsForm.get('factorRate').addValidators([
+        Validators.required,
+        Validators.min(1.001),
+        Validators.max(this.loanProductsTemplate?.maximumProductFactorRate)]);
+      this.loanProductSettingsForm.get('factorRate').updateValueAndValidity();
+      this.loanProductSettingsForm.get('factorRate').enable();
+    } else {
+      this.loanProductSettingsForm.patchValue({ factorRate: null, penaltyGracePeriod: null });
+      this.loanProductSettingsForm.get('factorRate').disable();
+    }
   }
 
   createLoanProductSettingsForm() {
@@ -680,6 +686,7 @@ export class LoanProductSettingsStepComponent implements OnInit {
         if (factorRateProductEnabled) {
           this.loanProductSettingsForm.get('factorRate').enable();
         } else {
+          this.loanProductSettingsForm.patchValue({ factorRate: null, penaltyGracePeriod: null });
           this.loanProductSettingsForm.get('factorRate').disable();
         }
       });
@@ -775,6 +782,10 @@ export class LoanProductSettingsStepComponent implements OnInit {
     }
     if (productSettings['delinquencyBucketId'] === '') {
       productSettings['delinquencyBucketId'] = null;
+    }
+    if (!productSettings['factorRateProductEnabled']) {
+      productSettings['factorRate'] = null;
+      productSettings['penaltyGracePeriod'] = null;
     }
 
     return productSettings;

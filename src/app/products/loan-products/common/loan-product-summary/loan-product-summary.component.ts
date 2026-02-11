@@ -82,6 +82,11 @@ export class LoanProductSummaryComponent implements OnInit, OnChanges {
     this.setCurrentValues();
   }
 
+  /** Whether the product is configured as Factor Rate (governs visibility of Factor Rate–specific fields). */
+  isFactorRateProduct(): boolean {
+    return !!this.loanProduct?.factorRateProductEnabled;
+  }
+
   setCurrentValues(): void {
     this.isAdvancedPaymentAllocation = LoanProducts.isAdvancedPaymentAllocationStrategy(
       this.loanProduct.transactionProcessingStrategyCode
