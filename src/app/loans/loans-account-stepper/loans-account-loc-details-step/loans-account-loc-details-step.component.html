@@ -139,6 +139,96 @@
             <mat-hint>{{ 'labels.heading.Amount After Advance Hint' | translate }}</mat-hint>
           </mat-form-field>
 
+          <!-- Requested Amount (editable) -->
+          <mat-form-field fxFlex="48%">
+            <mat-label
+              >{{ 'labels.inputs.Requested Amount' | translate }} ({{ selectedInvoiceCurrency || '---' }})</mat-label
+            >
+            <input matInput formControlName="requestedAmount" type="number" step="0.01" min="0" />
+            <mat-hint>Amount requested for funding</mat-hint>
+            <mat-error *ngIf="locDetailsForm.get('requestedAmount')?.hasError('min')">
+              {{ 'labels.inputs.Requested Amount' | translate }}
+              {{ 'labels.commons.must be greater than or equal to' | translate }} 0
+            </mat-error>
+          </mat-form-field>
+
+          <!-- Funded Amount (computed) -->
+          <mat-form-field fxFlex="48%">
+            <mat-label
+              >{{ 'labels.inputs.Funded Amount' | translate }} ({{ selectedInvoiceCurrency || '---' }})</mat-label
+            >
+            <input matInput formControlName="fundedAmountInInvoiceCurrency" type="number" readonly />
+            <mat-hint>Lowest of: Amount after Advance, Requested Amount, Available Limit</mat-hint>
+          </mat-form-field>
+
+          <!-- Exchange Rate -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Exchange Rate' | translate }}</mat-label>
+            <input matInput formControlName="exchangeRate" type="number" step="0.0001" min="0.01" required />
+            <mat-error *ngIf="locDetailsForm.get('exchangeRate')?.hasError('required')">
+              {{ 'labels.inputs.Exchange Rate' | translate }} {{ 'labels.commons.is required' | translate }}
+            </mat-error>
+            <mat-error *ngIf="locDetailsForm.get('exchangeRate')?.hasError('min')">
+              {{ 'labels.inputs.Exchange Rate' | translate }}
+              {{ 'labels.commons.must be greater than' | translate }} 0.01
+            </mat-error>
+          </mat-form-field>
+
+          <!-- Markup -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Markup' | translate }}</mat-label>
+            <input matInput formControlName="markup" type="number" step="0.0001" min="0" required />
+            <mat-error *ngIf="locDetailsForm.get('markup')?.hasError('required')">
+              {{ 'labels.inputs.Markup' | translate }} {{ 'labels.commons.is required' | translate }}
+            </mat-error>
+            <mat-error *ngIf="locDetailsForm.get('markup')?.hasError('min')">
+              {{ 'labels.inputs.Markup' | translate }}
+              {{ 'labels.commons.must be greater than or equal to' | translate }} 0
+            </mat-error>
+          </mat-form-field>
+
+          <!-- Invoice Amount in AED (computed) -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Invoice Amount' | translate }} ({{ facilityCurrency }})</mat-label>
+            <input matInput formControlName="invoiceAmountInAED" type="number" readonly />
+            <mat-hint>Calculated as: Invoice Amount × (Exchange Rate + Markup)</mat-hint>
+          </mat-form-field>
+
+          <!-- Disapproved Amount in AED (computed) -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Disapproved Amount' | translate }} ({{ facilityCurrency }})</mat-label>
+            <input matInput formControlName="disapprovedAmountInAED" type="number" readonly />
+            <mat-hint>Calculated as: Disapproved Amount × (Exchange Rate + Markup)</mat-hint>
+          </mat-form-field>
+
+          <!-- Approved Invoice Amount in AED (computed) -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Approved Invoice Amount' | translate }} ({{ facilityCurrency }})</mat-label>
+            <input matInput formControlName="approvedInvoiceAmountInAED" type="number" readonly />
+            <mat-hint>Calculated as: Approved Invoice Amount × (Exchange Rate + Markup)</mat-hint>
+          </mat-form-field>
+
+          <!-- Amount after Advance in AED (computed) -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Amount after Advance' | translate }} ({{ facilityCurrency }})</mat-label>
+            <input matInput formControlName="amountAfterAdvanceInAED" type="number" readonly />
+            <mat-hint>Calculated as: Amount after Advance × (Exchange Rate + Markup)</mat-hint>
+          </mat-form-field>
+
+          <!-- Requested Amount in AED (computed) -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Requested Amount' | translate }} ({{ facilityCurrency }})</mat-label>
+            <input matInput formControlName="requestedAmountInAED" type="number" readonly />
+            <mat-hint>Calculated as: Requested Amount × (Exchange Rate + Markup)</mat-hint>
+          </mat-form-field>
+
+          <!-- Funded Amount in AED (computed) -->
+          <mat-form-field fxFlex="48%">
+            <mat-label>{{ 'labels.inputs.Funded Amount' | translate }} ({{ facilityCurrency }})</mat-label>
+            <input matInput formControlName="amountInFacilityCurrency" type="number" readonly />
+            <mat-hint>Lowest of: Amount after Advance in AED, Requested Amount in AED, Available Limit</mat-hint>
+          </mat-form-field>
+
           <!-- Buyer Details -->
           <mat-form-field fxFlex="100%">
             <mat-label>{{ 'labels.inputs.Buyer Details' | translate }}</mat-label>
