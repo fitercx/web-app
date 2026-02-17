@@ -136,6 +136,30 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
         }
         lineOfCreditControl?.updateValueAndValidity();
 
+        // Initialize account linking options for edit mode
+        this.accountLinkingOptions = this.loansAccountTemplate.accountLinkingOptions || [];
+
+        // Ensure the linked account is in the options list (in case it's not included in accountLinkingOptions)
+        const linkedAccount = this.loansAccountTemplate.linkedAccount;
+        if (linkedAccount && linkedAccount.id) {
+          const existsInOptions = this.accountLinkingOptions.some((option: any) => option.id === linkedAccount.id);
+          if (!existsInOptions) {
+            // Add the linked account to options so it can be displayed in the dropdown
+            this.accountLinkingOptions = [
+              {
+                id: linkedAccount.id,
+                accountNo: linkedAccount.accountNo,
+                productName: linkedAccount.productName || ''
+              },
+              ...this.accountLinkingOptions
+
+            ];
+          }
+        }
+
+        // Determine the linkAccountId value: prefer direct linkAccountId, fallback to linkedAccount.id
+        const linkAccountIdValue = this.loansAccountTemplate.linkAccountId || (linkedAccount && linkedAccount.id) || '';
+
         this.loansAccountDetailsForm.patchValue({
           productId: this.loansAccountTemplate.loanProductId,
           submittedOnDate:
@@ -148,7 +172,7 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
             this.loansAccountTemplate.timeline.expectedDisbursementDate &&
             new Date(this.loansAccountTemplate.timeline.expectedDisbursementDate),
           externalId: this.loansAccountTemplate.externalId,
-          linkAccountId: this.loansAccountTemplate.linkAccountId,
+          linkAccountId: linkAccountIdValue,
           createStandingInstructionAtDisbursement: this.loansAccountTemplate.createStandingInstructionAtDisbursement,
           lineOfCreditId: this.getInitialLineOfCreditId()
         });
@@ -233,8 +257,26 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
         this.loanOfficerOptions = response.loanOfficerOptions;
         this.loanPurposeOptions = response.loanPurposeOptions;
         this.fundOptions = response.fundOptions;
-        this.accountLinkingOptions = response.accountLinkingOptions;
+        this.accountLinkingOptions = response.accountLinkingOptions || [];
         this.loanProductSelected = true;
+
+        // In edit mode, ensure the existing linked account is in the options list
+        const linkedAccount = this.loansAccountTemplate?.linkedAccount;
+        if (linkedAccount && linkedAccount.id) {
+          const existsInOptions = this.accountLinkingOptions.some((option: any) => option.id === linkedAccount.id);
+          if (!existsInOptions) {
+            // Add the linked account to options so it can be displayed in the dropdown
+            this.accountLinkingOptions = [
+              {
+                id: linkedAccount.id,
+                accountNo: linkedAccount.accountNo,
+                productName: linkedAccount.productName || ''
+              },
+              ...this.accountLinkingOptions
+
+            ];
+          }
+        }
 
         // Handle Line of Credit options
         this.isLocEnabled = response.additionalProperties?.isLocEnabled || false;
