@@ -880,9 +880,12 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   private isInstallmentBlockedByOverdueCharges(installment: any): boolean {
-    // Block adjustment if Overdue Interest > 0.0
-    const overdueInterest = Number(installment.totalOverdue ?? 0);
-    return overdueInterest > 0.0;
+    // Block adjustment only if there are actual overdue charges (fees, penalties)
+    // This matches the backend validation logic which checks for outstanding charges
+    // Note: We check fees and penalties; tax charges are validated on the backend
+    const feeChargesOutstanding = Number(installment.feeChargesOutstanding ?? 0);
+    const penaltyChargesOutstanding = Number(installment.penaltyChargesOutstanding ?? 0);
+    return feeChargesOutstanding > 0 || penaltyChargesOutstanding > 0;
   }
 
   /**
