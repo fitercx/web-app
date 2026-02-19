@@ -342,9 +342,9 @@
                       color="primary"
                       matTooltip="{{ 'tooltips.Disburse to Savings' | translate }}"
                       matTooltipPosition="above"
-                      *mifosxHasPermission="'DISBURSE_LOAN'"
+                      *mifosxHasPermission="'DISBURSETOSAVINGS_LOAN'"
                       (click)="routeEdit($event)"
-                      [routerLink]="['../', 'loans-accounts', element.id, 'actions', 'Disburse']"
+                      [routerLink]="['../', 'loans-accounts', element.id, 'actions', 'Disburse to Savings']"
                     >
                       <i class="fa fa-flag"></i>
                     </button>
@@ -576,11 +576,11 @@
             class="account-action-button"
             mat-raised-button
             color="primary"
-            matTooltip="{{ 'tooltips.Disburse' | translate }}"
+            matTooltip="{{ 'tooltips.Disburse to Savings' | translate }}"
             matTooltipPosition="above"
-            *mifosxHasPermission="'DISBURSE_LOAN'"
+            *mifosxHasPermission="'DISBURSETOSAVINGS_LOAN'"
             (click)="routeEdit($event)"
-            [routerLink]="['../', 'loans-accounts', element.id, 'actions', 'Disburse']"
+            [routerLink]="['../', 'loans-accounts', element.id, 'actions', 'Disburse to Savings']"
           >
             <i class="fa fa-flag"></i>
           </button>
