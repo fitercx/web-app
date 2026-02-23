@@ -6,6 +6,7 @@ import { LoansService } from 'app/loans/loans.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { Currency } from 'app/shared/models/general.model';
 import { ClientsService } from 'app/clients/clients.service';
+import { OrganizationService } from 'app/organization/organization.service';
 
 @Component({
   selector: 'mifosx-disburse-to-savings-account',
@@ -28,6 +29,10 @@ export class DisburseToSavingsAccountComponent implements OnInit {
   eligibleSavingsAccounts: any[] = [];
   /** Loading state for savings accounts */
   isLoadingSavingsAccounts = false;
+  /** Payment Type Options */
+  paymentTypeOptions: any[] = [];
+  /** Loading state for payment types */
+  isLoadingPaymentTypes = false;
 
   /**
    * Get data from `Resolver`.
@@ -44,7 +49,8 @@ export class DisburseToSavingsAccountComponent implements OnInit {
     private dateUtils: Dates,
     private loanService: LoansService,
     private settingsService: SettingsService,
-    private clientsService: ClientsService
+    private clientsService: ClientsService,
+    private organizationService: OrganizationService
   ) {}
 
   ngOnInit() {
@@ -57,12 +63,19 @@ export class DisburseToSavingsAccountComponent implements OnInit {
     // Build form once so user input isn't lost when async data arrives
     this.setDisbursementToSavingsForm();
 
+    // Fetch payment types
+    this.fetchPaymentTypes();
+
     const loanId = this.route.snapshot.params['loanId'];
     this.loanService.getLoanAccountAssociationDetails(loanId).subscribe((loanDetails: any) => {
       this.loanDetailsData = loanDetails;
       // Only perform LOC-specific adjustments; do NOT rebuild the form.
       if (this.isLineOfCreditReceivable()) {
         this.disbursementForm.get('transactionAmount')?.disable();
+      }
+      // For LOC loans, pre-select "Disbursement of Invoice" payment type
+      if (this.isLineOfCreditLoan()) {
+        this.preSelectDisbursementOfInvoicePaymentType();
       }
       // Fetch and filter eligible savings accounts
       this.fetchEligibleSavingsAccounts(loanDetails);
@@ -93,6 +106,8 @@ export class DisburseToSavingsAccountComponent implements OnInit {
 
     const existingNote = this.disbursementForm?.get('note')?.value || '';
     const existingDestinationAccount = this.disbursementForm?.get('destinationSavingsAccountId')?.value ?? null;
+    const existingAutoWithdraw = this.disbursementForm?.get('autoWithdrawFromSavings')?.value ?? false;
+    const existingPaymentTypeId = this.disbursementForm?.get('paymentTypeId')?.value ?? null;
 
     this.disbursementForm = this.formBuilder.group({
       actualDisbursementDate: [
@@ -104,8 +119,18 @@ export class DisburseToSavingsAccountComponent implements OnInit {
         Validators.required
       ],
       destinationSavingsAccountId: [existingDestinationAccount],
-      note: [existingNote]
+      note: [existingNote],
+      autoWithdrawFromSavings: [existingAutoWithdraw],
+      paymentTypeId: [existingPaymentTypeId]
     });
+
+    // Subscribe to checkbox changes to toggle paymentTypeId validation
+    this.disbursementForm.get('autoWithdrawFromSavings')?.valueChanges.subscribe((isChecked: boolean) => {
+      this.updatePaymentTypeValidation(isChecked);
+    });
+
+    // Set initial validation state
+    this.updatePaymentTypeValidation(existingAutoWithdraw);
 
     if (this.dataObject?.fixedEmiAmount) {
       if (!this.disbursementForm.get('fixedEmiAmount')) {
@@ -142,22 +167,52 @@ export class DisburseToSavingsAccountComponent implements OnInit {
       disbursementLoanFormData.actualDisbursementDate = this.dateUtils.formatDate(chosenDate, dateFormat);
     }
 
+    // Destructure to exclude paymentTypeId and autoWithdrawFromSavings from spread
+    const { paymentTypeId, autoWithdrawFromSavings, ...formDataWithoutPaymentType } = disbursementLoanFormData;
+
     const data = {
-      ...disbursementLoanFormData,
+      ...formDataWithoutPaymentType,
       dateFormat,
       locale,
       transactionAmount: disbursementLoanFormData.transactionAmount * 1
     };
 
-    // Only include destinationSavingsAccountId if it's provided
-    if (disbursementLoanFormData.destinationSavingsAccountId) {
-      data['destinationSavingsAccountId'] = disbursementLoanFormData.destinationSavingsAccountId;
+    // Include autoWithdrawFromSavings flag and withdrawalPaymentTypeId only when checkbox is selected
+    if (autoWithdrawFromSavings) {
+      data['autoWithdrawFromSavings'] = true;
+      if (paymentTypeId) {
+        data['withdrawalPaymentTypeId'] = paymentTypeId;
+      }
     }
 
     const loanId = this.route.snapshot.params['loanId'];
     this.loanService.loanActionButtons(loanId, 'disbursetosavings', data).subscribe(() => {
       this.router.navigate(['../../general'], { relativeTo: this.route });
     });
+  }
+
+  /**
+   * Updates the validation for paymentTypeId based on checkbox state
+   */
+  updatePaymentTypeValidation(isAutoWithdrawChecked: boolean): void {
+    const paymentTypeControl = this.disbursementForm.get('paymentTypeId');
+    if (isAutoWithdrawChecked) {
+      paymentTypeControl?.setValidators([Validators.required]);
+    } else {
+      paymentTypeControl?.clearValidators();
+    }
+    paymentTypeControl?.updateValueAndValidity();
+  }
+
+  /**
+   * Checks if the loan is under a Line of Credit (any type)
+   */
+  isLineOfCreditLoan(): boolean {
+    const loanInfo = this.loanDetailsData || this.dataObject;
+    if (!loanInfo) {
+      return false;
+    }
+    return !!(loanInfo.lineOfCreditId || loanInfo.additionalProperties?.lineOfCreditId);
   }
 
   /**
@@ -174,6 +229,40 @@ export class DisburseToSavingsAccountComponent implements OnInit {
     }
     const locType = loanInfo.locType || loanInfo.additionalProperties?.locProductType;
     return locType === 'RECEIVABLE';
+  }
+
+  /**
+   * Fetches payment types from the organization service
+   */
+  fetchPaymentTypes(): void {
+    this.isLoadingPaymentTypes = true;
+    this.organizationService.getPaymentTypes().subscribe({
+      next: (paymentTypes: any) => {
+        this.paymentTypeOptions = paymentTypes || [];
+        this.isLoadingPaymentTypes = false;
+        // Try to pre-select payment type for LOC loans if loan details already loaded
+        if (this.isLineOfCreditLoan()) {
+          this.preSelectDisbursementOfInvoicePaymentType();
+        }
+      },
+      error: (error) => {
+        console.error('Error fetching payment types:', error);
+        this.paymentTypeOptions = [];
+        this.isLoadingPaymentTypes = false;
+      }
+    });
+  }
+
+  /**
+   * Pre-selects "Disbursement of Invoice" payment type for LOC loans
+   */
+  preSelectDisbursementOfInvoicePaymentType(): void {
+    const disbursementOfInvoice = this.paymentTypeOptions.find((pt: any) => pt.name === 'Disbursement of Invoice');
+    if (disbursementOfInvoice) {
+      this.disbursementForm.patchValue({
+        paymentTypeId: disbursementOfInvoice.id
+      });
+    }
   }
 
   /**

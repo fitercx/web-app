@@ -87,7 +87,8 @@ export class DisburseComponent implements OnInit {
       ],
       externalId: '',
       paymentTypeId: '',
-      note: ''
+      note: '',
+      autoWithdrawFromSavings: [false]
     });
   }
 
@@ -143,6 +144,14 @@ export class DisburseComponent implements OnInit {
       locale
     };
     data['transactionAmount'] = data['transactionAmount'] * 1;
+
+    // Include autoWithdrawFromSavings flag if checked
+    if (disbursementLoanFormData.autoWithdrawFromSavings) {
+      data['autoWithdrawFromSavings'] = true;
+    } else {
+      delete data['autoWithdrawFromSavings'];
+    }
+
     this.loanService.loanActionButtons(this.loanId, 'disburse', data).subscribe((response: any) => {
       this.router.navigate(['../../general'], { relativeTo: this.route });
     });
