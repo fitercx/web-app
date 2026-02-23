@@ -124,6 +124,14 @@ export class DisburseToSavingsAccountComponent implements OnInit {
       paymentTypeId: [existingPaymentTypeId]
     });
 
+    // Subscribe to checkbox changes to toggle paymentTypeId validation
+    this.disbursementForm.get('autoWithdrawFromSavings')?.valueChanges.subscribe((isChecked: boolean) => {
+      this.updatePaymentTypeValidation(isChecked);
+    });
+
+    // Set initial validation state
+    this.updatePaymentTypeValidation(existingAutoWithdraw);
+
     if (this.dataObject?.fixedEmiAmount) {
       if (!this.disbursementForm.get('fixedEmiAmount')) {
         this.disbursementForm.addControl(
@@ -181,6 +189,19 @@ export class DisburseToSavingsAccountComponent implements OnInit {
     this.loanService.loanActionButtons(loanId, 'disbursetosavings', data).subscribe(() => {
       this.router.navigate(['../../general'], { relativeTo: this.route });
     });
+  }
+
+  /**
+   * Updates the validation for paymentTypeId based on checkbox state
+   */
+  updatePaymentTypeValidation(isAutoWithdrawChecked: boolean): void {
+    const paymentTypeControl = this.disbursementForm.get('paymentTypeId');
+    if (isAutoWithdrawChecked) {
+      paymentTypeControl?.setValidators([Validators.required]);
+    } else {
+      paymentTypeControl?.clearValidators();
+    }
+    paymentTypeControl?.updateValueAndValidity();
   }
 
   /**
