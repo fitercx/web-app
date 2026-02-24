@@ -40,13 +40,9 @@
               formControlName="invoiceDueDate"
               [min]="invoiceDueDateMinDate"
               [max]="maxDate"
-              required
             />
             <mat-datepicker-toggle matSuffix [for]="invoiceDueDatePicker"></mat-datepicker-toggle>
             <mat-datepicker #invoiceDueDatePicker></mat-datepicker>
-            <mat-error *ngIf="locDetailsForm.get('invoiceDueDate')?.hasError('required')">
-              {{ 'labels.inputs.Invoice Due Date' | translate }} {{ 'labels.commons.is required' | translate }}
-            </mat-error>
           </mat-form-field>
 
           <!-- Invoice Currency -->
