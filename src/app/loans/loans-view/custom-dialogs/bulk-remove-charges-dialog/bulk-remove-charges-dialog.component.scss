@@ -34,8 +34,8 @@
 }
 
 mat-dialog-content {
-  min-width: 400px;
-  max-width: 500px;
+  min-width: 500px;
+  max-width: 600px;
 }
 
 mat-dialog-actions {
@@ -77,4 +77,93 @@ mat-dialog-actions {
 .remove-all-checkbox {
   margin-bottom: 8px;
   font-weight: 500;
+}
+
+.optional-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  background-color: #ff9800;
+  color: white;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.warning-text {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  background-color: #fff3cd;
+  border-left: 4px solid #ff9800;
+  border-radius: 4px;
+  margin-top: 8px;
+  color: #856404;
+  font-size: 13px;
+}
+
+.warning-icon {
+  color: #ff9800;
+  margin-right: 8px;
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+
+mat-radio-group {
+  margin-bottom: 16px;
+}
+
+mat-radio-button {
+  margin-bottom: 8px;
+
+  ::ng-deep .mat-radio-label {
+    white-space: normal;
+  }
+}
+
+.emi-selection-container {
+  max-height: 300px;
+  overflow-y: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  padding: 12px;
+  background-color: #fafafa;
+}
+
+.emi-checkbox-item {
+  margin-bottom: 12px;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+
+  ::ng-deep .mat-checkbox-label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+}
+
+.emi-details {
+  font-size: 12px;
+  color: #666;
+  font-weight: normal;
+  margin-left: 24px;
+}
+
+.no-emi-message {
+  display: flex;
+  align-items: center;
+  padding: 12px;
+  background-color: #fff3cd;
+  border-left: 4px solid #ff9800;
+  border-radius: 4px;
+  color: #856404;
+  font-size: 14px;
+
+  .info-icon {
+    color: #ff9800;
+    margin-right: 8px;
+  }
 }

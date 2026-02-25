@@ -102,7 +102,10 @@
           <mat-menu #More="matMenu">
             <span *ngFor="let option of buttonConfig.options">
               <button mat-menu-item *mifosxHasPermission="option.taskPermissionName" (click)="doAction(option.name)">
-                {{ 'labels.menus.' + option.name | translate }}
+                <mat-icon matListIcon *ngIf="option.icon">
+                  <fa-icon [icon]="option.icon" size="sm"></fa-icon>
+                </mat-icon>
+                <span> {{ 'labels.menus.' + option.name | translate }} </span>
               </button>
             </span>
           </mat-menu>

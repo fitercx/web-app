@@ -3,6 +3,7 @@ export class SavingsButtonsConfiguration {
   optionArray: {
     name: string;
     taskPermissionName: string;
+    icon?: string;
   }[];
 
   buttonsArray: {
@@ -183,7 +184,7 @@ export class SavingsButtonsConfiguration {
     }
   }
 
-  addOption(option: { name: string; taskPermissionName: string }) {
+  addOption(option: { name: string; taskPermissionName: string; icon?: string }) {
     this.optionArray.push(option);
   }
 }
