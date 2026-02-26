@@ -80,10 +80,21 @@ export class SavingsAccountViewComponent implements OnInit {
     const subStatus = this.savingsAccountData.subStatus;
     this.buttonConfig = new SavingsButtonsConfiguration(status, subStatus);
     if (this.savingsAccountData.clientId) {
-      this.buttonConfig.addOption({
+      const transferFundsAction = {
         name: 'Transfer Funds',
+        icon: 'exchange',
         taskPermissionName: 'CREATE_ACCOUNTTRANSFER'
-      });
+      };
+      const withdrawalIndex = this.buttonConfig.singleButtons.findIndex((button) => button.name === 'Withdrawal');
+      if (withdrawalIndex >= 0) {
+        this.buttonConfig.singleButtons.splice(withdrawalIndex + 1, 0, transferFundsAction);
+      } else {
+        this.buttonConfig.addOption({
+          name: 'Transfer Funds',
+          taskPermissionName: 'CREATE_ACCOUNTTRANSFER',
+          icon: 'exchange'
+        });
+      }
     }
     if (this.savingsAccountData.externalId && environment.interbankTransfers === 'true') {
       this.buttonConfig.addOption({

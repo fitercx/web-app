@@ -354,16 +354,23 @@ export class ChargesTabComponent implements OnInit {
    */
   openBulkRemoveDialog() {
     const dialogRef = this.dialog.open(BulkRemoveChargesDialogComponent, {
-      width: '500px',
-      data: {}
+      width: '600px',
+      data: {
+        loanDetails: this.loanDetails
+      }
     });
 
     dialogRef.afterClosed().subscribe((result: any) => {
       if (result && result.confirm) {
         if (result.removeAll) {
+          // Option 1: Remove All
           this.bulkDeactivateAllOverdueCharges();
-        } else {
-          this.bulkDeactivateOverdueCharges(result.startDate, result.endDate);
+        } else if (result.removeEmi) {
+          // Option 2: Remove Complete EMI Overdue Charges
+          this.bulkDeactivateEmiOverdueCharges(result.selectedEmiNumbers);
+        } else if (result.byDateRange) {
+          // Option 3: Remove by Date Range
+          this.bulkDeactivateOverdueCharges(result.startDate, result.endDate, false);
         }
       }
     });
@@ -372,7 +379,7 @@ export class ChargesTabComponent implements OnInit {
   /**
    * Bulk deactivates overdue charges from the selected date range
    */
-  bulkDeactivateOverdueCharges(startDate: Date, endDate?: Date) {
+  bulkDeactivateOverdueCharges(startDate: Date, endDate?: Date, removeCompleteEmiOverdue: boolean = true) {
     if (!startDate) {
       return;
     }
@@ -387,27 +394,22 @@ export class ChargesTabComponent implements OnInit {
     if (endDate) {
       // Date range
       const endDateStr = this.dateUtils.formatDate(endDate, 'dd MMMM yyyy');
-      dialogContext =
-        this.translateService.instant(
-          'labels.dialogContext.Are you sure you want to deactivate all overdue charges with due dates between'
-        ) + ` ${startDateStr} ${this.translateService.instant('labels.text.and')} ${endDateStr}?`;
-      additionalNotes = this.translateService.instant(
-        'labels.text.This action will permanently deactivate all overdue charges with due dates within the selected date range. This action cannot be undone.'
-      );
+      dialogContext = `Are you sure you want to deactivate all overdue charges with due dates between ${startDateStr} and ${endDateStr}?`;
+      additionalNotes =
+        'This action will permanently deactivate all overdue charges with due dates within the selected date range. This action cannot be undone.';
     } else {
-      // Single date or from date onwards
-      dialogContext =
-        this.translateService.instant(
-          'labels.dialogContext.Are you sure you want to deactivate all overdue charges with due date on or after'
-        ) + ` ${startDateStr}?`;
-      additionalNotes = this.translateService.instant(
-        'labels.text.This action will permanently deactivate all overdue charges with due date on or after the selected date. This action cannot be undone.'
-      );
+      // Single date
+      dialogContext = `Are you sure you want to deactivate all overdue charges with due date on ${startDateStr}?`;
+      additionalNotes =
+        'This action will permanently deactivate all overdue charges with due date on the selected date. This action cannot be undone.';
+    }
+    if (removeCompleteEmiOverdue) {
+      additionalNotes += ' Complete EMI overdue charges for impacted EMI(s) will also be removed.';
     }
 
     const confirmDialogRef = this.dialog.open(ConfirmationDialogComponent, {
       data: {
-        heading: this.translateService.instant('labels.heading.Bulk Remove Overdue Charges'),
+        heading: 'Bulk Remove Overdue Charges',
         dialogContext: dialogContext,
         type: 'Dangerous',
         additionalNotes: additionalNotes
@@ -419,20 +421,76 @@ export class ChargesTabComponent implements OnInit {
         const payload: any = {
           dueDate: this.dateUtils.formatDate(startDate, dateFormat),
           dateFormat,
-          locale
+          locale,
+          removeCompleteEmiOverdue
         };
 
-        // Add end date if provided
+        // End date provided => range; not provided => exact single date only.
         if (endDate) {
           payload.toDueDate = this.dateUtils.formatDate(endDate, dateFormat);
+        } else {
+          payload.toDueDate = this.dateUtils.formatDate(startDate, dateFormat);
         }
 
         this.loansService.deactivateOverdueCharges(this.loanDetails.id, payload).subscribe({
           next: () => {
-            this.reload();
+            // Force a full page reload to ensure repayment schedule updates
+            setTimeout(() => {
+              this.reload();
+            }, 500);
           },
           error: (error) => {
             console.error('Error deactivating overdue charges:', error);
+          }
+        });
+      }
+    });
+  }
+
+  /**
+   * Bulk deactivates complete EMI overdue charges for selected EMI(s)
+   */
+  bulkDeactivateEmiOverdueCharges(selectedEmiNumbers: number[]) {
+    if (!selectedEmiNumbers || selectedEmiNumbers.length === 0) {
+      return;
+    }
+
+    const emiList = selectedEmiNumbers.join(', ');
+    const dialogContext = `Are you sure you want to deactivate all overdue charges for EMI(s) ${emiList}?`;
+    const additionalNotes =
+      'This action will permanently deactivate all overdue charges for the selected EMI(s), ensuring repayment schedule remains in sync. This action cannot be undone.';
+
+    const confirmDialogRef = this.dialog.open(ConfirmationDialogComponent, {
+      data: {
+        heading: 'Bulk Remove EMI Overdue Charges',
+        dialogContext: dialogContext,
+        type: 'Dangerous',
+        additionalNotes: additionalNotes
+      }
+    });
+
+    confirmDialogRef.afterClosed().subscribe((response: any) => {
+      if (response.confirm) {
+        const locale = this.settingsService.language.code;
+        const dateFormat = this.settingsService.dateFormat;
+
+        // Send payload with selected EMI numbers
+        const payload: any = {
+          dateFormat,
+          locale,
+          removeCompleteEmiOverdue: true,
+          selectedEmiNumbers: selectedEmiNumbers
+        };
+
+        this.loansService.deactivateOverdueCharges(this.loanDetails.id, payload).subscribe({
+          next: () => {
+            // Force a full page reload to ensure repayment schedule updates
+            setTimeout(() => {
+              this.reload();
+            }, 500);
+          },
+          error: (error) => {
+            console.error('Error deactivating EMI overdue charges:', error);
           }
         });
       }
@@ -452,7 +510,7 @@ export class ChargesTabComponent implements OnInit {
 
     const confirmDialogRef = this.dialog.open(ConfirmationDialogComponent, {
       data: {
-        heading: this.translateService.instant('labels.heading.Bulk Remove Overdue Charges'),
+        heading: 'Bulk Remove Overdue Charges',
         dialogContext: dialogContext,
         type: 'Dangerous',
         additionalNotes: additionalNotes
@@ -472,7 +530,10 @@ export class ChargesTabComponent implements OnInit {
 
         this.loansService.deactivateOverdueCharges(this.loanDetails.id, payload).subscribe({
           next: () => {
-            this.reload();
+            // Force a full page reload to ensure repayment schedule updates
+            setTimeout(() => {
+              this.reload();
+            }, 500);
           },
           error: (error) => {
             console.error('Error deactivating overdue charges:', error);
