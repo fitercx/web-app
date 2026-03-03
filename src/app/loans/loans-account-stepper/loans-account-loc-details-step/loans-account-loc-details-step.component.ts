@@ -250,10 +250,7 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
         '',
         Validators.required
       ],
-      invoiceDueDate: [
-        '',
-        Validators.required
-      ],
+      invoiceDueDate: [''],
       invoiceAmount: [
         '',
         [

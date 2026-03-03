@@ -13,6 +13,7 @@ import { LoansService } from 'app/loans/loans.service';
 
 import { jsPDF, jsPDFOptions } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 @Component({
   selector: 'mifosx-repayment-schedule-tab',
@@ -209,6 +210,280 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       }
     });
     pdf.save(fileName);
+  }
+
+  /**
+   * Exports the accrual report showing monthly interest accruals
+   */
+  exportAccrualReport() {
+    if (
+      !this.repaymentScheduleDetails ||
+      !this.repaymentScheduleDetails.periods ||
+      this.repaymentScheduleDetails.periods.length === 0
+    ) {
+      return;
+    }
+
+    const periods = this.repaymentScheduleDetails.periods;
+    const loanInfo = this.loanData || this.loanDetailsData;
+
+    // Get loan start date (disbursement date or first period fromDate)
+    let startDate: Date;
+    if (loanInfo?.timeline?.actualDisbursementDate) {
+      startDate = this.dateUtils.parseDate(loanInfo.timeline.actualDisbursementDate);
+    } else if (periods[0]?.fromDate) {
+      startDate = this.dateUtils.parseDate(periods[0].fromDate);
+    } else if (periods[0]?.dueDate) {
+      startDate = this.dateUtils.parseDate(periods[0].dueDate);
+    } else {
+      console.error('Cannot determine loan start date');
+      return;
+    }
+
+    // Get final maturity date (last period dueDate)
+    const lastPeriod = periods[periods.length - 1];
+    const maturityDate = this.dateUtils.parseDate(lastPeriod.dueDate);
+
+    // Generate monthly accrual data
+    const accrualData = this.generateAccrualData(periods, startDate, maturityDate);
+
+    // Export to Excel
+    this.exportAccrualToExcel(accrualData, startDate);
+  }
+
+  /**
+   * Returns the number of days between two dates (inclusive of both dates).
+   */
+  private getDaysBetween(from: Date, to: Date): number {
+    const fromTime = new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime();
+    const toTime = new Date(to.getFullYear(), to.getMonth(), to.getDate()).getTime();
+    return Math.round((toTime - fromTime) / (24 * 60 * 60 * 1000)) + 1;
+  }
+
+  /**
+   * Gets the start date of a schedule period (day after previous due, or fromDate, or loan start).
+   */
+  private getPeriodStartDate(
+    period: RepaymentSchedulePeriod,
+    periodIndex: number,
+    periods: RepaymentSchedulePeriod[],
+    startDate: Date
+  ): Date {
+    if (period.fromDate) {
+      return this.dateUtils.parseDate(period.fromDate);
+    }
+    if (periodIndex > 0 && periods[periodIndex - 1].dueDate) {
+      const prevDue = this.dateUtils.parseDate(periods[periodIndex - 1].dueDate);
+      const next = new Date(prevDue);
+      next.setDate(next.getDate() + 1);
+      return next;
+    }
+    return new Date(startDate);
+  }
+
+  /**
+   * Calculates day-weighted interest accrued in a date range from a single period.
+   * Returns (overlapDays / periodDays) * periodInterest.
+   */
+  private getDayWeightedInterestForRange(
+    periodStart: Date,
+    periodDue: Date,
+    periodDays: number,
+    periodInterest: number,
+    rangeStart: Date,
+    rangeEnd: Date
+  ): number {
+    const overlapStart = periodStart > rangeStart ? periodStart : rangeStart;
+    const overlapEnd = periodDue < rangeEnd ? periodDue : rangeEnd;
+    if (overlapStart > overlapEnd) {
+      return 0;
+    }
+    const overlapDays = this.getDaysBetween(overlapStart, overlapEnd);
+    if (periodDays <= 0) {
+      return 0;
+    }
+    return (overlapDays / periodDays) * periodInterest;
+  }
+
+  /**
+   * Generates monthly accrual data from repayment schedule periods.
+   * Accrual is calculated month-wise on the basis of number of days: each period's interest
+   * is allocated to calendar months in proportion to how many days of that period fall in each month.
+   */
+  private generateAccrualData(periods: RepaymentSchedulePeriod[], startDate: Date, maturityDate: Date): any[] {
+    const accrualRows: any[] = [];
+    const currentDate = this.settingsService.businessDate;
+    let index = 1;
+
+    let initialPrincipal = 0;
+    const firstDisbursementPeriod = periods.find((p) => p.principalDisbursed && p.principalDisbursed > 0);
+    if (firstDisbursementPeriod) {
+      initialPrincipal = firstDisbursementPeriod.principalDisbursed;
+    } else if (periods.length > 0) {
+      initialPrincipal = (periods[0].principalLoanBalanceOutstanding || 0) + (periods[0].principalDue || 0);
+    }
+    let previousPrincipalBalance = initialPrincipal;
+
+    let currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
+    const finalMonth = new Date(maturityDate.getFullYear(), maturityDate.getMonth(), 1);
+
+    while (currentMonth <= finalMonth) {
+      const year = currentMonth.getFullYear();
+      const month = currentMonth.getMonth();
+
+      let monthEndDate: Date;
+      if (year === maturityDate.getFullYear() && month === maturityDate.getMonth()) {
+        monthEndDate = new Date(maturityDate);
+      } else {
+        monthEndDate = new Date(year, month + 1, 0);
+      }
+
+      let monthStartDate: Date;
+      if (year === startDate.getFullYear() && month === startDate.getMonth()) {
+        monthStartDate = new Date(startDate);
+      } else {
+        monthStartDate = new Date(year, month, 1);
+      }
+
+      // Opening principal
+      let openingPrincipal = previousPrincipalBalance;
+      const periodsBeforeMonth = periods.filter((p) => {
+        if (!p.dueDate) return false;
+        return this.dateUtils.parseDate(p.dueDate) < monthStartDate;
+      });
+      if (periodsBeforeMonth.length > 0) {
+        const lastBefore = periodsBeforeMonth[periodsBeforeMonth.length - 1];
+        openingPrincipal = lastBefore.principalLoanBalanceOutstanding ?? 0;
+        if (lastBefore.principalDisbursed) {
+          openingPrincipal = lastBefore.principalDisbursed;
+        }
+      } else if (year === startDate.getFullYear() && month === startDate.getMonth()) {
+        openingPrincipal = initialPrincipal;
+      }
+
+      // Interest accrued this month: day-weighted by overlap of each period with this month
+      let interestAccrued = 0;
+      periods.forEach((period, periodIndex) => {
+        if (!period.dueDate || (period.interestOriginalDue ?? 0) === 0) {
+          return;
+        }
+        const periodDue = this.dateUtils.parseDate(period.dueDate);
+        const periodStart = this.getPeriodStartDate(period, periodIndex, periods, startDate);
+        if (periodDue < monthStartDate || periodStart > monthEndDate) {
+          return;
+        }
+        const periodDays = period.daysInPeriod ?? Math.max(1, this.getDaysBetween(periodStart, periodDue));
+        interestAccrued += this.getDayWeightedInterestForRange(
+          periodStart,
+          periodDue,
+          periodDays,
+          period.interestOriginalDue ?? 0,
+          monthStartDate,
+          monthEndDate
+        );
+      });
+
+      // Closing principal
+      let closingPrincipal = openingPrincipal;
+      const periodsUpToMonthEnd = periods.filter(
+        (p) => p.dueDate && this.dateUtils.parseDate(p.dueDate) <= monthEndDate
+      );
+      if (periodsUpToMonthEnd.length > 0) {
+        closingPrincipal = periodsUpToMonthEnd[periodsUpToMonthEnd.length - 1].principalLoanBalanceOutstanding ?? 0;
+      }
+      if (year === maturityDate.getFullYear() && month === maturityDate.getMonth()) {
+        closingPrincipal = 0;
+      }
+
+      // Actual interest accrued: for past months = full month (same as Interest Accrued); for current month = accrual up to business date; future = blank
+      let actualInterestAccrued: number | null;
+      if (monthEndDate < currentDate) {
+        actualInterestAccrued = interestAccrued;
+      } else if (currentDate >= monthStartDate && currentDate <= monthEndDate) {
+        actualInterestAccrued = 0;
+        const effectiveEnd = currentDate;
+        periods.forEach((period, periodIndex) => {
+          if (!period.dueDate || (period.interestOriginalDue ?? 0) === 0) return;
+          const periodDue = this.dateUtils.parseDate(period.dueDate);
+          const periodStart = this.getPeriodStartDate(period, periodIndex, periods, startDate);
+          if (periodDue < monthStartDate || periodStart > effectiveEnd) return;
+          const periodDays = period.daysInPeriod ?? Math.max(1, this.getDaysBetween(periodStart, periodDue));
+          actualInterestAccrued += this.getDayWeightedInterestForRange(
+            periodStart,
+            periodDue,
+            periodDays,
+            period.interestOriginalDue ?? 0,
+            monthStartDate,
+            effectiveEnd
+          );
+        });
+      } else {
+        actualInterestAccrued = null;
+      }
+
+      const monthEndDateStr = this.dateUtils.formatDate(monthEndDate, Dates.DEFAULT_DATEFORMAT);
+
+      accrualRows.push({
+        Index: index,
+        'End of Month': monthEndDateStr,
+        'Opening Principal': this.formatCurrency(openingPrincipal),
+        'Closing Principal': this.formatCurrency(closingPrincipal),
+        'Interest Accrued': this.formatCurrency(interestAccrued),
+        'Actual Interest Accrued': actualInterestAccrued !== null ? this.formatCurrency(actualInterestAccrued) : ''
+      });
+
+      previousPrincipalBalance = closingPrincipal;
+      currentMonth = new Date(year, month + 1, 1);
+      index++;
+    }
+
+    return accrualRows;
+  }
+
+  /**
+   * Formats a number as currency string
+   */
+  private formatCurrency(value: number): string {
+    if (value === null || value === undefined) {
+      return '0.00';
+    }
+    return value.toFixed(2);
+  }
+
+  /**
+   * Exports accrual data to Excel file
+   */
+  private exportAccrualToExcel(accrualData: any[], startDate: Date) {
+    if (!accrualData || accrualData.length === 0) {
+      return;
+    }
+
+    // Create worksheet from data
+    const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(accrualData);
+
+    // Set column widths
+    const colWidths = [
+      { wch: 8 }, // Index
+      { wch: 15 }, // End of Month
+      { wch: 18 }, // Opening Principal
+      { wch: 18 }, // Closing Principal
+      { wch: 18 }, // Interest Accrued
+      { wch: 22 } // Actual Interest Accrued
+
+    ];
+    ws['!cols'] = colWidths;
+
+    // Create workbook and add worksheet
+    const wb: XLSX.WorkBook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Accrual Report');
+
+    // Generate filename
+    const businessDate = this.dateUtils.formatDate(this.settingsService.businessDate, Dates.DEFAULT_DATEFORMAT);
+    const loanId = this.loanDetailsData?.id || this.loanData?.id || 'loan';
+    const fileName = `Accrual-Report-${loanId}-${businessDate}.xlsx`;
+
+    // Save file
+    XLSX.writeFile(wb, fileName);
   }
 
   editInstallment(period: RepaymentSchedulePeriod): void {
@@ -880,9 +1155,12 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   private isInstallmentBlockedByOverdueCharges(installment: any): boolean {
-    // Block adjustment if Overdue Interest > 0.0
-    const overdueInterest = Number(installment.totalOverdue ?? 0);
-    return overdueInterest > 0.0;
+    // Block adjustment only if there are actual overdue charges (fees, penalties)
+    // This matches the backend validation logic which checks for outstanding charges
+    // Note: We check fees and penalties; tax charges are validated on the backend
+    const feeChargesOutstanding = Number(installment.feeChargesOutstanding ?? 0);
+    const penaltyChargesOutstanding = Number(installment.penaltyChargesOutstanding ?? 0);
+    return feeChargesOutstanding > 0 || penaltyChargesOutstanding > 0;
   }
 
   /**

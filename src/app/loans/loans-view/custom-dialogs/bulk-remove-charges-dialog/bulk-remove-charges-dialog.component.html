@@ -1,16 +1,57 @@
-<h2 mat-dialog-title>
-  {{ 'labels.heading.Bulk Remove Overdue Charges' | translate }}
-</h2>
+<h2 mat-dialog-title>Bulk Remove Overdue Charges</h2>
 
 <mat-dialog-content>
   <form [formGroup]="bulkRemoveForm" fxLayout="column" fxLayoutGap="16px">
-    <mat-checkbox formControlName="removeAll" class="remove-all-checkbox">
-      {{ 'Remove All Overdue Charges' | translate }}
-    </mat-checkbox>
+    <!-- Radio button group for removal type -->
+    <mat-radio-group formControlName="removalType" fxLayout="column" fxLayoutGap="12px">
+      <!-- Option 1: Remove All -->
+      <mat-radio-button value="removeAll">
+        <strong>1. {{ 'Remove All Overdue Charges' | translate }}</strong>
+      </mat-radio-button>
 
-    <div *ngIf="!bulkRemoveForm.get('removeAll')?.value" fxLayout="column" fxLayoutGap="16px">
+      <!-- Option 2: Remove EMI Charges -->
+      <mat-radio-button value="removeEmi">
+        <strong>2. {{ 'Remove Complete EMI Overdue Charges' | translate }}</strong>
+      </mat-radio-button>
+
+      <!-- Option 3: By Date Range (Optional) -->
+      <mat-radio-button value="byDateRange">
+        <strong>3. {{ 'Remove by Date Range' | translate }}</strong>
+        <span class="optional-badge">({{ 'Optional' | translate }})</span>
+      </mat-radio-button>
+    </mat-radio-group>
+
+    <!-- EMI selection (only shown when "Remove Complete EMI Overdue Charges" is selected) -->
+    <div *ngIf="bulkRemoveForm.get('removalType')?.value === 'removeEmi'" fxLayout="column" fxLayoutGap="16px">
       <p class="info-text">
-        {{ 'labels.text.Select a date range to remove all overdue charges within that period' | translate }}
+        {{ 'Select EMI(s) to remove overdue charges' | translate }}
+      </p>
+
+      <div *ngIf="emisWithOverdueCharges.length === 0" class="no-emi-message">
+        <mat-icon class="info-icon">info</mat-icon>
+        <span>{{ 'No EMIs with overdue charges found' | translate }}</span>
+      </div>
+
+      <div *ngIf="emisWithOverdueCharges.length > 0" class="emi-selection-container">
+        <div *ngFor="let emi of emisWithOverdueCharges; let i = index" class="emi-checkbox-item">
+          <mat-checkbox [formControl]="getSelectedEmisFormArray().at(i)">
+            <strong>EMI #{{ emi.installmentNumber }}</strong> - {{ emi.dueDateFormatted }}
+            <span class="emi-details">
+              ({{ emi.chargeCount }} {{ 'charge(s)' | translate }},
+              {{ emi.overdueAmount | currency: 'AED' : 'symbol-narrow' : '1.2-2' }})
+            </span>
+          </mat-checkbox>
+        </div>
+      </div>
+    </div>
+
+    <!-- Date range fields (only shown when "By Date Range" is selected) -->
+    <div *ngIf="bulkRemoveForm.get('removalType')?.value === 'byDateRange'" fxLayout="column" fxLayoutGap="16px">
+      <p class="info-text warning-text">
+        <mat-icon class="warning-icon">warning</mat-icon>
+        {{
+          'Date range removal may cause schedule discrepancies. Use EMI removal option for safer operation' | translate
+        }}
       </p>
 
       <div class="date-field-wrapper">
@@ -46,26 +87,31 @@
           <mat-datepicker-toggle matSuffix [for]="endDatePicker"></mat-datepicker-toggle>
           <mat-datepicker #endDatePicker></mat-datepicker>
           <mat-hint>{{
-            'labels.hints.Select end date to remove charges within a range, or leave empty to remove from start date onwards'
+            'Select end date to remove charges within a range, or leave empty to remove only selected start date'
               | translate
           }}</mat-hint>
         </mat-form-field>
       </div>
     </div>
 
+    <!-- Information box -->
     <div class="info-box">
       <mat-icon class="info-icon">info</mat-icon>
       <p class="info-text">
-        <small *ngIf="bulkRemoveForm.get('removeAll')?.value">
-          • {{ 'labels.text.All overdue charges will be permanently deactivated' | translate }}<br />
-          • {{ 'labels.text.This action cannot be undone' | translate }}
+        <small *ngIf="bulkRemoveForm.get('removalType')?.value === 'removeAll'">
+          • {{ 'All overdue charges will be permanently deactivated' | translate }}<br />
+          • {{ 'This action cannot be undone' | translate }}
         </small>
-        <small *ngIf="!bulkRemoveForm.get('removeAll')?.value">
-          • {{ 'labels.text.All overdue charges with due date on or after the start date will be removed' | translate
-          }}<br />
-          • {{ 'labels.text.If end date is provided, only charges within the date range will be removed' | translate
-          }}<br />
-          • {{ 'labels.text.This action cannot be undone' | translate }}
+        <small *ngIf="bulkRemoveForm.get('removalType')?.value === 'removeEmi'">
+          • {{ 'All overdue charges for impacted EMI(s) will be removed' | translate }}<br />
+          • {{ 'This ensures repayment schedule remains in sync' | translate }}<br />
+          • {{ 'This action cannot be undone' | translate }}
+        </small>
+        <small *ngIf="bulkRemoveForm.get('removalType')?.value === 'byDateRange'">
+          • {{ 'If end date is blank, only charges on selected start date will be removed' | translate }}<br />
+          • {{ 'If end date is provided, only charges within the date range will be removed' | translate }}<br />
+          • {{ 'Warning: Date-based removal may cause schedule discrepancies' | translate }}<br />
+          • {{ 'This action cannot be undone' | translate }}
         </small>
       </p>
     </div>
@@ -79,7 +125,11 @@
   <button
     mat-raised-button
     color="warn"
-    [disabled]="!bulkRemoveForm.get('removeAll')?.value && !bulkRemoveForm.get('startDate')?.valid"
+    [disabled]="
+      (bulkRemoveForm.get('removalType')?.value === 'byDateRange' && !bulkRemoveForm.get('startDate')?.valid) ||
+      (bulkRemoveForm.get('removalType')?.value === 'removeEmi' && getSelectedEmiNumbers().length === 0) ||
+      !bulkRemoveForm.get('removalType')?.value
+    "
     (click)="submit()"
   >
     <mat-icon>delete_sweep</mat-icon>

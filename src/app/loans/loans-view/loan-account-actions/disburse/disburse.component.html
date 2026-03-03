@@ -84,6 +84,10 @@
             <mat-label>{{ 'labels.inputs.Note' | translate }}</mat-label>
             <textarea matInput formControlName="note" cdkTextareaAutosize cdkAutosizeMinRows="2"></textarea>
           </mat-form-field>
+
+          <mat-checkbox formControlName="autoWithdrawFromSavings" class="auto-withdraw-checkbox">
+            {{ 'labels.inputs.Automatically withdraw full disbursed amount from linked savings account' | translate }}
+          </mat-checkbox>
         </div>
 
         <mat-card-actions fxLayout="row" fxLayout.xs="column" fxLayoutAlign="center" fxLayoutGap="5px">
