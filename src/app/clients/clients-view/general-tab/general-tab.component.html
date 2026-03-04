@@ -267,10 +267,10 @@
               </ng-container>
 
               <ng-container matColumnDef="Outstanding Balance">
-                <th mat-header-cell class="r-amount" *matHeaderCellDef>
-                  {{ 'labels.inputs.Outstanding Balance' | translate }}
+                <th mat-header-cell class="center" *matHeaderCellDef>
+                  <div style="text-align: center">{{ 'labels.inputs.Outstanding Balance' | translate }}<br />(AED)</div>
                 </th>
-                <td mat-cell class="r-amount" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
+                <td mat-cell class="center" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
                   {{
                     (loan.status?.overpaid
                       ? 0
@@ -283,18 +283,18 @@
               </ng-container>
 
               <ng-container matColumnDef="Amount Paid">
-                <th mat-header-cell class="r-amount" *matHeaderCellDef>
-                  {{ 'labels.inputs.Amount Paid' | translate }}
+                <th mat-header-cell class="center" *matHeaderCellDef>
+                  <div style="text-align: center">{{ 'labels.inputs.Amount Paid' | translate }}<br />(AED)</div>
                 </th>
-                <td mat-cell class="r-amount" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
+                <td mat-cell class="center" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
                   {{ loan.amountPaid | formatNumber }}
                 </td>
               </ng-container>
               <ng-container *ngIf="!showClosedLOCLoans" matColumnDef="Refund Amount">
-                <th mat-header-cell class="r-amount" *matHeaderCellDef>
-                  {{ 'labels.inputs.Refund Amount' | translate }}
+                <th mat-header-cell class="center" *matHeaderCellDef>
+                  <div style="text-align: center">{{ 'labels.inputs.Refund Amount' | translate }}<br />(AED)</div>
                 </th>
-                <td mat-cell class="r-amount" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
+                <td mat-cell class="center" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
                   {{ loan.totalOverPaidDerived | formatNumber }}
                 </td>
               </ng-container>
