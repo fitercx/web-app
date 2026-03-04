@@ -1219,6 +1219,8 @@
       "Expected Interest": "Expected Interest",
       "Enable Line of Credit Receivable functionality": "Enable Line of Credit Receivable functionality",
       "Disbursed Amount": "Disbursed Amount",
+      "Disburse in Invoice Currency": "Disburse in Invoice Currency",
+      "Amount in Invoice Currency": "Amount in Invoice Currency",
       "Refund Amount": "Refund Amount",
       "Facility Amount (Principal)": "Facility Amount (Principal)",
       "Invoice Details": "Invoice Details",
