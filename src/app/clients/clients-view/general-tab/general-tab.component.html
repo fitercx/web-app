@@ -418,15 +418,15 @@
                           }}</span>
                         </div>
                         <div class="detail-item">
-                          <span class="detail-label">{{ 'labels.inputs.Issued Date' | translate }}:</span>
+                          <span class="detail-label">{{ 'labels.inputs.Invoice Due Date' | translate }}:</span>
                           <span class="detail-value">
                             <ng-container *ngIf="loan.status?.waitingForDisbursal || loan.status?.pendingApproval">
                               N/A
                             </ng-container>
                             <ng-container *ngIf="!(loan.status?.waitingForDisbursal || loan.status?.pendingApproval)">
                               {{
-                                loan.timeline?.actualDisbursementDate
-                                  ? (loan.timeline.actualDisbursementDate | dateFormat)
+                                loan.additionalProperties?.invoiceDueDate
+                                  ? (loan.additionalProperties.invoiceDueDate | dateFormat)
                                   : '-'
                               }}
                             </ng-container>
