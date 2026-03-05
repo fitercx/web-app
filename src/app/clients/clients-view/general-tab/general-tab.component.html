@@ -264,7 +264,9 @@
                 <td mat-cell *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
                   {{
                     loan.additionalProperties?.disburseInInvoiceCurrency
-                      ? (loan.additionalProperties?.approvedPayableAmount | formatNumber) +
+                      ? ((loan.isFactorRateEnabled ? loan.factorRateLoanAmount : loan.originalLoan) /
+                          (loan.additionalProperties?.markup + loan.additionalProperties?.exchangeRate)
+                          | formatNumber) +
                         ' ' +
                         loan.additionalProperties?.invoiceCurrency
                       : ((loan.isFactorRateEnabled ? loan.factorRateLoanAmount : loan.originalLoan) | formatNumber) +
