@@ -39,6 +39,10 @@ export class DisburseToSavingsAccountComponent implements OnInit {
   invoiceCurrency: string = '';
   /** The funded amount in invoice currency */
   fundedAmountInInvoiceCurrency: number | null = null;
+  /** Markup rate from additionalProperties */
+  markup: number = 0;
+  /** Exchange rate from additionalProperties */
+  exchangeRate: number = 0;
 
   /**
    * Get data from `Resolver`.
@@ -261,6 +265,10 @@ export class DisburseToSavingsAccountComponent implements OnInit {
     const invoiceCurrency = additionalProperties.invoiceCurrency;
     const fundedAmount = additionalProperties.fundedAmountInInvoiceCurrency;
 
+    // Store markup and exchangeRate for dynamic calculation
+    this.markup = additionalProperties.markup || 0;
+    this.exchangeRate = additionalProperties.exchangeRate || 0;
+
     // Show option only if invoice currency exists and is not AED
     if (invoiceCurrency && invoiceCurrency !== 'AED' && fundedAmount != null) {
       this.showInvoiceCurrencyOption = true;
@@ -269,6 +277,19 @@ export class DisburseToSavingsAccountComponent implements OnInit {
     } else {
       this.showInvoiceCurrencyOption = false;
     }
+  }
+
+  /**
+   * Calculates the amount in invoice currency based on the current transaction amount (in AED)
+   * Formula: transactionAmount / (markup + exchangeRate)
+   */
+  get calculatedAmountInInvoiceCurrency(): number | null {
+    const transactionAmount = this.disbursementForm?.get('transactionAmount')?.value;
+    const divisor = this.markup + this.exchangeRate;
+    if (transactionAmount == null || divisor === 0) {
+      return this.fundedAmountInInvoiceCurrency;
+    }
+    return transactionAmount / divisor;
   }
 
   /**
