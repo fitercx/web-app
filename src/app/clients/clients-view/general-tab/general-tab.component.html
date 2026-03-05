@@ -262,7 +262,14 @@
               <ng-container matColumnDef="Disbursed Amount">
                 <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Disbursed Amount' | translate }}</th>
                 <td mat-cell *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
-                  {{ (loan.isFactorRateEnabled ? loan.factorRateLoanAmount : loan.originalLoan) | formatNumber }}
+                  {{
+                    loan.additionalProperties?.disburseInInvoiceCurrency
+                      ? (loan.additionalProperties?.approvedPayableAmount | formatNumber) +
+                        ' ' +
+                        loan.additionalProperties?.invoiceCurrency
+                      : ((loan.isFactorRateEnabled ? loan.factorRateLoanAmount : loan.originalLoan) | formatNumber) +
+                        ' AED'
+                  }}
                 </td>
               </ng-container>
 
