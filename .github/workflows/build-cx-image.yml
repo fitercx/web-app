@@ -86,7 +86,7 @@ jobs:
       - name: Configure AWS Credentials - Staging Account
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-region: me-central-1
+          aws-region: ap-south-1
           role-to-assume: ${{ secrets.AWS_STG_ACCOUNT_ROLE }}
           role-session-name: GitHubActionStaging
 
@@ -103,7 +103,7 @@ jobs:
       - name: Configure AWS Credentials - PROD Account
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-region: me-central-1
+          aws-region: ap-south-1
           role-to-assume: ${{ secrets.AWS_PROD_ACCOUNT_ROLE }}
           role-session-name: GitHubActionProduction
 
