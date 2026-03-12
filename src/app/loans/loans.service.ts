@@ -184,6 +184,14 @@ export class LoansService {
   }
 
   /**
+   * Gets loan notes with document attachments (includes presigned URLs for viewing)
+   * @param loanId Loan ID
+   */
+  getLoanNotesWithDocuments(loanId: string): Observable<any> {
+    return this.http.get(`/loans/${loanId}/notes-with-documents`);
+  }
+
+  /**
    * Adds a note to the particular Loan Id
    * @param loanId Loan ID
    * @param noteData Note Data to be added
@@ -191,6 +199,15 @@ export class LoansService {
    */
   createLoanNote(loanId: string, noteData: any): Observable<any> {
     return this.http.post(`/loans/${loanId}/notes`, noteData);
+  }
+
+  /**
+   * Creates a loan note with document attachments
+   * @param loanId Loan ID
+   * @param noteData Note data with documents
+   */
+  createLoanNoteWithDocuments(loanId: string, noteData: any): Observable<any> {
+    return this.http.post(`/loans/${loanId}/notes-with-documents`, noteData);
   }
 
   /**

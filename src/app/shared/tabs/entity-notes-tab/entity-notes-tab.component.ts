@@ -374,4 +374,30 @@ export class EntityNotesTabComponent implements OnInit {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
+
+  /**
+   * Check if a content type is an image
+   */
+  isImageType(contentType: string): boolean {
+    return contentType && contentType.startsWith('image/');
+  }
+
+  /**
+   * Get icon for non-image file types
+   */
+  getFileIcon(contentType: string): string {
+    if (contentType && contentType.includes('pdf')) {
+      return 'file-pdf';
+    }
+    return 'file-alt';
+  }
+
+  /**
+   * Open document in new tab using presigned URL
+   */
+  openDocument(document: any): void {
+    if (document.presignedUrl) {
+      window.open(document.presignedUrl, '_blank');
+    }
+  }
 }

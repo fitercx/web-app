@@ -6,6 +6,7 @@ import { ActivatedRoute } from '@angular/router';
 /** Custom Services */
 import { LoansService } from '../../loans.service';
 import { AuthenticationService } from '../../../core/authentication/authentication.service';
+import { CreateNoteWithDocumentsRequest } from 'app/shared/models/file-upload.model';
 
 @Component({
   selector: 'mifosx-notes-tab',
@@ -25,6 +26,8 @@ export class NotesTabComponent {
     const savedCredentials = this.authenticationService.getCredentials();
     this.username = savedCredentials.username;
     this.entityId = this.route.parent.snapshot.params['loanId'];
+    this.addNote = this.addNote.bind(this);
+    this.addNoteWithDocuments = this.addNoteWithDocuments.bind(this);
     this.route.data.subscribe((data: { loanNotes: any }) => {
       this.entityNotes = data.loanNotes;
     });
@@ -37,6 +40,21 @@ export class NotesTabComponent {
         createdByUsername: this.username,
         createdOn: new Date(),
         note: noteContent.note
+      });
+    });
+  }
+
+  /**
+   * Creates a loan note with document attachments.
+   */
+  addNoteWithDocuments(noteData: CreateNoteWithDocumentsRequest) {
+    this.loansService.createLoanNoteWithDocuments(this.entityId, noteData).subscribe((response: any) => {
+      this.entityNotes.push({
+        id: response.resourceId,
+        createdByUsername: this.username,
+        createdOn: new Date(),
+        note: noteData.note,
+        documents: noteData.documents
       });
     });
   }
