@@ -1,6 +1,9 @@
 import { Component } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 
+/** rxjs Imports */
+import { switchMap, map } from 'rxjs/operators';
+
 /** Custom Components */
 
 /** Custom Services */
@@ -46,17 +49,26 @@ export class NotesTabComponent {
 
   /**
    * Creates a loan note with document attachments.
+   * After creation, fetches the note with presigned URLs.
    */
   addNoteWithDocuments(noteData: CreateNoteWithDocumentsRequest) {
-    this.loansService.createLoanNoteWithDocuments(this.entityId, noteData).subscribe((response: any) => {
-      this.entityNotes.push({
-        id: response.resourceId,
-        createdByUsername: this.username,
-        createdOn: new Date(),
-        note: noteData.note,
-        documents: noteData.documents
-      });
-    });
+    this.loansService
+      .createLoanNoteWithDocuments(this.entityId, noteData)
+      .pipe(
+        switchMap((response: any) => {
+          // After creating, fetch all notes to get the one with presigned URLs
+          return this.loansService.getLoanNotesWithDocuments(this.entityId).pipe(
+            map((notes: any[]) => {
+              // Find the newly created note by resourceId
+              const createdNote = notes.find((n: any) => n.id === response.resourceId);
+              if (createdNote) {
+                this.entityNotes.push(createdNote);
+              }
+            })
+          );
+        })
+      )
+      .subscribe();
   }
 
   editNote(noteId: string, noteContent: any, index: number) {
