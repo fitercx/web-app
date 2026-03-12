@@ -276,6 +276,15 @@ export class ClientsService {
     return this.http.post(`/clients/${clientId}/notes`, noteData);
   }
 
+  /**
+   * Creates a client note with document attachments
+   * @param clientId Client ID
+   * @param noteData Note data with documents
+   */
+  createClientNoteWithDocuments(clientId: string, noteData: any) {
+    return this.http.post(`/clients/${clientId}/notes-with-documents`, noteData);
+  }
+
   editClientNote(clientId: string, noteId: string, noteData: any) {
     return this.http.put(`/clients/${clientId}/notes/${noteId}`, noteData);
   }

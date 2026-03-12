@@ -8,7 +8,13 @@ import { SavingsService } from 'app/savings/savings.service';
 import { DeleteDialogComponent } from 'app/shared/delete-dialog/delete-dialog.component';
 import { FormDialogComponent } from 'app/shared/form-dialog/form-dialog.component';
 import { S3Service } from 'app/core/services/s3.service';
-import { FileUploadStatus, FileMetadataRequest, PresignedUrlResponse } from 'app/shared/models/file-upload.model';
+import {
+  FileUploadStatus,
+  FileMetadataRequest,
+  PresignedUrlResponse,
+  NoteDocumentAttachment,
+  CreateNoteWithDocumentsRequest
+} from 'app/shared/models/file-upload.model';
 
 @Component({
   selector: 'mifosx-entity-notes-tab',
@@ -22,6 +28,7 @@ export class EntityNotesTabComponent implements OnInit {
   @Input() entityNotes: any;
 
   @Input() callbackAdd: (note: any) => void;
+  @Input() callbackAddWithDocuments: (noteData: CreateNoteWithDocumentsRequest) => void;
   @Input() callbackEdit: (noteId: string, note: string, index: number) => void;
   @Input() callbackDelete: (noteId: string, index: number) => void;
 
@@ -61,8 +68,41 @@ export class EntityNotesTabComponent implements OnInit {
   }
 
   addNote() {
-    this.callbackAdd(this.noteForm.value);
+    // Get successfully uploaded files
+    const uploadedFiles = this.selectedFiles.filter((f) => f.status === 'completed' && f.s3ObjectKey);
+
+    if (uploadedFiles.length > 0 && this.callbackAddWithDocuments) {
+      // Create note with documents
+      const documents: NoteDocumentAttachment[] = uploadedFiles.map((f) => ({
+        uploadCorrelationId: f.uploadCorrelationId,
+        fileName: f.file.name,
+        size: f.file.size,
+        contentType: f.file.type,
+        s3ObjectKey: f.s3ObjectKey!,
+        description: ''
+      }));
+
+      const noteData: CreateNoteWithDocumentsRequest = {
+        note: this.noteForm.value.note,
+        documents: documents
+      };
+
+      this.callbackAddWithDocuments(noteData);
+    } else {
+      // Create note without documents (original behavior)
+      this.callbackAdd(this.noteForm.value);
+    }
+
+    // Reset form and clear selected files
     this.formRef.resetForm();
+    this.selectedFiles = [];
+  }
+
+  /**
+   * Check if there are any files still uploading
+   */
+  isUploading(): boolean {
+    return this.selectedFiles.some((f) => f.status === 'uploading' || f.status === 'getting-url');
   }
 
   editNote(noteId: string, noteContent: string, index: number) {
@@ -251,7 +291,10 @@ export class EntityNotesTabComponent implements OnInit {
           );
           if (fileStatus) {
             fileStatus.presignedUrl = presignedResponse.presignedUrl;
+            // Store the S3 object key for later use when creating the note
+            fileStatus.s3ObjectKey = presignedResponse.objectKey;
             console.log(`Presigned URL received for ${fileStatus.file.name}:`, presignedResponse.presignedUrl);
+            console.log(`S3 Object Key: ${presignedResponse.objectKey}`);
             // Immediately start uploading to S3
             this.uploadFileToS3(fileStatus);
           } else {

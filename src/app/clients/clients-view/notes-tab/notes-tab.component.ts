@@ -7,6 +7,7 @@ import { ActivatedRoute } from '@angular/router';
 /** Custom Services */
 import { ClientsService } from '../../clients.service';
 import { AuthenticationService } from 'app/core/authentication/authentication.service';
+import { CreateNoteWithDocumentsRequest } from 'app/shared/models/file-upload.model';
 
 /**
  * Notes Tab Component
@@ -36,6 +37,7 @@ export class NotesTabComponent implements OnInit {
   ) {
     this.entityId = this.route.parent.snapshot.params['clientId'];
     this.addNote = this.addNote.bind(this);
+    this.addNoteWithDocuments = this.addNoteWithDocuments.bind(this);
   }
 
   ngOnInit(): void {
@@ -79,6 +81,21 @@ export class NotesTabComponent implements OnInit {
         createdByUsername: this.username,
         createdOn: new Date(),
         note: noteContent.note
+      });
+    });
+  }
+
+  /**
+   * Creates a client note with document attachments.
+   */
+  addNoteWithDocuments(noteData: CreateNoteWithDocumentsRequest) {
+    this.clientsService.createClientNoteWithDocuments(this.entityId, noteData).subscribe((response: any) => {
+      this.entityNotes.push({
+        id: response.resourceId,
+        createdByUsername: this.username,
+        createdOn: new Date(),
+        note: noteData.note,
+        documents: noteData.documents
       });
     });
   }

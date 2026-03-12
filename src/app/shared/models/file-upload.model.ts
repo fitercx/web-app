@@ -20,8 +20,14 @@ export interface PresignedUrlResponse {
   uploadCorrelationId: string;
   /** Presigned PUT URL for direct upload to S3 */
   presignedUrl: string;
+  /** S3 object key for the uploaded file */
+  objectKey?: string;
   /** Expiration time for the presigned URL */
   expiresAt?: string;
+  /** Expiration in seconds */
+  expiresInSeconds?: number;
+  /** Whether the presigned URL was generated successfully */
+  success?: boolean;
 }
 
 /**
@@ -34,6 +40,8 @@ export interface FileUploadStatus {
   file: File;
   /** Presigned URL for uploading */
   presignedUrl?: string;
+  /** S3 object key after upload */
+  s3ObjectKey?: string;
   /** Current upload status */
   status: 'pending' | 'getting-url' | 'uploading' | 'completed' | 'error';
   /** Upload progress percentage (0-100) */
@@ -42,4 +50,32 @@ export interface FileUploadStatus {
   errorMessage?: string;
   /** Preview URL for images */
   previewUrl?: string;
+}
+
+/**
+ * Document attachment for note creation
+ */
+export interface NoteDocumentAttachment {
+  /** Frontend-generated UUID for correlation */
+  uploadCorrelationId: string;
+  /** Name of the file */
+  fileName: string;
+  /** Size of the file in bytes */
+  size: number;
+  /** MIME content type */
+  contentType: string;
+  /** S3 object key */
+  s3ObjectKey: string;
+  /** Optional description */
+  description?: string;
+}
+
+/**
+ * Request payload for creating note with documents
+ */
+export interface CreateNoteWithDocumentsRequest {
+  /** Note text content */
+  note: string;
+  /** Array of document attachments */
+  documents: NoteDocumentAttachment[];
 }
