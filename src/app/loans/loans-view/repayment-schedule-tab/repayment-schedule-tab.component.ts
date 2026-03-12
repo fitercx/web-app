@@ -9,7 +9,7 @@ import { DatepickerBase } from 'app/shared/form-dialog/formfield/model/datepicke
 import { FormfieldBase } from 'app/shared/form-dialog/formfield/model/formfield-base';
 import { InputBase } from 'app/shared/form-dialog/formfield/model/input-base';
 import { AdjustInstallmentDateDialogComponent } from '../custom-dialogs/adjust-installment-date-dialog/adjust-installment-date-dialog.component';
-import { LoansService } from 'app/loans/loans.service';
+import { AccrualReportPeriod, LoansService } from 'app/loans/loans.service';
 
 import { jsPDF, jsPDFOptions } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -213,9 +213,41 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   /**
-   * Exports the accrual report showing monthly interest accruals
+   * Exports the accrual report using "Generate Loan Monthly Accrual Summations" data from the backend.
+   * Falls back to client-side calculation if the API is unavailable.
    */
   exportAccrualReport() {
+    const loanId = this.loanDetailsData?.id ?? this.loanData?.id;
+    if (loanId) {
+      this.loansService.getAccrualReport(String(loanId)).subscribe({
+        next: (response) => {
+          const periods = response?.periods ?? [];
+          if (periods.length > 0) {
+            const accrualData = periods.map((p: AccrualReportPeriod) => ({
+              Index: p.index,
+              'End of Month': p.endOfMonth,
+              'Opening Principal': this.formatCurrency(Number(p.openingPrincipal)),
+              'Closing Principal': this.formatCurrency(Number(p.closingPrincipal)),
+              'Interest Accrued': this.formatCurrency(Number(p.interestAccrued)),
+              'Actual Interest Accrued':
+                p.actualInterestAccrued != null ? this.formatCurrency(Number(p.actualInterestAccrued)) : ''
+            }));
+            this.exportAccrualToExcel(accrualData, new Date());
+          } else {
+            this.exportAccrualReportFromSchedule();
+          }
+        },
+        error: () => this.exportAccrualReportFromSchedule()
+      });
+    } else {
+      this.exportAccrualReportFromSchedule();
+    }
+  }
+
+  /**
+   * Fallback: generates accrual data from repayment schedule and exports to Excel.
+   */
+  private exportAccrualReportFromSchedule() {
     if (
       !this.repaymentScheduleDetails ||
       !this.repaymentScheduleDetails.periods ||
@@ -227,7 +259,6 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     const periods = this.repaymentScheduleDetails.periods;
     const loanInfo = this.loanData || this.loanDetailsData;
 
-    // Get loan start date (disbursement date or first period fromDate)
     let startDate: Date;
     if (loanInfo?.timeline?.actualDisbursementDate) {
       startDate = this.dateUtils.parseDate(loanInfo.timeline.actualDisbursementDate);
@@ -240,14 +271,9 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       return;
     }
 
-    // Get final maturity date (last period dueDate)
     const lastPeriod = periods[periods.length - 1];
     const maturityDate = this.dateUtils.parseDate(lastPeriod.dueDate);
-
-    // Generate monthly accrual data
     const accrualData = this.generateAccrualData(periods, startDate, maturityDate);
-
-    // Export to Excel
     this.exportAccrualToExcel(accrualData, startDate);
   }
 
