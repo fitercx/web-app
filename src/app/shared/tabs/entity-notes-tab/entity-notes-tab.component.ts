@@ -7,6 +7,8 @@ import { LoansService } from 'app/loans/loans.service';
 import { SavingsService } from 'app/savings/savings.service';
 import { DeleteDialogComponent } from 'app/shared/delete-dialog/delete-dialog.component';
 import { FormDialogComponent } from 'app/shared/form-dialog/form-dialog.component';
+import { S3Service } from 'app/core/services/s3.service';
+import { FileUploadStatus, FileMetadataRequest, PresignedUrlResponse } from 'app/shared/models/file-upload.model';
 
 @Component({
   selector: 'mifosx-entity-notes-tab',
@@ -25,13 +27,24 @@ export class EntityNotesTabComponent implements OnInit {
 
   noteForm: UntypedFormGroup;
 
+  /** File upload properties */
+  selectedFiles: FileUploadStatus[] = [];
+  isDragOver = false;
+  acceptedImageTypes = [
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp'
+  ];
+
   constructor(
     private formBuilder: UntypedFormBuilder,
     private savingsService: SavingsService,
     private loansService: LoansService,
     private clientsService: ClientsService,
     private groupsService: GroupsService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private s3Service: S3Service
   ) {}
 
   ngOnInit() {
@@ -87,5 +100,235 @@ export class EntityNotesTabComponent implements OnInit {
         this.callbackDelete(noteId, index);
       }
     });
+  }
+
+  /**
+   * Handle drag over event
+   */
+  onDragOver(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = true;
+  }
+
+  /**
+   * Handle drag leave event
+   */
+  onDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = false;
+  }
+
+  /**
+   * Handle file drop event
+   */
+  onFileDrop(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = false;
+
+    const files = event.dataTransfer?.files;
+    if (files && files.length > 0) {
+      this.processFiles(files);
+    }
+  }
+
+  /**
+   * Handle files selected via file input
+   */
+  onFilesSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      this.processFiles(input.files);
+    }
+    // Reset input so same file can be selected again
+    input.value = '';
+  }
+
+  /**
+   * Process selected files - validate, create previews, and request presigned URLs
+   */
+  private processFiles(fileList: FileList): void {
+    const validFiles: File[] = [];
+
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      if (this.isValidImageFile(file)) {
+        validFiles.push(file);
+      }
+    }
+
+    if (validFiles.length === 0) {
+      return;
+    }
+
+    // Create file status objects and generate previews
+    const newFileStatuses: FileUploadStatus[] = validFiles.map((file) => {
+      const fileStatus: FileUploadStatus = {
+        uploadCorrelationId: this.s3Service.generateCorrelationId(),
+        file: file,
+        status: 'pending',
+        progress: 0,
+        previewUrl: undefined
+      };
+
+      // Generate preview
+      this.generatePreview(file, fileStatus);
+
+      return fileStatus;
+    });
+
+    // Add to selected files
+    this.selectedFiles = [
+      ...this.selectedFiles,
+      ...newFileStatuses
+    ];
+
+    // Request presigned URLs from backend
+    this.requestPresignedUrls(newFileStatuses);
+  }
+
+  /**
+   * Validate if file is an accepted image type
+   */
+  private isValidImageFile(file: File): boolean {
+    return this.acceptedImageTypes.includes(file.type);
+  }
+
+  /**
+   * Generate image preview URL
+   */
+  private generatePreview(file: File, fileStatus: FileUploadStatus): void {
+    const reader = new FileReader();
+    reader.onload = (e: ProgressEvent<FileReader>) => {
+      fileStatus.previewUrl = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  /**
+   * Request presigned URLs from the backend
+   */
+  private requestPresignedUrls(fileStatuses: FileUploadStatus[]): void {
+    // Update status to getting-url
+    fileStatuses.forEach((fs) => (fs.status = 'getting-url'));
+
+    // Create metadata request
+    const metadataRequests: FileMetadataRequest[] = fileStatuses.map((fs) => ({
+      uploadCorrelationId: fs.uploadCorrelationId,
+      fileName: fs.file.name,
+      contentType: fs.file.type,
+      fileSize: fs.file.size
+    }));
+
+    // Call backend to get presigned URLs
+    this.s3Service.generatePresignedUrls(metadataRequests).subscribe({
+      next: (response: any) => {
+        console.log('Raw response from backend:', response);
+
+        // Handle different response structures
+        let responses: PresignedUrlResponse[] = [];
+        if (Array.isArray(response)) {
+          responses = response;
+        } else if (response && response.urls) {
+          responses = response.urls;
+        } else if (response && response.files) {
+          responses = response.files;
+        } else if (response && response.data) {
+          responses = Array.isArray(response.data) ? response.data : [response.data];
+        } else if (response && response.presignedUrl) {
+          // Single response object
+          responses = [response];
+        }
+
+        console.log('Parsed presigned URL responses:', responses);
+
+        // Match responses to file statuses by correlation ID and start uploads
+        responses.forEach((presignedResponse: PresignedUrlResponse) => {
+          const fileStatus = fileStatuses.find(
+            (fs) => fs.uploadCorrelationId === presignedResponse.uploadCorrelationId
+          );
+          if (fileStatus) {
+            fileStatus.presignedUrl = presignedResponse.presignedUrl;
+            console.log(`Presigned URL received for ${fileStatus.file.name}:`, presignedResponse.presignedUrl);
+            // Immediately start uploading to S3
+            this.uploadFileToS3(fileStatus);
+          } else {
+            console.warn(`No matching file status found for correlation ID: ${presignedResponse.uploadCorrelationId}`);
+          }
+        });
+
+        // Check if any files didn't get a presigned URL
+        fileStatuses.forEach((fs) => {
+          if (!fs.presignedUrl && fs.status === 'getting-url') {
+            console.error(`No presigned URL received for ${fs.file.name} (${fs.uploadCorrelationId})`);
+            fs.status = 'error';
+            fs.errorMessage = 'No presigned URL received';
+          }
+        });
+      },
+      error: (error) => {
+        console.error('Error getting presigned URLs:', error);
+        fileStatuses.forEach((fs) => {
+          fs.status = 'error';
+          fs.errorMessage = 'Failed to get upload URL';
+        });
+      }
+    });
+  }
+
+  /**
+   * Upload a single file to S3 using its presigned URL
+   */
+  private uploadFileToS3(fileStatus: FileUploadStatus): void {
+    if (!fileStatus.presignedUrl) {
+      fileStatus.status = 'error';
+      fileStatus.errorMessage = 'No presigned URL available';
+      return;
+    }
+
+    fileStatus.status = 'uploading';
+    fileStatus.progress = 0;
+
+    this.s3Service
+      .uploadFileToS3(fileStatus.presignedUrl, fileStatus.file, (progress) => {
+        fileStatus.progress = progress;
+      })
+      .subscribe({
+        next: () => {
+          fileStatus.status = 'completed';
+          fileStatus.progress = 100;
+          console.log(`Successfully uploaded ${fileStatus.file.name} to S3`);
+        },
+        error: (error) => {
+          fileStatus.status = 'error';
+          fileStatus.errorMessage = `Upload failed: ${error.statusText || 'Unknown error'}`;
+          console.error(`Failed to upload ${fileStatus.file.name} to S3:`, error);
+        }
+      });
+  }
+
+  /**
+   * Remove a file from the selected files list
+   */
+  removeFile(index: number): void {
+    this.selectedFiles.splice(index, 1);
+  }
+
+  /**
+   * Format file size for display
+   */
+  formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = [
+      'Bytes',
+      'KB',
+      'MB',
+      'GB'
+    ];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   }
 }
