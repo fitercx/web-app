@@ -16,7 +16,6 @@ export class ActiveLoansTabComponent implements OnInit {
     'Account No',
     'Invoice Number',
     'Supplier/Buyer Name',
-    'Loan Account',
     'Disbursed Amount',
     'Outstanding Balance',
     'Amount Paid',
