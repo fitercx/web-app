@@ -7,6 +7,16 @@ import { Observable } from 'rxjs';
 import { Dates } from 'app/core/utils/dates';
 import { SettingsService } from 'app/settings/settings.service';
 
+/** Accrual report row from backend (Generate Loan Monthly Accrual Summations logic) */
+export interface AccrualReportPeriod {
+  index: number;
+  endOfMonth: string;
+  openingPrincipal: number;
+  closingPrincipal: number;
+  interestAccrued: number;
+  actualInterestAccrued: number | null;
+}
+
 /**
  * Loans service.
  */
@@ -71,6 +81,13 @@ export class LoansService {
   getLoanAccountResource(loanId: string, associations: string): Observable<any> {
     const httpParams = new HttpParams().set('associations', associations);
     return this.http.get(`/loans/${loanId}`, { params: httpParams });
+  }
+
+  /**
+   * Retrieves accrual report for a loan (same data as "Generate Loan Monthly Accrual Summations" job).
+   */
+  getAccrualReport(loanId: string): Observable<{ periods: AccrualReportPeriod[] }> {
+    return this.http.get(`/loans/${loanId}/accrual-report`) as Observable<{ periods: AccrualReportPeriod[] }>;
   }
 
   getGuarantorTemplate(loanId: string): Observable<any> {

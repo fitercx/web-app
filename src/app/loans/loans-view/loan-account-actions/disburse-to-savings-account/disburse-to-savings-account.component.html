@@ -74,6 +74,23 @@
               <strong>{{ 'labels.commons.required' | translate }}</strong>
             </mat-error>
           </mat-form-field>
+
+          <div *ngIf="showInvoiceCurrencyOption" class="invoice-currency-section">
+            <mat-checkbox formControlName="disburseInInvoiceCurrency" class="invoice-currency-checkbox">
+              {{ 'labels.inputs.Disburse in Invoice Currency' | translate }} ({{ invoiceCurrency }})
+            </mat-checkbox>
+            <div *ngIf="disbursementForm.get('disburseInInvoiceCurrency')?.value" class="invoice-currency-info-box">
+              <mat-icon class="info-icon">info</mat-icon>
+              <div class="info-content">
+                <p class="info-title">
+                  {{ 'labels.inputs.Amount in Invoice Currency' | translate }} ({{ invoiceCurrency }})
+                </p>
+                <p class="info-amount">
+                  {{ calculatedAmountInInvoiceCurrency | formatNumber: null : 2 }} {{ invoiceCurrency }}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <mat-card-actions fxLayout="row" fxLayout.xs="column" fxLayoutAlign="center" fxLayoutGap="5px">

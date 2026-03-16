@@ -125,7 +125,6 @@ export class GeneralTabComponent {
     'Account No',
     'Invoice Number',
     'Supplier/Buyer Name',
-    'Loan Product',
     'Disbursed Amount',
     'Outstanding Balance',
     'Amount Paid',

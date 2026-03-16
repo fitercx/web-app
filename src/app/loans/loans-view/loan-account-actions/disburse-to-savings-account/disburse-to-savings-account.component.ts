@@ -33,6 +33,16 @@ export class DisburseToSavingsAccountComponent implements OnInit {
   paymentTypeOptions: any[] = [];
   /** Loading state for payment types */
   isLoadingPaymentTypes = false;
+  /** Whether the loan has a different invoice currency than AED */
+  showInvoiceCurrencyOption = false;
+  /** The invoice currency code */
+  invoiceCurrency: string = '';
+  /** The funded amount in invoice currency */
+  fundedAmountInInvoiceCurrency: number | null = null;
+  /** Markup rate from additionalProperties */
+  markup: number = 0;
+  /** Exchange rate from additionalProperties */
+  exchangeRate: number = 0;
 
   /**
    * Get data from `Resolver`.
@@ -76,6 +86,8 @@ export class DisburseToSavingsAccountComponent implements OnInit {
       // For LOC loans, pre-select "Disbursement of Invoice" payment type
       if (this.isLineOfCreditLoan()) {
         this.preSelectDisbursementOfInvoicePaymentType();
+        // Check if invoice currency option should be shown
+        this.checkInvoiceCurrencyOption(loanDetails);
       }
       // Fetch and filter eligible savings accounts
       this.fetchEligibleSavingsAccounts(loanDetails);
@@ -108,6 +120,7 @@ export class DisburseToSavingsAccountComponent implements OnInit {
     const existingDestinationAccount = this.disbursementForm?.get('destinationSavingsAccountId')?.value ?? null;
     const existingAutoWithdraw = this.disbursementForm?.get('autoWithdrawFromSavings')?.value ?? false;
     const existingPaymentTypeId = this.disbursementForm?.get('paymentTypeId')?.value ?? null;
+    const existingDisburseInInvoiceCurrency = this.disbursementForm?.get('disburseInInvoiceCurrency')?.value ?? false;
 
     this.disbursementForm = this.formBuilder.group({
       actualDisbursementDate: [
@@ -121,7 +134,8 @@ export class DisburseToSavingsAccountComponent implements OnInit {
       destinationSavingsAccountId: [existingDestinationAccount],
       note: [existingNote],
       autoWithdrawFromSavings: [existingAutoWithdraw],
-      paymentTypeId: [existingPaymentTypeId]
+      paymentTypeId: [existingPaymentTypeId],
+      disburseInInvoiceCurrency: [existingDisburseInInvoiceCurrency]
     });
 
     // Subscribe to checkbox changes to toggle paymentTypeId validation
@@ -167,8 +181,9 @@ export class DisburseToSavingsAccountComponent implements OnInit {
       disbursementLoanFormData.actualDisbursementDate = this.dateUtils.formatDate(chosenDate, dateFormat);
     }
 
-    // Destructure to exclude paymentTypeId and autoWithdrawFromSavings from spread
-    const { paymentTypeId, autoWithdrawFromSavings, ...formDataWithoutPaymentType } = disbursementLoanFormData;
+    // Destructure to exclude paymentTypeId, autoWithdrawFromSavings, and disburseInInvoiceCurrency from spread
+    const { paymentTypeId, autoWithdrawFromSavings, disburseInInvoiceCurrency, ...formDataWithoutPaymentType } =
+      disbursementLoanFormData;
 
     const data = {
       ...formDataWithoutPaymentType,
@@ -183,6 +198,11 @@ export class DisburseToSavingsAccountComponent implements OnInit {
       if (paymentTypeId) {
         data['withdrawalPaymentTypeId'] = paymentTypeId;
       }
+    }
+
+    // Include disburseInInvoiceCurrency flag for LOC loans with non-AED invoice currency
+    if (this.showInvoiceCurrencyOption && disburseInInvoiceCurrency) {
+      data['disburseInInvoiceCurrency'] = true;
     }
 
     const loanId = this.route.snapshot.params['loanId'];
@@ -229,6 +249,47 @@ export class DisburseToSavingsAccountComponent implements OnInit {
     }
     const locType = loanInfo.locType || loanInfo.additionalProperties?.locProductType;
     return locType === 'RECEIVABLE';
+  }
+
+  /**
+   * Checks if invoice currency option should be shown for LOC loans
+   * Shows option when invoice currency is different from AED
+   */
+  checkInvoiceCurrencyOption(loanDetails: any): void {
+    const additionalProperties = loanDetails?.additionalProperties || this.dataObject?.additionalProperties;
+    if (!additionalProperties) {
+      this.showInvoiceCurrencyOption = false;
+      return;
+    }
+
+    const invoiceCurrency = additionalProperties.invoiceCurrency;
+    const fundedAmount = additionalProperties.fundedAmountInInvoiceCurrency;
+
+    // Store markup and exchangeRate for dynamic calculation
+    this.markup = additionalProperties.markup || 0;
+    this.exchangeRate = additionalProperties.exchangeRate || 0;
+
+    // Show option only if invoice currency exists and is not AED
+    if (invoiceCurrency && invoiceCurrency !== 'AED' && fundedAmount != null) {
+      this.showInvoiceCurrencyOption = true;
+      this.invoiceCurrency = invoiceCurrency;
+      this.fundedAmountInInvoiceCurrency = fundedAmount;
+    } else {
+      this.showInvoiceCurrencyOption = false;
+    }
+  }
+
+  /**
+   * Calculates the amount in invoice currency based on the current transaction amount (in AED)
+   * Formula: transactionAmount / (markup + exchangeRate)
+   */
+  get calculatedAmountInInvoiceCurrency(): number | null {
+    const transactionAmount = this.disbursementForm?.get('transactionAmount')?.value;
+    const divisor = this.markup + this.exchangeRate;
+    if (transactionAmount == null || divisor === 0) {
+      return this.fundedAmountInInvoiceCurrency;
+    }
+    return transactionAmount / divisor;
   }
 
   /**

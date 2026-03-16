@@ -259,25 +259,27 @@
                 </td>
               </ng-container>
 
-              <ng-container matColumnDef="Loan Product">
-                <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Loan Product' | translate }}</th>
-                <td mat-cell *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
-                  {{ loan.productName }}
-                </td>
-              </ng-container>
-
               <ng-container matColumnDef="Disbursed Amount">
                 <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Disbursed Amount' | translate }}</th>
                 <td mat-cell *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
-                  {{ (loan.isFactorRateEnabled ? loan.factorRateLoanAmount : loan.originalLoan) | formatNumber }}
+                  {{
+                    loan.additionalProperties?.disburseInInvoiceCurrency
+                      ? ((loan.isFactorRateEnabled ? loan.factorRateLoanAmount : loan.originalLoan) /
+                          (loan.additionalProperties?.markup + loan.additionalProperties?.exchangeRate)
+                          | formatNumber) +
+                        ' ' +
+                        loan.additionalProperties?.invoiceCurrency
+                      : ((loan.isFactorRateEnabled ? loan.factorRateLoanAmount : loan.originalLoan) | formatNumber) +
+                        ' AED'
+                  }}
                 </td>
               </ng-container>
 
               <ng-container matColumnDef="Outstanding Balance">
-                <th mat-header-cell class="r-amount" *matHeaderCellDef>
-                  {{ 'labels.inputs.Outstanding Balance' | translate }}
+                <th mat-header-cell class="center" *matHeaderCellDef>
+                  <div style="text-align: center">{{ 'labels.inputs.Outstanding Balance' | translate }}<br />(AED)</div>
                 </th>
-                <td mat-cell class="r-amount" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
+                <td mat-cell class="center" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
                   {{
                     (loan.status?.overpaid
                       ? 0
@@ -290,18 +292,18 @@
               </ng-container>
 
               <ng-container matColumnDef="Amount Paid">
-                <th mat-header-cell class="r-amount" *matHeaderCellDef>
-                  {{ 'labels.inputs.Amount Paid' | translate }}
+                <th mat-header-cell class="center" *matHeaderCellDef>
+                  <div style="text-align: center">{{ 'labels.inputs.Amount Paid' | translate }}<br />(AED)</div>
                 </th>
-                <td mat-cell class="r-amount" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
+                <td mat-cell class="center" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
                   {{ loan.amountPaid | formatNumber }}
                 </td>
               </ng-container>
               <ng-container *ngIf="!showClosedLOCLoans" matColumnDef="Refund Amount">
-                <th mat-header-cell class="r-amount" *matHeaderCellDef>
-                  {{ 'labels.inputs.Refund Amount' | translate }}
+                <th mat-header-cell class="center" *matHeaderCellDef>
+                  <div style="text-align: center">{{ 'labels.inputs.Refund Amount' | translate }}<br />(AED)</div>
                 </th>
-                <td mat-cell class="r-amount" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
+                <td mat-cell class="center" *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
                   {{ loan.totalOverPaidDerived | formatNumber }}
                 </td>
               </ng-container>
@@ -425,15 +427,15 @@
                           }}</span>
                         </div>
                         <div class="detail-item">
-                          <span class="detail-label">{{ 'labels.inputs.Issued Date' | translate }}:</span>
+                          <span class="detail-label">{{ 'labels.inputs.Invoice Due Date' | translate }}:</span>
                           <span class="detail-value">
                             <ng-container *ngIf="loan.status?.waitingForDisbursal || loan.status?.pendingApproval">
                               N/A
                             </ng-container>
                             <ng-container *ngIf="!(loan.status?.waitingForDisbursal || loan.status?.pendingApproval)">
                               {{
-                                loan.timeline?.actualDisbursementDate
-                                  ? (loan.timeline.actualDisbursementDate | dateFormat)
+                                loan.additionalProperties?.invoiceDueDate
+                                  ? (loan.additionalProperties.invoiceDueDate | dateFormat)
                                   : '-'
                               }}
                             </ng-container>
@@ -442,6 +444,10 @@
                         <div class="detail-item" *ngIf="loan.additionalProperties?.daysPastDue != null">
                           <span class="detail-label">{{ 'labels.inputs.DPD' | translate }}:</span>
                           <span class="detail-value">{{ loan.additionalProperties.daysPastDue }}</span>
+                        </div>
+                        <div class="detail-item" *ngIf="loan.additionalProperties?.lateFee != null">
+                          <span class="detail-label">{{ 'labels.inputs.Late Fee' | translate }}:</span>
+                          <span class="detail-value">{{ loan.additionalProperties.lateFee | formatNumber }}</span>
                         </div>
                       </div>
                     </div>
