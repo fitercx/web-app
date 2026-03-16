@@ -79,7 +79,7 @@ export class NotesTabComponent implements OnInit {
    */
   addNote(noteContent: any) {
     this.clientsService.createClientNote(this.entityId, noteContent).subscribe((response: any) => {
-      this.entityNotes.push({
+      this.entityNotes.unshift({
         id: response.resourceId,
         createdByUsername: this.username,
         createdOn: new Date(),
@@ -103,7 +103,7 @@ export class NotesTabComponent implements OnInit {
               // Find the newly created note by resourceId
               const createdNote = notes.find((n: any) => n.id === response.resourceId);
               if (createdNote) {
-                this.entityNotes.push(createdNote);
+                this.entityNotes.unshift(createdNote);
               }
             })
           );

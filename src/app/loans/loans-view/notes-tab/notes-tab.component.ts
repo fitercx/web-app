@@ -38,7 +38,7 @@ export class NotesTabComponent {
 
   addNote(noteContent: any) {
     this.loansService.createLoanNote(this.entityId, noteContent).subscribe((response: any) => {
-      this.entityNotes.push({
+      this.entityNotes.unshift({
         id: response.resourceId,
         createdByUsername: this.username,
         createdOn: new Date(),
@@ -62,7 +62,7 @@ export class NotesTabComponent {
               // Find the newly created note by resourceId
               const createdNote = notes.find((n: any) => n.id === response.resourceId);
               if (createdNote) {
-                this.entityNotes.push(createdNote);
+                this.entityNotes.unshift(createdNote);
               }
             })
           );

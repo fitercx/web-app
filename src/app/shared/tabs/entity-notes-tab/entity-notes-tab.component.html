@@ -20,8 +20,8 @@
         </button>
       </div>
 
-      <!-- Image upload section -->
-      <div class="image-upload-section">
+      <!-- Image upload section - only shown when document uploads are supported -->
+      <div class="image-upload-section" *ngIf="callbackAddWithDocuments">
         <div
           class="file-drop-zone"
           [class.drag-over]="isDragOver"
@@ -49,7 +49,12 @@
             fxLayoutAlign="start center"
           >
             <div class="preview-image-container">
-              <img *ngIf="fileStatus.previewUrl" [src]="fileStatus.previewUrl" alt="Preview" class="preview-image" />
+              <img
+                *ngIf="fileStatus.previewUrl"
+                [src]="fileStatus.previewUrl"
+                [alt]="fileStatus.file.name"
+                class="preview-image"
+              />
               <div class="file-status-overlay" [ngClass]="fileStatus.status">
                 <fa-icon *ngIf="fileStatus.status === 'pending'" icon="clock" class="status-icon"></fa-icon>
                 <fa-icon

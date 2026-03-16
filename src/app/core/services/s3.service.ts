@@ -50,17 +50,14 @@ export class S3Service {
 
       xhr.addEventListener('load', () => {
         if (xhr.status >= 200 && xhr.status < 300) {
-          console.log(`S3 upload successful for ${file.name}`);
           observer.next({ status: xhr.status, response: xhr.response });
           observer.complete();
         } else {
-          console.error(`S3 upload failed for ${file.name}:`, xhr.status, xhr.statusText);
           observer.error({ status: xhr.status, statusText: xhr.statusText, response: xhr.response });
         }
       });
 
       xhr.addEventListener('error', () => {
-        console.error(`S3 upload error for ${file.name}`);
         observer.error({ status: xhr.status, statusText: 'Network error' });
       });
 
@@ -84,6 +81,10 @@ export class S3Service {
    * @returns {string} A randomly generated UUID
    */
   generateCorrelationId(): string {
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+      return crypto.randomUUID();
+    }
+    // Fallback for older browsers
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
       const r = (Math.random() * 16) | 0;
       const v = c === 'x' ? r : (r & 0x3) | 0x8;

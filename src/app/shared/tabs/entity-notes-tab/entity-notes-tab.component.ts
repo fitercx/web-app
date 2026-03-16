@@ -28,7 +28,7 @@ export class EntityNotesTabComponent implements OnInit {
   @Input() entityNotes: any;
 
   @Input() callbackAdd: (note: any) => void;
-  @Input() callbackAddWithDocuments: (noteData: CreateNoteWithDocumentsRequest) => void;
+  @Input() callbackAddWithDocuments?: (noteData: CreateNoteWithDocumentsRequest) => void;
   @Input() callbackEdit: (noteId: string, note: string, index: number) => void;
   @Input() callbackDelete: (noteId: string, index: number) => void;
 
@@ -79,7 +79,8 @@ export class EntityNotesTabComponent implements OnInit {
         size: f.file.size,
         contentType: f.file.type,
         s3ObjectKey: f.s3ObjectKey!,
-        description: ''
+        description: '',
+        previewUrl: f.previewUrl
       }));
 
       const noteData: CreateNoteWithDocumentsRequest = {
@@ -265,8 +266,6 @@ export class EntityNotesTabComponent implements OnInit {
     // Call backend to get presigned URLs
     this.s3Service.generatePresignedUrls(metadataRequests).subscribe({
       next: (response: any) => {
-        console.log('Raw response from backend:', response);
-
         // Handle different response structures
         let responses: PresignedUrlResponse[] = [];
         if (Array.isArray(response)) {
@@ -282,8 +281,6 @@ export class EntityNotesTabComponent implements OnInit {
           responses = [response];
         }
 
-        console.log('Parsed presigned URL responses:', responses);
-
         // Match responses to file statuses by correlation ID and start uploads
         responses.forEach((presignedResponse: PresignedUrlResponse) => {
           const fileStatus = fileStatuses.find(
@@ -293,26 +290,20 @@ export class EntityNotesTabComponent implements OnInit {
             fileStatus.presignedUrl = presignedResponse.presignedUrl;
             // Store the S3 object key for later use when creating the note
             fileStatus.s3ObjectKey = presignedResponse.objectKey;
-            console.log(`Presigned URL received for ${fileStatus.file.name}:`, presignedResponse.presignedUrl);
-            console.log(`S3 Object Key: ${presignedResponse.objectKey}`);
             // Immediately start uploading to S3
             this.uploadFileToS3(fileStatus);
-          } else {
-            console.warn(`No matching file status found for correlation ID: ${presignedResponse.uploadCorrelationId}`);
           }
         });
 
         // Check if any files didn't get a presigned URL
         fileStatuses.forEach((fs) => {
           if (!fs.presignedUrl && fs.status === 'getting-url') {
-            console.error(`No presigned URL received for ${fs.file.name} (${fs.uploadCorrelationId})`);
             fs.status = 'error';
             fs.errorMessage = 'No presigned URL received';
           }
         });
       },
-      error: (error) => {
-        console.error('Error getting presigned URLs:', error);
+      error: () => {
         fileStatuses.forEach((fs) => {
           fs.status = 'error';
           fs.errorMessage = 'Failed to get upload URL';
@@ -342,20 +333,29 @@ export class EntityNotesTabComponent implements OnInit {
         next: () => {
           fileStatus.status = 'completed';
           fileStatus.progress = 100;
-          console.log(`Successfully uploaded ${fileStatus.file.name} to S3`);
         },
         error: (error) => {
           fileStatus.status = 'error';
           fileStatus.errorMessage = `Upload failed: ${error.statusText || 'Unknown error'}`;
-          console.error(`Failed to upload ${fileStatus.file.name} to S3:`, error);
         }
       });
   }
 
   /**
    * Remove a file from the selected files list
+   * Prevents removal while file is being uploaded
    */
   removeFile(index: number): void {
+    const fileStatus = this.selectedFiles[index];
+    if (!fileStatus) {
+      return;
+    }
+
+    // Prevent removal while the file is in-flight
+    if (fileStatus.status === 'getting-url' || fileStatus.status === 'uploading') {
+      return;
+    }
+
     this.selectedFiles.splice(index, 1);
   }
 
