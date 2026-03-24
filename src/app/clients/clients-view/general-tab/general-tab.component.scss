@@ -356,3 +356,49 @@
     }
   }
 }
+
+// Bulk Action Toolbar Styling for LOC Loans
+.bulk-action-toolbar {
+  background-color: #e3f2fd;
+  padding: 12px 16px;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  border: 1px solid #90caf9;
+
+  .selection-count {
+    font-weight: 500;
+    color: #0064ff;
+  }
+
+  button {
+    mat-icon {
+      margin-right: 4px;
+    }
+  }
+}
+
+// Bulk Mode Toggle Button
+.bulk-mode-toggle-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+// Bulk Mode Indicator
+.bulk-mode-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background-color: #0064ff;
+  color: white;
+  border-radius: 16px;
+  font-size: 13px;
+  font-weight: 500;
+
+  .mode-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}

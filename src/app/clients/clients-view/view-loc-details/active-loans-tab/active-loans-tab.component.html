@@ -1,5 +1,83 @@
 <div class="tab-container mat-typography">
+  <!-- Bulk Disburse Mode Toggle Button -->
+  <div class="mode-toggle-section" *ngIf="hasSelectableLoans()">
+    <ng-container *mifosxHasPermission="'DISBURSETOSAVINGS_LOAN'">
+      <button
+        mat-raised-button
+        [color]="isBulkDisburseMode ? 'accent' : 'primary'"
+        (click)="toggleBulkDisburseMode()"
+        class="bulk-mode-toggle-btn"
+      >
+        <mat-icon>{{ isBulkDisburseMode ? 'close' : 'checklist' }}</mat-icon>
+        {{
+          isBulkDisburseMode
+            ? ('labels.buttons.Exit Bulk Mode' | translate)
+            : ('labels.buttons.Select for Bulk Disburse' | translate)
+        }}
+      </button>
+    </ng-container>
+  </div>
+
+  <!-- Bulk Mode Active Indicator & Action Toolbar -->
+  <div class="bulk-action-toolbar" *ngIf="isBulkDisburseMode">
+    <div class="bulk-mode-indicator">
+      <mat-icon class="mode-icon">playlist_add_check</mat-icon>
+      <span class="mode-text">{{ 'labels.text.Bulk Disburse Mode Active' | translate }}</span>
+    </div>
+    <div class="selection-info" *ngIf="selection.selected.length > 0">
+      <span class="selection-count">
+        {{ selection.selected.length }} {{ 'labels.text.loans selected' | translate }}
+      </span>
+      <span class="selection-amount">
+        ({{ getSelectedTotalAmount() | number: '1.2-2' }} {{ locCurrency || 'AED' }})
+      </span>
+    </div>
+    <div class="bulk-actions">
+      <ng-container *mifosxHasPermission="'DISBURSETOSAVINGS_LOAN'">
+        <button
+          mat-raised-button
+          color="primary"
+          *ngIf="selection.selected.length > 0"
+          [disabled]="isBulkDisburseInProgress"
+          (click)="openBulkDisburseDialog()"
+        >
+          <mat-icon *ngIf="!isBulkDisburseInProgress">flag</mat-icon>
+          <mat-spinner *ngIf="isBulkDisburseInProgress" diameter="20"></mat-spinner>
+          {{ 'labels.buttons.Bulk Disburse' | translate }} ({{ selection.selected.length }})
+        </button>
+      </ng-container>
+      <button mat-button color="warn" *ngIf="selection.selected.length > 0" (click)="clearSelection()">
+        {{ 'labels.buttons.Clear Selection' | translate }}
+      </button>
+    </div>
+  </div>
+
   <table mat-table [dataSource]="loanAccounts">
+    <!-- Checkbox Column -->
+    <ng-container matColumnDef="select">
+      <th mat-header-cell *matHeaderCellDef>
+        <mat-checkbox
+          (change)="$event ? masterToggle() : null"
+          [checked]="selection.hasValue() && isAllSelected()"
+          [indeterminate]="isIndeterminate()"
+          [aria-label]="checkboxLabel()"
+          color="primary"
+        >
+        </mat-checkbox>
+      </th>
+      <td mat-cell *matCellDef="let row">
+        <mat-checkbox
+          *ngIf="isSelectable(row)"
+          (click)="$event.stopPropagation()"
+          (change)="$event ? selection.toggle(row) : null"
+          [checked]="selection.isSelected(row)"
+          [aria-label]="checkboxLabel(row)"
+          color="primary"
+        >
+        </mat-checkbox>
+        <span *ngIf="!isSelectable(row)" class="checkbox-placeholder">-</span>
+      </td>
+    </ng-container>
     <ng-container matColumnDef="Invoice Number">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Invoice Number' | translate }}</th>
       <td mat-cell *matCellDef="let element">
