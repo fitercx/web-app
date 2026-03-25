@@ -156,6 +156,22 @@ export class MakeRepaymentComponent implements OnInit {
       this.repaymentLoanForm.patchValue({
         transactionAmount: Math.round(totalAmount * 100) / 100
       });
+
+      // If the user selected a future repayment date, add the additional future LPI portion.
+      const selectedDate = this.dateUtils.parseDate(transactionDate);
+      const businessDate = this.settingsService.businessDate;
+      if (selectedDate && businessDate && selectedDate.getTime() > businessDate.getTime()) {
+        this.loanService.getFutureLPICharges(this.loanId, transactionDate).subscribe((futureLPI) => {
+          const additionalLPIAmount = Number(futureLPI?.totalLPIAmount || 0);
+          this.dataObject.penaltyTemplate.penaltyAmountDue = Number(penaltyAmount || 0) + additionalLPIAmount;
+
+          const futureTotalAmount =
+            principalAmount + interestAmount + feesAmount + (Number(penaltyAmount || 0) + additionalLPIAmount);
+          this.repaymentLoanForm.patchValue({
+            transactionAmount: Math.round(futureTotalAmount * 100) / 100
+          });
+        });
+      }
     });
   }
 }
