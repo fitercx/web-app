@@ -54,6 +54,18 @@ export class LoansService {
     return this.http.get(`/loans/crediblex/${loanId}/transactions/template/penalties`, { params: httpParams });
   }
 
+  /**
+   * Calculates additional future LPI (late payment interest) charges for a selected transaction date.
+   */
+  getFutureLPICharges(loanId: string, transactionDate: string): Observable<any> {
+    const httpParams = new HttpParams()
+      .set('locale', this.settingsService.language.code)
+      .set('dateFormat', this.settingsService.dateFormat)
+      .set('transactionDate', transactionDate);
+
+    return this.http.get(`/loans/crediblex/${loanId}/transactions/future-charges`, { params: httpParams });
+  }
+
   getLoanPrepayLoanActionTemplate(loanId: string, transactionDate: string): Observable<any> {
     if (!transactionDate) {
       transactionDate = this.dateUtils.formatDate(this.settingsService.businessDate, this.settingsService.dateFormat);
