@@ -26,18 +26,6 @@
       </mat-error>
     </mat-form-field>
 
-    <!-- Payment Type -->
-    <mat-form-field appearance="outline" class="full-width">
-      <mat-label>{{ 'labels.inputs.Payment Type' | translate }}</mat-label>
-      <mat-select formControlName="paymentTypeId">
-        <mat-option [value]="null">{{ 'labels.inputs.None' | translate }}</mat-option>
-        <mat-option *ngFor="let paymentType of paymentTypeOptions" [value]="paymentType.id">
-          {{ paymentType.name }}
-        </mat-option>
-      </mat-select>
-      <mat-hint *ngIf="isLoadingPaymentTypes">{{ 'labels.text.Loading' | translate }}...</mat-hint>
-    </mat-form-field>
-
     <!-- Auto Withdraw from Savings -->
     <div class="checkbox-field">
       <mat-checkbox formControlName="autoWithdrawFromSavings" color="primary">

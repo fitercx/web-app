@@ -1,10 +1,10 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { ClientsService, BulkLoanDisbursementRequest, BulkLoanDisbursementResponse } from 'app/clients/clients.service';
+import { ClientsService, BulkLoanDisbursementResponse } from 'app/clients/clients.service';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatTableDataSource } from '@angular/material/table';
 import { SelectionModel } from '@angular/cdk/collections';
-import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MatDialog } from '@angular/material/dialog';
 import {
   BulkDisburseDialogComponent,
   BulkDisburseDialogData
@@ -114,16 +114,6 @@ export class ActiveLoansTabComponent implements OnInit {
 
           this.loanAccounts.data = merged;
           this.totalRecords = data.totalFilteredRecords;
-
-          // Debug: Log loan statuses to understand the data
-          console.log('Loans loaded:', merged.length);
-          merged.forEach((loan: any) => {
-            console.log(`Loan ${loan.id} (${loan.accountNo}):`, {
-              status: loan.status,
-              isSelectable: this.isSelectable(loan)
-            });
-          });
-          console.log('Selectable loans count:', this.getSelectableLoans().length);
 
           // Clear selection when data changes
           this.selection.clear();
@@ -419,7 +409,7 @@ export class ActiveLoansTabComponent implements OnInit {
   /**
    * Execute the bulk disbursement API call
    */
-  private executeBulkDisburse(payload: BulkLoanDisbursementRequest): void {
+  private executeBulkDisburse(payload: any): void {
     this.isBulkDisburseInProgress = true;
 
     // Show loading dialog

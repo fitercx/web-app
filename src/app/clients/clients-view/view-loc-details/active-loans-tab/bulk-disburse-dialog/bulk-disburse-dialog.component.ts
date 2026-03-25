@@ -76,7 +76,6 @@ export class BulkDisburseDialogComponent implements OnInit {
         new Date(),
         Validators.required
       ],
-      paymentTypeId: [null],
       autoWithdrawFromSavings: [false],
       withdrawalPaymentTypeId: [null],
       note: [''],
@@ -122,13 +121,13 @@ export class BulkDisburseDialogComponent implements OnInit {
   }
 
   /**
-   * Pre-select "Disbursement of Invoice" payment type for LOC loans
+   * Pre-select "Disbursement of Invoice" payment type for withdrawal
    */
   private preSelectDisbursementOfInvoicePaymentType(): void {
     const disbursementOfInvoice = this.paymentTypeOptions.find((pt: any) => pt.name === 'Disbursement of Invoice');
     if (disbursementOfInvoice) {
       this.bulkDisburseForm.patchValue({
-        paymentTypeId: disbursementOfInvoice.id
+        withdrawalPaymentTypeId: disbursementOfInvoice.id
       });
     }
   }
@@ -141,21 +140,8 @@ export class BulkDisburseDialogComponent implements OnInit {
     this.totalAmount = 0;
     this.nonAedLoans = [];
 
-    console.log('Analyzing selected loans for bulk disburse:', this.data.selectedLoans);
-
     this.data.selectedLoans.forEach((loan) => {
-      // Debug: log loan currency info
       const ap = loan.additionalProperties || {};
-      console.log(`Loan ${loan.id} currency info:`, {
-        'ap.invoiceCurrency': ap.invoiceCurrency,
-        'loan.invoiceCurrency': loan.invoiceCurrency,
-        'loan.currency?.code': loan.currency?.code,
-        'ap.invoiceAmount': ap.invoiceAmount,
-        'loan.invoiceAmount': loan.invoiceAmount,
-        'ap.exchangeRate': ap.exchangeRate,
-        'loan.exchangeRate': loan.exchangeRate,
-        isNonAed: this.isNonAedLoan(loan)
-      });
 
       // Always add the AED equivalent to total
       const aedAmount = this.getLoanAmountInAed(loan);
@@ -173,7 +159,6 @@ export class BulkDisburseDialogComponent implements OnInit {
     });
 
     this.hasNonAedInvoices = this.nonAedLoans.length > 0;
-    console.log('Non-AED loans found:', this.nonAedLoans.length, 'hasNonAedInvoices:', this.hasNonAedInvoices);
   }
 
   /**
@@ -416,10 +401,6 @@ export class BulkDisburseDialogComponent implements OnInit {
     };
 
     // Add optional fields - ensure IDs are numbers
-    if (formValues.paymentTypeId) {
-      requestPayload.paymentTypeId = Number(formValues.paymentTypeId);
-    }
-
     if (formValues.autoWithdrawFromSavings) {
       requestPayload.autoWithdrawFromSavings = true;
       if (formValues.withdrawalPaymentTypeId) {
@@ -430,10 +411,6 @@ export class BulkDisburseDialogComponent implements OnInit {
     if (formValues.note?.trim()) {
       requestPayload.note = formValues.note.trim();
     }
-
-    console.log('Bulk disburse payload:', JSON.stringify(requestPayload, null, 2));
-    console.log('Date format from settings:', dateFormat);
-    console.log('Formatted date:', disbursementDate);
 
     this.dialogRef.close({ action: 'disburse', payload: requestPayload });
   }

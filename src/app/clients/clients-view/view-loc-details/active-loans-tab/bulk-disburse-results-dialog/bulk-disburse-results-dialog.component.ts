@@ -41,17 +41,17 @@ export class BulkDisburseResultsDialogComponent {
   }
 
   /**
-   * Get the status text
+   * Get the status text translation key
    */
   getStatusText(result: SingleLoanDisbursementResult): string {
-    return result.success ? 'Success' : 'Failed';
+    return result.success ? 'labels.commons.Success' : 'labels.commons.Failed';
   }
 
   /**
    * Get the error message for failed disbursements
    */
   getErrorMessage(result: SingleLoanDisbursementResult): string {
-    return result.errorMessage || result.errorCode || 'Unknown error';
+    return result.errorMessage || result.errorCode || 'labels.commons.Unknown error';
   }
 
   /**

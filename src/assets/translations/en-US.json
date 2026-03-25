@@ -818,9 +818,13 @@
       "should": "should",
       "on": "on",
       "Password validation": "Password should contain minimum {{minchar}} characters, that should income 1 uppercase, lowercase and special character and should not consists of repeated characters or white-spaces",
-      "must be less than or equal to": "must be less than or equal to"
+      "must be less than or equal to": "must be less than or equal to",
+      "Success": "Success",
+      "Failed": "Failed",
+      "Unknown error": "Unknown error"
     },
     "heading": {
+      "Bulk Disbursement Results": "Bulk Disbursement Results",
       "Selected Loans Summary": "Selected Loans Summary",
       "Bulk Loan Disbursement": "Bulk Loan Disbursement",
       "Invoice Detail": "Invoice Detail",

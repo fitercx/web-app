@@ -52,7 +52,7 @@
           <div class="status-cell" [class.success]="result.success" [class.failed]="!result.success">
             <mat-icon [color]="getStatusIconColor(result)">{{ getStatusIcon(result) }}</mat-icon>
             <div class="status-details">
-              <span class="status-label">{{ getStatusText(result) }}</span>
+              <span class="status-label">{{ getStatusText(result) | translate }}</span>
               <span class="error-message" *ngIf="!result.success">{{ getErrorMessage(result) }}</span>
             </div>
           </div>

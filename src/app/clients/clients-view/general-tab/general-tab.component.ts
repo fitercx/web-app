@@ -3,10 +3,10 @@ import { Component, OnInit } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { animate, state, style, transition, trigger } from '@angular/animations';
 import { SelectionModel } from '@angular/cdk/collections';
-import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MatDialog } from '@angular/material/dialog';
 
 /** Custom Services. */
-import { ClientsService, BulkLoanDisbursementRequest, BulkLoanDisbursementResponse } from 'app/clients/clients.service';
+import { ClientsService, BulkLoanDisbursementResponse } from 'app/clients/clients.service';
 import {
   BulkDisburseDialogComponent,
   BulkDisburseDialogData
