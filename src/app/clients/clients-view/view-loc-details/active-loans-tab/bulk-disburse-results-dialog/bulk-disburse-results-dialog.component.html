@@ -1,0 +1,80 @@
+<h2 mat-dialog-title>{{ 'labels.heading.Bulk Disbursement Results' | translate }}</h2>
+
+<mat-dialog-content>
+  <!-- Overall Status Summary -->
+  <div class="status-summary" [ngClass]="getOverallStatusClass()">
+    <mat-icon>{{ getOverallStatusIcon() }}</mat-icon>
+    <div class="status-text">
+      <span class="status-count">
+        {{ data.response.totalSuccessful }} {{ 'labels.text.of' | translate }} {{ data.response.totalRequested }}
+        {{ 'labels.text.loans disbursed successfully' | translate }}
+      </span>
+      <span class="status-badge" *ngIf="data.response.status === 'COMPLETE'">
+        {{ 'labels.status.Complete' | translate }}
+      </span>
+      <span class="status-badge" *ngIf="data.response.status === 'PARTIAL'">
+        {{ 'labels.status.Partial' | translate }}
+      </span>
+      <span class="status-badge" *ngIf="data.response.status === 'FAILED'">
+        {{ 'labels.status.Failed' | translate }}
+      </span>
+    </div>
+  </div>
+
+  <!-- Results Table -->
+  <div class="results-table-container">
+    <table mat-table [dataSource]="data.response.loanResults" class="results-table">
+      <!-- Loan Account No Column -->
+      <ng-container matColumnDef="loanAccountNo">
+        <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Loan Account' | translate }}</th>
+        <td mat-cell *matCellDef="let result">{{ result.loanAccountNo || '-' }}</td>
+      </ng-container>
+
+      <!-- Invoice No Column -->
+      <ng-container matColumnDef="invoiceNo">
+        <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Invoice' | translate }}</th>
+        <td mat-cell *matCellDef="let result">{{ result.invoiceNo || '-' }}</td>
+      </ng-container>
+
+      <!-- Amount Column -->
+      <ng-container matColumnDef="amount">
+        <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Amount' | translate }}</th>
+        <td mat-cell *matCellDef="let result">
+          <span *ngIf="result.success">{{ result.amountDisbursed | number: '1.2-2' }}</span>
+          <span *ngIf="!result.success">-</span>
+        </td>
+      </ng-container>
+
+      <!-- Status Column -->
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Status' | translate }}</th>
+        <td mat-cell *matCellDef="let result">
+          <div class="status-cell" [class.success]="result.success" [class.failed]="!result.success">
+            <mat-icon [color]="getStatusIconColor(result)">{{ getStatusIcon(result) }}</mat-icon>
+            <div class="status-details">
+              <span class="status-label">{{ getStatusText(result) | translate }}</span>
+              <span class="error-message" *ngIf="!result.success">{{ getErrorMessage(result) }}</span>
+            </div>
+          </div>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: displayedColumns" [class.failed-row]="!row.success"></tr>
+    </table>
+  </div>
+
+  <!-- Total Disbursed Summary -->
+  <div class="total-summary" *ngIf="data.response.totalSuccessful > 0">
+    <span class="total-label">{{ 'labels.inputs.Total Disbursed' | translate }}:</span>
+    <span class="total-amount">
+      {{ data.response.totalAmountDisbursed | number: '1.2-2' }} {{ data.locCurrency || 'AED' }}
+    </span>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-raised-button color="primary" (click)="close()">
+    {{ 'labels.buttons.Close' | translate }}
+  </button>
+</mat-dialog-actions>

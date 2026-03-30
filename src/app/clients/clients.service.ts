@@ -594,4 +594,115 @@ export class ClientsService {
   getVendorByLosExternalId(losExternalId: string): Observable<any> {
     return this.http.get(`/clients/vendors/los-external-id/${losExternalId}`);
   }
+
+  /**
+   * Bulk disburse multiple loans under a Line of Credit
+   * POST /v1/clients/{clientId}/creditlines/{lineOfCreditId}/bulkdisburse
+   * @param clientId Client ID who owns the Line of Credit
+   * @param lineOfCreditId Line of Credit ID
+   * @param bulkDisburseData Bulk disbursement request data
+   * @returns Observable of bulk disbursement response
+   */
+  bulkDisburseLOCLoans(
+    clientId: string,
+    lineOfCreditId: string,
+    bulkDisburseData: BulkLoanDisbursementRequest
+  ): Observable<BulkLoanDisbursementResponse> {
+    return this.http.post<BulkLoanDisbursementResponse>(
+      `/v1/clients/${clientId}/creditlines/${lineOfCreditId}/bulkdisburse`,
+      bulkDisburseData
+    );
+  }
+}
+
+/**
+ * Request payload for bulk loan disbursement under a Line of Credit.
+ */
+export interface BulkLoanDisbursementRequest {
+  /** List of individual loan disbursement requests */
+  loans: SingleLoanDisbursementRequest[];
+  /** Actual disbursement date for all loans (if not specified per loan) */
+  actualDisbursementDate?: string;
+  /** Date format pattern */
+  dateFormat?: string;
+  /** Locale for formatting */
+  locale?: string;
+  /** Payment type ID for the disbursement */
+  paymentTypeId?: number;
+  /** Whether to auto-withdraw from savings after disbursement */
+  autoWithdrawFromSavings?: boolean;
+  /** Payment type ID for withdrawal transaction (required if autoWithdrawFromSavings is true) */
+  withdrawalPaymentTypeId?: number;
+  /** Note to be added to all disbursement transactions */
+  note?: string;
+}
+
+/**
+ * Individual loan disbursement request within a bulk operation.
+ */
+export interface SingleLoanDisbursementRequest {
+  /** Loan ID to disburse */
+  loanId: number;
+  /** Override actual disbursement date for this specific loan */
+  actualDisbursementDate?: string;
+  /** Transaction amount (optional, defaults to approved amount) */
+  transactionAmount?: number;
+  /** Whether to disburse in invoice currency (for LOC loans) */
+  disburseInInvoiceCurrency?: boolean;
+  /** Override withdrawal amount for this loan */
+  withdrawalAmount?: number;
+  /** External transaction ID */
+  externalId?: string;
+  /** Note specific to this loan disbursement */
+  note?: string;
+}
+
+/**
+ * Response payload for bulk loan disbursement operation.
+ */
+export interface BulkLoanDisbursementResponse {
+  /** Line of Credit ID for which disbursement was processed */
+  lineOfCreditId: number;
+  /** Total number of loans in the request */
+  totalRequested: number;
+  /** Number of loans successfully disbursed */
+  totalSuccessful: number;
+  /** Number of loans that failed to disburse */
+  totalFailed: number;
+  /** Total amount disbursed across all successful loans */
+  totalAmountDisbursed: number;
+  /** Overall status: COMPLETE, PARTIAL, or FAILED */
+  status: 'COMPLETE' | 'PARTIAL' | 'FAILED';
+  /** List of individual loan disbursement results */
+  loanResults: SingleLoanDisbursementResult[];
+}
+
+/**
+ * Result for a single loan disbursement within the bulk operation.
+ */
+export interface SingleLoanDisbursementResult {
+  /** Loan ID */
+  loanId: number;
+  /** Client ID associated with the loan */
+  clientId?: number;
+  /** Whether disbursement was successful */
+  success: boolean;
+  /** Amount disbursed (if successful) */
+  amountDisbursed?: number;
+  /** Net amount disbursed (after fees/charges) */
+  netAmountDisbursed?: number;
+  /** Transaction ID of the disbursement (if successful) */
+  transactionId?: number;
+  /** Resource ID returned by the command processing */
+  resourceId?: number;
+  /** Amount withdrawn from savings (if autoWithdrawFromSavings was true) */
+  withdrawalAmount?: number;
+  /** Error code if disbursement failed */
+  errorCode?: string;
+  /** Error message if disbursement failed */
+  errorMessage?: string;
+  /** Loan account number */
+  loanAccountNo?: string;
+  /** Invoice number (for LOC drawdowns) */
+  invoiceNo?: string;
 }

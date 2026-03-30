@@ -64,6 +64,9 @@ import { TransactionHistoryTabComponent } from './clients-view/view-loc-details/
 import { ViewLocChargesComponent } from './clients-view/view-loc-details/view-loc-charges/view-loc-charges.component';
 import { AuditTrailTabComponent } from './clients-view/view-loc-details/audit-trail-tab/audit-trail-tab.component';
 import { ManageApprovedBuyersDialogComponent } from './clients-view/manage-approved-buyers-dialog/manage-approved-buyers-dialog.component';
+import { BulkDisburseDialogComponent } from './clients-view/view-loc-details/active-loans-tab/bulk-disburse-dialog/bulk-disburse-dialog.component';
+import { BulkDisburseResultsDialogComponent } from './clients-view/view-loc-details/active-loans-tab/bulk-disburse-results-dialog/bulk-disburse-results-dialog.component';
+import { BulkDisburseLoadingDialogComponent } from './clients-view/view-loc-details/active-loans-tab/bulk-disburse-loading-dialog/bulk-disburse-loading-dialog.component';
 
 /**
  * Clients Module
@@ -133,7 +136,10 @@ import { ManageApprovedBuyersDialogComponent } from './clients-view/manage-appro
     TransactionHistoryTabComponent,
     ViewLocChargesComponent,
     AuditTrailTabComponent,
-    ManageApprovedBuyersDialogComponent
+    ManageApprovedBuyersDialogComponent,
+    BulkDisburseDialogComponent,
+    BulkDisburseResultsDialogComponent,
+    BulkDisburseLoadingDialogComponent
   ],
   providers: []
 })
