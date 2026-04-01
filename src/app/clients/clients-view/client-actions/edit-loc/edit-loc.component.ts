@@ -10,6 +10,7 @@ import { delay } from 'rxjs/operators';
 /** Custom Services */
 import { ClientsService } from '../../../clients.service';
 import { SettingsService } from 'app/settings/settings.service';
+import { nonNegativeWithPrecisionValidator } from 'app/clients/utils/amount-validation.util';
 
 /**
  * Edit LOC component.
@@ -107,6 +108,11 @@ export class EditLocComponent implements OnInit {
     } catch (e) {
       return '';
     }
+  }
+
+  get selectedCurrencyDecimalPlaces(): number {
+    const selected = this.currencyOptions.find((currency) => currency.code === this.selectedCurrencyCode);
+    return Number.isInteger(selected?.decimalPlaces) ? selected.decimalPlaces : 2;
   }
 
   // Savings accounts filtered by the currently selected currency code
@@ -223,7 +229,15 @@ export class EditLocComponent implements OnInit {
         'basicInfo',
         'currencyCode'
       ])
-      ?.valueChanges.subscribe(() => this.updateFilteredCharges());
+      ?.valueChanges.subscribe(() => {
+        this.updateFilteredCharges();
+        this.locForm
+          .get([
+            'limitsTerms',
+            'blockedAmount'
+          ])
+          ?.updateValueAndValidity();
+      });
 
     // Watch settlement account changes
     this.locForm.get('settlementSavingsAccountId')?.valueChanges.subscribe(() => this.onSettlementAccountChanged());
@@ -342,6 +356,7 @@ export class EditLocComponent implements OnInit {
 
       limitsTerms: {
         maxCreditLimit: loc.maximumAmount || loc.maxCreditLimit || '',
+        blockedAmount: loc.blockedAmount ?? 0,
         startDate: this.formatDateForInput(loc.startDate || loc.activationDate),
         expiryDate: this.formatDateForInput(loc.endDate || loc.expiryDate),
         reviewPeriod: loc.reviewPeriod || '6', // Default to 6 months if not set
@@ -691,6 +706,10 @@ export class EditLocComponent implements OnInit {
         maxCreditLimit: [
           '',
           Validators.required
+        ],
+        blockedAmount: [
+          0,
+          [nonNegativeWithPrecisionValidator(() => this.selectedCurrencyDecimalPlaces)]
         ],
         startDate: [''],
         expiryDate: [''],

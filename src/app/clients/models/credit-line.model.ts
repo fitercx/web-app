@@ -40,6 +40,7 @@ export interface CreditLineDetails {
   name: string;
   productType: string;
   maximumAmount: number;
+  blockedAmount?: number;
   availableBalance: number;
   consumedAmount: number;
   status: CreditLineStatus; // renamed from activationStatus
@@ -70,6 +71,7 @@ export interface CreditLineTableData {
   name: string;
   accountNo: string;
   creditLimit: number;
+  blockedAmount?: number;
   availableBalance: number;
   outstanding: number;
   type: string;
@@ -166,6 +168,14 @@ export interface ApiErrorResponse {
   userMessage: string;
   httpStatusCode?: number;
   defaultUserMessage?: string;
+}
+
+export interface UpdateBlockedAmountRequest {
+  amount: number;
+  actionDate: string;
+  dateFormat: string;
+  locale: string;
+  note?: string;
 }
 
 /**

@@ -16,6 +16,7 @@ import { delay } from 'rxjs/operators';
 import { MatStepper } from '@angular/material/stepper';
 import { ClientsService } from '../../../clients.service';
 import { SettingsService } from 'app/settings/settings.service';
+import { nonNegativeWithPrecisionValidator } from 'app/clients/utils/amount-validation.util';
 
 /**
  * Create LOC component.
@@ -112,6 +113,11 @@ export class CreateLocComponent implements OnInit {
     } catch (e) {
       return '';
     }
+  }
+
+  get selectedCurrencyDecimalPlaces(): number {
+    const selected = this.currencyOptions.find((currency) => currency.code === this.selectedCurrencyCode);
+    return Number.isInteger(selected?.decimalPlaces) ? selected.decimalPlaces : 2;
   }
 
   // Get display name for cash margin type
@@ -242,7 +248,15 @@ export class CreateLocComponent implements OnInit {
         'basicInfo',
         'currencyCode'
       ])
-      ?.valueChanges.subscribe(() => this.updateFilteredCharges());
+      ?.valueChanges.subscribe(() => {
+        this.updateFilteredCharges();
+        this.locForm
+          .get([
+            'limitsTerms',
+            'blockedAmount'
+          ])
+          ?.updateValueAndValidity();
+      });
 
     // read resolved currencies from route (resolved before page load)
     const currenciesResolved = this.route.snapshot.data['currencies'] || this.route.parent?.snapshot.data['currencies'];
@@ -505,6 +519,10 @@ export class CreateLocComponent implements OnInit {
           maxCreditLimit: [
             '',
             Validators.required
+          ],
+          blockedAmount: [
+            0,
+            [nonNegativeWithPrecisionValidator(() => this.selectedCurrencyDecimalPlaces)]
           ],
           // maxPerDrawdown field removed as per requirements
           startDate: [''],

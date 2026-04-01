@@ -245,6 +245,27 @@
                 </mat-form-field>
 
                 <mat-form-field fxFlex>
+                  <mat-label>Blocked Amount</mat-label>
+                  <input
+                    matInput
+                    class="right-input"
+                    type="number"
+                    formControlName="blockedAmount"
+                    placeholder="0.00"
+                    step="0.01"
+                    min="0"
+                  />
+                  <span matSuffix>{{ selectedCurrencyCode || '' }}</span>
+                  <mat-hint>Reserved amount that cannot be drawn down</mat-hint>
+                  <mat-error *ngIf="locForm.get(['limitsTerms', 'blockedAmount'])?.hasError('min')"
+                    >Blocked Amount must be 0 or greater.</mat-error
+                  >
+                  <mat-error *ngIf="locForm.get(['limitsTerms', 'blockedAmount'])?.hasError('precision')"
+                    >Blocked Amount exceeds allowed currency precision.</mat-error
+                  >
+                </mat-form-field>
+
+                <mat-form-field fxFlex>
                   <mat-label>{{ 'labels.inputs.Loan officer' | translate }}</mat-label>
                   <mat-select
                     formControlName="loanOfficerId"
@@ -619,6 +640,14 @@
                 <span fxFlex="40%" class="preview-label">Maximum Credit Limit</span>
                 <span fxFlex="60%">
                   {{ previewPayload.maximumAmount || previewPayload.maxCreditLimit | formatNumber }}
+                  {{ selectedCurrencyCode || '' }}
+                </span>
+              </div>
+
+              <div fxFlexFill class="preview-field">
+                <span fxFlex="40%" class="preview-label">Blocked Amount</span>
+                <span fxFlex="60%">
+                  {{ previewPayload.blockedAmount || 0 | formatNumber }}
                   {{ selectedCurrencyCode || '' }}
                 </span>
               </div>

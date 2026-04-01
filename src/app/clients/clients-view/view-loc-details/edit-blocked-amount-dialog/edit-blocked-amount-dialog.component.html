@@ -1,0 +1,40 @@
+<h2 mat-dialog-title>Edit Blocked Amount</h2>
+
+<mat-dialog-content [formGroup]="form">
+  <div fxLayout="column" fxLayoutGap="16px">
+    <mat-radio-group formControlName="action" aria-label="Blocked amount action">
+      <mat-radio-button value="block">Block more amount</mat-radio-button>
+      <mat-radio-button value="unblock" style="margin-left: 16px">Unblock amount</mat-radio-button>
+    </mat-radio-group>
+
+    <div class="current-amount">Current blocked amount: {{ currentBlockedAmount | currency: currencyCode }}</div>
+
+    <mat-form-field appearance="fill">
+      <mat-label>{{ isUnblockAction ? 'Unblock Amount' : 'Block Amount' }}</mat-label>
+      <input matInput formControlName="amount" type="number" step="0.01" min="0.01" />
+      <span matSuffix>{{ currencyCode }}</span>
+      <mat-error *ngIf="form.get('amount')?.invalid && (form.get('amount')?.touched || form.get('amount')?.dirty)">
+        {{ getAmountErrorMessage() }}
+      </mat-error>
+    </mat-form-field>
+
+    <mat-form-field appearance="fill">
+      <mat-label>Action Date</mat-label>
+      <input matInput [matDatepicker]="picker" formControlName="actionDate" />
+      <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
+      <mat-datepicker #picker></mat-datepicker>
+    </mat-form-field>
+
+    <mat-form-field appearance="fill">
+      <mat-label>Note (Optional)</mat-label>
+      <textarea matInput formControlName="note" rows="3"></textarea>
+    </mat-form-field>
+  </div>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button type="button" (click)="cancel()" [disabled]="isSubmitting">Cancel</button>
+  <button mat-raised-button color="primary" type="button" (click)="submit()" [disabled]="isSubmitting || form.invalid">
+    {{ isSubmitting ? 'Saving...' : 'Save' }}
+  </button>
+</mat-dialog-actions>

@@ -105,6 +105,12 @@
                   </tr>
                   <tr>
                     <td>
+                      <b>{{ 'labels.inputs.Blocked Amount' | translate }}</b>
+                    </td>
+                    <td>{{ locDetails?.blockedAmount || 0 | currency: locDetails?.currency || '' }}</td>
+                  </tr>
+                  <tr>
+                    <td>
                       <b>{{ 'labels.inputs.Available Balance' | translate }}</b>
                     </td>
                     <td class="available">{{ locDetails?.availableBalance | currency: locDetails?.currency || '' }}</td>
@@ -219,6 +225,14 @@
           </mat-icon>
           {{ 'labels.buttons.Decrease Limit' | translate }}
         </button>
+        <ng-container *mifosxHasPermission="'UPDATE_CREDITLINE'">
+          <button mat-menu-item (click)="doAction('Edit Blocked Amount')" *ngIf="canEditBlockedAmount()">
+            <mat-icon matListIcon>
+              <fa-icon icon="wallet" size="sm"></fa-icon>
+            </mat-icon>
+            Edit Blocked Amount
+          </button>
+        </ng-container>
 
         <!-- Fallback action - always show View Details if no other actions are available -->
         <button
@@ -479,16 +493,28 @@
                   >
                 </div>
                 <div class="detail-row">
+                  <span class="detail-label">{{ 'labels.inputs.Approved Facility' | translate }}:</span>
+                  <span class="detail-value"
+                    ><strong>{{ locDetails?.creditLimit | currency: locDetails?.currency || '' }}</strong></span
+                  >
+                </div>
+                <div class="detail-row">
                   <span class="detail-label">{{ 'labels.inputs.Available Balance' | translate }}:</span>
                   <span class="detail-value available-balance"
                     ><strong>{{ locDetails?.availableBalance | currency: locDetails?.currency || '' }}</strong></span
+                  >
+                </div>
+                <div class="detail-row">
+                  <span class="detail-label">{{ 'labels.inputs.Blocked Amount' | translate }}:</span>
+                  <span class="detail-value"
+                    ><strong>{{ locDetails?.blockedAmount || 0 | currency: locDetails?.currency || '' }}</strong></span
                   >
                 </div>
                 <div
                   class="detail-row"
                   *ngIf="locDetails?.consumedAmount !== null && locDetails?.consumedAmount !== undefined"
                 >
-                  <span class="detail-label">{{ 'labels.inputs.Consumed Amount' | translate }}:</span>
+                  <span class="detail-label">Utilized Amount:</span>
                   <span class="detail-value consumed-amount"
                     ><strong>{{ locDetails?.consumedAmount | currency: locDetails?.currency || '' }}</strong></span
                   >

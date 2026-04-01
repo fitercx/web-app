@@ -6,10 +6,15 @@ import { MatDialog } from '@angular/material/dialog';
 /** Custom Services */
 import { ClientsService } from '../../clients.service';
 import { SettingsService } from 'app/settings/settings.service';
+import { AlertService } from 'app/core/alert/alert.service';
 
 /** Custom Components */
 import { FormDialogComponent } from 'app/shared/form-dialog/form-dialog.component';
 import { ManageApprovedBuyersDialogComponent } from '../manage-approved-buyers-dialog/manage-approved-buyers-dialog.component';
+import {
+  EditBlockedAmountDialogComponent,
+  EditBlockedAmountDialogResult
+} from './edit-blocked-amount-dialog/edit-blocked-amount-dialog.component';
 
 /** Custom Models */
 import { ApprovedBuyer, ManageApprovedBuyersDialogData } from '../../models/credit-line.model';
@@ -48,6 +53,7 @@ export class ViewLocDetailsComponent implements OnInit {
   // Chart properties
   circumference = 2 * Math.PI * 15.9155; // ~100
   strokeDashoffset = this.circumference;
+  blockedAmountActionAllowed = true;
 
   /**
    * Extract approved buyers from various possible data structures
@@ -129,7 +135,8 @@ export class ViewLocDetailsComponent implements OnInit {
     private router: Router,
     private dialog: MatDialog,
     private clientsService: ClientsService,
-    private settingsService: SettingsService
+    private settingsService: SettingsService,
+    private alertService: AlertService
   ) {
     this.clientId = this.route.parent?.snapshot.paramMap.get('clientId') || '';
     this.locId = this.route.snapshot.paramMap.get('locId') || '';
@@ -184,6 +191,7 @@ export class ViewLocDetailsComponent implements OnInit {
       interestRate: data.interestRateOverride,
       annualInterestRate: data.annualInterestRate,
       creditLimit: data.maximumAmount,
+      blockedAmount: data.blockedAmount || 0,
       approvedCreditFacilityAmount: data.approvedCreditFacilityAmount,
       availableBalance: data.availableBalance,
 
@@ -344,8 +352,58 @@ export class ViewLocDetailsComponent implements OnInit {
       case 'Decrease Limit':
         this.openLimitActionDialog('decreasecreditlimit');
         break;
+      case 'Edit Blocked Amount':
+        this.openEditBlockedAmountDialog();
+        break;
       default:
     }
+  }
+
+  openEditBlockedAmountDialog(): void {
+    const dialogRef = this.dialog.open(EditBlockedAmountDialogComponent, {
+      width: '560px',
+      data: {
+        currentBlockedAmount: Number(this.locDetails?.blockedAmount || 0),
+        currencyCode: this.getCurrencyCode(),
+        currencyDecimalPlaces: 2
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((result?: EditBlockedAmountDialogResult) => {
+      if (!result) {
+        return;
+      }
+
+      const request =
+        result.action === 'blockamount'
+          ? this.clientsService.blockLocAmount(this.clientId, this.locId, result.payload)
+          : this.clientsService.unblockLocAmount(this.clientId, this.locId, result.payload);
+
+      request.subscribe(
+        () => {
+          const formattedAmount = new Intl.NumberFormat(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+          }).format(result.payload.amount);
+          const actionLabel = result.action === 'blockamount' ? 'Blocked amount updated' : 'Blocked amount reduced';
+          this.alertService.alert({
+            type: 'Line of Credit',
+            message: `${actionLabel}: ${formattedAmount} ${this.getCurrencyCode()}`.trim()
+          });
+          this.refreshLocData();
+        },
+        (error) => {
+          if (error?.status === 401 || error?.status === 403) {
+            this.blockedAmountActionAllowed = false;
+          }
+          this.alertService.alert({ type: 'Line of Credit', message: this.extractApiErrorMessage(error) });
+        }
+      );
+    });
+  }
+
+  canEditBlockedAmount(): boolean {
+    return this.isActive() && this.blockedAmountActionAllowed;
   }
 
   /**
@@ -409,6 +467,25 @@ export class ViewLocDetailsComponent implements OnInit {
         }
       );
     }
+  }
+
+  private extractApiErrorMessage(error: any): string {
+    const firstValidationMessage = error?.error?.errors?.[0]?.defaultUserMessage;
+    return (
+      firstValidationMessage ||
+      error?.error?.defaultUserMessage ||
+      error?.error?.userMessage ||
+      error?.error?.developerMessage ||
+      error?.message ||
+      'Request failed. Please review your input and try again.'
+    );
+  }
+
+  private getCurrencyCode(): string {
+    if (typeof this.locDetails?.currency === 'string') {
+      return this.locDetails.currency;
+    }
+    return this.locDetails?.currency?.code || '';
   }
 
   /**

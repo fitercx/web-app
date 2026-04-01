@@ -125,6 +125,7 @@ export class GeneralTabComponent {
   locColumns: string[] = [
     'External Id',
     'Credit Limit',
+    'Blocked Amount',
     'Available Balance',
     'Type',
     'Outstanding/Utilization',
@@ -377,6 +378,7 @@ export class GeneralTabComponent {
           return null;
         }
         const maximumAmount = loc.maximumAmount || 0;
+        const blockedAmount = loc.blockedAmount || 0;
         const consumedAmount = loc.consumedAmount || 0;
         const utilization = maximumAmount > 0 ? Math.round((consumedAmount / maximumAmount) * 100) : 0;
         // For legacy fallback when loans not provided, derive from loanAccounts
@@ -442,6 +444,7 @@ export class GeneralTabComponent {
           name: loc.name,
           accountNo: loc.accountNumber || loc.externalId || `LOC-${loc.id}`,
           creditLimit: maximumAmount,
+          blockedAmount,
           availableBalance: loc.availableBalance,
           outstanding: consumedAmount,
           type:
