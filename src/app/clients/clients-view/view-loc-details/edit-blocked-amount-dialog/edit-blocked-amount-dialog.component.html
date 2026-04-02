@@ -19,13 +19,6 @@
     </mat-form-field>
 
     <mat-form-field appearance="fill">
-      <mat-label>Action Date</mat-label>
-      <input matInput [matDatepicker]="picker" formControlName="actionDate" />
-      <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
-      <mat-datepicker #picker></mat-datepicker>
-    </mat-form-field>
-
-    <mat-form-field appearance="fill">
       <mat-label>Note (Optional)</mat-label>
       <textarea matInput formControlName="note" rows="3"></textarea>
     </mat-form-field>

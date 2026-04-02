@@ -45,10 +45,6 @@ export class EditBlockedAmountDialogComponent {
           Validators.required,
           positiveWithPrecisionValidator(() => this.currencyDecimalPlaces)]
       ],
-      actionDate: [
-        new Date(),
-        Validators.required
-      ],
       note: ['']
     });
 
@@ -138,7 +134,7 @@ export class EditBlockedAmountDialogComponent {
       action: value.action === 'unblock' ? 'unblockamount' : 'blockamount',
       payload: {
         amount: Number(value.amount),
-        actionDate: this.formatDate(value.actionDate),
+        actionDate: this.formatDate(new Date()),
         dateFormat: 'yyyy-MM-dd',
         locale: 'en',
         ...(note ? { note } : {})
