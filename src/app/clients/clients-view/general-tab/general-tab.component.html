@@ -469,41 +469,67 @@
                         </div>
                         <div class="detail-item">
                           <span class="detail-label">{{ 'labels.inputs.Invoice Amount' | translate }}:</span>
-                          <span class="detail-value">{{
-                            loan?.additionalProperties?.invoiceAmount | formatNumber
-                          }}</span>
+                          <span class="detail-value">
+                            <ng-container *ngIf="loan?.additionalProperties?.invoiceAmount != null">
+                              {{ loan.additionalProperties.invoiceAmount | formatNumber }}
+                              {{ loan.additionalProperties?.invoiceCurrency || element.currency?.code || 'AED' }}
+                            </ng-container>
+                            <ng-container *ngIf="loan?.additionalProperties?.invoiceAmount == null">-</ng-container>
+                          </span>
                         </div>
                         <div class="detail-item">
                           <span class="detail-label">{{ 'labels.inputs.Approved Amount' | translate }}:</span>
-                          <span class="detail-value">{{ getApprovedAmount(loan, element) | formatNumber }}</span>
+                          <span class="detail-value">
+                            <ng-container *ngIf="getApprovedAmount(loan, element) != null">
+                              {{ getApprovedAmount(loan, element) | formatNumber }}
+                              {{ loan.additionalProperties?.invoiceCurrency || element.currency?.code || 'AED' }}
+                            </ng-container>
+                            <ng-container *ngIf="getApprovedAmount(loan, element) == null">-</ng-container>
+                          </span>
                         </div>
-                        <div class="detail-item" *ngIf="loan?.additionalProperties?.amountAfterAdvance">
+                        <div class="detail-item" *ngIf="loan?.additionalProperties?.amountAfterAdvance != null">
                           <span class="detail-label">{{ 'labels.inputs.Amount After Advance' | translate }}:</span>
-                          <span class="detail-value">{{
-                            loan?.additionalProperties?.amountAfterAdvance | formatNumber
-                          }}</span>
+                          <span class="detail-value">
+                            {{ loan.additionalProperties.amountAfterAdvance | formatNumber }}
+                            {{ loan.additionalProperties?.invoiceCurrency || element.currency?.code || 'AED' }}
+                          </span>
                         </div>
-                        <div class="detail-item" *ngIf="loan?.additionalProperties?.amountInFacilityCurrency">
+                        <div class="detail-item" *ngIf="loan?.additionalProperties?.amountInFacilityCurrency != null">
                           <span class="detail-label"
                             >{{ 'labels.inputs.Amount in Facility Currency' | translate }}:</span
                           >
-                          <span class="detail-value">{{
-                            loan?.additionalProperties?.amountInFacilityCurrency | formatNumber
-                          }}</span>
+                          <span class="detail-value">
+                            {{ loan.additionalProperties.amountInFacilityCurrency | formatNumber }}
+                            {{ element.currency?.code || 'AED' }}
+                          </span>
                         </div>
                         <div class="detail-item">
                           <span class="detail-label">{{ 'labels.inputs.Disbursed Amount' | translate }}:</span>
-                          <span class="detail-value">{{ loan.originalLoan | formatNumber }}</span>
+                          <span class="detail-value">
+                            <ng-container *ngIf="loan.originalLoan != null">
+                              {{ loan.originalLoan | formatNumber }} {{ element.currency?.code || 'AED' }}
+                            </ng-container>
+                            <ng-container *ngIf="loan.originalLoan == null">-</ng-container>
+                          </span>
                         </div>
                         <div class="detail-item">
                           <span class="detail-label">{{ 'labels.inputs.Amount Paid' | translate }}:</span>
-                          <span class="detail-value">{{ loan.amountPaid | formatNumber }}</span>
+                          <span class="detail-value">
+                            <ng-container *ngIf="loan.amountPaid != null">
+                              {{ loan.amountPaid | formatNumber }} {{ element.currency?.code || 'AED' }}
+                            </ng-container>
+                            <ng-container *ngIf="loan.amountPaid == null">-</ng-container>
+                          </span>
                         </div>
                         <div class="detail-item">
                           <span class="detail-label">{{ 'labels.inputs.Outstanding Balance' | translate }}:</span>
-                          <span class="detail-value">{{
-                            (loan.status?.overpaid ? 0 : loan.loanBalance) | formatNumber
-                          }}</span>
+                          <span class="detail-value">
+                            <ng-container *ngIf="loan.loanBalance != null || loan.status?.overpaid">
+                              {{ (loan.status?.overpaid ? 0 : loan.loanBalance) | formatNumber }}
+                              {{ element.currency?.code || 'AED' }}
+                            </ng-container>
+                            <ng-container *ngIf="loan.loanBalance == null && !loan.status?.overpaid">-</ng-container>
+                          </span>
                         </div>
                         <div class="detail-item">
                           <span class="detail-label">{{ 'labels.inputs.Invoice Due Date' | translate }}:</span>
@@ -526,7 +552,10 @@
                         </div>
                         <div class="detail-item" *ngIf="loan.additionalProperties?.lateFee != null">
                           <span class="detail-label">{{ 'labels.inputs.Late Fee' | translate }}:</span>
-                          <span class="detail-value">{{ loan.additionalProperties.lateFee | formatNumber }}</span>
+                          <span class="detail-value"
+                            >{{ loan.additionalProperties.lateFee | formatNumber }}
+                            {{ element.currency?.code || 'AED' }}</span
+                          >
                         </div>
                       </div>
                     </div>
