@@ -258,6 +258,20 @@ export class CreateLocComponent implements OnInit {
           ?.updateValueAndValidity();
       });
 
+    this.locForm
+      .get([
+        'limitsTerms',
+        'maxCreditLimit'
+      ])
+      ?.valueChanges.subscribe(() => {
+        this.locForm
+          .get([
+            'limitsTerms',
+            'blockedAmount'
+          ])
+          ?.updateValueAndValidity();
+      });
+
     // read resolved currencies from route (resolved before page load)
     const currenciesResolved = this.route.snapshot.data['currencies'] || this.route.parent?.snapshot.data['currencies'];
     if (currenciesResolved) {
@@ -382,6 +396,43 @@ export class CreateLocComponent implements OnInit {
           expiryDate: expiryDate
         }
       };
+    }
+
+    return null;
+  };
+
+  private parseAmount(value: any): number | null {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : null;
+    }
+
+    const normalized = String(value).replace(/,/g, '').trim();
+    if (!normalized) {
+      return null;
+    }
+
+    const amount = Number(normalized);
+    return Number.isFinite(amount) ? amount : null;
+  }
+
+  blockedAmountWithinLimitValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
+    if (!control) {
+      return null;
+    }
+
+    const maxCreditLimit = this.parseAmount(control.parent?.get('maxCreditLimit')?.value);
+    const blockedAmount = this.parseAmount(control.value);
+
+    if (maxCreditLimit === null || blockedAmount === null) {
+      return null;
+    }
+
+    if (blockedAmount > maxCreditLimit) {
+      return { blockedAmountExceedsLimit: true };
     }
 
     return null;
@@ -522,7 +573,10 @@ export class CreateLocComponent implements OnInit {
           ],
           blockedAmount: [
             0,
-            [nonNegativeWithPrecisionValidator(() => this.selectedCurrencyDecimalPlaces)]
+            [
+              nonNegativeWithPrecisionValidator(() => this.selectedCurrencyDecimalPlaces),
+              this.blockedAmountWithinLimitValidator
+            ]
           ],
           // maxPerDrawdown field removed as per requirements
           startDate: [''],

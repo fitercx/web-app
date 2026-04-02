@@ -142,7 +142,7 @@
     </ng-container>
 
     <ng-container matColumnDef="Blocked Amount">
-      <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Blocked Amount' | translate }}</th>
+      <th mat-header-cell class="r-amount" *matHeaderCellDef>Blocked Amount</th>
       <td mat-cell class="r-amount" *matCellDef="let element">
         {{ element.blockedAmount || 0 | currency: element.currency || '' }}
       </td>

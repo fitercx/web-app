@@ -280,6 +280,17 @@
                   <mat-error *ngIf="locForm.get(['limitsTerms', 'blockedAmount'])?.hasError('precision')"
                     >Blocked Amount exceeds allowed currency precision.</mat-error
                   >
+                  <mat-error
+                    *ngIf="
+                      locForm.get(['limitsTerms', 'blockedAmount'])?.hasError('blockedAmountExceedsLimit') &&
+                      (locForm.get(['limitsTerms', 'blockedAmount'])?.dirty ||
+                        locForm.get(['limitsTerms', 'blockedAmount'])?.touched ||
+                        locForm.get(['limitsTerms', 'maxCreditLimit'])?.dirty ||
+                        locForm.get(['limitsTerms', 'maxCreditLimit'])?.touched)
+                    "
+                  >
+                    Blocked Amount cannot exceed Maximum Credit Limit.
+                  </mat-error>
                 </mat-form-field>
 
                 <mat-form-field fxFlex>

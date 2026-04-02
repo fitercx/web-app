@@ -2,7 +2,15 @@
 import { Component, OnInit, ViewChild, ChangeDetectorRef } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { FormBuilder, FormGroup, Validators, AbstractControl, FormArray, ValidationErrors } from '@angular/forms';
+import {
+  FormBuilder,
+  FormGroup,
+  Validators,
+  AbstractControl,
+  FormArray,
+  ValidationErrors,
+  ValidatorFn
+} from '@angular/forms';
 import { MatStepper } from '@angular/material/stepper';
 import { of } from 'rxjs';
 import { delay } from 'rxjs/operators';
@@ -231,6 +239,20 @@ export class EditLocComponent implements OnInit {
       ])
       ?.valueChanges.subscribe(() => {
         this.updateFilteredCharges();
+        this.locForm
+          .get([
+            'limitsTerms',
+            'blockedAmount'
+          ])
+          ?.updateValueAndValidity();
+      });
+
+    this.locForm
+      .get([
+        'limitsTerms',
+        'maxCreditLimit'
+      ])
+      ?.valueChanges.subscribe(() => {
         this.locForm
           .get([
             'limitsTerms',
@@ -627,6 +649,43 @@ export class EditLocComponent implements OnInit {
     return cleaned;
   }
 
+  private parseAmount(value: any): number | null {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : null;
+    }
+
+    const normalized = String(value).replace(/,/g, '').trim();
+    if (!normalized) {
+      return null;
+    }
+
+    const amount = Number(normalized);
+    return Number.isFinite(amount) ? amount : null;
+  }
+
+  blockedAmountWithinLimitValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
+    if (!control) {
+      return null;
+    }
+
+    const maxCreditLimit = this.parseAmount(control.parent?.get('maxCreditLimit')?.value);
+    const blockedAmount = this.parseAmount(control.value);
+
+    if (maxCreditLimit === null || blockedAmount === null) {
+      return null;
+    }
+
+    if (blockedAmount > maxCreditLimit) {
+      return { blockedAmountExceedsLimit: true };
+    }
+
+    return null;
+  };
+
   /**
    * Formats dates according to system settings
    * @param dates Object containing date fields to format
@@ -709,7 +768,10 @@ export class EditLocComponent implements OnInit {
         ],
         blockedAmount: [
           0,
-          [nonNegativeWithPrecisionValidator(() => this.selectedCurrencyDecimalPlaces)]
+          [
+            nonNegativeWithPrecisionValidator(() => this.selectedCurrencyDecimalPlaces),
+            this.blockedAmountWithinLimitValidator
+          ]
         ],
         startDate: [''],
         expiryDate: [''],
