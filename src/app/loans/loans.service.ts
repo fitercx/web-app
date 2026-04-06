@@ -779,6 +779,11 @@ export class LoansService {
         : [loansAccount.supplierDetails];
     }
 
+    // Handle Short Disbursal flag for RBF loans
+    if (loansAccount.isShortDisbursal !== undefined && loansAccount.isShortDisbursal !== null) {
+      loansAccountData.isShortDisbursal = loansAccount.isShortDisbursal;
+    }
+
     return loansAccountData;
   }
 }

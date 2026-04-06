@@ -1,0 +1,140 @@
+<h2 mat-dialog-title>{{ 'labels.heading.Bulk Loan Disbursement' | translate }}</h2>
+
+<mat-dialog-content>
+  <p class="dialog-description">
+    {{ 'labels.text.You are about to disburse' | translate }} <strong>{{ data.selectedLoans.length }}</strong>
+    {{ 'labels.text.approved loans' | translate }}.
+  </p>
+
+  <form [formGroup]="bulkDisburseForm" class="bulk-disburse-form">
+    <!-- Disbursement Date -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>{{ 'labels.inputs.Disbursement Date' | translate }}</mat-label>
+      <input
+        matInput
+        [matDatepicker]="disbursementDatePicker"
+        formControlName="actualDisbursementDate"
+        [min]="minDate"
+        [max]="maxDate"
+        required
+      />
+      <mat-datepicker-toggle matSuffix [for]="disbursementDatePicker"></mat-datepicker-toggle>
+      <mat-datepicker #disbursementDatePicker></mat-datepicker>
+      <mat-error *ngIf="bulkDisburseForm.get('actualDisbursementDate')?.hasError('required')">
+        {{ 'labels.inputs.Disbursement Date' | translate }} {{ 'labels.commons.is' | translate }}
+        <strong>{{ 'labels.commons.required' | translate }}</strong>
+      </mat-error>
+    </mat-form-field>
+
+    <!-- Auto Withdraw from Savings -->
+    <div class="checkbox-field">
+      <mat-checkbox formControlName="autoWithdrawFromSavings" color="primary">
+        {{ 'labels.inputs.Auto Withdraw from Savings after Disbursement' | translate }}
+      </mat-checkbox>
+    </div>
+
+    <!-- Withdrawal Payment Type (shown when autoWithdrawFromSavings is checked) -->
+    <mat-form-field
+      appearance="outline"
+      class="full-width"
+      *ngIf="bulkDisburseForm.get('autoWithdrawFromSavings')?.value"
+    >
+      <mat-label>{{ 'labels.inputs.Withdrawal Payment Type' | translate }}</mat-label>
+      <mat-select formControlName="withdrawalPaymentTypeId" required>
+        <mat-option *ngFor="let paymentType of paymentTypeOptions" [value]="paymentType.id">
+          {{ paymentType.name }}
+        </mat-option>
+      </mat-select>
+      <mat-error *ngIf="bulkDisburseForm.get('withdrawalPaymentTypeId')?.hasError('required')">
+        {{ 'labels.inputs.Withdrawal Payment Type' | translate }} {{ 'labels.commons.is' | translate }}
+        <strong>{{ 'labels.commons.required' | translate }}</strong>
+      </mat-error>
+    </mat-form-field>
+
+    <!-- Note -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>{{ 'labels.inputs.Note' | translate }}</mat-label>
+      <textarea matInput formControlName="note" rows="2"></textarea>
+    </mat-form-field>
+
+    <!-- Selected Loans Summary -->
+    <div class="loans-summary-section">
+      <h4>{{ 'labels.heading.Selected Loans Summary' | translate }}</h4>
+
+      <table mat-table [dataSource]="data.selectedLoans" class="loans-summary-table">
+        <!-- Account No Column -->
+        <ng-container matColumnDef="accountNo">
+          <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Loan Account' | translate }}</th>
+          <td mat-cell *matCellDef="let loan">{{ loan.accountNo }}</td>
+        </ng-container>
+
+        <!-- Invoice No Column -->
+        <ng-container matColumnDef="invoiceNo">
+          <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Invoice No' | translate }}</th>
+          <td mat-cell *matCellDef="let loan">{{ getInvoiceNumber(loan) }}</td>
+        </ng-container>
+
+        <!-- Invoice Amount Column (original currency) -->
+        <ng-container matColumnDef="invoiceAmount">
+          <th mat-header-cell *matHeaderCellDef>
+            <div class="header-two-lines">
+              <span>{{ 'labels.inputs.Disbursed Amount' | translate }}</span>
+              <span class="header-subtitle">({{ 'labels.inputs.Invoice Currency' | translate }})</span>
+            </div>
+          </th>
+          <td mat-cell *matCellDef="let loan" [class.non-aed-currency]="isNonAedLoan(loan)">
+            <span *ngIf="isNonAedLoan(loan)" class="foreign-currency-amount">
+              {{ getInvoiceAmountDisplay(loan).amount | number: '1.2-2' }}
+              <span class="currency-badge">{{ getInvoiceAmountDisplay(loan).currency }}</span>
+            </span>
+            <span *ngIf="!isNonAedLoan(loan)"> {{ getInvoiceAmountDisplay(loan).amount | number: '1.2-2' }} AED </span>
+          </td>
+        </ng-container>
+
+        <!-- Amount in AED Column (converted) -->
+        <ng-container matColumnDef="amountAed">
+          <th mat-header-cell *matHeaderCellDef>
+            <div class="header-two-lines">
+              <span>{{ 'labels.inputs.Disbursed Amount' | translate }}</span>
+              <span class="header-subtitle">(AED)</span>
+            </div>
+          </th>
+          <td mat-cell *matCellDef="let loan">
+            {{ getLoanAmountInAed(loan) | number: '1.2-2' }}
+          </td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+        <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+      </table>
+    </div>
+
+    <!-- Non-AED Currency Warning and Option -->
+    <div *ngIf="hasNonAedInvoices" class="non-aed-warning">
+      <mat-icon color="warn">warning</mat-icon>
+      <span>
+        {{ 'labels.text.Some loans have non-AED invoice currency' | translate }}
+        ({{ nonAedLoans.length }} {{ 'labels.text.loans' | translate }})
+      </span>
+      <div class="invoice-currency-option">
+        <mat-checkbox formControlName="disburseInInvoiceCurrency" color="primary">
+          {{ 'labels.inputs.Disburse in invoice currency for applicable loans' | translate }}
+        </mat-checkbox>
+      </div>
+    </div>
+
+    <!-- Total Summary -->
+    <div class="total-summary">
+      <span class="total-label">{{ 'labels.inputs.Total to Disburse' | translate }}:</span>
+      <span class="total-amount">{{ totalAmount | number: '1.2-2' }} AED</span>
+    </div>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button (click)="cancel()">{{ 'labels.buttons.Cancel' | translate }}</button>
+  <button mat-raised-button color="primary" (click)="submit()" [disabled]="bulkDisburseForm.invalid">
+    <fa-icon icon="flag" class="m-r-10"></fa-icon>
+    {{ 'labels.buttons.Disburse All' | translate }}
+  </button>
+</mat-dialog-actions>

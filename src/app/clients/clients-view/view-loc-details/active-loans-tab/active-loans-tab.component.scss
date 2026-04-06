@@ -1,3 +1,113 @@
+.tab-container {
+  padding: 16px;
+}
+
+.mode-toggle-section {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: flex-end;
+
+  .bulk-mode-toggle-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+    }
+  }
+}
+
+.bulk-action-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  background-color: #e3f2fd;
+  border-radius: 4px;
+  border: 1px solid #90caf9;
+  gap: 12px;
+
+  .bulk-mode-indicator {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    background-color: #0064ff;
+    color: white;
+    border-radius: 16px;
+    font-size: 13px;
+    font-weight: 500;
+
+    .mode-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+  }
+
+  .selection-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    .selection-count {
+      font-weight: 500;
+      color: #0064ff;
+    }
+
+    .selection-amount {
+      color: rgb(0 0 0 / 60%);
+      font-size: 14px;
+    }
+  }
+
+  .bulk-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-left: auto;
+
+    button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+
+      mat-icon {
+        font-size: 18px;
+        width: 18px;
+        height: 18px;
+      }
+
+      mat-spinner {
+        margin-right: 4px;
+      }
+    }
+  }
+}
+
+.checkbox-placeholder {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+}
+
+// Highlight selectable rows
+tr.select-row {
+  &:hover {
+    background-color: rgb(0 0 0 / 4%);
+  }
+}
+
+// Selected row styling
+tr.mat-row.selected {
+  background-color: #e3f2fd;
+}
+
 .status-badge {
   display: inline-block;
   padding: 4px 12px;

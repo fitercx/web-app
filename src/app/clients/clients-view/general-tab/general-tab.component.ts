@@ -2,9 +2,20 @@
 import { Component, OnInit } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { animate, state, style, transition, trigger } from '@angular/animations';
+import { SelectionModel } from '@angular/cdk/collections';
+import { MatDialog } from '@angular/material/dialog';
 
 /** Custom Services. */
-import { ClientsService } from 'app/clients/clients.service';
+import { ClientsService, BulkLoanDisbursementResponse } from 'app/clients/clients.service';
+import {
+  BulkDisburseDialogComponent,
+  BulkDisburseDialogData
+} from '../view-loc-details/active-loans-tab/bulk-disburse-dialog/bulk-disburse-dialog.component';
+import {
+  BulkDisburseResultsDialogComponent,
+  BulkDisburseResultsDialogData
+} from '../view-loc-details/active-loans-tab/bulk-disburse-results-dialog/bulk-disburse-results-dialog.component';
+import { BulkDisburseLoadingDialogComponent } from '../view-loc-details/active-loans-tab/bulk-disburse-loading-dialog/bulk-disburse-loading-dialog.component';
 
 /**
  * General Tab component.
@@ -121,7 +132,8 @@ export class GeneralTabComponent {
     'expand'
   ];
 
-  locLoanColumns: string[] = [
+  /** Base columns for inner LOC loans (without select) */
+  private baseLocLoanColumns: string[] = [
     'Account No',
     'Invoice Number',
     'Supplier/Buyer Name',
@@ -133,13 +145,34 @@ export class GeneralTabComponent {
     'expand'
   ];
 
-  /** Columns actually displayed for inner LOC loans depending on toggle (hide Refund/Actions for closed loans view) */
-  get displayedLocLoanColumns(): string[] {
-    if (this.showClosedLOCLoans) {
-      return this.locLoanColumns.filter((c) => c !== 'Refund Amount' && c !== 'Actions');
-    }
-    return this.locLoanColumns;
+  /** Alias for colspan calculations in template */
+  get locLoanColumns(): string[] {
+    return this.baseLocLoanColumns;
   }
+
+  /** Columns actually displayed for inner LOC loans depending on toggle and bulk mode */
+  getDisplayedLocLoanColumns(locId: number): string[] {
+    const isBulkMode = this.locBulkDisburseMode.get(locId) || false;
+
+    if (this.showClosedLOCLoans) {
+      return this.baseLocLoanColumns.filter((c) => c !== 'Refund Amount' && c !== 'Actions');
+    }
+
+    if (isBulkMode) {
+      return [
+        'select',
+        ...this.baseLocLoanColumns
+      ];
+    }
+
+    return this.baseLocLoanColumns;
+  }
+
+  /** Selection models per LOC for bulk disbursement */
+  locLoanSelections: Map<number, SelectionModel<any>> = new Map();
+
+  /** Bulk disburse mode per LOC */
+  locBulkDisburseMode: Map<number, boolean> = new Map();
 
   /** Client Account Data */
   clientAccountData: any;
@@ -184,11 +217,13 @@ export class GeneralTabComponent {
    * @param {ActivatedRoute} route Activated Route
    * @param {ClientsService} clientService Clients Service
    * @param {Router} router Router
+   * @param {MatDialog} dialog Material Dialog
    */
   constructor(
     private route: ActivatedRoute,
     private clientService: ClientsService,
-    private router: Router
+    private router: Router,
+    private dialog: MatDialog
   ) {
     this.route.data.subscribe(
       (data: { clientAccountsData: any; clientChargesData: any; clientSummary: any; clientCollateralData: any }) => {
@@ -578,5 +613,191 @@ export class GeneralTabComponent {
     return productType === 'RECEIVABLE'
       ? loan?.additionalProperties?.approvedReceivableAmount
       : loan?.additionalProperties?.approvedPayableAmount;
+  }
+
+  // ========== Bulk Disbursement Selection Methods ==========
+
+  /** Get or create selection model for a specific LOC */
+  getSelectionForLOC(locId: number): SelectionModel<any> {
+    if (!this.locLoanSelections.has(locId)) {
+      this.locLoanSelections.set(locId, new SelectionModel<any>(true, []));
+    }
+    return this.locLoanSelections.get(locId)!;
+  }
+
+  /** Check if a loan is selectable (approved and waiting for disbursal) */
+  isLoanSelectable(loan: any): boolean {
+    if (!loan?.status) return false;
+    const status = loan.status;
+    // A loan is selectable if it's approved and waiting for disbursal
+    // Exclude pending approval, active (already disbursed), overpaid, closed statuses
+    return (
+      status.waitingForDisbursal === true ||
+      (!status.pendingApproval && !status.active && !status.overpaid && !status.closed && status.approved)
+    );
+  }
+
+  /** Check if all selectable loans in a LOC are selected */
+  isAllSelectedForLOC(loc: any): boolean {
+    const selection = this.getSelectionForLOC(loc.id);
+    const selectableLoans = (loc.loans || []).filter((loan: any) => this.isLoanSelectable(loan));
+    return selectableLoans.length > 0 && selectableLoans.every((loan: any) => selection.isSelected(loan));
+  }
+
+  /** Check if some (but not all) selectable loans are selected */
+  isSomeSelectedForLOC(loc: any): boolean {
+    const selection = this.getSelectionForLOC(loc.id);
+    const selectableLoans = (loc.loans || []).filter((loan: any) => this.isLoanSelectable(loan));
+    const selectedCount = selectableLoans.filter((loan: any) => selection.isSelected(loan)).length;
+    return selectedCount > 0 && selectedCount < selectableLoans.length;
+  }
+
+  /** Toggle all selectable loans selection for a LOC */
+  masterToggleForLOC(loc: any): void {
+    const selection = this.getSelectionForLOC(loc.id);
+    const selectableLoans = (loc.loans || []).filter((loan: any) => this.isLoanSelectable(loan));
+    if (this.isAllSelectedForLOC(loc)) {
+      selection.clear();
+    } else {
+      selectableLoans.forEach((loan: any) => selection.select(loan));
+    }
+  }
+
+  /** Toggle individual loan selection */
+  toggleLoanSelection(loc: any, loan: any): void {
+    const selection = this.getSelectionForLOC(loc.id);
+    selection.toggle(loan);
+  }
+
+  /** Check if a loan is selected */
+  isLoanSelected(loc: any, loan: any): boolean {
+    const selection = this.getSelectionForLOC(loc.id);
+    return selection.isSelected(loan);
+  }
+
+  /** Check if a LOC has any selectable loans */
+  hasSelectableLoansForLOC(loc: any): boolean {
+    return (loc.loans || []).some((loan: any) => this.isLoanSelectable(loan));
+  }
+
+  /** Get count of selected loans for a LOC */
+  getSelectedCountForLOC(loc: any): number {
+    const selection = this.getSelectionForLOC(loc.id);
+    return selection.selected.length;
+  }
+
+  /** Check if bulk disburse mode is active for a LOC */
+  isBulkModeActiveForLOC(locId: number): boolean {
+    return this.locBulkDisburseMode.get(locId) || false;
+  }
+
+  /** Toggle bulk disburse mode for a LOC */
+  toggleBulkDisburseModeForLOC(loc: any, event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+    }
+    const currentMode = this.locBulkDisburseMode.get(loc.id) || false;
+    this.locBulkDisburseMode.set(loc.id, !currentMode);
+
+    // Clear selection when exiting bulk mode
+    if (currentMode) {
+      const selection = this.getSelectionForLOC(loc.id);
+      selection.clear();
+    }
+  }
+
+  /** Open bulk disburse dialog for a LOC */
+  openBulkDisburseDialogForLOC(loc: any, event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+    }
+
+    const selection = this.getSelectionForLOC(loc.id);
+    const selectedLoans = selection.selected;
+
+    if (selectedLoans.length === 0) {
+      return;
+    }
+
+    const dialogData: BulkDisburseDialogData = {
+      clientId: this.clientid,
+      locId: loc.id,
+      locCurrency: loc.currency?.code || 'USD',
+      locType: loc.type, // 'Receivable' or 'Payable'
+      selectedLoans: selectedLoans
+    };
+
+    const dialogRef = this.dialog.open(BulkDisburseDialogComponent, {
+      width: '700px',
+      data: dialogData,
+      disableClose: true
+    });
+
+    dialogRef.afterClosed().subscribe((result: any) => {
+      if (result?.action === 'disburse' && result?.payload) {
+        // Execute the bulk disbursement
+        this.executeBulkDisburseForLOC(loc, result.payload, selection);
+      }
+    });
+  }
+
+  /**
+   * Execute bulk disbursement for a LOC and show results
+   */
+  private executeBulkDisburseForLOC(loc: any, payload: any, selection: SelectionModel<any>): void {
+    // Show loading dialog
+    const loadingDialogRef = this.dialog.open(BulkDisburseLoadingDialogComponent, {
+      width: '350px',
+      disableClose: true,
+      panelClass: 'loading-dialog-panel'
+    });
+
+    this.clientService.bulkDisburseLOCLoans(this.clientid.toString(), loc.id.toString(), payload).subscribe({
+      next: (response: BulkLoanDisbursementResponse) => {
+        loadingDialogRef.close();
+
+        // Show results dialog
+        const resultsData: BulkDisburseResultsDialogData = {
+          response: response,
+          locCurrency: loc.currency?.code || 'AED'
+        };
+
+        this.dialog.open(BulkDisburseResultsDialogComponent, {
+          width: '700px',
+          data: resultsData
+        });
+
+        // Clear selection
+        selection.clear();
+
+        // Exit bulk mode for this LOC
+        this.locBulkDisburseMode.set(loc.id, false);
+
+        // Refresh LOC data to get updated loan statuses
+        this.refreshLOCData();
+      },
+      error: (error) => {
+        loadingDialogRef.close();
+        console.error('Bulk disbursement failed:', error);
+        // Refresh to show current state
+        this.refreshLOCData();
+      }
+    });
+  }
+
+  /** Refresh LOC data after bulk disbursement */
+  private refreshLOCData(): void {
+    this.clientService.getClientCreditLines(this.clientid).subscribe(
+      (creditLines: any[]) => {
+        this.allLinesOfCredit = this.mapCreditLinesToTableFormat(creditLines || []);
+        this.applyLOCFilter();
+        // Clear all selections and bulk mode states after refresh
+        this.locLoanSelections.clear();
+        this.locBulkDisburseMode.clear();
+      },
+      (error) => {
+        console.error('Error refreshing lines of credit:', error);
+      }
+    );
   }
 }

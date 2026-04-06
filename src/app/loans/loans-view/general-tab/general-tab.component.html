@@ -146,6 +146,9 @@
           <ng-container *ngIf="ele.key === 'Penalty Grace Period'">
             {{ ele.value }} {{ 'labels.inputs.Days' | translate }}
           </ng-container>
+          <ng-container *ngIf="ele.key === 'Short Disbursal'">
+            {{ ele.value }}
+          </ng-container>
           <ng-container *ngIf="ele.key === 'Net Disbursed Amount'">
             <span>
               {{ ele.value | formatNumber }}

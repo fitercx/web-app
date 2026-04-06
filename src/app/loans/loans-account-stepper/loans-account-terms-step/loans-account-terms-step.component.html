@@ -10,6 +10,16 @@
       />
     </mat-form-field>
 
+    <mat-checkbox
+      fxFlex="58%"
+      labelPosition="before"
+      formControlName="isShortDisbursal"
+      matTooltip="{{ 'tooltips.Short Disbursal Help Text' | translate }}"
+      class="margin-b"
+    >
+      {{ 'labels.inputs.Short Disbursal' | translate }}
+    </mat-checkbox>
+
     <mifosx-input-amount
       fxFlex="58%"
       *ngIf="currency && !locSelected"
