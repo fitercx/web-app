@@ -3600,6 +3600,10 @@
       "Write a note": "Write a note",
       "Drag and drop images here or click to browse": "Drag and drop images here or click to browse",
       "Supports: JPG, PNG, GIF, WEBP": "Supports: JPG, PNG, GIF, WEBP",
+      "No presigned URL received": "No presigned URL received",
+      "Failed to get upload URL": "Failed to get upload URL",
+      "No presigned URL available": "No presigned URL available",
+      "Upload failed": "Upload failed",
       "“Maker-Checker” principle requires every tasks": "The “Maker-Checker” principle requires every tasks to be completed by two people to reduce the chance of errors and misuse. One person initiates the process and the second completes it."
     },
     "titles": {

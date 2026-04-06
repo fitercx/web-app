@@ -1,6 +1,7 @@
 import { Component, Input, OnInit, ViewChild } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
+import { TranslateService } from '@ngx-translate/core';
 import { ClientsService } from 'app/clients/clients.service';
 import { GroupsService } from 'app/groups/groups.service';
 import { LoansService } from 'app/loans/loans.service';
@@ -53,7 +54,8 @@ export class EntityNotesTabComponent implements OnInit {
     private clientsService: ClientsService,
     private groupsService: GroupsService,
     private dialog: MatDialog,
-    private s3Service: S3Service
+    private s3Service: S3Service,
+    private translateService: TranslateService
   ) {}
 
   ngOnInit() {
@@ -73,6 +75,12 @@ export class EntityNotesTabComponent implements OnInit {
     // Get successfully uploaded files
     const uploadedFiles = this.selectedFiles.filter((f) => f.status === 'completed' && f.s3ObjectKey);
 
+    // If documents support is available and the user selected files but none completed successfully,
+    // do not silently create a note without attachments. Let the user resolve upload issues instead.
+    if (this.callbackAddWithDocuments && this.selectedFiles.length > 0 && uploadedFiles.length === 0) {
+      return;
+    }
+
     if (uploadedFiles.length > 0 && this.callbackAddWithDocuments) {
       // Create note with documents
       const documents: NoteDocumentAttachment[] = uploadedFiles.map((f) => ({
@@ -81,8 +89,7 @@ export class EntityNotesTabComponent implements OnInit {
         size: f.file.size,
         contentType: f.file.type,
         s3ObjectKey: f.s3ObjectKey!,
-        description: '',
-        previewUrl: f.previewUrl
+        description: ''
       }));
 
       const noteData: CreateNoteWithDocumentsRequest = {
@@ -310,14 +317,14 @@ export class EntityNotesTabComponent implements OnInit {
         fileStatuses.forEach((fs) => {
           if (!fs.presignedUrl && fs.status === 'getting-url') {
             fs.status = 'error';
-            fs.errorMessage = 'No presigned URL received';
+            fs.errorMessage = this.translateService.instant('labels.text.No presigned URL received');
           }
         });
       },
       error: () => {
         fileStatuses.forEach((fs) => {
           fs.status = 'error';
-          fs.errorMessage = 'Failed to get upload URL';
+          fs.errorMessage = this.translateService.instant('labels.text.Failed to get upload URL');
         });
       }
     });
@@ -329,7 +336,7 @@ export class EntityNotesTabComponent implements OnInit {
   private uploadFileToS3(fileStatus: FileUploadStatus): void {
     if (!fileStatus.presignedUrl) {
       fileStatus.status = 'error';
-      fileStatus.errorMessage = 'No presigned URL available';
+      fileStatus.errorMessage = this.translateService.instant('labels.text.No presigned URL available');
       return;
     }
 
@@ -345,9 +352,9 @@ export class EntityNotesTabComponent implements OnInit {
           fileStatus.status = 'completed';
           fileStatus.progress = 100;
         },
-        error: (error) => {
+        error: () => {
           fileStatus.status = 'error';
-          fileStatus.errorMessage = `Upload failed: ${error.statusText || 'Unknown error'}`;
+          fileStatus.errorMessage = this.translateService.instant('labels.text.Upload failed');
         }
       });
   }
@@ -408,7 +415,7 @@ export class EntityNotesTabComponent implements OnInit {
    */
   openDocument(document: any): void {
     if (document.presignedUrl) {
-      window.open(document.presignedUrl, '_blank');
+      window.open(document.presignedUrl, '_blank', 'noopener,noreferrer');
     }
   }
 }

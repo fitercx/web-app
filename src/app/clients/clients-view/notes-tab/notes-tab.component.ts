@@ -3,7 +3,7 @@ import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 
 /** rxjs Imports */
-import { switchMap, map } from 'rxjs/operators';
+import { switchMap, tap } from 'rxjs/operators';
 
 /** Custom Components */
 
@@ -99,7 +99,7 @@ export class NotesTabComponent implements OnInit {
         switchMap((response: any) => {
           // After creating, fetch all notes to get the one with presigned URLs
           return this.clientsService.getClientNotesWithDocuments(this.entityId).pipe(
-            map((notes: any[]) => {
+            tap((notes: any[]) => {
               // Find the newly created note by resourceId
               const createdNote = notes.find((n: any) => n.id === response.resourceId);
               if (createdNote) {
