@@ -285,6 +285,11 @@ export class GeneralTabComponent implements OnInit {
         key: 'Penalty Grace Period',
         value: this.loanDetails?.penaltyGracePeriod
       });
+      this.loanDetailsTableData.push({
+        key: 'Short Disbursal',
+        value:
+          this.loanDetails?.isShortDisbursal !== undefined ? (this.loanDetails.isShortDisbursal ? 'Yes' : 'No') : 'Yes'
+      });
       this.loanDetailsTableData = this.loanDetailsTableData.filter((item) => item.key !== 'Disapproved Amount');
       this.loanDetailsTableData = this.loanDetailsTableData.filter((item) => item.key !== 'Invoice Amount');
     }

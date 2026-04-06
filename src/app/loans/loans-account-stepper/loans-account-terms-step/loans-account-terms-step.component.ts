@@ -214,7 +214,10 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
         multiDisburseLoan: this.loansAccountTermsData.multiDisburseLoan,
         interestRateFrequencyType: interestRateFrequencyType,
         balloonRepaymentAmount: this.loansAccountTermsData.balloonRepaymentAmount,
-        interestRecognitionOnDisbursementDate: this.loansAccountTermsData.interestRecognitionOnDisbursementDate || false
+        interestRecognitionOnDisbursementDate:
+          this.loansAccountTermsData.interestRecognitionOnDisbursementDate || false,
+        isShortDisbursal:
+          this.loansAccountTermsData.isShortDisbursal !== undefined ? this.loansAccountTermsData.isShortDisbursal : true
       });
 
       // Handle LOC product field restrictions
@@ -387,7 +390,10 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
         multiDisburseLoan: this.loansAccountTermsData.multiDisburseLoan,
         interestRateFrequencyType: interestRateFrequencyType,
         balloonRepaymentAmount: this.loansAccountTermsData.balloonRepaymentAmount,
-        interestRecognitionOnDisbursementDate: this.loansAccountTermsData.interestRecognitionOnDisbursementDate || false
+        interestRecognitionOnDisbursementDate:
+          this.loansAccountTermsData.interestRecognitionOnDisbursementDate || false,
+        isShortDisbursal:
+          this.loansAccountTermsData.isShortDisbursal !== undefined ? this.loansAccountTermsData.isShortDisbursal : true
       });
 
       // Handle LOC product field restrictions
@@ -676,7 +682,8 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
       multiDisburseLoan: [false],
       interestRateFrequencyType: [''],
       balloonRepaymentAmount: [''],
-      interestRecognitionOnDisbursementDate: [false]
+      interestRecognitionOnDisbursementDate: [false],
+      isShortDisbursal: [true]
     });
   }
 
