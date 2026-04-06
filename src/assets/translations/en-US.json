@@ -1236,6 +1236,8 @@
       "Enable Line of Credit Payable functionality": "Enable Line of Credit Payable functionality",
       "Linked Savings Account (Auto Debit Source)": "Linked Savings Account (Auto Debit Source)",
       "Invoice Number": "Invoice Number",
+      "Invoice No": "Invoice No.",
+      "Amount in AED": "Amount in AED",
       "Supplier/Buyer Name": "Supplier/Buyer Name",
       "PreDisbursal Amount": "PreDisbursal Amount",
       "Tax Amount": "Tax Amount",
