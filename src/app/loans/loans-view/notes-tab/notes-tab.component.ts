@@ -18,6 +18,7 @@ import { CreateNoteWithDocumentsRequest } from 'app/shared/models/file-upload.mo
 })
 export class NotesTabComponent {
   entityId: string;
+  clientId: number;
   username: string;
   entityNotes: any;
 
@@ -29,6 +30,7 @@ export class NotesTabComponent {
     const savedCredentials = this.authenticationService.getCredentials();
     this.username = savedCredentials.username;
     this.entityId = this.route.parent.snapshot.params['loanId'];
+    this.clientId = parseInt(this.route.parent.parent.snapshot.params['clientId'], 10);
     this.addNote = this.addNote.bind(this);
     this.addNoteWithDocuments = this.addNoteWithDocuments.bind(this);
     this.route.data.subscribe((data: { loanNotes: any }) => {

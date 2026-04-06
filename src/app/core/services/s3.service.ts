@@ -91,18 +91,4 @@ export class S3Service {
       return v.toString(16);
     });
   }
-
-  /**
-   * Creates file metadata request from a File object
-   * @param {File} file The file to create metadata for
-   * @returns {FileMetadataRequest} The file metadata request object
-   */
-  createFileMetadata(file: File): FileMetadataRequest {
-    return {
-      uploadCorrelationId: this.generateCorrelationId(),
-      fileName: file.name,
-      contentType: file.type,
-      fileSize: file.size
-    };
-  }
 }

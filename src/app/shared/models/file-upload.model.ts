@@ -10,6 +10,12 @@ export interface FileMetadataRequest {
   contentType: string;
   /** Size of the file in bytes */
   fileSize: number;
+  /** Resource type (e.g., 'clients', 'loans') */
+  resourceType: string;
+  /** Resource ID (e.g., clientId, loanId) */
+  resourceId: number;
+  /** Parent resource ID (e.g., clientId for loans) - optional */
+  parentResourceId?: number;
 }
 
 /**

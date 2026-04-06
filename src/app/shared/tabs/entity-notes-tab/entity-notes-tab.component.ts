@@ -26,6 +26,8 @@ export class EntityNotesTabComponent implements OnInit {
 
   @Input() entityId: string;
   @Input() entityNotes: any;
+  @Input() resourceType: string;
+  @Input() parentResourceId?: number;
 
   @Input() callbackAdd: (note: any) => void;
   @Input() callbackAddWithDocuments?: (noteData: CreateNoteWithDocumentsRequest) => void;
@@ -255,13 +257,22 @@ export class EntityNotesTabComponent implements OnInit {
     // Update status to getting-url
     fileStatuses.forEach((fs) => (fs.status = 'getting-url'));
 
-    // Create metadata request
-    const metadataRequests: FileMetadataRequest[] = fileStatuses.map((fs) => ({
-      uploadCorrelationId: fs.uploadCorrelationId,
-      fileName: fs.file.name,
-      contentType: fs.file.type,
-      fileSize: fs.file.size
-    }));
+    // Create metadata request with resource information
+    const metadataRequests: FileMetadataRequest[] = fileStatuses.map((fs) => {
+      const request: FileMetadataRequest = {
+        uploadCorrelationId: fs.uploadCorrelationId,
+        fileName: fs.file.name,
+        contentType: fs.file.type,
+        fileSize: fs.file.size,
+        resourceType: this.resourceType,
+        resourceId: parseInt(this.entityId, 10)
+      };
+      // Add parentResourceId if provided (e.g., for loans)
+      if (this.parentResourceId) {
+        request.parentResourceId = this.parentResourceId;
+      }
+      return request;
+    });
 
     // Call backend to get presigned URLs
     this.s3Service.generatePresignedUrls(metadataRequests).subscribe({

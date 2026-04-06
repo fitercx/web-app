@@ -1,6 +1,8 @@
 <mifosx-entity-notes-tab
   [entityId]="entityId"
   [entityNotes]="entityNotes"
+  [resourceType]="'loans'"
+  [parentResourceId]="clientId"
   [callbackAdd]="addNote"
   [callbackAddWithDocuments]="addNoteWithDocuments"
   [callbackEdit]="editNote"
