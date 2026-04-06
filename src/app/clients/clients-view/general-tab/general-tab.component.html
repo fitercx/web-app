@@ -480,11 +480,13 @@
                         <div class="detail-item">
                           <span class="detail-label">{{ 'labels.inputs.Approved Amount' | translate }}:</span>
                           <span class="detail-value">
-                            <ng-container *ngIf="getApprovedAmount(loan, element) != null">
-                              {{ getApprovedAmount(loan, element) | formatNumber }}
+                            <ng-container
+                              *ngIf="getApprovedAmount(loan, element) as approvedAmount; else noApprovedAmount"
+                            >
+                              {{ approvedAmount | formatNumber }}
                               {{ loan.additionalProperties?.invoiceCurrency || element.currency?.code || 'AED' }}
                             </ng-container>
-                            <ng-container *ngIf="getApprovedAmount(loan, element) == null">-</ng-container>
+                            <ng-template #noApprovedAmount>-</ng-template>
                           </span>
                         </div>
                         <div class="detail-item" *ngIf="loan?.additionalProperties?.amountAfterAdvance != null">
