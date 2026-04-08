@@ -1,12 +1,21 @@
 import { Component, Input, OnInit, ViewChild } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { MatDialog } from '@angular/material/dialog';
+import { TranslateService } from '@ngx-translate/core';
 import { ClientsService } from 'app/clients/clients.service';
 import { GroupsService } from 'app/groups/groups.service';
 import { LoansService } from 'app/loans/loans.service';
 import { SavingsService } from 'app/savings/savings.service';
 import { DeleteDialogComponent } from 'app/shared/delete-dialog/delete-dialog.component';
 import { FormDialogComponent } from 'app/shared/form-dialog/form-dialog.component';
+import { S3Service } from 'app/core/services/s3.service';
+import {
+  FileUploadStatus,
+  FileMetadataRequest,
+  PresignedUrlResponse,
+  NoteDocumentAttachment,
+  CreateNoteWithDocumentsRequest
+} from 'app/shared/models/file-upload.model';
 
 @Component({
   selector: 'mifosx-entity-notes-tab',
@@ -18,12 +27,25 @@ export class EntityNotesTabComponent implements OnInit {
 
   @Input() entityId: string;
   @Input() entityNotes: any;
+  @Input() resourceType: string;
+  @Input() parentResourceId?: number;
 
   @Input() callbackAdd: (note: any) => void;
+  @Input() callbackAddWithDocuments?: (noteData: CreateNoteWithDocumentsRequest) => void;
   @Input() callbackEdit: (noteId: string, note: string, index: number) => void;
   @Input() callbackDelete: (noteId: string, index: number) => void;
 
   noteForm: UntypedFormGroup;
+
+  /** File upload properties */
+  selectedFiles: FileUploadStatus[] = [];
+  isDragOver = false;
+  acceptedImageTypes = [
+    'image/jpeg',
+    'image/png',
+    'image/gif',
+    'image/webp'
+  ];
 
   constructor(
     private formBuilder: UntypedFormBuilder,
@@ -31,7 +53,9 @@ export class EntityNotesTabComponent implements OnInit {
     private loansService: LoansService,
     private clientsService: ClientsService,
     private groupsService: GroupsService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private s3Service: S3Service,
+    private translateService: TranslateService
   ) {}
 
   ngOnInit() {
@@ -48,8 +72,47 @@ export class EntityNotesTabComponent implements OnInit {
   }
 
   addNote() {
-    this.callbackAdd(this.noteForm.value);
+    // Get successfully uploaded files
+    const uploadedFiles = this.selectedFiles.filter((f) => f.status === 'completed' && f.s3ObjectKey);
+
+    // If documents support is available and the user selected files but none completed successfully,
+    // do not silently create a note without attachments. Let the user resolve upload issues instead.
+    if (this.callbackAddWithDocuments && this.selectedFiles.length > 0 && uploadedFiles.length === 0) {
+      return;
+    }
+
+    if (uploadedFiles.length > 0 && this.callbackAddWithDocuments) {
+      // Create note with documents
+      const documents: NoteDocumentAttachment[] = uploadedFiles.map((f) => ({
+        uploadCorrelationId: f.uploadCorrelationId,
+        fileName: f.file.name,
+        size: f.file.size,
+        contentType: f.file.type,
+        s3ObjectKey: f.s3ObjectKey!,
+        description: ''
+      }));
+
+      const noteData: CreateNoteWithDocumentsRequest = {
+        note: this.noteForm.value.note,
+        documents: documents
+      };
+
+      this.callbackAddWithDocuments(noteData);
+    } else {
+      // Create note without documents (original behavior)
+      this.callbackAdd(this.noteForm.value);
+    }
+
+    // Reset form and clear selected files
     this.formRef.resetForm();
+    this.selectedFiles = [];
+  }
+
+  /**
+   * Check if there are any files still uploading
+   */
+  isUploading(): boolean {
+    return this.selectedFiles.some((f) => f.status === 'uploading' || f.status === 'getting-url');
   }
 
   editNote(noteId: string, noteContent: string, index: number) {
@@ -87,5 +150,272 @@ export class EntityNotesTabComponent implements OnInit {
         this.callbackDelete(noteId, index);
       }
     });
+  }
+
+  /**
+   * Handle drag over event
+   */
+  onDragOver(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = true;
+  }
+
+  /**
+   * Handle drag leave event
+   */
+  onDragLeave(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = false;
+  }
+
+  /**
+   * Handle file drop event
+   */
+  onFileDrop(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+    this.isDragOver = false;
+
+    const files = event.dataTransfer?.files;
+    if (files && files.length > 0) {
+      this.processFiles(files);
+    }
+  }
+
+  /**
+   * Handle files selected via file input
+   */
+  onFilesSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (input.files && input.files.length > 0) {
+      this.processFiles(input.files);
+    }
+    // Reset input so same file can be selected again
+    input.value = '';
+  }
+
+  /**
+   * Process selected files - validate, create previews, and request presigned URLs
+   */
+  private processFiles(fileList: FileList): void {
+    const validFiles: File[] = [];
+
+    for (let i = 0; i < fileList.length; i++) {
+      const file = fileList[i];
+      if (this.isValidImageFile(file)) {
+        validFiles.push(file);
+      }
+    }
+
+    if (validFiles.length === 0) {
+      return;
+    }
+
+    // Create file status objects and generate previews
+    const newFileStatuses: FileUploadStatus[] = validFiles.map((file) => {
+      const fileStatus: FileUploadStatus = {
+        uploadCorrelationId: this.s3Service.generateCorrelationId(),
+        file: file,
+        status: 'pending',
+        progress: 0,
+        previewUrl: undefined
+      };
+
+      // Generate preview
+      this.generatePreview(file, fileStatus);
+
+      return fileStatus;
+    });
+
+    // Add to selected files
+    this.selectedFiles = [
+      ...this.selectedFiles,
+      ...newFileStatuses
+    ];
+
+    // Request presigned URLs from backend
+    this.requestPresignedUrls(newFileStatuses);
+  }
+
+  /**
+   * Validate if file is an accepted image type
+   */
+  private isValidImageFile(file: File): boolean {
+    return this.acceptedImageTypes.includes(file.type);
+  }
+
+  /**
+   * Generate image preview URL
+   */
+  private generatePreview(file: File, fileStatus: FileUploadStatus): void {
+    const reader = new FileReader();
+    reader.onload = (e: ProgressEvent<FileReader>) => {
+      fileStatus.previewUrl = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  /**
+   * Request presigned URLs from the backend
+   */
+  private requestPresignedUrls(fileStatuses: FileUploadStatus[]): void {
+    // Update status to getting-url
+    fileStatuses.forEach((fs) => (fs.status = 'getting-url'));
+
+    // Create metadata request with resource information
+    const metadataRequests: FileMetadataRequest[] = fileStatuses.map((fs) => {
+      const request: FileMetadataRequest = {
+        uploadCorrelationId: fs.uploadCorrelationId,
+        fileName: fs.file.name,
+        contentType: fs.file.type,
+        fileSize: fs.file.size,
+        resourceType: this.resourceType,
+        resourceId: parseInt(this.entityId, 10)
+      };
+      // Add parentResourceId if provided (e.g., for loans)
+      if (this.parentResourceId) {
+        request.parentResourceId = this.parentResourceId;
+      }
+      return request;
+    });
+
+    // Call backend to get presigned URLs
+    this.s3Service.generatePresignedUrls(metadataRequests).subscribe({
+      next: (response: any) => {
+        // Handle different response structures
+        let responses: PresignedUrlResponse[] = [];
+        if (Array.isArray(response)) {
+          responses = response;
+        } else if (response && response.urls) {
+          responses = response.urls;
+        } else if (response && response.files) {
+          responses = response.files;
+        } else if (response && response.data) {
+          responses = Array.isArray(response.data) ? response.data : [response.data];
+        } else if (response && response.presignedUrl) {
+          // Single response object
+          responses = [response];
+        }
+
+        // Match responses to file statuses by correlation ID and start uploads
+        responses.forEach((presignedResponse: PresignedUrlResponse) => {
+          const fileStatus = fileStatuses.find(
+            (fs) => fs.uploadCorrelationId === presignedResponse.uploadCorrelationId
+          );
+          if (fileStatus) {
+            fileStatus.presignedUrl = presignedResponse.presignedUrl;
+            // Store the S3 object key for later use when creating the note
+            fileStatus.s3ObjectKey = presignedResponse.objectKey;
+            // Immediately start uploading to S3
+            this.uploadFileToS3(fileStatus);
+          }
+        });
+
+        // Check if any files didn't get a presigned URL
+        fileStatuses.forEach((fs) => {
+          if (!fs.presignedUrl && fs.status === 'getting-url') {
+            fs.status = 'error';
+            fs.errorMessage = this.translateService.instant('labels.text.No presigned URL received');
+          }
+        });
+      },
+      error: () => {
+        fileStatuses.forEach((fs) => {
+          fs.status = 'error';
+          fs.errorMessage = this.translateService.instant('labels.text.Failed to get upload URL');
+        });
+      }
+    });
+  }
+
+  /**
+   * Upload a single file to S3 using its presigned URL
+   */
+  private uploadFileToS3(fileStatus: FileUploadStatus): void {
+    if (!fileStatus.presignedUrl) {
+      fileStatus.status = 'error';
+      fileStatus.errorMessage = this.translateService.instant('labels.text.No presigned URL available');
+      return;
+    }
+
+    fileStatus.status = 'uploading';
+    fileStatus.progress = 0;
+
+    this.s3Service
+      .uploadFileToS3(fileStatus.presignedUrl, fileStatus.file, (progress) => {
+        fileStatus.progress = progress;
+      })
+      .subscribe({
+        next: () => {
+          fileStatus.status = 'completed';
+          fileStatus.progress = 100;
+        },
+        error: () => {
+          fileStatus.status = 'error';
+          fileStatus.errorMessage = this.translateService.instant('labels.text.Upload failed');
+        }
+      });
+  }
+
+  /**
+   * Remove a file from the selected files list
+   * Prevents removal while file is being uploaded
+   */
+  removeFile(index: number): void {
+    const fileStatus = this.selectedFiles[index];
+    if (!fileStatus) {
+      return;
+    }
+
+    // Prevent removal while the file is in-flight
+    if (fileStatus.status === 'getting-url' || fileStatus.status === 'uploading') {
+      return;
+    }
+
+    this.selectedFiles.splice(index, 1);
+  }
+
+  /**
+   * Format file size for display
+   */
+  formatFileSize(bytes: number): string {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = [
+      'Bytes',
+      'KB',
+      'MB',
+      'GB'
+    ];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  }
+
+  /**
+   * Check if a content type is an image
+   */
+  isImageType(contentType: string): boolean {
+    return contentType && contentType.startsWith('image/');
+  }
+
+  /**
+   * Get icon for non-image file types
+   */
+  getFileIcon(contentType: string): string {
+    if (contentType && contentType.includes('pdf')) {
+      return 'file-pdf';
+    }
+    return 'file-alt';
+  }
+
+  /**
+   * Open document in new tab using presigned URL
+   */
+  openDocument(document: any): void {
+    if (document.presignedUrl) {
+      window.open(document.presignedUrl, '_blank', 'noopener,noreferrer');
+    }
   }
 }

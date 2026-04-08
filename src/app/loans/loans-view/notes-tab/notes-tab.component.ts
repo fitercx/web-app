@@ -1,11 +1,15 @@
 import { Component } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 
+/** rxjs Imports */
+import { switchMap, tap } from 'rxjs/operators';
+
 /** Custom Components */
 
 /** Custom Services */
 import { LoansService } from '../../loans.service';
 import { AuthenticationService } from '../../../core/authentication/authentication.service';
+import { CreateNoteWithDocumentsRequest } from 'app/shared/models/file-upload.model';
 
 @Component({
   selector: 'mifosx-notes-tab',
@@ -14,6 +18,7 @@ import { AuthenticationService } from '../../../core/authentication/authenticati
 })
 export class NotesTabComponent {
   entityId: string;
+  clientId: number;
   username: string;
   entityNotes: any;
 
@@ -25,6 +30,9 @@ export class NotesTabComponent {
     const savedCredentials = this.authenticationService.getCredentials();
     this.username = savedCredentials.username;
     this.entityId = this.route.parent.snapshot.params['loanId'];
+    this.clientId = parseInt(this.route.parent.parent.snapshot.params['clientId'], 10);
+    this.addNote = this.addNote.bind(this);
+    this.addNoteWithDocuments = this.addNoteWithDocuments.bind(this);
     this.route.data.subscribe((data: { loanNotes: any }) => {
       this.entityNotes = data.loanNotes;
     });
@@ -32,13 +40,37 @@ export class NotesTabComponent {
 
   addNote(noteContent: any) {
     this.loansService.createLoanNote(this.entityId, noteContent).subscribe((response: any) => {
-      this.entityNotes.push({
+      this.entityNotes.unshift({
         id: response.resourceId,
         createdByUsername: this.username,
         createdOn: new Date(),
         note: noteContent.note
       });
     });
+  }
+
+  /**
+   * Creates a loan note with document attachments.
+   * After creation, fetches the note with presigned URLs.
+   */
+  addNoteWithDocuments(noteData: CreateNoteWithDocumentsRequest) {
+    this.loansService
+      .createLoanNoteWithDocuments(this.entityId, noteData)
+      .pipe(
+        switchMap((response: any) => {
+          // After creating, fetch all notes to get the one with presigned URLs
+          return this.loansService.getLoanNotesWithDocuments(this.entityId).pipe(
+            tap((notes: any[]) => {
+              // Find the newly created note by resourceId
+              const createdNote = notes.find((n: any) => n.id === response.resourceId);
+              if (createdNote) {
+                this.entityNotes.unshift(createdNote);
+              }
+            })
+          );
+        })
+      )
+      .subscribe();
   }
 
   editNote(noteId: string, noteContent: any, index: number) {

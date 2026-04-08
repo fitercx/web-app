@@ -272,8 +272,25 @@ export class ClientsService {
     return this.http.get(`/clients/${clientId}/notes`);
   }
 
+  /**
+   * Gets client notes with document attachments (includes presigned URLs for viewing)
+   * @param clientId Client ID
+   */
+  getClientNotesWithDocuments(clientId: string) {
+    return this.http.get(`/clients/${clientId}/notes-with-documents`);
+  }
+
   createClientNote(clientId: string, noteData: any) {
     return this.http.post(`/clients/${clientId}/notes`, noteData);
+  }
+
+  /**
+   * Creates a client note with document attachments
+   * @param clientId Client ID
+   * @param noteData Note data with documents
+   */
+  createClientNoteWithDocuments(clientId: string, noteData: any) {
+    return this.http.post(`/clients/${clientId}/notes-with-documents`, noteData);
   }
 
   editClientNote(clientId: string, noteId: string, noteData: any) {
