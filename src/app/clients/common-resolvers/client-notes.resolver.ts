@@ -24,6 +24,6 @@ export class ClientNotesResolver implements Resolve<Object> {
    */
   resolve(route: ActivatedRouteSnapshot): Observable<any> {
     const clientId = route.parent.paramMap.get('clientId');
-    return this.clientsService.getClientNotes(clientId);
+    return this.clientsService.getClientNotesWithDocuments(clientId);
   }
 }

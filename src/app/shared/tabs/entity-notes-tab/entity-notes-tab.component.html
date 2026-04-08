@@ -2,49 +2,160 @@
   <h3>{{ 'labels.heading.Notes' | translate }}</h3>
 
   <div>
-    <form
-      #formRef="ngForm"
-      [formGroup]="noteForm"
-      fxLayout="row"
-      fxLayoutAlign="start baseline"
-      fxLayoutGap="20px"
-      (ngSubmit)="addNote()"
-    >
-      <mat-form-field fxFlex="calc(85%-20px)">
-        <textarea
-          required
-          formControlName="note"
-          matInput
-          placeholder="{{ 'labels.text.Write a note' | translate }} ..."
-          cdkTextareaAutosize
-          cdkAutosizeMinRows="2"
-        ></textarea>
-      </mat-form-field>
-      <button mat-raised-button fxFlex color="primary" [disabled]="!noteForm.valid">
-        <fa-icon icon="plus" class="m-r-10"></fa-icon>{{ 'labels.buttons.Add' | translate }}
-      </button>
+    <form #formRef="ngForm" [formGroup]="noteForm" fxLayout="column" fxLayoutGap="16px" (ngSubmit)="addNote()">
+      <!-- Note text input row -->
+      <div fxLayout="row" fxLayoutAlign="start baseline" fxLayoutGap="20px">
+        <mat-form-field fxFlex="calc(85%-20px)">
+          <textarea
+            required
+            formControlName="note"
+            matInput
+            placeholder="{{ 'labels.text.Write a note' | translate }} ..."
+            cdkTextareaAutosize
+            cdkAutosizeMinRows="2"
+          ></textarea>
+        </mat-form-field>
+        <button mat-raised-button fxFlex color="primary" [disabled]="!noteForm.valid || isUploading()">
+          <fa-icon icon="plus" class="m-r-10"></fa-icon>{{ 'labels.buttons.Add' | translate }}
+        </button>
+      </div>
+
+      <!-- Image upload section - only shown when document uploads are supported -->
+      <div class="image-upload-section" *ngIf="callbackAddWithDocuments">
+        <div
+          class="file-drop-zone"
+          [class.drag-over]="isDragOver"
+          (dragover)="onDragOver($event)"
+          (dragleave)="onDragLeave($event)"
+          (drop)="onFileDrop($event)"
+          (click)="fileInput.click()"
+        >
+          <input #fileInput type="file" accept="image/*" multiple hidden (change)="onFilesSelected($event)" />
+          <div class="drop-zone-content" fxLayout="column" fxLayoutAlign="center center" fxLayoutGap="8px">
+            <fa-icon icon="cloud-upload-alt" size="2x" class="upload-icon"></fa-icon>
+            <span class="drop-zone-text">{{
+              'labels.text.Drag and drop images here or click to browse' | translate
+            }}</span>
+            <span class="drop-zone-hint">{{ 'labels.text.Supports: JPG, PNG, GIF, WEBP' | translate }}</span>
+          </div>
+        </div>
+
+        <!-- Selected files preview -->
+        <div *ngIf="selectedFiles.length > 0" class="selected-files-container" fxLayout="row wrap" fxLayoutGap="12px">
+          <div
+            *ngFor="let fileStatus of selectedFiles; let i = index"
+            class="file-preview-item"
+            fxLayout="column"
+            fxLayoutAlign="start center"
+          >
+            <div class="preview-image-container">
+              <img
+                *ngIf="fileStatus.previewUrl"
+                [src]="fileStatus.previewUrl"
+                [alt]="fileStatus.file.name"
+                class="preview-image"
+              />
+              <div class="file-status-overlay" [ngClass]="fileStatus.status">
+                <fa-icon *ngIf="fileStatus.status === 'pending'" icon="clock" class="status-icon"></fa-icon>
+                <fa-icon
+                  *ngIf="fileStatus.status === 'getting-url'"
+                  icon="spinner"
+                  [spin]="true"
+                  class="status-icon"
+                ></fa-icon>
+                <fa-icon
+                  *ngIf="fileStatus.status === 'uploading'"
+                  icon="spinner"
+                  [spin]="true"
+                  class="status-icon"
+                ></fa-icon>
+                <fa-icon
+                  *ngIf="fileStatus.status === 'completed'"
+                  icon="check-circle"
+                  class="status-icon success"
+                ></fa-icon>
+                <fa-icon
+                  *ngIf="fileStatus.status === 'error'"
+                  icon="exclamation-circle"
+                  class="status-icon error"
+                ></fa-icon>
+              </div>
+              <button
+                mat-icon-button
+                class="remove-file-btn"
+                (click)="removeFile(i); $event.stopPropagation()"
+                type="button"
+              >
+                <fa-icon icon="times"></fa-icon>
+              </button>
+            </div>
+            <span class="file-name"
+              >{{ fileStatus.file.name | slice: 0 : 15 }}{{ fileStatus.file.name.length > 15 ? '...' : '' }}</span
+            >
+            <span class="file-size">{{ formatFileSize(fileStatus.file.size) }}</span>
+            <mat-progress-bar
+              *ngIf="fileStatus.status === 'uploading'"
+              mode="determinate"
+              [value]="fileStatus.progress"
+              class="upload-progress"
+            ></mat-progress-bar>
+            <span *ngIf="fileStatus.errorMessage" class="error-message">{{ fileStatus.errorMessage }}</span>
+          </div>
+        </div>
+      </div>
     </form>
   </div>
 
-  <mat-list>
-    <mat-list-item *ngFor="let entityNote of entityNotes; let i = index">
-      <fa-icon icon="sticky-note" matListIcon></fa-icon>
-      <h3 matLine>{{ entityNote.note }}</h3>
-      <p matLine>
-        <span
-          ><b>{{ 'labels.inputs.Created By' | translate }}:</b> {{ entityNote.createdByUsername }}</span
-        ><br />
-        <span
-          ><b>{{ 'labels.inputs.Date' | translate }}:</b> {{ entityNote.createdOn | dateFormat }}</span
-        >
-      </p>
-      <div fxLayout="row" fxLayoutAlign="flex-start">
-        <button mat-button color="primary" (click)="editNote(entityNote.id, entityNote.note, i)">
-          <fa-icon icon="edit"></fa-icon>
-        </button>
-        <button mat-button color="warn" (click)="deleteNote(entityNote.id, i)">
-          <fa-icon icon="trash"></fa-icon>
-        </button>
+  <mat-list class="notes-list">
+    <mat-list-item *ngFor="let entityNote of entityNotes; let i = index" class="note-item">
+      <fa-icon icon="sticky-note" matListIcon class="note-icon"></fa-icon>
+      <div matLine class="note-content-wrapper">
+        <div class="note-header" fxLayout="row" fxLayoutAlign="space-between start">
+          <div class="note-details">
+            <p class="note-text">{{ entityNote.note }}</p>
+            <p class="note-meta">
+              <span
+                ><b>{{ 'labels.inputs.Created By' | translate }}:</b> {{ entityNote.createdByUsername }}</span
+              >
+              <span class="meta-separator">|</span>
+              <span
+                ><b>{{ 'labels.inputs.Date' | translate }}:</b> {{ entityNote.createdOn | dateFormat }}</span
+              >
+            </p>
+          </div>
+          <div class="note-actions" fxLayout="row" fxLayoutAlign="flex-start">
+            <button mat-icon-button color="primary" (click)="editNote(entityNote.id, entityNote.note, i)">
+              <fa-icon icon="edit"></fa-icon>
+            </button>
+            <button mat-icon-button color="warn" (click)="deleteNote(entityNote.id, i)">
+              <fa-icon icon="trash"></fa-icon>
+            </button>
+          </div>
+        </div>
+        <!-- Documents attached to note -->
+        <div *ngIf="entityNote.documents && entityNote.documents.length > 0" class="note-documents">
+          <div class="documents-grid" fxLayout="row wrap" fxLayoutGap="12px">
+            <div *ngFor="let doc of entityNote.documents" class="document-item" (click)="openDocument(doc)">
+              <div class="document-preview">
+                <img
+                  *ngIf="isImageType(doc.type)"
+                  [src]="doc.presignedUrl"
+                  [alt]="doc.fileName"
+                  class="document-image"
+                />
+                <fa-icon
+                  *ngIf="!isImageType(doc.type)"
+                  [icon]="getFileIcon(doc.type)"
+                  size="2x"
+                  class="document-file-icon"
+                ></fa-icon>
+              </div>
+              <span class="document-name"
+                >{{ doc.fileName | slice: 0 : 15 }}{{ doc.fileName.length > 15 ? '...' : '' }}</span
+              >
+            </div>
+          </div>
+        </div>
       </div>
     </mat-list-item>
   </mat-list>

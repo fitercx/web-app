@@ -39,6 +39,8 @@ import {
   faEyeSlash,
   faFile,
   faFileAlt,
+  faFileImage,
+  faFilePdf,
   faFileUpload,
   faFileWord,
   faFillDrip,
@@ -112,7 +114,8 @@ import {
   faPause,
   faReceipt,
   faTableCells,
-  faSave
+  faSave,
+  faSpinner
 } from '@fortawesome/free-solid-svg-icons';
 
 /**
@@ -164,6 +167,8 @@ export class IconsModule {
       faEyeSlash,
       faFile,
       faFileAlt,
+      faFileImage,
+      faFilePdf,
       faFileUpload,
       faFileWord,
       faFileExcel,
@@ -237,7 +242,8 @@ export class IconsModule {
       faUndo,
       faReceipt,
       faTableCells,
-      faSave
+      faSave,
+      faSpinner
     );
   }
 }

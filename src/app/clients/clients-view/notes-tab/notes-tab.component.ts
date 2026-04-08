@@ -2,11 +2,15 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 
+/** rxjs Imports */
+import { switchMap, tap } from 'rxjs/operators';
+
 /** Custom Components */
 
 /** Custom Services */
 import { ClientsService } from '../../clients.service';
 import { AuthenticationService } from 'app/core/authentication/authentication.service';
+import { CreateNoteWithDocumentsRequest } from 'app/shared/models/file-upload.model';
 
 /**
  * Notes Tab Component
@@ -36,6 +40,7 @@ export class NotesTabComponent implements OnInit {
   ) {
     this.entityId = this.route.parent.snapshot.params['clientId'];
     this.addNote = this.addNote.bind(this);
+    this.addNoteWithDocuments = this.addNoteWithDocuments.bind(this);
   }
 
   ngOnInit(): void {
@@ -74,12 +79,36 @@ export class NotesTabComponent implements OnInit {
    */
   addNote(noteContent: any) {
     this.clientsService.createClientNote(this.entityId, noteContent).subscribe((response: any) => {
-      this.entityNotes.push({
+      this.entityNotes.unshift({
         id: response.resourceId,
         createdByUsername: this.username,
         createdOn: new Date(),
         note: noteContent.note
       });
     });
+  }
+
+  /**
+   * Creates a client note with document attachments.
+   * After creation, fetches the note with presigned URLs.
+   */
+  addNoteWithDocuments(noteData: CreateNoteWithDocumentsRequest) {
+    this.clientsService
+      .createClientNoteWithDocuments(this.entityId, noteData)
+      .pipe(
+        switchMap((response: any) => {
+          // After creating, fetch all notes to get the one with presigned URLs
+          return this.clientsService.getClientNotesWithDocuments(this.entityId).pipe(
+            tap((notes: any[]) => {
+              // Find the newly created note by resourceId
+              const createdNote = notes.find((n: any) => n.id === response.resourceId);
+              if (createdNote) {
+                this.entityNotes.unshift(createdNote);
+              }
+            })
+          );
+        })
+      )
+      .subscribe();
   }
 }
