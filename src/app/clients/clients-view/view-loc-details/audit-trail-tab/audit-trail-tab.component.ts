@@ -13,6 +13,7 @@ import { ActivatedRoute } from '@angular/router';
 export class AuditTrailTabComponent implements OnInit {
   /** Audit trail data */
   auditData: any = {};
+  currencyCode = '';
 
   /** Display columns for audit table */
   displayedColumns: string[] = [
@@ -41,6 +42,7 @@ export class AuditTrailTabComponent implements OnInit {
   private processAuditData(data: any): void {
     // Check if timeLineData exists and use it, otherwise fallback to direct properties
     const timelineData = data.timeLineData || data;
+    this.currencyCode = this.resolveCurrencyCode(data);
 
     // Extract audit information from timeLineData structure
     this.auditData = {
@@ -84,13 +86,13 @@ export class AuditTrailTabComponent implements OnInit {
     };
 
     // Build audit entries timeline
-    this.buildAuditEntries();
+    this.buildAuditEntries(data);
   }
 
   /**
    * Build audit entries for timeline display
    */
-  private buildAuditEntries(): void {
+  private buildAuditEntries(data: any): void {
     const entries: any[] = [];
 
     // Submission entry (from timeLineData)
@@ -189,10 +191,59 @@ export class AuditTrailTabComponent implements OnInit {
       });
     }
 
+    const blockedHistory = this.extractBlockedAmountHistory(data);
+    blockedHistory.forEach((item: any) => {
+      const isUnblock = item.action === 'unblockamount' || item.action === 'unblock';
+      const amountText = this.formatAmount(item.amount);
+      const noteText = item.note ? ` — Note: ${item.note}` : '';
+
+      entries.push({
+        date: item.actionDate,
+        action: isUnblock ? 'Blocked Amount Unblocked' : 'Blocked Amount Updated',
+        user: item.user || this.auditData.lastModifiedByUsername || 'System',
+        details: `${isUnblock ? 'Unblocked' : 'Blocked'} ${amountText}${noteText}`,
+        icon: isUnblock ? 'remove_circle' : 'account_balance_wallet',
+        color: isUnblock ? 'warn' : 'accent'
+      });
+    });
+
     // Sort entries by date (newest first)
     this.auditEntries = entries
       .filter((entry) => entry.date) // Only include entries with valid dates
       .sort((a, b) => b.date.getTime() - a.date.getTime());
+  }
+
+  private extractBlockedAmountHistory(data: any): any[] {
+    const history = data?.blockedAmountHistory || data?.blockAmountHistory || [];
+    if (!Array.isArray(history)) {
+      return [];
+    }
+
+    return history
+      .map((item: any) => ({
+        actionDate: this.parseDate(item.actionDate || item.date),
+        action: String(item.action || item.actionType || '').toLowerCase(),
+        amount: Number(item.amount || 0),
+        note: String(item.note || item.description || '').trim(),
+        user: item.user || item.maker || item.createdByUsername || item.lastModifiedByUsername || null
+      }))
+      .filter((item: any) => item.actionDate);
+  }
+
+  private resolveCurrencyCode(data: any): string {
+    if (typeof data?.currency === 'string') {
+      return data.currency;
+    }
+    return data?.currency?.code || data?.currencyCode || '';
+  }
+
+  private formatAmount(amount: number): string {
+    const numericAmount = Number.isFinite(amount) ? amount : 0;
+    const formatted = new Intl.NumberFormat(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    }).format(numericAmount);
+    return `${formatted}${this.currencyCode ? ` ${this.currencyCode}` : ''}`;
   }
 
   /**

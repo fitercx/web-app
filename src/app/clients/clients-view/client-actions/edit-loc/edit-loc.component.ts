@@ -2,7 +2,15 @@
 import { Component, OnInit, ViewChild, ChangeDetectorRef } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
-import { FormBuilder, FormGroup, Validators, AbstractControl, FormArray, ValidationErrors } from '@angular/forms';
+import {
+  FormBuilder,
+  FormGroup,
+  Validators,
+  AbstractControl,
+  FormArray,
+  ValidationErrors,
+  ValidatorFn
+} from '@angular/forms';
 import { MatStepper } from '@angular/material/stepper';
 import { of } from 'rxjs';
 import { delay } from 'rxjs/operators';
@@ -10,6 +18,7 @@ import { delay } from 'rxjs/operators';
 /** Custom Services */
 import { ClientsService } from '../../../clients.service';
 import { SettingsService } from 'app/settings/settings.service';
+import { nonNegativeWithPrecisionValidator } from 'app/clients/utils/amount-validation.util';
 
 /**
  * Edit LOC component.
@@ -107,6 +116,11 @@ export class EditLocComponent implements OnInit {
     } catch (e) {
       return '';
     }
+  }
+
+  get selectedCurrencyDecimalPlaces(): number {
+    const selected = this.currencyOptions.find((currency) => currency.code === this.selectedCurrencyCode);
+    return Number.isInteger(selected?.decimalPlaces) ? selected.decimalPlaces : 2;
   }
 
   // Savings accounts filtered by the currently selected currency code
@@ -223,7 +237,29 @@ export class EditLocComponent implements OnInit {
         'basicInfo',
         'currencyCode'
       ])
-      ?.valueChanges.subscribe(() => this.updateFilteredCharges());
+      ?.valueChanges.subscribe(() => {
+        this.updateFilteredCharges();
+        this.locForm
+          .get([
+            'limitsTerms',
+            'blockedAmount'
+          ])
+          ?.updateValueAndValidity();
+      });
+
+    this.locForm
+      .get([
+        'limitsTerms',
+        'maxCreditLimit'
+      ])
+      ?.valueChanges.subscribe(() => {
+        this.locForm
+          .get([
+            'limitsTerms',
+            'blockedAmount'
+          ])
+          ?.updateValueAndValidity();
+      });
 
     // Watch settlement account changes
     this.locForm.get('settlementSavingsAccountId')?.valueChanges.subscribe(() => this.onSettlementAccountChanged());
@@ -342,6 +378,7 @@ export class EditLocComponent implements OnInit {
 
       limitsTerms: {
         maxCreditLimit: loc.maximumAmount || loc.maxCreditLimit || '',
+        blockedAmount: loc.blockedAmount ?? 0,
         startDate: this.formatDateForInput(loc.startDate || loc.activationDate),
         expiryDate: this.formatDateForInput(loc.endDate || loc.expiryDate),
         reviewPeriod: loc.reviewPeriod || '6', // Default to 6 months if not set
@@ -612,6 +649,43 @@ export class EditLocComponent implements OnInit {
     return cleaned;
   }
 
+  private parseAmount(value: any): number | null {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : null;
+    }
+
+    const normalized = String(value).replace(/,/g, '').trim();
+    if (!normalized) {
+      return null;
+    }
+
+    const amount = Number(normalized);
+    return Number.isFinite(amount) ? amount : null;
+  }
+
+  blockedAmountWithinLimitValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
+    if (!control) {
+      return null;
+    }
+
+    const maxCreditLimit = this.parseAmount(control.parent?.get('maxCreditLimit')?.value);
+    const blockedAmount = this.parseAmount(control.value);
+
+    if (maxCreditLimit === null || blockedAmount === null) {
+      return null;
+    }
+
+    if (blockedAmount > maxCreditLimit) {
+      return { blockedAmountExceedsLimit: true };
+    }
+
+    return null;
+  };
+
   /**
    * Formats dates according to system settings
    * @param dates Object containing date fields to format
@@ -691,6 +765,13 @@ export class EditLocComponent implements OnInit {
         maxCreditLimit: [
           '',
           Validators.required
+        ],
+        blockedAmount: [
+          0,
+          [
+            nonNegativeWithPrecisionValidator(() => this.selectedCurrencyDecimalPlaces),
+            this.blockedAmountWithinLimitValidator
+          ]
         ],
         startDate: [''],
         expiryDate: [''],

@@ -16,6 +16,7 @@ import { delay } from 'rxjs/operators';
 import { MatStepper } from '@angular/material/stepper';
 import { ClientsService } from '../../../clients.service';
 import { SettingsService } from 'app/settings/settings.service';
+import { nonNegativeWithPrecisionValidator } from 'app/clients/utils/amount-validation.util';
 
 /**
  * Create LOC component.
@@ -112,6 +113,11 @@ export class CreateLocComponent implements OnInit {
     } catch (e) {
       return '';
     }
+  }
+
+  get selectedCurrencyDecimalPlaces(): number {
+    const selected = this.currencyOptions.find((currency) => currency.code === this.selectedCurrencyCode);
+    return Number.isInteger(selected?.decimalPlaces) ? selected.decimalPlaces : 2;
   }
 
   // Get display name for cash margin type
@@ -242,7 +248,29 @@ export class CreateLocComponent implements OnInit {
         'basicInfo',
         'currencyCode'
       ])
-      ?.valueChanges.subscribe(() => this.updateFilteredCharges());
+      ?.valueChanges.subscribe(() => {
+        this.updateFilteredCharges();
+        this.locForm
+          .get([
+            'limitsTerms',
+            'blockedAmount'
+          ])
+          ?.updateValueAndValidity();
+      });
+
+    this.locForm
+      .get([
+        'limitsTerms',
+        'maxCreditLimit'
+      ])
+      ?.valueChanges.subscribe(() => {
+        this.locForm
+          .get([
+            'limitsTerms',
+            'blockedAmount'
+          ])
+          ?.updateValueAndValidity();
+      });
 
     // read resolved currencies from route (resolved before page load)
     const currenciesResolved = this.route.snapshot.data['currencies'] || this.route.parent?.snapshot.data['currencies'];
@@ -368,6 +396,43 @@ export class CreateLocComponent implements OnInit {
           expiryDate: expiryDate
         }
       };
+    }
+
+    return null;
+  };
+
+  private parseAmount(value: any): number | null {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+
+    if (typeof value === 'number') {
+      return Number.isFinite(value) ? value : null;
+    }
+
+    const normalized = String(value).replace(/,/g, '').trim();
+    if (!normalized) {
+      return null;
+    }
+
+    const amount = Number(normalized);
+    return Number.isFinite(amount) ? amount : null;
+  }
+
+  blockedAmountWithinLimitValidator: ValidatorFn = (control: AbstractControl): ValidationErrors | null => {
+    if (!control) {
+      return null;
+    }
+
+    const maxCreditLimit = this.parseAmount(control.parent?.get('maxCreditLimit')?.value);
+    const blockedAmount = this.parseAmount(control.value);
+
+    if (maxCreditLimit === null || blockedAmount === null) {
+      return null;
+    }
+
+    if (blockedAmount > maxCreditLimit) {
+      return { blockedAmountExceedsLimit: true };
     }
 
     return null;
@@ -505,6 +570,13 @@ export class CreateLocComponent implements OnInit {
           maxCreditLimit: [
             '',
             Validators.required
+          ],
+          blockedAmount: [
+            0,
+            [
+              nonNegativeWithPrecisionValidator(() => this.selectedCurrencyDecimalPlaces),
+              this.blockedAmountWithinLimitValidator
+            ]
           ],
           // maxPerDrawdown field removed as per requirements
           startDate: [''],

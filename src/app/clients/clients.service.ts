@@ -4,6 +4,7 @@ import { HttpClient, HttpParams } from '@angular/common/http';
 
 /** rxjs Imports */
 import { Observable } from 'rxjs';
+import { UpdateBlockedAmountRequest } from './models/credit-line.model';
 /**
  * Clients service.
  */
@@ -401,6 +402,14 @@ export class ClientsService {
    */
   performLocAction(clientId: string, locId: string, action: string, actionData: any = {}) {
     return this.http.post(`/v1/clients/${clientId}/creditlines/${locId}/${action}`, actionData);
+  }
+
+  blockLocAmount(clientId: string, locId: string, payload: UpdateBlockedAmountRequest): Observable<any> {
+    return this.http.post(`/v1/clients/${clientId}/creditlines/${locId}/blockamount`, payload);
+  }
+
+  unblockLocAmount(clientId: string, locId: string, payload: UpdateBlockedAmountRequest): Observable<any> {
+    return this.http.post(`/v1/clients/${clientId}/creditlines/${locId}/unblockamount`, payload);
   }
 
   /**

@@ -138,12 +138,21 @@
 
     <ng-container matColumnDef="Credit Limit">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Credit Limit' | translate }}</th>
-      <td mat-cell *matCellDef="let element">{{ element.creditLimit | formatNumber }}</td>
+      <td mat-cell *matCellDef="let element">{{ element.creditLimit | currency: element.currency || '' }}</td>
+    </ng-container>
+
+    <ng-container matColumnDef="Blocked Amount">
+      <th mat-header-cell class="r-amount" *matHeaderCellDef>Blocked Amount</th>
+      <td mat-cell class="r-amount" *matCellDef="let element">
+        {{ element.blockedAmount || 0 | currency: element.currency || '' }}
+      </td>
     </ng-container>
 
     <ng-container matColumnDef="Available Balance">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Available Balance' | translate }}</th>
-      <td mat-cell class="r-amount" *matCellDef="let element">{{ element.availableBalance | formatNumber }}</td>
+      <td mat-cell class="r-amount" *matCellDef="let element">
+        {{ element.availableBalance | currency: element.currency || '' }}
+      </td>
     </ng-container>
 
     <ng-container matColumnDef="Type">
@@ -160,7 +169,7 @@
         {{ 'labels.inputs.Outstanding/Utilization' | translate }}
       </th>
       <td mat-cell class="r-amount" *matCellDef="let element">
-        {{ element.outstanding | formatNumber }}
+        {{ element.outstanding | currency: element.currency || '' }}
         <span class="utilization-text">({{ element.utilization }}%)</span>
       </td>
     </ng-container>

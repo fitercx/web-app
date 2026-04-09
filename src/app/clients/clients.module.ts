@@ -67,6 +67,7 @@ import { ManageApprovedBuyersDialogComponent } from './clients-view/manage-appro
 import { BulkDisburseDialogComponent } from './clients-view/view-loc-details/active-loans-tab/bulk-disburse-dialog/bulk-disburse-dialog.component';
 import { BulkDisburseResultsDialogComponent } from './clients-view/view-loc-details/active-loans-tab/bulk-disburse-results-dialog/bulk-disburse-results-dialog.component';
 import { BulkDisburseLoadingDialogComponent } from './clients-view/view-loc-details/active-loans-tab/bulk-disburse-loading-dialog/bulk-disburse-loading-dialog.component';
+import { EditBlockedAmountDialogComponent } from './clients-view/view-loc-details/edit-blocked-amount-dialog/edit-blocked-amount-dialog.component';
 
 /**
  * Clients Module
@@ -139,7 +140,8 @@ import { BulkDisburseLoadingDialogComponent } from './clients-view/view-loc-deta
     ManageApprovedBuyersDialogComponent,
     BulkDisburseDialogComponent,
     BulkDisburseResultsDialogComponent,
-    BulkDisburseLoadingDialogComponent
+    BulkDisburseLoadingDialogComponent,
+    EditBlockedAmountDialogComponent
   ],
   providers: []
 })
