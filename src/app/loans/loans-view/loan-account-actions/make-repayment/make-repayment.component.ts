@@ -3,6 +3,10 @@ import { Component, OnInit, Input } from '@angular/core';
 import { UntypedFormGroup, UntypedFormBuilder, Validators, UntypedFormControl } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
 
+/** RxJS Imports */
+import { of } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
+
 /** Custom Services */
 import { LoansService } from 'app/loans/loans.service';
 import { SettingsService } from 'app/settings/settings.service';
@@ -27,13 +31,22 @@ export class MakeRepaymentComponent implements OnInit {
   showPaymentDetails = false;
   /** Minimum Date allowed. */
   minDate = new Date(2000, 0, 1);
-  /** Maximum Date allowed. */
+  /** Maximum Date allowed — extended 1 year ahead to allow future repayment date selection. */
   maxDate = new Date();
   /** Repayment Loan Form */
   repaymentLoanForm: UntypedFormGroup;
   currency: Currency | null = null;
 
   penaltyTemplate: Number;
+
+  /**
+   * Baseline principal/interest outstanding captured from the resolver's initial
+   * penalty template (loaded for business date). The /template/penalties endpoint
+   * returns 0 for these fields when no installment falls on the selected future date,
+   * so we always fall back to these resolver-loaded values for display.
+   */
+  private baselinePrincipalOutstanding: number = 0;
+  private baselineInterestOutstanding: number = 0;
 
   /**
    * @param {FormBuilder} formBuilder Form Builder.
@@ -58,11 +71,19 @@ export class MakeRepaymentComponent implements OnInit {
    * and initialize with the required values
    */
   ngOnInit() {
-    this.maxDate = this.settingsService.businessDate;
+    const businessDate = this.settingsService.businessDate;
+    this.maxDate = new Date(businessDate);
+    this.maxDate.setFullYear(this.maxDate.getFullYear() + 1);
     this.createRepaymentLoanForm();
     this.setRepaymentLoanDetails();
     if (this.dataObject.repaymentTemplate.currency) {
       this.currency = this.dataObject.repaymentTemplate.currency;
+    }
+
+    // Capture resolver-loaded outstanding amounts as baseline fallback values.
+    if (this.dataObject.penaltyTemplate) {
+      this.baselinePrincipalOutstanding = this.dataObject.penaltyTemplate.principalOutstanding || 0;
+      this.baselineInterestOutstanding = this.dataObject.penaltyTemplate.interestOutstanding || 0;
     }
 
     this.repaymentLoanForm.get('transactionDate')?.valueChanges.subscribe((newDate: Date) => {
@@ -141,21 +162,41 @@ export class MakeRepaymentComponent implements OnInit {
   }
 
   private refreshPenaltyTemplate(transactionDate: string): void {
-    this.loanService.getLoanPenaltiesTemplate(this.loanId, transactionDate).subscribe((template) => {
-      this.dataObject.penaltyTemplate = template;
+    const businessDate = this.settingsService.businessDate;
+    const selectedDate = this.dateUtils.parseDate(transactionDate);
+    const isFutureDate = selectedDate && businessDate && selectedDate.getTime() > businessDate.getTime();
 
-      // Calculate the total transaction amount using the correct property names
-      const principalAmount = template.principalOutstanding || 0;
-      const interestAmount = template.interestOutstanding || 0;
-      const feesAmount = this.dataObject.repaymentTemplate.feeChargesPortion || 0;
-      const penaltyAmount = template.penaltyAmountDue || 0;
+    this.loanService
+      .getLoanPenaltiesTemplate(this.loanId, transactionDate)
+      .pipe(
+        switchMap((template: any) => {
+          this.dataObject.penaltyTemplate = template;
+          if (isFutureDate) {
+            return this.loanService
+              .getFutureLPICharges(this.loanId, transactionDate)
+              .pipe(switchMap((futureLPI: any) => of({ template, futureLPI })));
+          }
+          return of({ template, futureLPI: null as any });
+        })
+      )
+      .subscribe(({ template, futureLPI }: { template: any; futureLPI: any }) => {
+        // /template/penalties returns 0 for principal/interest when no installment falls
+        // on the selected date (always the case for future dates). Fall back to the
+        // baseline values captured from the resolver so the display stays correct.
+        const principalAmount = template.principalOutstanding || this.baselinePrincipalOutstanding;
+        const interestAmount = template.interestOutstanding || this.baselineInterestOutstanding;
+        const feesAmount = this.dataObject.repaymentTemplate.feeChargesPortion || 0;
+        const penaltyAmount = template.penaltyAmountDue || 0;
+        const additionalLPIAmount = Number(futureLPI?.totalLPIAmount || 0);
 
-      const totalAmount = principalAmount + interestAmount + feesAmount + penaltyAmount;
+        this.dataObject.penaltyTemplate.principalOutstanding = principalAmount;
+        this.dataObject.penaltyTemplate.interestOutstanding = interestAmount;
+        this.dataObject.penaltyTemplate.penaltyAmountDue = penaltyAmount + additionalLPIAmount;
 
-      // Update the transaction amount in the form with 2 decimal places
-      this.repaymentLoanForm.patchValue({
-        transactionAmount: Math.round(totalAmount * 100) / 100
+        const totalAmount = principalAmount + interestAmount + feesAmount + penaltyAmount + additionalLPIAmount;
+        this.repaymentLoanForm.patchValue({
+          transactionAmount: Math.round(totalAmount * 100) / 100
+        });
       });
-    });
   }
 }
