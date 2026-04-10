@@ -293,8 +293,10 @@
       "Home": "Home"
     },
     "buttons": {
-      "Increase Credit Limit LOC": "Increase Credit Limit",
-      "Decrease Credit Limit LOC": "Decrease Credit Limit",
+      "Increase Credit Limit LOC": "Increase New Available Balance",
+      "Decrease Credit Limit LOC": "Decrease New Available Balance",
+      "Increase New Available Balance LOC": "Increase New Available Balance",
+      "Decrease New Available Balance LOC": "Decrease New Available Balance",
       "Reactivate LOC": "Reactivate",
       "Deactivate LOC": "Deactivate",
       "Activate LOC": "Activate",
