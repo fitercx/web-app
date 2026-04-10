@@ -541,7 +541,10 @@ export class ViewLocDetailsComponent implements OnInit {
    */
   private openLimitActionDialog(action: string): void {
     const actionTitle = this.getLimitActionTitle(action);
-    const amountLabel = action === 'increasecreditlimit' ? 'Increase Amount' : 'Decrease Amount';
+    const amountLabel =
+      action === 'increasecreditlimit'
+        ? 'Enter new available balance'
+        : 'Enter amount to decrease from available balance';
 
     const dialogRef = this.dialog.open(FormDialogComponent, {
       data: {
@@ -616,8 +619,8 @@ export class ViewLocDetailsComponent implements OnInit {
    */
   private getLimitActionTitle(action: string): string {
     const titles: { [key: string]: string } = {
-      increasecreditlimit: 'Increase Credit Limit',
-      decreasecreditlimit: 'Decrease Credit Limit'
+      increasecreditlimit: 'Increase New Available Balance',
+      decreasecreditlimit: 'Decrease New Available Balance'
     };
     return titles[action] || action;
   }
