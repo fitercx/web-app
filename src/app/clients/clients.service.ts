@@ -413,6 +413,17 @@ export class ClientsService {
   }
 
   /**
+   * Adjust credit limit for a line of credit
+   * POST /v1/clients/{clientId}/creditlines/{lineOfCreditId}/adjustcreditlimit
+   * @param clientId Client Id
+   * @param locId LOC Id
+   * @param payload Payload with locale, dateFormat, actionDate, and amount
+   */
+  adjustCreditLimit(clientId: string, locId: string, payload: any): Observable<any> {
+    return this.http.post(`/v1/clients/${clientId}/creditlines/${locId}/adjustcreditlimit`, payload);
+  }
+
+  /**
    * GET /v1/lineofcredits/{locId}/charges
    * Get all charges for a line of credit
    */
