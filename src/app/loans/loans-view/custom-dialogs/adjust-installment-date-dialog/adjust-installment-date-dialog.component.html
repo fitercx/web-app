@@ -63,6 +63,20 @@
       </mat-form-field>
     </div>
 
+    <div class="date-field-wrapper">
+      <mat-checkbox formControlName="adjustWithInterestRecalculation" color="primary">
+        {{ 'labels.text.Adjust with recalculation of interest' | translate }}
+      </mat-checkbox>
+      <p class="recalc-hint">
+        <small>
+          {{
+            'labels.text.When enabled the schedule is regenerated and interest is recalculated from the selected installment onwards, following the same approach as Loan Reschedule > Change Repayment Date.'
+              | translate
+          }}
+        </small>
+      </p>
+    </div>
+
     <div class="info-box m-t-10">
       <mat-icon class="info-icon">info</mat-icon>
       <p class="info-text">
@@ -74,7 +88,13 @@
             'labels.text.When you adjust an installment date, all subsequent installments will be automatically shifted by the same number of days'
               | translate
           }}<br />
-          • {{ 'labels.text.emi amount unchanged' | translate }}
+          <ng-container *ngIf="!adjustDateForm.get('adjustWithInterestRecalculation')?.value">
+            • {{ 'labels.text.emi amount unchanged' | translate }}
+          </ng-container>
+          <ng-container *ngIf="adjustDateForm.get('adjustWithInterestRecalculation')?.value">
+            •
+            {{ 'labels.text.EMI and interest will be recalculated from the selected installment onwards' | translate }}
+          </ng-container>
         </small>
       </p>
     </div>

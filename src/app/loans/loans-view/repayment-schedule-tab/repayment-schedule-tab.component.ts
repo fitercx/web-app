@@ -1108,12 +1108,13 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       if (result) {
         const locale = this.settingsService.language.code;
         const dateFormat = this.settingsService.dateFormat;
-        const payload = {
+        const payload: any = {
           installmentNumber: installment.period,
           newDueDate: this.dateUtils.formatDate(result.newDueDate, dateFormat),
           adjustmentDate: this.dateUtils.formatDate(this.settingsService.businessDate, dateFormat),
           dateFormat,
-          locale
+          locale,
+          adjustWithInterestRecalculation: !!result.adjustWithInterestRecalculation
         };
 
         this.loansService.adjustInstallmentDate(this.loanDetailsData.id, payload).subscribe({
@@ -1208,12 +1209,13 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       if (result) {
         const locale = this.settingsService.language.code;
         const dateFormat = this.settingsService.dateFormat;
-        const payload = {
+        const payload: any = {
           installmentNumber: result.installmentNumber,
           newDueDate: this.dateUtils.formatDate(result.newDueDate, dateFormat),
           adjustmentDate: this.dateUtils.formatDate(this.settingsService.businessDate, dateFormat),
           dateFormat,
-          locale
+          locale,
+          adjustWithInterestRecalculation: !!result.adjustWithInterestRecalculation
         };
 
         this.loansService.adjustInstallmentDate(this.loanDetailsData.id, payload).subscribe({
