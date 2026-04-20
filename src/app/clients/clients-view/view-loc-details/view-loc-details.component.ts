@@ -346,11 +346,8 @@ export class ViewLocDetailsComponent implements OnInit {
       case 'Close':
         this.openActionDialog('close');
         break;
-      case 'Increase Limit':
-        this.openLimitActionDialog('increasecreditlimit');
-        break;
-      case 'Decrease Limit':
-        this.openLimitActionDialog('decreasecreditlimit');
+      case 'Update Approved Facility Limit':
+        this.openUpdateApprovedFacilityLimitDialog();
         break;
       case 'Edit Blocked Amount':
         this.openEditBlockedAmountDialog();
@@ -537,15 +534,9 @@ export class ViewLocDetailsComponent implements OnInit {
   }
 
   /**
-   * Open action dialog with date, amount and note fields for limit actions
+   * Open dialog for updating approved facility limit
    */
-  private openLimitActionDialog(action: string): void {
-    const actionTitle = this.getLimitActionTitle(action);
-    const amountLabel =
-      action === 'increasecreditlimit'
-        ? 'Enter new available balance'
-        : 'Enter amount to decrease from available balance';
-
+  private openUpdateApprovedFacilityLimitDialog(): void {
     const dialogRef = this.dialog.open(FormDialogComponent, {
       data: {
         formfields: [
@@ -559,7 +550,7 @@ export class ViewLocDetailsComponent implements OnInit {
           }),
           new InputBase({
             controlName: 'amount',
-            label: amountLabel,
+            label: 'New Approved Facility Limit',
             value: '',
             required: true,
             order: 2,
@@ -581,7 +572,7 @@ export class ViewLocDetailsComponent implements OnInit {
 
         ],
         layout: {
-          addButtonText: `${actionTitle} LOC`,
+          addButtonText: 'Update Approved Facility Limit',
           cancelButtonText: 'Cancel'
         },
         pristine: false
@@ -593,8 +584,8 @@ export class ViewLocDetailsComponent implements OnInit {
     dialogRef.afterClosed().subscribe((response: any) => {
       if (response && response.data) {
         const formValue = response.data.value;
-        const payload = this.buildLimitActionPayload(action, formValue.actionDate, formValue.amount, formValue.note);
-        this.performLocAction(action, payload);
+        const payload = this.buildAdjustCreditLimitPayload(formValue.actionDate, formValue.amount);
+        this.performAdjustCreditLimit(payload);
       }
     });
   }
@@ -615,14 +606,38 @@ export class ViewLocDetailsComponent implements OnInit {
   }
 
   /**
-   * Get action title for limit actions
+   * Build payload for adjust credit limit action
    */
-  private getLimitActionTitle(action: string): string {
-    const titles: { [key: string]: string } = {
-      increasecreditlimit: 'Increase New Available Balance',
-      decreasecreditlimit: 'Decrease New Available Balance'
+  private buildAdjustCreditLimitPayload(actionDate: Date, amount: number): any {
+    const formattedDate = this.formatDateForPayload(actionDate);
+    return {
+      locale: this.locale,
+      dateFormat: this.dateFormat,
+      actionDate: formattedDate,
+      amount: String(amount)
     };
-    return titles[action] || action;
+  }
+
+  /**
+   * Perform adjust credit limit API call
+   */
+  private performAdjustCreditLimit(payload: any): void {
+    this.clientsService.adjustCreditLimit(this.clientId, this.locId, payload).subscribe(
+      (response: any) => {
+        this.alertService.alert({
+          type: 'Line of Credit',
+          message: 'Approved Facility Limit updated successfully'
+        });
+        this.refreshLocData();
+      },
+      (error: any) => {
+        console.error('Adjust credit limit failed:', error);
+        this.alertService.alert({
+          type: 'Line of Credit',
+          message: this.extractApiErrorMessage(error)
+        });
+      }
+    );
   }
 
   /**
@@ -651,26 +666,6 @@ export class ViewLocDetailsComponent implements OnInit {
       locale: this.locale,
       dateFormat: this.dateFormat,
       [dateFieldName]: formattedDate
-    };
-
-    if (note && note.trim()) {
-      payload.note = note.trim();
-    }
-
-    return payload;
-  }
-
-  /**
-   * Build payload for LOC limit actions with locale, dateFormat, date and amount
-   */
-  private buildLimitActionPayload(action: string, actionDate: Date, amount: number, note?: string): any {
-    const formattedDate = this.formatDateForPayload(actionDate);
-
-    const payload: any = {
-      locale: this.locale,
-      dateFormat: this.dateFormat,
-      actionDate: formattedDate,
-      amount: amount
     };
 
     if (note && note.trim()) {

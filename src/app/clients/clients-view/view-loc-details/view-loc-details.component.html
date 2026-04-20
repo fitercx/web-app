@@ -212,18 +212,16 @@
           {{ 'labels.buttons.Reactivate' | translate }}
         </button>
 
-        <!-- Actions for limit changes (available only for ACTIVE) -->
-        <button mat-menu-item (click)="doAction('Increase Limit')" *ngIf="locDetails?.status?.code === 'status.active'">
+        <!-- Action for updating approved facility limit (available only for ACTIVE) -->
+        <button
+          mat-menu-item
+          (click)="doAction('Update Approved Facility Limit')"
+          *ngIf="locDetails?.status?.code === 'status.active'"
+        >
           <mat-icon matListIcon>
-            <fa-icon icon="arrow-up" size="sm"></fa-icon>
+            <fa-icon icon="edit" size="sm"></fa-icon>
           </mat-icon>
-          {{ 'labels.buttons.Increase Limit' | translate }}
-        </button>
-        <button mat-menu-item (click)="doAction('Decrease Limit')" *ngIf="locDetails?.status?.code === 'status.active'">
-          <mat-icon matListIcon>
-            <fa-icon icon="arrow-down" size="sm"></fa-icon>
-          </mat-icon>
-          {{ 'labels.buttons.Decrease Limit' | translate }}
+          Update Approved Facility Limit
         </button>
         <ng-container *mifosxHasPermission="'UPDATE_CREDITLINE'">
           <button mat-menu-item (click)="doAction('Edit Blocked Amount')" *ngIf="canEditBlockedAmount()">
