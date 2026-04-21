@@ -30,13 +30,20 @@
           (drop)="onFileDrop($event)"
           (click)="fileInput.click()"
         >
-          <input #fileInput type="file" accept="image/*" multiple hidden (change)="onFilesSelected($event)" />
+          <input
+            #fileInput
+            type="file"
+            accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
+            multiple
+            hidden
+            (change)="onFilesSelected($event)"
+          />
           <div class="drop-zone-content" fxLayout="column" fxLayoutAlign="center center" fxLayoutGap="8px">
             <fa-icon icon="cloud-upload-alt" size="2x" class="upload-icon"></fa-icon>
             <span class="drop-zone-text">{{
-              'labels.text.Drag and drop images here or click to browse' | translate
+              'labels.text.Drag and drop files here or click to browse' | translate
             }}</span>
-            <span class="drop-zone-hint">{{ 'labels.text.Supports: JPG, PNG, GIF, WEBP' | translate }}</span>
+            <span class="drop-zone-hint">{{ 'labels.text.Supports: Images, PDF, Word, Excel, CSV' | translate }}</span>
           </div>
         </div>
 
@@ -50,11 +57,14 @@
           >
             <div class="preview-image-container">
               <img
-                *ngIf="fileStatus.previewUrl"
+                *ngIf="fileStatus.previewUrl && isImageType(fileStatus.file.type)"
                 [src]="fileStatus.previewUrl"
                 [alt]="fileStatus.file.name"
                 class="preview-image"
               />
+              <div *ngIf="!isImageType(fileStatus.file.type)" class="file-icon-container">
+                <fa-icon [icon]="getFileIcon(fileStatus.file.type)" size="3x" class="file-type-icon"></fa-icon>
+              </div>
               <div class="file-status-overlay" [ngClass]="fileStatus.status">
                 <fa-icon *ngIf="fileStatus.status === 'pending'" icon="clock" class="status-icon"></fa-icon>
                 <fa-icon
@@ -123,14 +133,15 @@
               >
             </p>
           </div>
-          <div class="note-actions" fxLayout="row" fxLayoutAlign="flex-start">
+          <!-- Edit and Delete buttons are disabled -->
+          <!-- <div class="note-actions" fxLayout="row" fxLayoutAlign="flex-start">
             <button mat-icon-button color="primary" (click)="editNote(entityNote.id, entityNote.note, i)">
               <fa-icon icon="edit"></fa-icon>
             </button>
             <button mat-icon-button color="warn" (click)="deleteNote(entityNote.id, i)">
               <fa-icon icon="trash"></fa-icon>
             </button>
-          </div>
+          </div> -->
         </div>
         <!-- Documents attached to note -->
         <div *ngIf="entityNote.documents && entityNote.documents.length > 0" class="note-documents">
