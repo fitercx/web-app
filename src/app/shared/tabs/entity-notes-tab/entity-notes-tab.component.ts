@@ -40,11 +40,25 @@ export class EntityNotesTabComponent implements OnInit {
   /** File upload properties */
   selectedFiles: FileUploadStatus[] = [];
   isDragOver = false;
-  acceptedImageTypes = [
+  acceptedFileTypes = [
+    // Images
     'image/jpeg',
     'image/png',
     'image/gif',
-    'image/webp'
+    'image/webp',
+    // PDF
+    'application/pdf',
+    // Microsoft Word
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    // Microsoft Excel
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    // CSV
+    'text/csv',
+    'application/csv',
+    // Text
+    'text/plain'
   ];
 
   constructor(
@@ -204,7 +218,7 @@ export class EntityNotesTabComponent implements OnInit {
 
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i];
-      if (this.isValidImageFile(file)) {
+      if (this.isValidFile(file)) {
         validFiles.push(file);
       }
     }
@@ -213,7 +227,7 @@ export class EntityNotesTabComponent implements OnInit {
       return;
     }
 
-    // Create file status objects and generate previews
+    // Create file status objects and generate previews for images only
     const newFileStatuses: FileUploadStatus[] = validFiles.map((file) => {
       const fileStatus: FileUploadStatus = {
         uploadCorrelationId: this.s3Service.generateCorrelationId(),
@@ -223,8 +237,10 @@ export class EntityNotesTabComponent implements OnInit {
         previewUrl: undefined
       };
 
-      // Generate preview
-      this.generatePreview(file, fileStatus);
+      // Generate preview only for image files
+      if (this.isImageType(file.type)) {
+        this.generatePreview(file, fileStatus);
+      }
 
       return fileStatus;
     });
@@ -240,10 +256,10 @@ export class EntityNotesTabComponent implements OnInit {
   }
 
   /**
-   * Validate if file is an accepted image type
+   * Validate if file is an accepted file type
    */
-  private isValidImageFile(file: File): boolean {
-    return this.acceptedImageTypes.includes(file.type);
+  private isValidFile(file: File): boolean {
+    return this.acceptedFileTypes.includes(file.type);
   }
 
   /**
@@ -404,8 +420,23 @@ export class EntityNotesTabComponent implements OnInit {
    * Get icon for non-image file types
    */
   getFileIcon(contentType: string): string {
-    if (contentType && contentType.includes('pdf')) {
+    if (!contentType) {
+      return 'file-alt';
+    }
+    if (contentType.includes('pdf')) {
       return 'file-pdf';
+    }
+    if (contentType.includes('word') || contentType.includes('document')) {
+      return 'file-word';
+    }
+    if (contentType.includes('excel') || contentType.includes('spreadsheet')) {
+      return 'file-excel';
+    }
+    if (contentType.includes('csv') || contentType === 'text/csv') {
+      return 'file-csv';
+    }
+    if (contentType.includes('text/plain')) {
+      return 'file-alt';
     }
     return 'file-alt';
   }
