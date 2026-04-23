@@ -41,7 +41,8 @@ export class AdjustInstallmentDateDialogComponent implements OnInit {
       newDueDate: [
         '',
         Validators.required
-      ]
+      ],
+      adjustWithInterestRecalculation: [false]
     });
 
     // When installment is selected, pre-fill the new due date
@@ -67,7 +68,8 @@ export class AdjustInstallmentDateDialogComponent implements OnInit {
       const formValue = this.adjustDateForm.value;
       this.dialogRef.close({
         installmentNumber: formValue.installmentNumber,
-        newDueDate: formValue.newDueDate
+        newDueDate: formValue.newDueDate,
+        adjustWithInterestRecalculation: !!formValue.adjustWithInterestRecalculation
       });
     }
   }

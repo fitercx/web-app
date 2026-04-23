@@ -95,6 +95,11 @@ form {
   margin-left: 6px;
 }
 
+.recalc-hint {
+  margin: 4px 0 0 30px;
+  color: #616161;
+}
+
 // Ensure labels are always visible and readable
 ::ng-deep .mat-form-field-appearance-outline {
   .mat-form-field-label {
