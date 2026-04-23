@@ -167,6 +167,11 @@ export class ActiveLoansTabComponent implements OnInit {
         ap.approvedPayableAmount;
       out.invoiceAmountInAED =
         out.invoiceAmountInAED ?? extra.invoiceAmountInAED ?? extraAp.invoiceAmountInAED ?? ap.invoiceAmountInAED;
+      out.disburseInInvoiceCurrency =
+        out.disburseInInvoiceCurrency ??
+        extra.disburseInInvoiceCurrency ??
+        extraAp.disburseInInvoiceCurrency ??
+        ap.disburseInInvoiceCurrency;
     } else {
       out.originalLoan = out.originalLoan ?? out.principal;
       out.invoiceNumber = out.invoiceNumber ?? ap.invoiceNumber ?? ap.invoiceNo;
@@ -183,6 +188,7 @@ export class ActiveLoansTabComponent implements OnInit {
       out.approvedReceivableAmount = out.approvedReceivableAmount ?? ap.approvedReceivableAmount;
       out.approvedPayableAmount = out.approvedPayableAmount ?? ap.approvedPayableAmount;
       out.invoiceAmountInAED = out.invoiceAmountInAED ?? ap.invoiceAmountInAED;
+      out.disburseInInvoiceCurrency = out.disburseInInvoiceCurrency ?? ap.disburseInInvoiceCurrency;
     }
     // Common fallbacks
     out.amountPaid = out.amountPaid ?? out.summary?.totalRepayment ?? out.summary?.totalRepaymentDerived;
@@ -227,6 +233,51 @@ export class ActiveLoansTabComponent implements OnInit {
    * @param element The loan account element
    * @returns The outstanding balance amount
    */
+  /**
+   * Gets the formatted disbursed amount display string.
+   * Handles disburseInInvoiceCurrency flag to show amount in correct currency.
+   * @param element The loan account element
+   * @returns Formatted disbursed amount with currency
+   */
+  getDisbursedAmountDisplay(element: any): string {
+    const ap = element.additionalProperties || {};
+    const disburseInInvoiceCurrency = element.disburseInInvoiceCurrency ?? ap.disburseInInvoiceCurrency;
+    const invoiceCurrency = element.invoiceCurrency ?? ap.invoiceCurrency;
+    const exchangeRate = element.exchangeRate ?? ap.exchangeRate ?? 1;
+    const markup = element.markup ?? ap.markup ?? 0;
+    const originalLoan = element.originalLoan ?? element.principal;
+
+    // If no original loan amount, return placeholder
+    if (originalLoan == null) {
+      return '-';
+    }
+
+    if (disburseInInvoiceCurrency && invoiceCurrency && exchangeRate) {
+      // Convert from facility currency (AED) back to invoice currency
+      const effectiveRate = exchangeRate + markup;
+      const amountInInvoiceCurrency = effectiveRate > 0 ? originalLoan / effectiveRate : originalLoan;
+      return this.formatAmount(amountInInvoiceCurrency) + ' ' + invoiceCurrency;
+    }
+
+    // Default: show in facility currency (AED)
+    return this.formatAmount(originalLoan) + ' ' + (this.locCurrency || 'AED');
+  }
+
+  /**
+   * Formats a number as a currency amount with thousands separator and 3 decimal places.
+   * @param amount The amount to format
+   * @returns Formatted amount string
+   */
+  private formatAmount(amount: number): string {
+    if (amount == null || Number.isNaN(amount)) {
+      return '-';
+    }
+    return amount.toLocaleString('en-US', {
+      minimumFractionDigits: 3,
+      maximumFractionDigits: 3
+    });
+  }
+
   getOutstandingBalance(element: any): number {
     // If loan is overpaid, show 0
     if (element.status?.overpaid) {
