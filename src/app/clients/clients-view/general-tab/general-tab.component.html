@@ -350,16 +350,24 @@
               <ng-container matColumnDef="Disbursed Amount">
                 <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Disbursed Amount' | translate }}</th>
                 <td mat-cell *matCellDef="let loan" (click)="navigateToLoan(loan.id, $event)">
-                  {{
-                    loan.additionalProperties?.disburseInInvoiceCurrency
-                      ? ((loan.isFactorRateEnabled ? loan.factorRateLoanAmount : loan.originalLoan) /
-                          (loan.additionalProperties?.markup + loan.additionalProperties?.exchangeRate)
-                          | formatNumber) +
-                        ' ' +
-                        loan.additionalProperties?.invoiceCurrency
-                      : ((loan.isFactorRateEnabled ? loan.factorRateLoanAmount : loan.originalLoan) | formatNumber) +
-                        ' AED'
-                  }}
+                  <ng-container
+                    *ngIf="
+                      (loan.isFactorRateEnabled ? loan.factorRateLoanAmount : loan.originalLoan) != null;
+                      else noDisbursedAmount
+                    "
+                  >
+                    {{
+                      loan.additionalProperties?.disburseInInvoiceCurrency
+                        ? ((loan.isFactorRateEnabled ? loan.factorRateLoanAmount : loan.originalLoan) /
+                            ((loan.additionalProperties?.markup || 0) + (loan.additionalProperties?.exchangeRate || 1))
+                            | formatNumber) +
+                          ' ' +
+                          loan.additionalProperties?.invoiceCurrency
+                        : ((loan.isFactorRateEnabled ? loan.factorRateLoanAmount : loan.originalLoan) | formatNumber) +
+                          ' AED'
+                    }}
+                  </ng-container>
+                  <ng-template #noDisbursedAmount>-</ng-template>
                 </td>
               </ng-container>
 
@@ -646,7 +654,15 @@
     <ng-container matColumnDef="Loan Amount">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Loan Amount' | translate }}</th>
       <td mat-cell *matCellDef="let element">
-        {{ (element.isFactorRateEnabled ? element.factorRateLoanAmount : element.originalLoan) | formatNumber }}
+        <ng-container
+          *ngIf="(element.isFactorRateEnabled ? element.factorRateLoanAmount : element.originalLoan) != null"
+        >
+          {{ (element.isFactorRateEnabled ? element.factorRateLoanAmount : element.originalLoan) | formatNumber }}
+        </ng-container>
+        <ng-container
+          *ngIf="(element.isFactorRateEnabled ? element.factorRateLoanAmount : element.originalLoan) == null"
+          >-</ng-container
+        >
       </td>
     </ng-container>
 
@@ -914,7 +930,15 @@
     <ng-container matColumnDef="Loan Amount">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Loan Amount' | translate }}</th>
       <td mat-cell *matCellDef="let element">
-        {{ (element.isFactorRateEnabled ? element.factorRateLoanAmount : element.originalLoan) | formatNumber }}
+        <ng-container
+          *ngIf="(element.isFactorRateEnabled ? element.factorRateLoanAmount : element.originalLoan) != null"
+        >
+          {{ (element.isFactorRateEnabled ? element.factorRateLoanAmount : element.originalLoan) | formatNumber }}
+        </ng-container>
+        <ng-container
+          *ngIf="(element.isFactorRateEnabled ? element.factorRateLoanAmount : element.originalLoan) == null"
+          >-</ng-container
+        >
       </td>
     </ng-container>
 
