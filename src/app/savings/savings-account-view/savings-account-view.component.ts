@@ -38,6 +38,7 @@ export class SavingsAccountViewComponent implements OnInit {
   entityType: string;
 
   isActive = false;
+  isReadOnlyClosedAccount = false;
   currency: Currency;
 
   /**
@@ -76,9 +77,19 @@ export class SavingsAccountViewComponent implements OnInit {
    */
   setConditionalButtons() {
     const status = this.savingsAccountData.status.value;
-    this.isActive = status === 'Active';
+    // Keep tabs visible for view-only statuses such as Closed; hide only for pre-activation states.
+    this.isActive =
+      !this.savingsAccountData.status.rejected && !this.savingsAccountData.status.submittedAndPendingApproval;
+    this.isReadOnlyClosedAccount = !!this.savingsAccountData.status?.closed;
     const subStatus = this.savingsAccountData.subStatus;
     this.buttonConfig = new SavingsButtonsConfiguration(status, subStatus);
+
+    if (this.isReadOnlyClosedAccount) {
+      this.buttonConfig.buttonsArray = [];
+      this.buttonConfig.optionArray = [];
+      return;
+    }
+
     if (this.savingsAccountData.clientId) {
       const transferFundsAction = {
         name: 'Transfer Funds',
