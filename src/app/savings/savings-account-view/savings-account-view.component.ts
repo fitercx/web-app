@@ -86,7 +86,7 @@ export class SavingsAccountViewComponent implements OnInit {
 
     if (this.isReadOnlyClosedAccount) {
       this.buttonConfig.buttonsArray = [];
-      this.buttonConfig.optionArray = [];
+      (this.buttonConfig as any).optionArray = undefined;
       return;
     }
 
