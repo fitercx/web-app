@@ -164,6 +164,25 @@ export class LoansService {
   }
 
   /**
+   * Payload for client general-tab expanded loan row: nominal interest, interest kind, repayment schedule (for next EMI).
+   * Schedule EMI in UI uses totalDueForPeriod (see repayment-schedule tab).
+   */
+  getLoanGeneralTabExpandData(loanId: string): Observable<any> {
+    let httpParams = new HttpParams()
+      .set('fields', 'annualInterestRate,interestRatePerPeriod,interestType')
+      .set('associations', 'repaymentSchedule');
+    return this.http.get(`/loans/${loanId}`, { params: httpParams });
+  }
+
+  /**
+   * @deprecated Prefer getLoanGeneralTabExpandData — includes schedule-aligned EMI.
+   */
+  getLoanCoreInterestFields(loanId: string): Observable<any> {
+    const httpParams = new HttpParams().set('fields', 'annualInterestRate,interestRatePerPeriod');
+    return this.http.get(`/loans/${loanId}`, { params: httpParams });
+  }
+
+  /**
    * Get collateral template.
    * @param {string} loanId Loan Id.
    * @returns {Observable<any>}
