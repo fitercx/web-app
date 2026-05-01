@@ -1,5 +1,5 @@
 /** Angular Imports */
-import { Component, OnInit } from '@angular/core';
+import { ChangeDetectorRef, Component } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { animate, state, style, transition, trigger } from '@angular/animations';
 import { SelectionModel } from '@angular/cdk/collections';
@@ -7,6 +7,8 @@ import { MatDialog } from '@angular/material/dialog';
 
 /** Custom Services. */
 import { ClientsService, BulkLoanDisbursementResponse } from 'app/clients/clients.service';
+import { LoansService } from 'app/loans/loans.service';
+import { take } from 'rxjs/operators';
 import {
   BulkDisburseDialogComponent,
   BulkDisburseDialogData
@@ -214,17 +216,27 @@ export class GeneralTabComponent {
   expandedLOCElement: any | null = null;
   expandedLOCLoanElement: any | null = null; // expanded loan inside a LOC
 
+  /** Today's date for RBF progress timeline */
+  today: Date = new Date();
+
+  /** In-flight guard for expand-time loan hydration (schedule + interest). */
+  private loanExpandHydrationInFlight = new Set<number>();
+
   /**
    * @param {ActivatedRoute} route Activated Route
    * @param {ClientsService} clientService Clients Service
    * @param {Router} router Router
    * @param {MatDialog} dialog Material Dialog
+   * @param {LoansService} loansService Loans API (interest fields on full loan)
+   * @param {ChangeDetectorRef} cdr Change detector
    */
   constructor(
     private route: ActivatedRoute,
     private clientService: ClientsService,
     private router: Router,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private loansService: LoansService,
+    private cdr: ChangeDetectorRef
   ) {
     this.route.data.subscribe(
       (data: { clientAccountsData: any; clientChargesData: any; clientSummary: any; clientCollateralData: any }) => {
@@ -343,10 +355,57 @@ export class GeneralTabComponent {
     return item.id || item.accountNo || item.collateralId || index;
   }
 
-  // Add this method
   toggleRow(element: any, event: Event): void {
     event.stopPropagation();
-    this.expandedElement = this.expandedElement === element ? null : element;
+    const collapsing = this.expandedElement === element;
+    this.expandedElement = collapsing ? null : element;
+    if (!collapsing && this.expandedElement) {
+      this.hydrateLoanExpandFromApiIfNeeded(this.expandedElement);
+    }
+  }
+
+  /**
+   * Merge repayment schedule + nominal interest + interest type from GET /loans/{id} once per expand (client /accounts is incomplete).
+   */
+  private hydrateLoanExpandFromApiIfNeeded(element: any): void {
+    if (!element?.id) {
+      return;
+    }
+    if (element._loanExpandHydrated) {
+      return;
+    }
+
+    const loanId = Number(element.id);
+    if (this.loanExpandHydrationInFlight.has(loanId)) {
+      return;
+    }
+    this.loanExpandHydrationInFlight.add(loanId);
+
+    this.loansService
+      .getLoanGeneralTabExpandData(String(loanId))
+      .pipe(take(1))
+      .subscribe({
+        next: (data: any) => {
+          this.loanExpandHydrationInFlight.delete(loanId);
+          if (data?.annualInterestRate != null) {
+            element.annualInterestRate = data.annualInterestRate;
+          }
+          if (data?.interestRatePerPeriod != null && element.interestRatePerPeriod == null) {
+            element.interestRatePerPeriod = data.interestRatePerPeriod;
+          }
+          if (data?.interestType != null) {
+            element.interestType = data.interestType;
+          }
+          if (data?.repaymentSchedule != null) {
+            element.repaymentSchedule = data.repaymentSchedule;
+          }
+          element._loanExpandHydrated = true;
+          this.cdr.markForCheck();
+        },
+        error: () => {
+          this.loanExpandHydrationInFlight.delete(loanId);
+        }
+      });
   }
 
   toggleLOCRow(element: any, event: Event): void {
@@ -599,6 +658,19 @@ export class GeneralTabComponent {
     }
   }
 
+  /** Returns true if the loan product is RBF */
+  isRBFLoan(element: any): boolean {
+    return (element?.productName || '').toUpperCase() === 'RBF';
+  }
+
+  /** Returns repayment percentage (0-100) for a loan */
+  getRBFRepaymentPercent(element: any): number {
+    const total = element?.originalLoan || 0;
+    const paid = element?.amountPaid || 0;
+    if (!total) return 0;
+    return Math.min(Math.round((paid / total) * 10000) / 100, 100);
+  }
+
   /** Determine if a loan is closed based on status code (reuse existing logic from AccountsFilterPipe) */
   private isLoanClosed(loan: any): boolean {
     if (!loan?.status?.code) return false;
@@ -616,6 +688,109 @@ export class GeneralTabComponent {
     return productType === 'RECEIVABLE'
       ? loan?.additionalProperties?.approvedReceivableAmount
       : loan?.additionalProperties?.approvedPayableAmount;
+  }
+
+  /** Resolve interest rate from common backend field variants */
+  getLoanInterestRate(element: any): number | null {
+    const candidate =
+      element?.annualInterestRate ??
+      element?.additionalProperties?.annualInterestRate ??
+      element?.nominalAnnualInterestRate ??
+      element?.nominalInterestRatePerPeriod ??
+      element?.interestRatePerPeriod;
+
+    return candidate != null && !Number.isNaN(Number(candidate)) ? Number(candidate) : null;
+  }
+
+  /**
+   * Next EMI aligned with repayment schedule tab (EMI Amount / Due Payment column uses totalDueForPeriod).
+   * Skips disbursement / fee-at-disbursement rows (often ~fee total e.g. 2110 vs real EMI ~17586).
+   */
+  getNextEMIWithoutCharges(element: any): number | null {
+    const periods = element?.repaymentSchedule?.periods;
+    if (Array.isArray(periods) && periods.length > 0) {
+      const nextPeriod = this.pickNextRepaymentScheduleInstallmentPeriod(periods);
+      if (nextPeriod) {
+        const td =
+          nextPeriod.totalDueForPeriod ?? nextPeriod.emiAmount ?? this.sumPrincipalInterestFeesForPeriod(nextPeriod);
+        if (td != null && !Number.isNaN(Number(td))) {
+          const n = Number(td);
+          if (n > 0) {
+            return n;
+          }
+        }
+      }
+      // Schedule present but no instalment resolved — do not fall back to client-summary EMI (often fee/disbursement-derived).
+      return null;
+    }
+
+    const fromSummary = element?.additionalProperties?.effectiveInstallmentAmount;
+    if (fromSummary != null && !Number.isNaN(Number(fromSummary))) {
+      const n = Number(fromSummary);
+      if (n > 0) {
+        return n;
+      }
+    }
+
+    const fixedEmi = element?.fixedEmiAmount;
+    if (fixedEmi != null && !Number.isNaN(Number(fixedEmi)) && Number(fixedEmi) > 0) {
+      return Number(fixedEmi);
+    }
+
+    return null;
+  }
+
+  /**
+   * Disbursement row / tranche fee row — not a recurring EMI (matches repayment-schedule-tab disbursement logic).
+   */
+  private isRepaymentScheduleDisbursementRow(p: any): boolean {
+    if (!p) {
+      return true;
+    }
+    const st = String(p.status ?? '').toUpperCase();
+    if (st === 'DISBURSEMENT') {
+      return true;
+    }
+    const periodNum = Number(p.period);
+    if (periodNum === 0) {
+      return true;
+    }
+    const principalDisbursed = Number(p.principalDisbursed ?? 0);
+    if (principalDisbursed > 0) {
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Next real instalment: exclude disbursement rows; prefer SCHEDULED; then earliest incomplete by period #.
+   */
+  private pickNextRepaymentScheduleInstallmentPeriod(periods: any[]): any | null {
+    const candidates = periods.filter((p: any) => {
+      if (!p || p.complete || p.downPaymentPeriod) {
+        return false;
+      }
+      if (this.isRepaymentScheduleDisbursementRow(p)) {
+        return false;
+      }
+      return true;
+    });
+    if (!candidates.length) {
+      return null;
+    }
+    const scheduled = candidates.find((p: any) => String(p.status ?? '').toUpperCase() === 'SCHEDULED');
+    if (scheduled) {
+      return scheduled;
+    }
+    return [...candidates].sort((a: any, b: any) => (Number(a.period) || 0) - (Number(b.period) || 0))[0];
+  }
+
+  private sumPrincipalInterestFeesForPeriod(p: any): number | null {
+    const principal = Number(p.principalDue ?? 0);
+    const interest = Number(p.interestDue ?? 0);
+    const fees = Number(p.feeChargesDue ?? 0) + Number(p.penaltyChargesDue ?? 0) + Number(p.taxChargesDue ?? 0);
+    const sum = principal + interest + fees;
+    return sum > 0 ? sum : null;
   }
 
   // ========== Bulk Disbursement Selection Methods ==========

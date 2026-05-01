@@ -733,7 +733,7 @@
             color="primary"
             matTooltip="{{ 'tooltips.Transfer Funds' | translate }}"
             matTooltipPosition="above"
-            *mifosxHasPermission="'DISBURSETOSAVINGS_LOAN'"
+            *mifosxHasPermission="'DISBURSE_LOAN'"
             (click)="routeEdit($event); routeTransferFund(element.id)"
           >
             <i class="fa fa-exchange"></i>
@@ -754,137 +754,334 @@
     <ng-container matColumnDef="expandedDetail">
       <td mat-cell *matCellDef="let element" [attr.colspan]="openLoansColumns.length">
         <div class="detail-row-container" [@detailExpand]="element === expandedElement ? 'expanded' : 'collapsed'">
-          <div class="loan-details-expand">
-            <div class="details-grid">
-              <div class="detail-item">
-                <span class="detail-label">{{ 'labels.inputs.External ID' | translate }}:</span>
-                <span class="detail-value">{{ element.externalId || '-' }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">{{ 'labels.inputs.DP Name' | translate }}:</span>
-                <span class="detail-value">{{ element.additionalProperties?.dpName || '-' }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">{{ 'labels.inputs.Loan Status' | translate }}:</span>
-                <span class="detail-value">{{
-                  (element.status?.value || element.status?.code || '-') +
-                    (element.status?.active ? (element.inArrears ? ' - Arrears' : ' - Good standing') : '')
-                }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">{{ 'labels.inputs.Net Disbursed Amount' | translate }}:</span>
-                <span class="detail-value">
-                  {{
-                    element.status?.pendingApproval === true || element.status?.waitingForDisbursal === true
-                      ? 'N/A'
-                      : element.additionalProperties?.netDisbursedAmount != null
-                        ? (element.additionalProperties.netDisbursedAmount | formatNumber)
-                        : '-'
-                  }}
-                </span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">{{ 'labels.inputs.Remitter Name' | translate }}:</span>
-                <span class="detail-value">{{ element.additionalProperties?.remitterName || '-' }}</span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">{{ 'labels.inputs.Installment Amount' | translate }}:</span>
-                <span class="detail-value">
-                  {{
-                    element.status?.pendingApproval || element.status?.waitingForDisbursal
-                      ? 'N/A'
-                      : element.additionalProperties?.effectiveInstallmentAmount != null
-                        ? (element.additionalProperties.effectiveInstallmentAmount | formatNumber)
-                        : '-'
-                  }}
-                </span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">{{ 'labels.inputs.Issued Date' | translate }}:</span>
-                <span class="detail-value">
-                  <ng-container *ngIf="element.status.waitingForDisbursal || element.status.pendingApproval">
-                    N/A
-                  </ng-container>
-                  <ng-container *ngIf="!(element.status.waitingForDisbursal || element.status.pendingApproval)">
+          <!-- ====== RBF CARD LAYOUT ====== -->
+          <ng-container *ngIf="isRBFLoan(element); else defaultLoanDetail">
+            <div class="rbf-expand-container">
+              <!-- Repayment Progress -->
+              <div class="rbf-progress-section">
+                <div class="rbf-progress-header">
+                  <span class="rbf-progress-label">Repayment progress</span>
+                  <span class="rbf-progress-stats">
+                    {{ getRBFRepaymentPercent(element) }}% paid
+                    <ng-container
+                      *ngIf="
+                        element.additionalProperties?.paidInstalmentCount != null &&
+                        element.additionalProperties?.totalInstalmentCount != null
+                      "
+                    >
+                      &nbsp;·&nbsp; {{ element.additionalProperties.paidInstalmentCount }} of
+                      {{ element.additionalProperties.totalInstalmentCount }} instalments
+                    </ng-container>
+                  </span>
+                </div>
+                <div class="rbf-progress-bar-track">
+                  <div class="rbf-progress-bar-fill" [style.width.%]="getRBFRepaymentPercent(element)"></div>
+                </div>
+                <div class="rbf-progress-timeline">
+                  <span class="rbf-timeline-issued">
+                    Issued ·
                     {{
-                      element.timeline.actualDisbursementDate
+                      element.timeline?.actualDisbursementDate
                         ? (element.timeline.actualDisbursementDate | dateFormat)
                         : '-'
                     }}
-                  </ng-container>
-                </span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">{{ 'labels.inputs.Outstanding Late Fee' | translate }}:</span>
-                <span class="detail-value">
-                  {{
-                    element.status?.pendingApproval || element.status?.waitingForDisbursal
-                      ? 'N/A'
-                      : element.additionalProperties?.totalLateFees != null
-                        ? (element.additionalProperties.totalLateFees | formatNumber)
+                  </span>
+                  <span class="rbf-timeline-today">Today · {{ today | date: 'dd MMM yyyy' }}</span>
+                  <span class="rbf-timeline-maturity">
+                    Maturity ·
+                    {{
+                      element.actualMaturityDate || element.timeline?.expectedMaturityDate
+                        ? (element.actualMaturityDate || element.timeline?.expectedMaturityDate | dateFormat)
                         : '-'
-                  }}
-                </span>
+                    }}
+                  </span>
+                </div>
               </div>
-              <div class="detail-item">
-                <span class="detail-label">{{ 'labels.inputs.Planned Closure Date' | translate }}:</span>
-                <span class="detail-value">
-                  {{
-                    element.status?.pendingApproval || element.status?.waitingForDisbursal
-                      ? 'N/A'
-                      : element.timeline?.expectedMaturityDate
-                        ? (element.timeline.expectedMaturityDate | dateFormat)
-                        : '-'
-                  }}
-                </span>
-              </div>
-              <div class="detail-item">
-                <span class="detail-label">{{ 'labels.inputs.DPD' | translate }}:</span>
-                <span class="detail-value">
-                  {{
-                    element.status?.pendingApproval || element.status?.waitingForDisbursal
-                      ? 'N/A'
-                      : element.additionalProperties?.daysPastDue != null &&
+
+              <!-- 3 Cards Row -->
+              <div class="rbf-cards-row">
+                <!-- LOAN TERMS -->
+                <div class="rbf-card">
+                  <div class="rbf-card-title">LOAN TERMS</div>
+                  <div class="rbf-card-row">
+                    <span class="rbf-card-label">Loan Amount</span>
+                    <span class="rbf-card-value">AED {{ element.originalLoan | formatNumber }}</span>
+                  </div>
+                  <div class="rbf-card-row">
+                    <span class="rbf-card-label">Interest Rate</span>
+                    <span class="rbf-card-value">
+                      <ng-container *ngIf="getLoanInterestRate(element) != null">
+                        {{ getLoanInterestRate(element) }}% p.a.
+                      </ng-container>
+                      <ng-container
+                        *ngIf="
+                          getLoanInterestRate(element) == null &&
+                          element.isFactorRateEnabled &&
+                          element.factorRate != null
+                        "
+                      >
+                        {{ element.factorRate | formatNumber }}% <span class="rbf-badge">Factor</span>
+                      </ng-container>
+                      <ng-container
+                        *ngIf="
+                          getLoanInterestRate(element) == null &&
+                          (!element.isFactorRateEnabled || element.factorRate == null)
+                        "
+                        >—</ng-container
+                      >
+                    </span>
+                  </div>
+                  <div class="rbf-card-row" *ngIf="element.interestType?.value">
+                    <span class="rbf-card-label">{{ 'labels.inputs.Interest Type' | translate }}</span>
+                    <span class="rbf-card-value">{{ 'labels.text.' + element.interestType.value | translate }}</span>
+                  </div>
+                  <div class="rbf-card-row">
+                    <span class="rbf-card-label">Loan Term</span>
+                    <span class="rbf-card-value"
+                      >{{ element.termFrequency }} {{ element.termPeriodFrequencyType?.code | translate }}</span
+                    >
+                  </div>
+                  <div class="rbf-card-row">
+                    <span class="rbf-card-label">Net Disbursed</span>
+                    <span class="rbf-card-value">
+                      <ng-container *ngIf="element.additionalProperties?.netDisbursedAmount != null"
+                        >AED {{ element.additionalProperties.netDisbursedAmount | formatNumber }}</ng-container
+                      >
+                      <ng-container *ngIf="element.additionalProperties?.netDisbursedAmount == null">—</ng-container>
+                    </span>
+                  </div>
+                  <div class="rbf-card-row">
+                    <span class="rbf-card-label">Maturity Date</span>
+                    <span class="rbf-card-value">{{
+                      element.actualMaturityDate || element.timeline?.expectedMaturityDate | dateFormat
+                    }}</span>
+                  </div>
+                </div>
+
+                <!-- REPAYMENT STATUS -->
+                <div class="rbf-card">
+                  <div class="rbf-card-title">REPAYMENT STATUS</div>
+                  <div class="rbf-card-row">
+                    <span class="rbf-card-label">Outstanding</span>
+                    <span class="rbf-card-value rbf-value-highlight">
+                      <ng-container *ngIf="element.loanBalance != null"
+                        >AED {{ element.loanBalance | formatNumber }}</ng-container
+                      >
+                      <ng-container *ngIf="element.loanBalance == null">—</ng-container>
+                    </span>
+                  </div>
+                  <div class="rbf-card-row">
+                    <span class="rbf-card-label">Amount Paid</span>
+                    <span class="rbf-card-value rbf-value-highlight">
+                      <ng-container *ngIf="element.amountPaid != null"
+                        >AED {{ element.amountPaid | formatNumber }}</ng-container
+                      >
+                      <ng-container *ngIf="element.amountPaid == null">—</ng-container>
+                    </span>
+                  </div>
+                  <div class="rbf-card-row">
+                    <span class="rbf-card-label">Next EMI</span>
+                    <span class="rbf-card-value rbf-value-highlight">
+                      <ng-container *ngIf="getNextEMIWithoutCharges(element) != null"
+                        >AED {{ getNextEMIWithoutCharges(element) | formatNumber }}</ng-container
+                      >
+                      <ng-container *ngIf="getNextEMIWithoutCharges(element) == null">—</ng-container>
+                    </span>
+                  </div>
+                  <div class="rbf-card-row">
+                    <span class="rbf-card-label">Late Fee</span>
+                    <span class="rbf-card-value">
+                      <ng-container
+                        *ngIf="
+                          element.additionalProperties?.totalLateFees != null &&
+                          element.additionalProperties.totalLateFees > 0
+                        "
+                        >AED {{ element.additionalProperties.totalLateFees | formatNumber }}</ng-container
+                      >
+                      <ng-container *ngIf="!(element.additionalProperties?.totalLateFees > 0)">—</ng-container>
+                    </span>
+                  </div>
+                  <div class="rbf-card-row">
+                    <span class="rbf-card-label">DPD</span>
+                    <span class="rbf-card-value">
+                      <ng-container
+                        *ngIf="
+                          element.additionalProperties?.daysPastDue != null &&
                           element.additionalProperties.daysPastDue >= 0
-                        ? element.additionalProperties.daysPastDue
-                        : '-'
-                  }}
-                </span>
-              </div>
+                        "
+                      >
+                        {{ element.additionalProperties.daysPastDue }}
+                        <span
+                          class="rbf-status-badge"
+                          [ngClass]="element.additionalProperties.daysPastDue === 0 ? 'good' : 'bad'"
+                        >
+                          {{ element.additionalProperties.daysPastDue === 0 ? 'Good standing' : 'Overdue' }}
+                        </span>
+                      </ng-container>
+                      <ng-container *ngIf="element.additionalProperties?.daysPastDue == null">—</ng-container>
+                    </span>
+                  </div>
+                </div>
 
-              <!--  Factor Rate Loan Fields  -->
-              <div class="detail-item" *ngIf="element.isFactorRateEnabled">
-                <span class="detail-label">{{ 'labels.inputs.Factor Rate' | translate }}:</span>
-                <span class="detail-value">{{ element.factorRate }}</span>
-              </div>
-
-              <div class="detail-item" *ngIf="element.isFactorRateEnabled">
-                <span class="detail-label">{{ 'labels.inputs.Total Fee Charges' | translate }}:</span>
-                <span class="detail-value">{{ element.totalFeeChargesCharged | formatNumber }}</span>
-              </div>
-              <div class="detail-item" *ngIf="element.isFactorRateEnabled">
-                <span class="detail-label">{{ 'labels.inputs.Total Tax Charges' | translate }}:</span>
-                <span class="detail-value">{{ element.totalTaxChargesCharged | formatNumber }}</span>
-              </div>
-
-              <div class="detail-item">
-                <span class="detail-label">{{ 'labels.inputs.Loan Term' | translate }}:</span>
-                <span class="detail-value"
-                  >{{ element.termFrequency }} {{ element.termPeriodFrequencyType?.code | translate }}
-                </span>
-              </div>
-
-              <div class="detail-item">
-                <span class="detail-label">{{ 'labels.inputs.Maturity Date' | translate }}:</span>
-                <span class="detail-value">{{ element.actualMaturityDate | dateFormat }} </span>
-              </div>
-
-              <div class="detail-item" *ngIf="element.isFactorRateEnabled">
-                <span class="detail-label">{{ 'labels.inputs.Penalty Grace Period' | translate }}:</span>
-                <span class="detail-value">{{ element.penaltyGracePeriod }} </span>
+                <!-- ACCOUNT INFO -->
+                <div class="rbf-card">
+                  <div class="rbf-card-title">ACCOUNT INFO</div>
+                  <div class="rbf-card-row">
+                    <span class="rbf-card-label">Account No</span>
+                    <span class="rbf-card-value">{{ element.accountNo }}</span>
+                  </div>
+                  <div class="rbf-card-row">
+                    <span class="rbf-card-label">External ID</span>
+                    <span class="rbf-card-value">{{ element.externalId || '—' }}</span>
+                  </div>
+                  <div class="rbf-card-row">
+                    <span class="rbf-card-label">Loan Product</span>
+                    <span class="rbf-card-value">{{ element.productName }}</span>
+                  </div>
+                  <div class="rbf-card-row">
+                    <span class="rbf-card-label">Remitter Name</span>
+                    <span class="rbf-card-value">{{ element.additionalProperties?.remitterName || '—' }}</span>
+                  </div>
+                  <div class="rbf-card-row">
+                    <span class="rbf-card-label">DP Name</span>
+                    <span class="rbf-card-value">{{ element.additionalProperties?.dpName || '—' }}</span>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </ng-container>
+
+          <!-- ====== DEFAULT LAYOUT (non-RBF) ====== -->
+          <ng-template #defaultLoanDetail>
+            <div class="loan-details-expand">
+              <div class="details-grid">
+                <div class="detail-item">
+                  <span class="detail-label">{{ 'labels.inputs.External ID' | translate }}:</span>
+                  <span class="detail-value">{{ element.externalId || '-' }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">{{ 'labels.inputs.DP Name' | translate }}:</span>
+                  <span class="detail-value">{{ element.additionalProperties?.dpName || '-' }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">{{ 'labels.inputs.Loan Status' | translate }}:</span>
+                  <span class="detail-value">{{
+                    (element.status?.value || element.status?.code || '-') +
+                      (element.status?.active ? (element.inArrears ? ' - Arrears' : ' - Good standing') : '')
+                  }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">{{ 'labels.inputs.Net Disbursed Amount' | translate }}:</span>
+                  <span class="detail-value">
+                    {{
+                      element.status?.pendingApproval === true || element.status?.waitingForDisbursal === true
+                        ? 'N/A'
+                        : element.additionalProperties?.netDisbursedAmount != null
+                          ? (element.additionalProperties.netDisbursedAmount | formatNumber)
+                          : '-'
+                    }}
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">{{ 'labels.inputs.Remitter Name' | translate }}:</span>
+                  <span class="detail-value">{{ element.additionalProperties?.remitterName || '-' }}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">{{ 'labels.inputs.Installment Amount' | translate }}:</span>
+                  <span class="detail-value">
+                    {{
+                      element.status?.pendingApproval || element.status?.waitingForDisbursal
+                        ? 'N/A'
+                        : element.additionalProperties?.effectiveInstallmentAmount != null
+                          ? (element.additionalProperties.effectiveInstallmentAmount | formatNumber)
+                          : '-'
+                    }}
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">{{ 'labels.inputs.Issued Date' | translate }}:</span>
+                  <span class="detail-value">
+                    <ng-container *ngIf="element.status.waitingForDisbursal || element.status.pendingApproval"
+                      >N/A</ng-container
+                    >
+                    <ng-container *ngIf="!(element.status.waitingForDisbursal || element.status.pendingApproval)">
+                      {{
+                        element.timeline.actualDisbursementDate
+                          ? (element.timeline.actualDisbursementDate | dateFormat)
+                          : '-'
+                      }}
+                    </ng-container>
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">{{ 'labels.inputs.Outstanding Late Fee' | translate }}:</span>
+                  <span class="detail-value">
+                    {{
+                      element.status?.pendingApproval || element.status?.waitingForDisbursal
+                        ? 'N/A'
+                        : element.additionalProperties?.totalLateFees != null
+                          ? (element.additionalProperties.totalLateFees | formatNumber)
+                          : '-'
+                    }}
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">{{ 'labels.inputs.Planned Closure Date' | translate }}:</span>
+                  <span class="detail-value">
+                    {{
+                      element.status?.pendingApproval || element.status?.waitingForDisbursal
+                        ? 'N/A'
+                        : element.timeline?.expectedMaturityDate
+                          ? (element.timeline.expectedMaturityDate | dateFormat)
+                          : '-'
+                    }}
+                  </span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">{{ 'labels.inputs.DPD' | translate }}:</span>
+                  <span class="detail-value">
+                    {{
+                      element.status?.pendingApproval || element.status?.waitingForDisbursal
+                        ? 'N/A'
+                        : element.additionalProperties?.daysPastDue != null &&
+                            element.additionalProperties.daysPastDue >= 0
+                          ? element.additionalProperties.daysPastDue
+                          : '-'
+                    }}
+                  </span>
+                </div>
+
+                <!--  Factor Rate Loan Fields  -->
+                <div class="detail-item" *ngIf="element.isFactorRateEnabled">
+                  <span class="detail-label">{{ 'labels.inputs.Factor Rate' | translate }}:</span>
+                  <span class="detail-value">{{ element.factorRate }}</span>
+                </div>
+                <div class="detail-item" *ngIf="element.isFactorRateEnabled">
+                  <span class="detail-label">{{ 'labels.inputs.Total Fee Charges' | translate }}:</span>
+                  <span class="detail-value">{{ element.totalFeeChargesCharged | formatNumber }}</span>
+                </div>
+                <div class="detail-item" *ngIf="element.isFactorRateEnabled">
+                  <span class="detail-label">{{ 'labels.inputs.Total Tax Charges' | translate }}:</span>
+                  <span class="detail-value">{{ element.totalTaxChargesCharged | formatNumber }}</span>
+                </div>
+
+                <div class="detail-item">
+                  <span class="detail-label">{{ 'labels.inputs.Loan Term' | translate }}:</span>
+                  <span class="detail-value"
+                    >{{ element.termFrequency }} {{ element.termPeriodFrequencyType?.code | translate }}</span
+                  >
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">{{ 'labels.inputs.Maturity Date' | translate }}:</span>
+                  <span class="detail-value">{{ element.actualMaturityDate | dateFormat }}</span>
+                </div>
+                <div class="detail-item" *ngIf="element.isFactorRateEnabled">
+                  <span class="detail-label">{{ 'labels.inputs.Penalty Grace Period' | translate }}:</span>
+                  <span class="detail-value">{{ element.penaltyGracePeriod }}</span>
+                </div>
+              </div>
+            </div>
+          </ng-template>
         </div>
       </td>
     </ng-container>
