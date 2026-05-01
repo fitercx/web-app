@@ -111,6 +111,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
   enableIncomeCapitalization = false;
   isProgressive = false;
   factorRateEnabled = false;
+  isRbfProduct = false;
 
   /** Subscriptions for loan term listeners */
   private loanTermSubscriptions: Subscription[] = [];
@@ -156,6 +157,9 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
         this.loanProduct = this.loansAccountTermsData.product;
       }
       this.factorRateEnabled = this.loansAccountProductTemplate?.product?.factorRateProductEnabled;
+      this.isRbfProduct =
+        this.loansAccountProductTemplate?.product?.shortName?.toLowerCase() === 'rbf' ||
+        this.loansAccountProductTemplate?.product?.name?.toLowerCase().includes('rbf');
       this.interestRateFrequencyTypeData = this.loansAccountTermsData.interestRateFrequencyTypeOptions;
 
       // Handle LOC products: use tenorDays from additionalProperties if available
@@ -353,6 +357,9 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
       }
 
       this.factorRateEnabled = this.loansAccountProductTemplate?.product?.factorRateProductEnabled;
+      this.isRbfProduct =
+        this.loansAccountProductTemplate?.product?.shortName?.toLowerCase() === 'rbf' ||
+        this.loansAccountProductTemplate?.product?.name?.toLowerCase().includes('rbf');
 
       // For LOC products, override the interest rate frequency type to be per annum
       let interestRateFrequencyType = this.loansAccountTermsData.interestRateFrequencyType.id;
@@ -866,7 +873,11 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
    * Returns loans account terms form value.
    */
   get loansAccountTerms() {
-    return this.loansAccountTermsForm.getRawValue();
+    const formValue = this.loansAccountTermsForm.getRawValue();
+    if (!this.isRbfProduct) {
+      delete formValue.isShortDisbursal;
+    }
+    return formValue;
   }
 
   get loanCollateral() {
