@@ -157,9 +157,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
         this.loanProduct = this.loansAccountTermsData.product;
       }
       this.factorRateEnabled = this.loansAccountProductTemplate?.product?.factorRateProductEnabled;
-      this.isRbfProduct =
-        this.loansAccountProductTemplate?.product?.shortName?.toLowerCase() === 'rbf' ||
-        this.loansAccountProductTemplate?.product?.name?.toLowerCase().includes('rbf');
+      this.updateIsRbfProduct();
       this.interestRateFrequencyTypeData = this.loansAccountTermsData.interestRateFrequencyTypeOptions;
 
       // Handle LOC products: use tenorDays from additionalProperties if available
@@ -357,9 +355,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
       }
 
       this.factorRateEnabled = this.loansAccountProductTemplate?.product?.factorRateProductEnabled;
-      this.isRbfProduct =
-        this.loansAccountProductTemplate?.product?.shortName?.toLowerCase() === 'rbf' ||
-        this.loansAccountProductTemplate?.product?.name?.toLowerCase().includes('rbf');
+      this.updateIsRbfProduct();
 
       // For LOC products, override the interest rate frequency type to be per annum
       let interestRateFrequencyType = this.loansAccountTermsData.interestRateFrequencyType.id;
@@ -863,6 +859,11 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
       });
       this.repaymentStrategyDisabled = true;
     }
+  }
+
+  private updateIsRbfProduct(): void {
+    const product = this.loansAccountProductTemplate?.product;
+    this.isRbfProduct = product?.shortName?.toLowerCase() === 'rbf' || product?.name?.toLowerCase().includes('rbf');
   }
 
   isDelinquencyEnabled(): boolean {
