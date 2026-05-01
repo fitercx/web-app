@@ -74,13 +74,8 @@ export class CheckerInboxComponent implements OnInit {
     private formBuilder: UntypedFormBuilder
   ) {
     this.route.data.subscribe((data: { makerCheckerResource: any; makerCheckerTemplate: any }) => {
-      this.searchData = data.makerCheckerResource;
-      if (this.searchData.length > 0) {
-        this.checkerData = true;
-      }
       this.makerCheckerTemplate = data.makerCheckerTemplate;
-      this.dataSource = new MatTableDataSource(this.searchData);
-      this.selection = new SelectionModel(true, []);
+      this.updateCheckerRows(data.makerCheckerResource || []);
     });
   }
 
@@ -109,14 +104,48 @@ export class CheckerInboxComponent implements OnInit {
       makerDateTimeto: this.dateUtils.formatDate(this.makerCheckerSearchForm.value.makerDateTimeto, dateFormat)
     };
     this.tasksService.getMakerCheckerData(makerCheckerSearchParams).subscribe((response: any) => {
-      this.searchData = response;
-      if (this.searchData.length === 0) {
-        this.noSearchedData = true;
-      } else {
-        this.noSearchedData = false;
+      this.updateCheckerRows(response || []);
+      this.noSearchedData = this.searchData.length === 0;
+    });
+  }
+
+  private updateCheckerRows(rows: any[]) {
+    this.searchData = rows;
+    this.checkerData = this.searchData.length > 0;
+    this.dataSource = new MatTableDataSource(this.searchData);
+    this.selection = new SelectionModel(true, []);
+    this.populateMissingClientNames();
+  }
+
+  private populateMissingClientNames() {
+    this.searchData.forEach((row: any) => {
+      if (row.clientName || !this.tasksService.isClientNameFromCommandSourceSupported(row)) {
+        return;
       }
-      this.dataSource = new MatTableDataSource(this.searchData);
-      this.selection = new SelectionModel(true, []);
+
+      const applyResolved = (resolvedClientName: string | undefined) => {
+        if (!resolvedClientName) {
+          return;
+        }
+
+        row.clientName = resolvedClientName;
+        this.dataSource.data = [...this.searchData];
+      };
+
+      /** List uses raw command JSON; detail GET /audits/:id applies replaceIds and matches the viewer page. */
+      this.tasksService.resolveClientNameFromCheckerData(row).subscribe((resolved: string | undefined) => {
+        if (resolved) {
+          applyResolved(resolved);
+          return;
+        }
+
+        this.tasksService.getCheckerInboxDetail(row.id).subscribe({
+          next: (detail: any) => {
+            this.tasksService.resolveClientNameFromCheckerData(detail, detail).subscribe(applyResolved);
+          },
+          error: () => {}
+        });
+      });
     });
   }
 

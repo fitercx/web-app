@@ -42,10 +42,18 @@ export class ViewCheckerInboxComponent {
   ) {
     this.route.data.subscribe((data: { checkerInboxDetail: any }) => {
       this.checkerInboxDetail = data.checkerInboxDetail;
-      this.jsondata = JSON.parse(this.checkerInboxDetail.commandAsJson);
+      this.jsondata = this.tasksService.parseCommandData(
+        this.checkerInboxDetail.commandAsJson || this.checkerInboxDetail.commandSource
+      );
       this.displayJSONData = !_.isEmpty(this.jsondata);
+
+      this.clientName = this.route.snapshot.queryParamMap.get('clientName') || undefined;
+      this.tasksService
+        .resolveClientNameFromCheckerData(this.checkerInboxDetail, this.checkerInboxDetail)
+        .subscribe((resolvedClientName: string | undefined) => {
+          this.clientName = resolvedClientName || this.clientName;
+        });
     });
-    this.clientName = this.route.snapshot.queryParamMap.get('clientName') || undefined;
   }
 
   /**
