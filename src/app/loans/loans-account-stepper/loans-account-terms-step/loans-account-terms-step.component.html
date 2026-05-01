@@ -16,6 +16,7 @@
       formControlName="isShortDisbursal"
       matTooltip="{{ 'tooltips.Short Disbursal Help Text' | translate }}"
       class="margin-b"
+      *ngIf="isRbfProduct"
     >
       {{ 'labels.inputs.Short Disbursal' | translate }}
     </mat-checkbox>

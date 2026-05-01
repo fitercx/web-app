@@ -111,6 +111,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
   enableIncomeCapitalization = false;
   isProgressive = false;
   factorRateEnabled = false;
+  isRbfProduct = false;
 
   /** Subscriptions for loan term listeners */
   private loanTermSubscriptions: Subscription[] = [];
@@ -156,6 +157,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
         this.loanProduct = this.loansAccountTermsData.product;
       }
       this.factorRateEnabled = this.loansAccountProductTemplate?.product?.factorRateProductEnabled;
+      this.updateIsRbfProduct();
       this.interestRateFrequencyTypeData = this.loansAccountTermsData.interestRateFrequencyTypeOptions;
 
       // Handle LOC products: use tenorDays from additionalProperties if available
@@ -353,6 +355,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
       }
 
       this.factorRateEnabled = this.loansAccountProductTemplate?.product?.factorRateProductEnabled;
+      this.updateIsRbfProduct();
 
       // For LOC products, override the interest rate frequency type to be per annum
       let interestRateFrequencyType = this.loansAccountTermsData.interestRateFrequencyType.id;
@@ -858,6 +861,11 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
     }
   }
 
+  private updateIsRbfProduct(): void {
+    const product = this.loansAccountProductTemplate?.product;
+    this.isRbfProduct = product?.shortName?.toLowerCase() === 'rbf' || product?.name?.toLowerCase().includes('rbf');
+  }
+
   isDelinquencyEnabled(): boolean {
     return !!this.loanProduct?.delinquencyBucket?.name;
   }
@@ -866,7 +874,11 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
    * Returns loans account terms form value.
    */
   get loansAccountTerms() {
-    return this.loansAccountTermsForm.getRawValue();
+    const formValue = this.loansAccountTermsForm.getRawValue();
+    if (!this.isRbfProduct) {
+      delete formValue.isShortDisbursal;
+    }
+    return formValue;
   }
 
   get loanCollateral() {
