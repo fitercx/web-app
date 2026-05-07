@@ -12,6 +12,10 @@
     margin-left: auto;
   }
 
+  .transaction-type-filter {
+    width: 220px;
+  }
+
   table {
     width: 100%;
 
@@ -26,6 +30,43 @@
       }
     }
   }
+}
+
+.transaction-type-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+}
+
+.transaction-type-deposit {
+  background: #16a34a;
+}
+
+.transaction-type-withdrawal {
+  background: #6b7280;
+}
+
+.transaction-type-disbursal {
+  background: #2563eb;
+}
+
+.transaction-type-refund {
+  background: #d97706;
+}
+
+.transaction-type-emi-transfer {
+  background: #4f46e5;
+}
+
+.transaction-type-charge-reversal {
+  background: #0d9488;
 }
 
 .select-row:hover {

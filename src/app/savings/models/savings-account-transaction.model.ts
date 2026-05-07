@@ -3,6 +3,7 @@ import { Currency } from 'app/shared/models/general.model';
 export interface SavingsAccountTransaction {
   id: number;
   transactionType: SavingsAccountTransactionType;
+  transactionSubType?: SavingsAccountTransactionSubType;
   entryType: string;
   accountId: number;
   accountNo: string;
@@ -21,6 +22,12 @@ export interface SavingsAccountTransaction {
   lienTransaction: boolean;
   releaseTransactionId: number;
   chargesPaidByData: any[];
+}
+
+export interface SavingsAccountTransactionSubType {
+  value: number;
+  code: string;
+  displayName: string;
 }
 
 export interface SavingsAccountTransactionType {
