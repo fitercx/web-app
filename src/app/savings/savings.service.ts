@@ -65,6 +65,15 @@ export class SavingsService {
   }
 
   /**
+   * @param accountId Savings Account Id.
+   * @param transactionId Savings Transaction Id.
+   * @returns {Observable<any>} Transaction sub-type keyed by savings transaction id.
+   */
+  getSavingsTransactionSubType(accountId: string, transactionId: string): Observable<any> {
+    return this.http.get(`/crediblex/savingsaccounts/${accountId}/transactions/${transactionId}/subtype`);
+  }
+
+  /**
    * @param accountId Savings Account Id of account to get data for.
    * @returns {Observable<any>} Savings account and template.
    */

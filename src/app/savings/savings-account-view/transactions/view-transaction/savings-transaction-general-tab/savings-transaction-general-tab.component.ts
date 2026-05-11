@@ -28,7 +28,26 @@ export class SavingsTransactionGeneralTabComponent {
     this.route.data.subscribe((data: { savingsAccountTransaction: any }) => {
       this.accountId = this.route.parent.snapshot.params['savingAccountId'];
       this.transactionData = data.savingsAccountTransaction;
+      this.transactionId = this.transactionData.id;
+      this.loadTransactionSubType();
     });
+  }
+
+  loadTransactionSubType(): void {
+    this.savingsService.getSavingsTransactionSubType(this.accountId, this.transactionId).subscribe({
+      next: (transactionSubTypes: { [key: string]: any }) => {
+        this.transactionData = {
+          ...this.transactionData,
+          transactionSubType: transactionSubTypes[this.transactionId] || this.transactionData.transactionSubType
+        };
+      }
+    });
+  }
+
+  transactionTypeLabel(): string {
+    const parent = this.transactionData.transactionType.value;
+    const subType = this.transactionData.transactionSubType;
+    return subType ? `${parent} - ${subType.displayName}` : parent;
   }
 
   allowUndo(): boolean {
