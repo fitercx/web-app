@@ -11,6 +11,13 @@
         <mat-checkbox [formControl]="hideAccrualsParam" (click)="hideAccruals()" class="accruals">
           {{ 'labels.inputs.Hide Accruals' | translate }}</mat-checkbox
         >
+        <mat-form-field class="transaction-type-filter">
+          <mat-select [formControl]="transactionTypeFilter" (selectionChange)="filterTransactionType()">
+            <mat-option *ngFor="let option of transactionTypeOptions" [value]="option.value">
+              {{ option.label }}
+            </mat-option>
+          </mat-select>
+        </mat-form-field>
         <button mat-raised-button color="primary" (click)="navigateToSavingsTransactionsReport()">
           {{ 'labels.buttons.Generate Report' | translate }}
         </button>
@@ -81,7 +88,9 @@
           [ngClass]="savingsTransactionColor(transaction)"
           (click)="showTransactions(transaction)"
         >
-          {{ transaction.transactionType.value | translateKey: 'catalogs' }}
+          <span class="transaction-type-badge" [ngClass]="transactionTypeBadgeClass(transaction)">
+            {{ transactionTypeLabel(transaction) }}
+          </span>
         </td>
       </ng-container>
 

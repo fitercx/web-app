@@ -31,6 +31,16 @@ export class TransactionsTabComponent implements OnInit {
   /** Form control to handle accural parameter */
   hideAccrualsParam: UntypedFormControl;
   hideReversedParam: UntypedFormControl;
+  transactionTypeFilter: UntypedFormControl;
+  transactionTypeOptions = [
+    { value: 'ALL', label: 'All Types' },
+    { value: 'DEPOSIT', label: 'Deposit' },
+    { value: 'WITHDRAWAL', label: 'Withdrawal' },
+    { value: 'WITHDRAWAL_DISBURSAL', label: 'Withdrawal - Disbursal' },
+    { value: 'WITHDRAWAL_REFUND', label: 'Withdrawal - Refund' },
+    { value: 'WITHDRAWAL_EMI_TRANSFER', label: 'Withdrawal - EMI Transfer' },
+    { value: 'CHARGE_REVERSAL', label: 'Charge Reversal' }
+  ];
   /** Columns to be displayed in transactions table. */
   displayedColumns: string[] = [
     'row',
@@ -75,7 +85,9 @@ export class TransactionsTabComponent implements OnInit {
   ngOnInit() {
     this.hideAccrualsParam = new UntypedFormControl(false);
     this.hideReversedParam = new UntypedFormControl(false);
+    this.transactionTypeFilter = new UntypedFormControl('ALL');
     this.setTransactions();
+    this.loadTransactionSubTypes();
   }
 
   setTransactions(): void {
@@ -83,6 +95,25 @@ export class TransactionsTabComponent implements OnInit {
     this.accountWithTransactions = this.transactionsData && this.transactionsData.length > 0;
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
+  }
+
+  loadTransactionSubTypes(): void {
+    this.savingsService.getSavingsTransactionSubTypes(this.accountId).subscribe({
+      next: (transactionSubTypes: { [key: string]: any }) => {
+        this.transactionsData = this.transactionsData.map((transaction: SavingsAccountTransaction) => ({
+          ...transaction,
+          transactionSubType: transactionSubTypes[transaction.id] || transaction.transactionSubType
+        }));
+        this.filterTransactions(
+          this.hideReversedParam.value,
+          this.hideAccrualsParam.value,
+          this.transactionTypeFilter.value
+        );
+      },
+      error: () => {
+        this.setTransactions();
+      }
+    });
   }
 
   /**
@@ -149,24 +180,107 @@ export class TransactionsTabComponent implements OnInit {
   }
 
   hideAccruals() {
-    this.filterTransactions(this.hideReversedParam.value, !this.hideAccrualsParam.value);
+    this.filterTransactions(
+      this.hideReversedParam.value,
+      !this.hideAccrualsParam.value,
+      this.transactionTypeFilter.value
+    );
   }
 
   hideReversed() {
-    this.filterTransactions(!this.hideReversedParam.value, this.hideAccrualsParam.value);
+    this.filterTransactions(
+      !this.hideReversedParam.value,
+      this.hideAccrualsParam.value,
+      this.transactionTypeFilter.value
+    );
   }
 
-  filterTransactions(hideReversed: boolean, hideAccrual: boolean): void {
+  filterTransactionType() {
+    this.filterTransactions(
+      this.hideReversedParam.value,
+      this.hideAccrualsParam.value,
+      this.transactionTypeFilter.value
+    );
+  }
+
+  filterTransactions(hideReversed: boolean, hideAccrual: boolean, transactionTypeFilter: string = 'ALL'): void {
     let transactions: SavingsAccountTransaction[] = this.transactionsData;
 
-    if (hideAccrual || hideReversed) {
-      transactions = this.transactionsData.filter((t: SavingsAccountTransaction) => {
-        return !(hideReversed && t.reversed) && !(hideAccrual && t.transactionType.accrual);
-      });
-    }
+    transactions = this.transactionsData.filter((t: SavingsAccountTransaction) => {
+      return (
+        !(hideReversed && t.reversed) &&
+        !(hideAccrual && t.transactionType.accrual) &&
+        this.matchesTransactionTypeFilter(t, transactionTypeFilter)
+      );
+    });
     this.dataSource = new MatTableDataSource(transactions);
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
+  }
+
+  matchesTransactionTypeFilter(transaction: SavingsAccountTransaction, transactionTypeFilter: string): boolean {
+    if (!transactionTypeFilter || transactionTypeFilter === 'ALL') {
+      return true;
+    }
+
+    const parentType = this.transactionTypeCode(transaction);
+    const subType = this.transactionSubTypeCode(transaction);
+    if (transactionTypeFilter === 'WITHDRAWAL_DISBURSAL') {
+      return parentType === 'WITHDRAWAL' && subType === 'DISBURSAL';
+    }
+    if (transactionTypeFilter === 'WITHDRAWAL_REFUND') {
+      return parentType === 'WITHDRAWAL' && subType === 'REFUND';
+    }
+    if (transactionTypeFilter === 'WITHDRAWAL_EMI_TRANSFER') {
+      return parentType === 'WITHDRAWAL' && subType === 'EMI_TRANSFER';
+    }
+    return parentType === transactionTypeFilter;
+  }
+
+  transactionTypeLabel(transaction: SavingsAccountTransaction): string {
+    const parent = transaction.transactionType.value;
+    const subType = transaction.transactionSubType;
+    return subType ? `${parent} - ${subType.displayName}` : parent;
+  }
+
+  transactionTypeBadgeClass(transaction: SavingsAccountTransaction): string {
+    const parentType = this.transactionTypeCode(transaction);
+    const subType = this.transactionSubTypeCode(transaction);
+    if (subType) {
+      return `transaction-type-${subType.toLowerCase().replace('_', '-')}`;
+    }
+    return `transaction-type-${parentType.toLowerCase().replace('_', '-')}`;
+  }
+
+  private transactionTypeCode(transaction: SavingsAccountTransaction): string {
+    const code = transaction.transactionType.code || '';
+    if (transaction.transactionType.deposit || code.endsWith('.deposit')) {
+      return 'DEPOSIT';
+    }
+    if (transaction.transactionType.withdrawal || code.endsWith('.withdrawal')) {
+      return 'WITHDRAWAL';
+    }
+    if (code.endsWith('.chargeReversal')) {
+      return 'CHARGE_REVERSAL';
+    }
+    return (transaction.transactionType.value || '').toUpperCase().replace(/ /g, '_');
+  }
+
+  private transactionSubTypeCode(transaction: SavingsAccountTransaction): string {
+    const subType = transaction.transactionSubType;
+    if (!subType) {
+      return '';
+    }
+    if (subType.code.endsWith('.disbursal')) {
+      return 'DISBURSAL';
+    }
+    if (subType.code.endsWith('.refund')) {
+      return 'REFUND';
+    }
+    if (subType.code.endsWith('.emiTransfer')) {
+      return 'EMI_TRANSFER';
+    }
+    return (subType.displayName || '').toUpperCase().replace(/ /g, '_');
   }
 
   savingsTransactionColor(transaction: SavingsAccountTransaction): string {
