@@ -169,7 +169,7 @@ export class LoansService {
    */
   getLoanGeneralTabExpandData(loanId: string): Observable<any> {
     let httpParams = new HttpParams()
-      .set('fields', 'annualInterestRate,interestRatePerPeriod,interestType')
+      .set('fields', 'annualInterestRate,interestRatePerPeriod,interestType,numberOfRepayments')
       .set('associations', 'repaymentSchedule');
     return this.http.get(`/loans/${loanId}`, { params: httpParams });
   }

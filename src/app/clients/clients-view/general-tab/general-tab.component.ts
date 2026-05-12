@@ -18,6 +18,7 @@ import {
   BulkDisburseResultsDialogData
 } from '../view-loc-details/active-loans-tab/bulk-disburse-results-dialog/bulk-disburse-results-dialog.component';
 import { BulkDisburseLoadingDialogComponent } from '../view-loc-details/active-loans-tab/bulk-disburse-loading-dialog/bulk-disburse-loading-dialog.component';
+import { TransferFromSavingsDialogComponent } from './transfer-from-savings-dialog/transfer-from-savings-dialog.component';
 
 /**
  * General Tab component.
@@ -326,6 +327,27 @@ export class GeneralTabComponent {
     $event.stopPropagation();
   }
 
+  openTransferFromSavingsDialog(loan: any, event: MouseEvent): void {
+    this.routeEdit(event);
+
+    const dialogRef = this.dialog.open(TransferFromSavingsDialogComponent, {
+      width: '42rem',
+      maxWidth: '95vw',
+      disableClose: false,
+      data: {
+        loan,
+        clientId: this.clientid
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((result: any) => {
+      if (result?.submitted) {
+        this.refreshClientLoanAndSavingsAccounts();
+        this.refreshLOCData();
+      }
+    });
+  }
+
   /**
    * @param {any} loanId Loan Id
    */
@@ -396,6 +418,9 @@ export class GeneralTabComponent {
           if (data?.interestType != null) {
             element.interestType = data.interestType;
           }
+          if (data?.numberOfRepayments != null) {
+            element.numberOfRepayments = data.numberOfRepayments;
+          }
           if (data?.repaymentSchedule != null) {
             element.repaymentSchedule = data.repaymentSchedule;
           }
@@ -427,6 +452,15 @@ export class GeneralTabComponent {
     );
   }
 
+  private refreshClientLoanAndSavingsAccounts(): void {
+    this.clientService.getClientAccountData(this.clientid).subscribe((data: any) => {
+      this.clientAccountData = data;
+      this.savingAccounts = data.savingsAccounts;
+      this.loanAccounts = data.loanAccounts;
+      this.shareAccounts = data.shareAccounts;
+    });
+  }
+
   mapCreditLinesToTableFormat(raw: any[]): any[] {
     return raw
       .map((item) => {
@@ -448,6 +482,7 @@ export class GeneralTabComponent {
                 accountNo: l.accountNo,
                 productName: l.productName,
                 originalLoan: l.originalLoan || l.principal,
+                numberOfRepayments: l.numberOfRepayments,
                 loanBalance: l.loanBalance,
                 amountPaid: l.amountPaid,
                 inArrears: l.inArrears,
@@ -547,6 +582,7 @@ export class GeneralTabComponent {
         accountNo: loan.accountNo,
         productName: loan.productName,
         originalLoan: loan.originalLoan || loan.principal,
+        numberOfRepayments: loan.numberOfRepayments,
         loanBalance: loan.loanBalance,
         amountPaid: loan.amountPaid,
         inArrears: loan.inArrears,
@@ -669,6 +705,76 @@ export class GeneralTabComponent {
     const paid = element?.amountPaid || 0;
     if (!total) return 0;
     return Math.min(Math.round((paid / total) * 10000) / 100, 100);
+  }
+
+  /** Returns EMI-count repayment progress for the RBF expanded loan row. */
+  getRBFRepaymentInstallmentProgressLabel(element: any): string {
+    return `${this.getRBFPaidInstallmentCount(element)}/${this.getRBFTotalInstallmentCount(element)} paid`;
+  }
+
+  /** Fully settled EMI count. Partial payments do not increment this count. */
+  private getRBFPaidInstallmentCount(element: any): number {
+    const periods = this.getRepaymentScheduleInstallmentPeriods(element);
+    if (periods.length > 0) {
+      return periods.filter((period: any) => this.isRepaymentScheduleInstallmentFullySettled(period)).length;
+    }
+
+    const summaryPaidCount = element?.additionalProperties?.paidInstalmentCount;
+    return this.toNonNegativeWholeNumber(summaryPaidCount);
+  }
+
+  /** Scheduled EMI count, using the schedule when loaded and loan tenure as fallback. */
+  private getRBFTotalInstallmentCount(element: any): number {
+    const periods = this.getRepaymentScheduleInstallmentPeriods(element);
+    if (periods.length > 0) {
+      return periods.length;
+    }
+
+    return this.toNonNegativeWholeNumber(
+      element?.numberOfRepayments ?? element?.additionalProperties?.totalInstalmentCount
+    );
+  }
+
+  private getRepaymentScheduleInstallmentPeriods(element: any): any[] {
+    const periods = element?.repaymentSchedule?.periods;
+    if (!Array.isArray(periods)) {
+      return [];
+    }
+
+    return periods.filter((period: any) => {
+      if (
+        !period ||
+        period.downPaymentPeriod ||
+        period.isAdditional ||
+        this.isRepaymentScheduleDisbursementRow(period)
+      ) {
+        return false;
+      }
+      const periodNumber = Number(period.period);
+      if (!periodNumber || periodNumber < 1) {
+        return false;
+      }
+      const dueAmount = Number(period.totalDueForPeriod ?? this.sumPrincipalInterestFeesForPeriod(period) ?? 0);
+      return dueAmount > 0;
+    });
+  }
+
+  private isRepaymentScheduleInstallmentFullySettled(period: any): boolean {
+    if (period?.complete === true || period?.obligationsMetOnDate) {
+      return true;
+    }
+
+    const dueAmount = Number(period?.totalDueForPeriod ?? this.sumPrincipalInterestFeesForPeriod(period) ?? 0);
+    const paidAmount = Number(period?.totalPaidForPeriod ?? 0);
+    return dueAmount > 0 && paidAmount >= dueAmount;
+  }
+
+  private toNonNegativeWholeNumber(value: any): number {
+    const numberValue = Number(value);
+    if (!Number.isFinite(numberValue) || numberValue <= 0) {
+      return 0;
+    }
+    return Math.floor(numberValue);
   }
 
   /** Determine if a loan is closed based on status code (reuse existing logic from AccountsFilterPipe) */
