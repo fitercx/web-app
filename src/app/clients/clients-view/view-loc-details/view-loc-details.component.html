@@ -223,7 +223,7 @@
           </mat-icon>
           Update Approved Facility Limit
         </button>
-        <ng-container *mifosxHasPermission="'UPDATE_CREDITLINE'">
+        <ng-container *mifosxHasPermission="'UPDATE_LINE_OF_CREDIT'">
           <button mat-menu-item (click)="doAction('Edit Blocked Amount')" *ngIf="canEditBlockedAmount()">
             <mat-icon matListIcon>
               <fa-icon icon="wallet" size="sm"></fa-icon>
