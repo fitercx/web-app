@@ -74,6 +74,18 @@
 
       <mat-nav-list>
         <mat-list-item
+          [routerLink]="['/search']"
+          [matTooltipPosition]="tooltipPosition"
+          matTooltip="Search"
+          routerLinkActive="active-menu"
+          [routerLinkActiveOptions]="{ exact: false }"
+        >
+          <mat-icon matListIcon>
+            <fa-icon icon="search" size="sm"></fa-icon>
+          </mat-icon>
+          <a matLine #search>Search</a>
+        </mat-list-item>
+        <mat-list-item
           [routerLink]="['/dashboard']"
           [matTooltipPosition]="tooltipPosition"
           matTooltip="{{ 'tooltips.Dashboard' | translate }}"

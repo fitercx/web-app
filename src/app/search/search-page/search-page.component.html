@@ -1,71 +1,50 @@
 <div class="container">
-  <mat-card fxLayout="column" fxLayoutGap="2%" *ngIf="hasResults">
-    <mat-error *ngIf="overload">{{ 'error.Searched query resulted more than 200 records' | translate }}</mat-error>
+  <h2>Search loan records</h2>
 
-    <table mat-table [dataSource]="dataSource">
-      <ng-container matColumnDef="entityType">
-        <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Entity Type' | translate }}</th>
-        <td mat-cell *matCellDef="let entity" class="view-details">{{ entity.entityType }}</td>
-      </ng-container>
+  <form class="search-form" fxLayout="row" fxLayout.lt-md="column" fxLayoutGap="2%" (ngSubmit)="search()">
+    <mat-form-field fxFlex="25%">
+      <mat-label>Search Type</mat-label>
+      <mat-select [formControl]="searchType">
+        <mat-option *ngFor="let option of searchTypeOptions" [value]="option.value">{{ option.label }}</mat-option>
+      </mat-select>
+    </mat-form-field>
 
-      <ng-container matColumnDef="entityName">
-        <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Entity Name' | translate }}</th>
-        <td mat-cell *matCellDef="let entity" class="view-details">{{ entity.entityName }}</td>
-      </ng-container>
+    <mat-form-field fxFlex>
+      <mat-label>{{ inputLabel }}</mat-label>
+      <input matInput type="text" [placeholder]="inputLabel" [formControl]="searchValue" />
+    </mat-form-field>
 
-      <ng-container matColumnDef="entityAccount">
-        <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Account No' | translate }}</th>
-        <td mat-cell *matCellDef="let entity" class="view-details">
-          <mifosx-account-number display="left" accountNo="{{ entity.entityAccountNo }}"></mifosx-account-number>
-        </td>
-      </ng-container>
+    <button mat-raised-button color="primary" type="submit" [disabled]="loading">
+      <fa-icon icon="search"></fa-icon>
+      Search
+    </button>
+  </form>
 
-      <ng-container matColumnDef="externalId">
-        <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.External Id' | translate }}</th>
-        <td mat-cell *matCellDef="let entity" class="view-details">
-          <mifosx-external-identifier externalId="{{ entity.entityExternalId }}"></mifosx-external-identifier>
-        </td>
-      </ng-container>
-
-      <ng-container matColumnDef="parentType">
-        <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Parent Type' | translate }}</th>
-        <td mat-cell *matCellDef="let entity" class="view-details">
-          {{ ['CLIENT', 'GROUP', 'CENTER'].includes(entity.entityType) ? 'Office' : 'Client' }}
-        </td>
-      </ng-container>
-
-      <ng-container matColumnDef="parentName">
-        <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Parent Name' | translate }}</th>
-        <td mat-cell *matCellDef="let entity" class="view-details">{{ entity.parentName }}</td>
-      </ng-container>
-
-      <ng-container matColumnDef="details">
-        <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Details' | translate }}</th>
-        <td mat-cell *matCellDef="let entity" class="view-details">
-          <button
-            mat-icon-button
-            matTooltip="{{ 'tooltips.View Entity' | translate }}"
-            (click)="navigate(entity)"
-            matTooltipPosition="right"
-          >
-            <fa-icon icon="eye" size="lg"></fa-icon>
-          </button>
-        </td>
-      </ng-container>
-
-      <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-      <tr mat-row *matRowDef="let entity; columns: displayedColumns"></tr>
-    </table>
-
-    <mat-paginator [pageSizeOptions]="[10, 25, 50, 100]" showFirstLastButtons></mat-paginator>
-  </mat-card>
-
-  <mat-card fxLayout="column" fxLayoutGap="2%" *ngIf="!hasResults">
-    <div class="alert">
-      <div class="message">
-        <i class="fa fa-exclamation-circle alert-check"></i>
-        {{ 'labels.text.No data found' | translate }}
+  <div class="results" *ngIf="results.length > 0">
+    <a
+      class="result-card"
+      *ngFor="let result of results"
+      [routerLink]="loanLink(result)"
+      [queryParams]="queryParams(result)"
+    >
+      <div class="result-main">
+        <div>
+          <div class="loan-id">Loan ID {{ result.loanAccountNo || result.loanId }}</div>
+          <div class="muted">{{ result.borrowerName || '-' }} · {{ result.product || '-' }}</div>
+          <div class="muted" *ngIf="searchType.value === 'invoiceNo'">Invoice Number {{ result.invoiceNo }}</div>
+        </div>
+        <span class="status-badge">{{ result.status || '-' }}</span>
       </div>
-    </div>
-  </mat-card>
+      <div class="result-footer">
+        <span>Outstanding</span>
+        <strong>{{
+          result.outstanding || 0 | currency: result.currencyCode || 'AED' : 'symbol-narrow' : '1.2-2'
+        }}</strong>
+      </div>
+    </a>
+  </div>
+
+  <div class="empty-state" *ngIf="submitted && !loading && results.length === 0">
+    No record found for {{ searchedValue }}
+  </div>
 </div>
