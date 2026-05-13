@@ -414,8 +414,10 @@
                     color="primary"
                     matTooltip="{{ 'tooltips.Make Repayment' | translate }}"
                     matTooltipPosition="above"
-                    (click)="routeEdit($event)"
-                    [routerLink]="['../', 'loans-accounts', element.id, 'actions', 'Make Repayment']"
+                    (click)="isRBFLoan(element) ? openTransferFromSavingsDialog(element, $event) : routeEdit($event)"
+                    [routerLink]="
+                      isRBFLoan(element) ? null : ['../', 'loans-accounts', element.id, 'actions', 'Make Repayment']
+                    "
                   >
                     <i class="fa fa-dollar"></i>
                   </button>
@@ -693,8 +695,8 @@
           color="primary"
           matTooltip="{{ 'tooltips.Make Repayment' | translate }}"
           matTooltipPosition="above"
-          (click)="routeEdit($event)"
-          [routerLink]="['../', 'loans-accounts', element.id, 'actions', 'Make Repayment']"
+          (click)="isRBFLoan(element) ? openTransferFromSavingsDialog(element, $event) : routeEdit($event)"
+          [routerLink]="isRBFLoan(element) ? null : ['../', 'loans-accounts', element.id, 'actions', 'Make Repayment']"
         >
           <i class="fa fa-dollar"></i>
         </button>
@@ -762,16 +764,7 @@
                 <div class="rbf-progress-header">
                   <span class="rbf-progress-label">Repayment progress</span>
                   <span class="rbf-progress-stats">
-                    {{ getRBFRepaymentPercent(element) }}% paid
-                    <ng-container
-                      *ngIf="
-                        element.additionalProperties?.paidInstalmentCount != null &&
-                        element.additionalProperties?.totalInstalmentCount != null
-                      "
-                    >
-                      &nbsp;·&nbsp; {{ element.additionalProperties.paidInstalmentCount }} of
-                      {{ element.additionalProperties.totalInstalmentCount }} instalments
-                    </ng-container>
+                    {{ getRBFRepaymentInstallmentProgressLabel(element) }}
                   </span>
                 </div>
                 <div class="rbf-progress-bar-track">
