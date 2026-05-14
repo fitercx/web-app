@@ -1,5 +1,5 @@
 /** Angular Imports */
-import { Component } from '@angular/core';
+import { AfterViewInit, Component } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 
 /**
@@ -10,7 +10,7 @@ import { ActivatedRoute } from '@angular/router';
   templateUrl: './loc-details-tab.component.html',
   styleUrls: ['./loc-details-tab.component.scss']
 })
-export class LocDetailsTabComponent {
+export class LocDetailsTabComponent implements AfterViewInit {
   /** Loan Details Data */
   loanDetailsData: any;
   /** Invoice Details from additionalProperties */
@@ -24,6 +24,19 @@ export class LocDetailsTabComponent {
       this.loanDetailsData = data.loanDetailsData;
       this.locDetails = data.loanDetailsData.additionalProperties;
     });
+  }
+
+  ngAfterViewInit(): void {
+    const invoiceNo = this.route.snapshot.queryParamMap.get('invoiceNo');
+    if (invoiceNo && invoiceNo === this.locDetails?.invoiceNo) {
+      setTimeout(() =>
+        document.getElementById('matched-invoice-row')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      );
+    }
+  }
+
+  isMatchedInvoice(): boolean {
+    return this.route.snapshot.queryParamMap.get('invoiceNo') === this.locDetails?.invoiceNo;
   }
 
   /**
