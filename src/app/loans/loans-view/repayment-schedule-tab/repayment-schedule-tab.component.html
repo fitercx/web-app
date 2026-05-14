@@ -22,8 +22,10 @@
     </ng-container>
 
     <ng-container matColumnDef="days">
-      <th mat-header-cell class="center" *matHeaderCellDef>{{ 'labels.inputs.Days' | translate }}</th>
-      <td mat-cell class="center" *matCellDef="let item" [ngClass]="installmentStyle(item)">{{ item.daysInPeriod }}</td>
+      <th mat-header-cell class="center" *matHeaderCellDef>{{ getIntervalLabel() | translate }}</th>
+      <td mat-cell class="center" *matCellDef="let item" [ngClass]="installmentStyle(item)">
+        {{ getIntervalValue(item) }}
+      </td>
       <td mat-footer-cell class="center" *matFooterCellDef>
         <b *ngIf="getDisplayedTotalOutstanding() !== null"> Total</b>
       </td>
