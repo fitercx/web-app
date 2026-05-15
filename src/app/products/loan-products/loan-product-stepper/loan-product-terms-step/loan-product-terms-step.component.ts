@@ -140,10 +140,6 @@ export class LoanProductTermsStepComponent implements OnInit, OnChanges {
     if (this.loanProductSettingsForm?.get('factorRateProductEnabled')?.value) {
       this.loanProductTermsForm.get('interestRatePerPeriod').disable();
       this.loanProductTermsForm.get('interestRatePerPeriod').patchValue(0);
-      this.loanProductTermsForm.get('repaymentFrequencyType').patchValue(0);
-      this.loanProductTermsForm.get('repaymentFrequencyType').disable();
-      this.loanProductTermsForm.get('repaymentEvery').patchValue(1);
-      this.loanProductTermsForm.get('repaymentEvery').disable();
     }
 
     // Subscribe to factorRateProductEnabled changes
@@ -153,10 +149,6 @@ export class LoanProductTermsStepComponent implements OnInit, OnChanges {
         if (factorRateProductEnabled) {
           this.loanProductTermsForm.get('interestRatePerPeriod').disable();
           this.loanProductTermsForm.get('interestRatePerPeriod').patchValue(0);
-          this.loanProductTermsForm.get('repaymentFrequencyType').patchValue(0);
-          this.loanProductTermsForm.get('repaymentFrequencyType').disable();
-          this.loanProductTermsForm.get('repaymentEvery').patchValue(1);
-          this.loanProductTermsForm.get('repaymentEvery').disable();
         } else {
           this.loanProductTermsForm.get('interestRatePerPeriod').enable();
           this.loanProductTermsForm
