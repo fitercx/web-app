@@ -85,6 +85,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   @Output() editPeriod = new EventEmitter();
 
   businessDate: Date = new Date();
+  isExportingRepaymentScheduleExcel = false;
 
   /** Tolerance threshold for floating-point comparison when matching principal amounts */
   private static readonly PRINCIPAL_COMPARISON_TOLERANCE = 0.01;
@@ -210,6 +211,400 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       }
     });
     pdf.save(fileName);
+  }
+
+  exportToExcel(): void {
+    if (!this.repaymentScheduleDetails?.periods?.length || this.isExportingRepaymentScheduleExcel) {
+      return;
+    }
+
+    this.isExportingRepaymentScheduleExcel = true;
+    setTimeout(() => {
+      try {
+        const worksheet = this.buildRepaymentScheduleWorksheet();
+        const workbook: XLSX.WorkBook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'Repayment Schedule');
+
+        const loanId = this.getLoanIdentifier();
+        const generationDate = this.formatDateForFileName(this.settingsService.businessDate);
+        XLSX.writeFile(workbook, `RepaymentSchedule_${loanId}_${generationDate}.xlsx`, { cellDates: true });
+      } finally {
+        this.isExportingRepaymentScheduleExcel = false;
+      }
+    });
+  }
+
+  private buildRepaymentScheduleWorksheet(): XLSX.WorkSheet {
+    const loanInfo = this.loanData || this.loanDetailsData || {};
+    const tableColumns = this.getRepaymentScheduleExportColumns();
+    const metadataRows = this.getRepaymentScheduleMetadataRows(loanInfo);
+    const tableStartRow = metadataRows.length + 2;
+    const tableHeaderRow = tableStartRow + 1;
+    const scheduleRows = this.repaymentScheduleDetails.periods.map((period: any) =>
+      tableColumns.map((column) => column.value(period))
+    );
+    const totalsRow = tableColumns.map((column) => (column.total ? column.total() : ''));
+
+    const rows = [
+      ['Repayment Schedule'],
+      ...metadataRows,
+      [],
+      tableColumns.map((column) => column.header),
+      ...scheduleRows,
+      totalsRow
+    ];
+
+    const worksheet: XLSX.WorkSheet = XLSX.utils.aoa_to_sheet(rows, { cellDates: true });
+    worksheet['!cols'] = this.getRepaymentScheduleColumnWidths(rows);
+
+    this.applyRepaymentScheduleExcelFormatting(worksheet, metadataRows, tableHeaderRow, rows.length, tableColumns);
+    return worksheet;
+  }
+
+  private getRepaymentScheduleMetadataRows(loanInfo: any): any[][] {
+    const metadataRows: any[][] = [
+      [
+        'Loan ID',
+        this.getLoanIdentifier()
+      ],
+      [
+        'Account No',
+        loanInfo.accountNo ?? ''
+      ],
+      [
+        'Customer',
+        loanInfo.clientName || loanInfo.group?.name || ''
+      ],
+      [
+        'Product',
+        loanInfo.loanProductName ?? ''
+      ],
+      [
+        'Status',
+        loanInfo.status?.value ?? ''
+      ],
+      [
+        'Currency',
+        this.currencyCode ?? loanInfo.currency?.code ?? this.repaymentScheduleDetails?.currency?.code ?? ''
+      ],
+      [
+        'Generated On',
+        this.toExcelDate(this.settingsService.businessDate)]
+
+    ];
+
+    if (loanInfo.timeline?.actualDisbursementDate) {
+      metadataRows.push([
+        'Disbursement Date',
+        this.toExcelDate(loanInfo.timeline.actualDisbursementDate)]);
+    }
+    if (loanInfo.timeline?.expectedMaturityDate) {
+      metadataRows.push([
+        'Maturity Date',
+        this.toExcelDate(loanInfo.timeline.expectedMaturityDate)]);
+    }
+    if (loanInfo.annualInterestRate != null) {
+      metadataRows.push([
+        'Interest Rate',
+        this.toPercentage(loanInfo.annualInterestRate)]);
+    } else if (loanInfo.interestRatePerPeriod != null) {
+      metadataRows.push([
+        'Interest Rate',
+        this.toPercentage(loanInfo.interestRatePerPeriod)]);
+    }
+
+    return metadataRows;
+  }
+
+  private getRepaymentScheduleExportColumns(): any[] {
+    return this.displayedColumns
+      .filter((column) => column !== 'check')
+      .map((column) => this.getRepaymentScheduleExportColumn(column))
+      .filter((column) => !!column);
+  }
+
+  private getRepaymentScheduleExportColumn(column: string): any {
+    const moneyFormat = '#,##0.000';
+    const numberFormat = '0';
+    const dateFormat = 'dd mmm yyyy';
+    const emiTotal = () =>
+      this.isLineOfCreditReceivable()
+        ? this.toNumber(this.repaymentScheduleDetails.totalPrincipalExpected) +
+          this.toNumber(this.repaymentScheduleDetails.totalInterestCharged) +
+          this.getDisplayTotalFees() +
+          this.getDisplayTotalTaxes()
+        : this.toNumber(this.repaymentScheduleDetails.totalPrincipalExpected) +
+          this.toNumber(this.repaymentScheduleDetails.totalInterestCharged);
+
+    const columns: any = {
+      number: { header: '#', value: (item: any) => item.period ?? '', format: numberFormat },
+      days: {
+        header: this.getPlainIntervalLabel(),
+        value: (item: any) => this.getIntervalValue(item),
+        total: () => 'Total',
+        format: numberFormat
+      },
+      balanceOfLoan: {
+        header: this.isLineOfCreditReceivable() ? 'PreDisbursal Amount' : 'Principal O/S',
+        value: (item: any) => this.toNumber(item.principalLoanBalanceOutstanding),
+        total: () => this.getDisplayedTotalOutstanding(),
+        format: moneyFormat
+      },
+      date: { header: 'Due Date', value: (item: any) => this.toExcelDate(item.dueDate), format: dateFormat },
+      emiAmount: {
+        header: this.getPlainEmiLabel(),
+        value: (item: any) =>
+          this.isLineOfCreditReceivable() || this.isLoanFactorRateEnabled()
+            ? this.toNumber(item.principalDue) +
+              this.toNumber(item.interestOriginalDue) +
+              this.getDisplayFeeForPeriod(item) +
+              this.getDisplayTaxForPeriod(item)
+            : this.toNumber(item.principalDue) + this.toNumber(item.interestOriginalDue),
+        total: emiTotal,
+        format: moneyFormat
+      },
+      principalDue: {
+        header: 'Principal Due',
+        value: (item: any) => this.toNumber(item.principalDue),
+        total: () => this.toNumber(this.repaymentScheduleDetails.totalPrincipalExpected),
+        format: moneyFormat
+      },
+      interest: {
+        header: this.isLineOfCreditReceivable() ? 'Expected Interest' : 'Interest',
+        value: (item: any) => this.toNumber(item.interestOriginalDue),
+        total: () => this.toNumber(this.repaymentScheduleDetails.totalInterestCharged),
+        format: moneyFormat
+      },
+      fees: {
+        header: 'Fees',
+        value: (item: any) =>
+          item.feeChargesReversed && item.feeChargesReversed > 0
+            ? this.toNumber(item.feeChargesReversed)
+            : this.getDisplayFeeForPeriod(item),
+        total: () => this.getDisplayTotalFees(),
+        format: moneyFormat
+      },
+      taxes: {
+        header: 'Taxes',
+        value: (item: any) => this.getDisplayTaxForPeriod(item),
+        total: () => this.getDisplayTotalTaxes(),
+        format: moneyFormat
+      },
+      penalties: {
+        header: 'Overdue Interest',
+        value: (item: any) =>
+          item.reversedPenaltyChargesDue && item.reversedPenaltyChargesDue > 0
+            ? this.toNumber(item.reversedPenaltyChargesDue)
+            : this.toNumber(item.penaltyChargesDue),
+        total: () => this.toNumber(this.repaymentScheduleDetails.totalPenaltyChargesCharged),
+        format: moneyFormat
+      },
+      waived: {
+        header: 'Waived Amount',
+        value: (item: any) => (this.isWaived ? this.toNumber(item.totalWaivedForPeriod) : ''),
+        total: () => (this.isWaived ? this.toNumber(this.repaymentScheduleDetails.totalWaived) : ''),
+        format: moneyFormat
+      },
+      status: {
+        header: 'Status',
+        value: (item: any) =>
+          item.interestOriginalDue === 0 && item.principalDue === 0
+            ? 'GRACE_PERIOD_APPLIED'
+            : this.getDisplayStatus(item)
+      },
+      paiddate: {
+        header: 'Paid Date',
+        value: (item: any) =>
+          item.interestOriginalDue === 0 && item.principalDue === 0 ? '' : this.toExcelDate(item.obligationsMetOnDate),
+        format: dateFormat
+      },
+      due: {
+        header: 'Due Payment',
+        value: (item: any) => this.toNumber(item.totalDueForPeriod),
+        total: () => this.toNumber(this.repaymentScheduleDetails.totalRepaymentExpected),
+        format: moneyFormat
+      },
+      paid: {
+        header: 'Amount Paid',
+        value: (item: any) => this.toNumber(item.totalPaidForPeriod),
+        total: () => this.toNumber(this.repaymentScheduleDetails.totalRepayment),
+        format: moneyFormat
+      },
+      inadvance: {
+        header: 'Advance Paid',
+        value: (item: any) => this.toNumber(item.totalPaidInAdvanceForPeriod),
+        total: () => this.toNumber(this.repaymentScheduleDetails.totalPaidInAdvance),
+        format: moneyFormat
+      },
+      late: {
+        header: 'Late Paid',
+        value: (item: any) => this.toNumber(item.totalPaidLateForPeriod),
+        total: () => this.toNumber(this.repaymentScheduleDetails.totalPaidLate),
+        format: moneyFormat
+      },
+      outstanding: {
+        header: 'Outstanding Amount',
+        value: (item: any) =>
+          !this.isLoanOverpaid() && this.shouldShowOutstanding(item)
+            ? this.toNumber(item.totalOutstandingForPeriod)
+            : '',
+        format: moneyFormat
+      },
+      disbursedAmount: {
+        header: 'Disbursed Amount',
+        value: (item: any) => this.getDisbursedAmount(item),
+        format: moneyFormat
+      },
+      refundAmount: {
+        header: 'Refund Amount',
+        value: (item: any) => {
+          const refundAmount = this.getRefundAmount(item);
+          return refundAmount > 0 ? refundAmount : '';
+        },
+        format: moneyFormat
+      }
+    };
+
+    return columns[column];
+  }
+
+  private applyRepaymentScheduleExcelFormatting(
+    worksheet: XLSX.WorkSheet,
+    metadataRows: any[][],
+    tableHeaderRow: number,
+    totalRows: number,
+    tableColumns: any[]
+  ): void {
+    const headerRowIndex = tableHeaderRow - 1;
+    const totalRowIndex = totalRows - 1;
+    const tableDataStartIndex = tableHeaderRow;
+    const moneyFormat = '#,##0.000';
+    const dateFormat = 'dd mmm yyyy';
+
+    this.setRowStyle(worksheet, 0, tableColumns.length, { bold: true, fill: 'D9EAF7' });
+    metadataRows.forEach((row, index) => {
+      this.setCellStyle(worksheet, index + 1, 0, { bold: true });
+      if (row[0] === 'Generated On' || row[0] === 'Disbursement Date' || row[0] === 'Maturity Date') {
+        this.setCellFormat(worksheet, index + 1, 1, dateFormat);
+      }
+      if (row[0] === 'Interest Rate') {
+        this.setCellFormat(worksheet, index + 1, 1, '0.00%');
+      }
+    });
+    this.setRowStyle(worksheet, headerRowIndex, tableColumns.length, { bold: true, fill: 'EDEDED' });
+    this.setRowStyle(worksheet, totalRowIndex, tableColumns.length, { bold: true, fill: 'F5F5F5' });
+
+    tableColumns.forEach((column, columnIndex) => {
+      for (let rowIndex = tableDataStartIndex; rowIndex < totalRows; rowIndex++) {
+        this.setCellFormat(worksheet, rowIndex, columnIndex, column.format);
+      }
+      if (column.total && !column.format) {
+        this.setCellFormat(worksheet, totalRowIndex, columnIndex, moneyFormat);
+      }
+    });
+  }
+
+  private setRowStyle(worksheet: XLSX.WorkSheet, rowIndex: number, columnCount: number, style: any): void {
+    for (let columnIndex = 0; columnIndex < columnCount; columnIndex++) {
+      this.setCellStyle(worksheet, rowIndex, columnIndex, style);
+    }
+  }
+
+  private setCellStyle(worksheet: XLSX.WorkSheet, rowIndex: number, columnIndex: number, style: any): void {
+    const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex });
+    if (!worksheet[cellAddress]) {
+      worksheet[cellAddress] = { t: 's', v: '' };
+    }
+    worksheet[cellAddress].s = {
+      font: style.bold ? { bold: true } : undefined,
+      fill: style.fill ? { fgColor: { rgb: style.fill } } : undefined
+    };
+  }
+
+  private setCellFormat(worksheet: XLSX.WorkSheet, rowIndex: number, columnIndex: number, format?: string): void {
+    if (!format) {
+      return;
+    }
+    const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex });
+    if (worksheet[cellAddress]) {
+      worksheet[cellAddress].z = format;
+    }
+  }
+
+  private getRepaymentScheduleColumnWidths(rows: any[][]): any[] {
+    const columnCount = Math.max(...rows.map((row) => row.length));
+    return Array.from({ length: columnCount }, (_, columnIndex) => {
+      const width = rows.reduce((maxWidth, row) => {
+        const value = row[columnIndex];
+        if (value instanceof Date) {
+          return Math.max(maxWidth, 12);
+        }
+        return Math.max(maxWidth, String(value ?? '').length + 2);
+      }, 10);
+      return { wch: Math.min(Math.max(width, 10), 28) };
+    });
+  }
+
+  private getLoanIdentifier(): string {
+    const loanInfo = this.loanData || this.loanDetailsData || {};
+    return String(loanInfo.id ?? loanInfo.accountNo ?? 'loan').replace(/[^A-Za-z0-9_-]/g, '');
+  }
+
+  private formatDateForFileName(date: Date): string {
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    return `${year}${month}${day}`;
+  }
+
+  private toExcelDate(value: any): Date | '' {
+    if (!value) {
+      return '';
+    }
+    if (value instanceof Date) {
+      return value;
+    }
+    if (Array.isArray(value) && value.length >= 3) {
+      return new Date(value[0], value[1] - 1, value[2]);
+    }
+    return this.dateUtils.parseDate(value);
+  }
+
+  private toNumber(value: any): number {
+    const numericValue = Number(value ?? 0);
+    return Number.isFinite(numericValue) ? numericValue : 0;
+  }
+
+  private toPercentage(value: any): number {
+    const numericValue = this.toNumber(value);
+    return Math.abs(numericValue) > 1 ? numericValue / 100 : numericValue;
+  }
+
+  private getPlainEmiLabel(): string {
+    const repaymentFrequencyTypeId = this.getRepaymentFrequencyTypeId();
+    switch (repaymentFrequencyTypeId) {
+      case 0:
+        return this.isAnyLineOfCredit() ? 'EMI Amount' : 'EDI Amount';
+      case 1:
+        return 'EWI Amount';
+      case 2:
+        return 'EMI Amount';
+      case 3:
+        return 'EAI Amount';
+      default:
+        return 'EMI Amount';
+    }
+  }
+
+  private getPlainIntervalLabel(): string {
+    switch (this.getRepaymentFrequencyTypeId()) {
+      case 1:
+        return 'Weeks';
+      case 2:
+        return 'Months';
+      default:
+        return 'Days';
+    }
   }
 
   /**
