@@ -9,10 +9,11 @@ import { DatepickerBase } from 'app/shared/form-dialog/formfield/model/datepicke
 import { FormfieldBase } from 'app/shared/form-dialog/formfield/model/formfield-base';
 import { InputBase } from 'app/shared/form-dialog/formfield/model/input-base';
 import { AdjustInstallmentDateDialogComponent } from '../custom-dialogs/adjust-installment-date-dialog/adjust-installment-date-dialog.component';
-import { AccrualReportPeriod, LoansService } from 'app/loans/loans.service';
+import { LoansService } from 'app/loans/loans.service';
 
 import { jsPDF, jsPDFOptions } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 
 @Component({
@@ -219,36 +220,167 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     }
 
     this.isExportingRepaymentScheduleExcel = true;
-    setTimeout(() => {
+    setTimeout(async () => {
       try {
-        const worksheet = this.buildRepaymentScheduleWorksheet();
+        const loanDetailsWorksheet = this.buildLoanDetailsWorksheet();
+        const repaymentScheduleWorksheet = this.buildRepaymentScheduleWorksheet();
         const workbook: XLSX.WorkBook = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(workbook, worksheet, 'Repayment Schedule');
+        XLSX.utils.book_append_sheet(workbook, loanDetailsWorksheet, 'Loan Details');
+        XLSX.utils.book_append_sheet(workbook, repaymentScheduleWorksheet, 'Repayment Schedule');
 
         const loanId = this.getLoanIdentifier();
         const generationDate = this.formatDateForFileName(this.settingsService.businessDate);
-        XLSX.writeFile(workbook, `RepaymentSchedule_${loanId}_${generationDate}.xlsx`, { cellDates: true });
+        await this.writeRepaymentScheduleWorkbook(workbook, `RepaymentSchedule_${loanId}_${generationDate}.xlsx`);
       } finally {
         this.isExportingRepaymentScheduleExcel = false;
       }
     });
   }
 
-  private buildRepaymentScheduleWorksheet(): XLSX.WorkSheet {
+  private async writeRepaymentScheduleWorkbook(workbook: XLSX.WorkBook, fileName: string): Promise<void> {
+    const workbookData = XLSX.write(workbook, {
+      bookType: 'xlsx',
+      type: 'array',
+      cellDates: true,
+      cellStyles: true
+    });
+    const zip = await JSZip.loadAsync(workbookData);
+    const totalRowNumber = this.repaymentScheduleDetails.periods.length + 2;
+
+    await this.applyBoldRowsToWorksheet(zip, 'xl/worksheets/sheet1.xml', [
+      1
+    ]);
+    await this.applyBoldRowsToWorksheet(zip, 'xl/worksheets/sheet2.xml', [
+      1,
+      totalRowNumber
+    ]);
+
+    const blob = await zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    this.downloadBlob(blob, fileName);
+  }
+
+  private async applyBoldRowsToWorksheet(zip: JSZip, sheetPath: string, rowNumbers: number[]): Promise<void> {
+    const worksheetFile = zip.file(sheetPath);
+    const stylesFile = zip.file('xl/styles.xml');
+    if (!worksheetFile || !stylesFile) {
+      return;
+    }
+
+    const parser = new DOMParser();
+    const serializer = new XMLSerializer();
+    const worksheetDocument = parser.parseFromString(await worksheetFile.async('string'), 'application/xml');
+    const rowNumberSet = new Set(rowNumbers.map((rowNumber) => String(rowNumber)));
+    const targetCells = Array.from(worksheetDocument.getElementsByTagName('c')).filter((cell) => {
+      const cellReference = cell.getAttribute('r') || '';
+      const rowNumber = cellReference.replace(/[A-Z]+/g, '');
+      return rowNumberSet.has(rowNumber);
+    });
+
+    if (!targetCells.length) {
+      return;
+    }
+
+    const styleIds = Array.from(new Set(targetCells.map((cell) => cell.getAttribute('s') || '0')));
+    const boldStyles = this.addBoldCellStyles(await stylesFile.async('string'), styleIds);
+
+    targetCells.forEach((cell) => {
+      const styleId = cell.getAttribute('s') || '0';
+      cell.setAttribute('s', boldStyles.styleMap[styleId] || styleId);
+    });
+
+    zip.file('xl/styles.xml', boldStyles.stylesXml);
+    zip.file(sheetPath, serializer.serializeToString(worksheetDocument));
+  }
+
+  private addBoldCellStyles(
+    stylesXml: string,
+    styleIds: string[]
+  ): { stylesXml: string; styleMap: { [key: string]: string } } {
+    const parser = new DOMParser();
+    const serializer = new XMLSerializer();
+    const stylesDocument = parser.parseFromString(stylesXml, 'application/xml');
+    const namespace = stylesDocument.documentElement.namespaceURI;
+    const fonts = stylesDocument.getElementsByTagName('fonts')[0];
+    const cellFormats = stylesDocument.getElementsByTagName('cellXfs')[0];
+    const existingFonts = Array.from(fonts.getElementsByTagName('font'));
+    const existingFormats = Array.from(cellFormats.getElementsByTagName('xf'));
+    const baseFont = existingFonts[0];
+    const boldFont = baseFont
+      ? (baseFont.cloneNode(true) as Element)
+      : stylesDocument.createElementNS(namespace, 'font');
+
+    if (!boldFont.getElementsByTagName('b').length) {
+      boldFont.insertBefore(stylesDocument.createElementNS(namespace, 'b'), boldFont.firstChild);
+    }
+
+    fonts.appendChild(boldFont);
+    const boldFontId = existingFonts.length;
+    fonts.setAttribute('count', String(boldFontId + 1));
+
+    const styleMap: { [key: string]: string } = {};
+    styleIds.forEach((styleId) => {
+      const baseFormat = existingFormats[Number(styleId)] || existingFormats[0];
+      const boldFormat = baseFormat
+        ? (baseFormat.cloneNode(true) as Element)
+        : stylesDocument.createElementNS(namespace, 'xf');
+      boldFormat.setAttribute('fontId', String(boldFontId));
+      boldFormat.setAttribute('applyFont', '1');
+      cellFormats.appendChild(boldFormat);
+      styleMap[styleId] = String(existingFormats.length + Object.keys(styleMap).length);
+    });
+
+    cellFormats.setAttribute('count', String(existingFormats.length + styleIds.length));
+    return { stylesXml: serializer.serializeToString(stylesDocument), styleMap };
+  }
+
+  private downloadBlob(blob: Blob, fileName: string): void {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  private buildLoanDetailsWorksheet(): XLSX.WorkSheet {
     const loanInfo = this.loanData || this.loanDetailsData || {};
-    const tableColumns = this.getRepaymentScheduleExportColumns();
     const metadataRows = this.getRepaymentScheduleMetadataRows(loanInfo);
-    const tableStartRow = metadataRows.length + 2;
-    const tableHeaderRow = tableStartRow + 1;
+    const rows = [
+      [
+        'Field',
+        'Value'
+      ],
+      ...metadataRows
+    ];
+
+    const worksheet: XLSX.WorkSheet = XLSX.utils.aoa_to_sheet(rows, { cellDates: true });
+    worksheet['!cols'] = this.getRepaymentScheduleColumnWidths(rows);
+
+    this.setRowStyle(worksheet, 0, rows[0].length, { bold: true, fill: 'EDEDED' });
+    metadataRows.forEach((row, index) => {
+      this.setCellStyle(worksheet, index + 1, 0, { bold: true });
+      if (row[0] === 'Generated On' || row[0] === 'Disbursement Date' || row[0] === 'Maturity Date') {
+        this.setCellFormat(worksheet, index + 1, 1, 'dd mmm yyyy');
+      }
+      if (row[0] === 'Interest Rate') {
+        this.setCellFormat(worksheet, index + 1, 1, '0.00%');
+      }
+    });
+
+    return worksheet;
+  }
+
+  private buildRepaymentScheduleWorksheet(): XLSX.WorkSheet {
+    const tableColumns = this.getRepaymentScheduleExportColumns();
     const scheduleRows = this.repaymentScheduleDetails.periods.map((period: any) =>
       tableColumns.map((column) => column.value(period))
     );
     const totalsRow = tableColumns.map((column) => (column.total ? column.total() : ''));
 
     const rows = [
-      ['Repayment Schedule'],
-      ...metadataRows,
-      [],
       tableColumns.map((column) => column.header),
       ...scheduleRows,
       totalsRow
@@ -257,7 +389,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     const worksheet: XLSX.WorkSheet = XLSX.utils.aoa_to_sheet(rows, { cellDates: true });
     worksheet['!cols'] = this.getRepaymentScheduleColumnWidths(rows);
 
-    this.applyRepaymentScheduleExcelFormatting(worksheet, metadataRows, tableHeaderRow, rows.length, tableColumns);
+    this.applyRepaymentScheduleExcelFormatting(worksheet, rows.length, tableColumns);
     return worksheet;
   }
 
@@ -470,27 +602,14 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
   private applyRepaymentScheduleExcelFormatting(
     worksheet: XLSX.WorkSheet,
-    metadataRows: any[][],
-    tableHeaderRow: number,
     totalRows: number,
     tableColumns: any[]
   ): void {
-    const headerRowIndex = tableHeaderRow - 1;
+    const headerRowIndex = 0;
     const totalRowIndex = totalRows - 1;
-    const tableDataStartIndex = tableHeaderRow;
+    const tableDataStartIndex = 1;
     const moneyFormat = '#,##0.000';
-    const dateFormat = 'dd mmm yyyy';
 
-    this.setRowStyle(worksheet, 0, tableColumns.length, { bold: true, fill: 'D9EAF7' });
-    metadataRows.forEach((row, index) => {
-      this.setCellStyle(worksheet, index + 1, 0, { bold: true });
-      if (row[0] === 'Generated On' || row[0] === 'Disbursement Date' || row[0] === 'Maturity Date') {
-        this.setCellFormat(worksheet, index + 1, 1, dateFormat);
-      }
-      if (row[0] === 'Interest Rate') {
-        this.setCellFormat(worksheet, index + 1, 1, '0.00%');
-      }
-    });
     this.setRowStyle(worksheet, headerRowIndex, tableColumns.length, { bold: true, fill: 'EDEDED' });
     this.setRowStyle(worksheet, totalRowIndex, tableColumns.length, { bold: true, fill: 'F5F5F5' });
 
@@ -612,31 +731,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
    * Falls back to client-side calculation if the API is unavailable.
    */
   exportAccrualReport() {
-    const loanId = this.loanDetailsData?.id ?? this.loanData?.id;
-    if (loanId) {
-      this.loansService.getAccrualReport(String(loanId)).subscribe({
-        next: (response) => {
-          const periods = response?.periods ?? [];
-          if (periods.length > 0) {
-            const accrualData = periods.map((p: AccrualReportPeriod) => ({
-              Index: p.index,
-              'End of Month': p.endOfMonth,
-              'Opening Principal': this.formatCurrency(Number(p.openingPrincipal)),
-              'Closing Principal': this.formatCurrency(Number(p.closingPrincipal)),
-              'Interest Accrued': this.formatCurrency(Number(p.interestAccrued)),
-              'Actual Interest Accrued':
-                p.actualInterestAccrued != null ? this.formatCurrency(Number(p.actualInterestAccrued)) : ''
-            }));
-            this.exportAccrualToExcel(accrualData, new Date());
-          } else {
-            this.exportAccrualReportFromSchedule();
-          }
-        },
-        error: () => this.exportAccrualReportFromSchedule()
-      });
-    } else {
-      this.exportAccrualReportFromSchedule();
-    }
+    this.exportAccrualReportFromSchedule();
   }
 
   /**
@@ -673,63 +768,9 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   /**
-   * Returns the number of days between two dates (inclusive of both dates).
-   */
-  private getDaysBetween(from: Date, to: Date): number {
-    const fromTime = new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime();
-    const toTime = new Date(to.getFullYear(), to.getMonth(), to.getDate()).getTime();
-    return Math.round((toTime - fromTime) / (24 * 60 * 60 * 1000)) + 1;
-  }
-
-  /**
-   * Gets the start date of a schedule period (day after previous due, or fromDate, or loan start).
-   */
-  private getPeriodStartDate(
-    period: RepaymentSchedulePeriod,
-    periodIndex: number,
-    periods: RepaymentSchedulePeriod[],
-    startDate: Date
-  ): Date {
-    if (period.fromDate) {
-      return this.dateUtils.parseDate(period.fromDate);
-    }
-    if (periodIndex > 0 && periods[periodIndex - 1].dueDate) {
-      const prevDue = this.dateUtils.parseDate(periods[periodIndex - 1].dueDate);
-      const next = new Date(prevDue);
-      next.setDate(next.getDate() + 1);
-      return next;
-    }
-    return new Date(startDate);
-  }
-
-  /**
-   * Calculates day-weighted interest accrued in a date range from a single period.
-   * Returns (overlapDays / periodDays) * periodInterest.
-   */
-  private getDayWeightedInterestForRange(
-    periodStart: Date,
-    periodDue: Date,
-    periodDays: number,
-    periodInterest: number,
-    rangeStart: Date,
-    rangeEnd: Date
-  ): number {
-    const overlapStart = periodStart > rangeStart ? periodStart : rangeStart;
-    const overlapEnd = periodDue < rangeEnd ? periodDue : rangeEnd;
-    if (overlapStart > overlapEnd) {
-      return 0;
-    }
-    const overlapDays = this.getDaysBetween(overlapStart, overlapEnd);
-    if (periodDays <= 0) {
-      return 0;
-    }
-    return (overlapDays / periodDays) * periodInterest;
-  }
-
-  /**
    * Generates monthly accrual data from repayment schedule periods.
-   * Accrual is calculated month-wise on the basis of number of days: each period's interest
-   * is allocated to calendar months in proportion to how many days of that period fall in each month.
+   * Accrual is calculated month-wise from repayment schedule due dates so the report total
+   * matches the schedule interest exactly.
    */
   private generateAccrualData(periods: RepaymentSchedulePeriod[], startDate: Date, maturityDate: Date): any[] {
     const accrualRows: any[] = [];
@@ -782,64 +823,41 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
         openingPrincipal = initialPrincipal;
       }
 
-      // Interest accrued this month: day-weighted by overlap of each period with this month
-      let interestAccrued = 0;
-      periods.forEach((period, periodIndex) => {
-        if (!period.dueDate || (period.interestOriginalDue ?? 0) === 0) {
-          return;
+      const periodsDueThisMonth = periods.filter((period) => {
+        if (!period.dueDate) {
+          return false;
         }
-        const periodDue = this.dateUtils.parseDate(period.dueDate);
-        const periodStart = this.getPeriodStartDate(period, periodIndex, periods, startDate);
-        if (periodDue < monthStartDate || periodStart > monthEndDate) {
-          return;
-        }
-        const periodDays = period.daysInPeriod ?? Math.max(1, this.getDaysBetween(periodStart, periodDue));
-        interestAccrued += this.getDayWeightedInterestForRange(
-          periodStart,
-          periodDue,
-          periodDays,
-          period.interestOriginalDue ?? 0,
-          monthStartDate,
-          monthEndDate
-        );
+        const dueDate = this.dateUtils.parseDate(period.dueDate);
+        return dueDate >= monthStartDate && dueDate <= monthEndDate;
       });
+
+      // Match the repayment schedule exactly by recognizing each installment's full interest in its due month.
+      const interestAccrued = periodsDueThisMonth.reduce(
+        (sum, period) => sum + this.toNumber(period.interestOriginalDue),
+        0
+      );
 
       // Closing principal
       let closingPrincipal = openingPrincipal;
-      const periodsUpToMonthEnd = periods.filter(
-        (p) => p.dueDate && this.dateUtils.parseDate(p.dueDate) <= monthEndDate
-      );
-      if (periodsUpToMonthEnd.length > 0) {
-        closingPrincipal = periodsUpToMonthEnd[periodsUpToMonthEnd.length - 1].principalLoanBalanceOutstanding ?? 0;
+      if (periodsDueThisMonth.length > 0) {
+        closingPrincipal =
+          periodsDueThisMonth[periodsDueThisMonth.length - 1].principalLoanBalanceOutstanding ?? openingPrincipal;
       }
       if (year === maturityDate.getFullYear() && month === maturityDate.getMonth()) {
         closingPrincipal = 0;
       }
 
-      // Actual interest accrued: for past months = full month (same as Interest Accrued); for current month = accrual up to business date; future = blank
-      let actualInterestAccrued: number | null;
+      // Actual interest accrued follows repayment schedule rows whose due dates have passed.
+      let actualInterestAccrued: number | null = null;
       if (monthEndDate < currentDate) {
         actualInterestAccrued = interestAccrued;
-      } else if (currentDate >= monthStartDate && currentDate <= monthEndDate) {
-        actualInterestAccrued = 0;
-        const effectiveEnd = currentDate;
-        periods.forEach((period, periodIndex) => {
-          if (!period.dueDate || (period.interestOriginalDue ?? 0) === 0) return;
-          const periodDue = this.dateUtils.parseDate(period.dueDate);
-          const periodStart = this.getPeriodStartDate(period, periodIndex, periods, startDate);
-          if (periodDue < monthStartDate || periodStart > effectiveEnd) return;
-          const periodDays = period.daysInPeriod ?? Math.max(1, this.getDaysBetween(periodStart, periodDue));
-          actualInterestAccrued += this.getDayWeightedInterestForRange(
-            periodStart,
-            periodDue,
-            periodDays,
-            period.interestOriginalDue ?? 0,
-            monthStartDate,
-            effectiveEnd
-          );
-        });
-      } else {
-        actualInterestAccrued = null;
+      } else if (currentDate >= monthStartDate) {
+        const duePeriodsThroughBusinessDate = periodsDueThisMonth.filter(
+          (period) => this.dateUtils.parseDate(period.dueDate) <= currentDate
+        );
+        actualInterestAccrued = duePeriodsThroughBusinessDate.length
+          ? duePeriodsThroughBusinessDate.reduce((sum, period) => sum + this.toNumber(period.interestOriginalDue), 0)
+          : null;
       }
 
       const monthEndDateStr = this.dateUtils.formatDate(monthEndDate, Dates.DEFAULT_DATEFORMAT);
@@ -879,8 +897,10 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       return;
     }
 
+    const accrualDataWithTotals = this.addAccrualTotalsRow(accrualData);
+
     // Create worksheet from data
-    const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(accrualData);
+    const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(accrualDataWithTotals);
 
     // Set column widths
     const colWidths = [
@@ -904,7 +924,48 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     const fileName = `Accrual-Report-${loanId}-${businessDate}.xlsx`;
 
     // Save file
-    XLSX.writeFile(wb, fileName);
+    this.writeAccrualWorkbook(wb, fileName, accrualDataWithTotals.length + 1);
+  }
+
+  private addAccrualTotalsRow(accrualData: any[]): any[] {
+    const interestAccruedTotal = accrualData.reduce((sum, row) => sum + this.toNumber(row['Interest Accrued']), 0);
+    const actualInterestAccruedTotal = accrualData.reduce(
+      (sum, row) => sum + this.toNumber(row['Actual Interest Accrued']),
+      0
+    );
+
+    return [
+      ...accrualData,
+      {
+        Index: 'Total',
+        'End of Month': '',
+        'Opening Principal': '',
+        'Closing Principal': '',
+        'Interest Accrued': this.formatCurrency(interestAccruedTotal),
+        'Actual Interest Accrued': this.formatCurrency(actualInterestAccruedTotal)
+      }
+    ];
+  }
+
+  private async writeAccrualWorkbook(workbook: XLSX.WorkBook, fileName: string, totalRowNumber: number): Promise<void> {
+    const workbookData = XLSX.write(workbook, {
+      bookType: 'xlsx',
+      type: 'array',
+      cellDates: true,
+      cellStyles: true
+    });
+    const zip = await JSZip.loadAsync(workbookData);
+
+    await this.applyBoldRowsToWorksheet(zip, 'xl/worksheets/sheet1.xml', [
+      1,
+      totalRowNumber
+    ]);
+
+    const blob = await zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    this.downloadBlob(blob, fileName);
   }
 
   editInstallment(period: RepaymentSchedulePeriod): void {
