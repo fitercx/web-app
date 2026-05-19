@@ -4,7 +4,14 @@
     <div class="mat-h3 loc-section-title">{{ 'labels.heading.Invoice Details' | translate }}</div>
     <mat-divider></mat-divider>
     <div class="margin-t">
-      <div fxLayout="row" fxLayout.lt-md="column" class="loc-field-row" *ngIf="locDetails.invoiceNo">
+      <div
+        id="matched-invoice-row"
+        fxLayout="row"
+        fxLayout.lt-md="column"
+        class="loc-field-row"
+        [class.matched-invoice]="isMatchedInvoice()"
+        *ngIf="locDetails.invoiceNo"
+      >
         <span fxFlex="40%" class="loc-field-label">{{ 'labels.inputs.Invoice No' | translate }}:</span>
         <span fxFlex="60%" class="loc-field-value">{{ locDetails.invoiceNo }}</span>
       </div>

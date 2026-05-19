@@ -8,20 +8,13 @@ import { Route } from '../core/route/route.service';
 /** Custom Components */
 import { SearchPageComponent } from './search-page/search-page.component';
 
-/** Custom Resolvers */
-import { SearchResolver } from './search.resolver';
-
 /** Search Routes */
 const routes: Routes = [
   Route.withShell([
     {
       path: 'search',
       component: SearchPageComponent,
-      data: { title: 'Search', breadcrumb: 'Search' },
-      runGuardsAndResolvers: 'paramsOrQueryParamsChange',
-      resolve: {
-        searchResults: SearchResolver
-      }
+      data: { title: 'Search', breadcrumb: 'Search' }
     }
   ])
 
@@ -29,7 +22,6 @@ const routes: Routes = [
 
 @NgModule({
   imports: [RouterModule.forChild(routes)],
-  providers: [SearchResolver],
   exports: [RouterModule]
 })
 export class SearchRoutingModule {}
