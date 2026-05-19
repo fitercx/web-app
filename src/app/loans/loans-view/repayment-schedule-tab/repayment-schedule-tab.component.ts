@@ -9,10 +9,11 @@ import { DatepickerBase } from 'app/shared/form-dialog/formfield/model/datepicke
 import { FormfieldBase } from 'app/shared/form-dialog/formfield/model/formfield-base';
 import { InputBase } from 'app/shared/form-dialog/formfield/model/input-base';
 import { AdjustInstallmentDateDialogComponent } from '../custom-dialogs/adjust-installment-date-dialog/adjust-installment-date-dialog.component';
-import { AccrualReportPeriod, LoansService } from 'app/loans/loans.service';
+import { LoansService } from 'app/loans/loans.service';
 
 import { jsPDF, jsPDFOptions } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 
 @Component({
@@ -85,6 +86,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   @Output() editPeriod = new EventEmitter();
 
   businessDate: Date = new Date();
+  isExportingRepaymentScheduleExcel = false;
 
   /** Tolerance threshold for floating-point comparison when matching principal amounts */
   private static readonly PRINCIPAL_COMPARISON_TOLERANCE = 0.01;
@@ -212,36 +214,524 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     pdf.save(fileName);
   }
 
+  exportToExcel(): void {
+    if (!this.repaymentScheduleDetails?.periods?.length || this.isExportingRepaymentScheduleExcel) {
+      return;
+    }
+
+    this.isExportingRepaymentScheduleExcel = true;
+    setTimeout(async () => {
+      try {
+        const loanDetailsWorksheet = this.buildLoanDetailsWorksheet();
+        const repaymentScheduleWorksheet = this.buildRepaymentScheduleWorksheet();
+        const workbook: XLSX.WorkBook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, loanDetailsWorksheet, 'Loan Details');
+        XLSX.utils.book_append_sheet(workbook, repaymentScheduleWorksheet, 'Repayment Schedule');
+
+        const loanId = this.getLoanIdentifier();
+        const generationDate = this.formatDateForFileName(this.settingsService.businessDate);
+        await this.writeRepaymentScheduleWorkbook(workbook, `RepaymentSchedule_${loanId}_${generationDate}.xlsx`);
+      } finally {
+        this.isExportingRepaymentScheduleExcel = false;
+      }
+    });
+  }
+
+  private async writeRepaymentScheduleWorkbook(workbook: XLSX.WorkBook, fileName: string): Promise<void> {
+    const workbookData = XLSX.write(workbook, {
+      bookType: 'xlsx',
+      type: 'array',
+      cellDates: true,
+      cellStyles: true
+    });
+    const zip = await JSZip.loadAsync(workbookData);
+    const totalRowNumber = this.repaymentScheduleDetails.periods.length + 2;
+
+    await this.applyBoldRowsToWorksheet(zip, 'xl/worksheets/sheet1.xml', [
+      1
+    ]);
+    await this.applyBoldRowsToWorksheet(zip, 'xl/worksheets/sheet2.xml', [
+      1,
+      totalRowNumber
+    ]);
+
+    const blob = await zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    this.downloadBlob(blob, fileName);
+  }
+
+  private async applyBoldRowsToWorksheet(zip: JSZip, sheetPath: string, rowNumbers: number[]): Promise<void> {
+    const worksheetFile = zip.file(sheetPath);
+    const stylesFile = zip.file('xl/styles.xml');
+    if (!worksheetFile || !stylesFile) {
+      return;
+    }
+
+    const parser = new DOMParser();
+    const serializer = new XMLSerializer();
+    const worksheetDocument = parser.parseFromString(await worksheetFile.async('string'), 'application/xml');
+    const rowNumberSet = new Set(rowNumbers.map((rowNumber) => String(rowNumber)));
+    const targetCells = Array.from(worksheetDocument.getElementsByTagName('c')).filter((cell) => {
+      const cellReference = cell.getAttribute('r') || '';
+      const rowNumber = cellReference.replace(/[A-Z]+/g, '');
+      return rowNumberSet.has(rowNumber);
+    });
+
+    if (!targetCells.length) {
+      return;
+    }
+
+    const styleIds = Array.from(new Set(targetCells.map((cell) => cell.getAttribute('s') || '0')));
+    const boldStyles = this.addBoldCellStyles(await stylesFile.async('string'), styleIds);
+
+    targetCells.forEach((cell) => {
+      const styleId = cell.getAttribute('s') || '0';
+      cell.setAttribute('s', boldStyles.styleMap[styleId] || styleId);
+    });
+
+    zip.file('xl/styles.xml', boldStyles.stylesXml);
+    zip.file(sheetPath, serializer.serializeToString(worksheetDocument));
+  }
+
+  private addBoldCellStyles(
+    stylesXml: string,
+    styleIds: string[]
+  ): { stylesXml: string; styleMap: { [key: string]: string } } {
+    const parser = new DOMParser();
+    const serializer = new XMLSerializer();
+    const stylesDocument = parser.parseFromString(stylesXml, 'application/xml');
+    const namespace = stylesDocument.documentElement.namespaceURI;
+    const fonts = stylesDocument.getElementsByTagName('fonts')[0];
+    const cellFormats = stylesDocument.getElementsByTagName('cellXfs')[0];
+    const existingFonts = Array.from(fonts.getElementsByTagName('font'));
+    const existingFormats = Array.from(cellFormats.getElementsByTagName('xf'));
+    const baseFont = existingFonts[0];
+    const boldFont = baseFont
+      ? (baseFont.cloneNode(true) as Element)
+      : stylesDocument.createElementNS(namespace, 'font');
+
+    if (!boldFont.getElementsByTagName('b').length) {
+      boldFont.insertBefore(stylesDocument.createElementNS(namespace, 'b'), boldFont.firstChild);
+    }
+
+    fonts.appendChild(boldFont);
+    const boldFontId = existingFonts.length;
+    fonts.setAttribute('count', String(boldFontId + 1));
+
+    const styleMap: { [key: string]: string } = {};
+    styleIds.forEach((styleId) => {
+      const baseFormat = existingFormats[Number(styleId)] || existingFormats[0];
+      const boldFormat = baseFormat
+        ? (baseFormat.cloneNode(true) as Element)
+        : stylesDocument.createElementNS(namespace, 'xf');
+      boldFormat.setAttribute('fontId', String(boldFontId));
+      boldFormat.setAttribute('applyFont', '1');
+      cellFormats.appendChild(boldFormat);
+      styleMap[styleId] = String(existingFormats.length + Object.keys(styleMap).length);
+    });
+
+    cellFormats.setAttribute('count', String(existingFormats.length + styleIds.length));
+    return { stylesXml: serializer.serializeToString(stylesDocument), styleMap };
+  }
+
+  private downloadBlob(blob: Blob, fileName: string): void {
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  private buildLoanDetailsWorksheet(): XLSX.WorkSheet {
+    const loanInfo = this.loanData || this.loanDetailsData || {};
+    const metadataRows = this.getRepaymentScheduleMetadataRows(loanInfo);
+    const rows = [
+      [
+        'Field',
+        'Value'
+      ],
+      ...metadataRows
+    ];
+
+    const worksheet: XLSX.WorkSheet = XLSX.utils.aoa_to_sheet(rows, { cellDates: true });
+    worksheet['!cols'] = this.getRepaymentScheduleColumnWidths(rows);
+
+    this.setRowStyle(worksheet, 0, rows[0].length, { bold: true, fill: 'EDEDED' });
+    metadataRows.forEach((row, index) => {
+      this.setCellStyle(worksheet, index + 1, 0, { bold: true });
+      if (row[0] === 'Generated On' || row[0] === 'Disbursement Date' || row[0] === 'Maturity Date') {
+        this.setCellFormat(worksheet, index + 1, 1, 'dd mmm yyyy');
+      }
+      if (row[0] === 'Interest Rate') {
+        this.setCellFormat(worksheet, index + 1, 1, '0.00%');
+      }
+    });
+
+    return worksheet;
+  }
+
+  private buildRepaymentScheduleWorksheet(): XLSX.WorkSheet {
+    const tableColumns = this.getRepaymentScheduleExportColumns();
+    const scheduleRows = this.repaymentScheduleDetails.periods.map((period: any) =>
+      tableColumns.map((column) => column.value(period))
+    );
+    const totalsRow = tableColumns.map((column) => (column.total ? column.total() : ''));
+
+    const rows = [
+      tableColumns.map((column) => column.header),
+      ...scheduleRows,
+      totalsRow
+    ];
+
+    const worksheet: XLSX.WorkSheet = XLSX.utils.aoa_to_sheet(rows, { cellDates: true });
+    worksheet['!cols'] = this.getRepaymentScheduleColumnWidths(rows);
+
+    this.applyRepaymentScheduleExcelFormatting(worksheet, rows.length, tableColumns);
+    return worksheet;
+  }
+
+  private getRepaymentScheduleMetadataRows(loanInfo: any): any[][] {
+    const metadataRows: any[][] = [
+      [
+        'Loan ID',
+        this.getLoanIdentifier()
+      ],
+      [
+        'Account No',
+        loanInfo.accountNo ?? ''
+      ],
+      [
+        'Customer',
+        loanInfo.clientName || loanInfo.group?.name || ''
+      ],
+      [
+        'Product',
+        loanInfo.loanProductName ?? ''
+      ],
+      [
+        'Status',
+        loanInfo.status?.value ?? ''
+      ],
+      [
+        'Currency',
+        this.currencyCode ?? loanInfo.currency?.code ?? this.repaymentScheduleDetails?.currency?.code ?? ''
+      ],
+      [
+        'Generated On',
+        this.toExcelDate(this.settingsService.businessDate)]
+
+    ];
+
+    if (loanInfo.timeline?.actualDisbursementDate) {
+      metadataRows.push([
+        'Disbursement Date',
+        this.toExcelDate(loanInfo.timeline.actualDisbursementDate)]);
+    }
+    if (loanInfo.timeline?.expectedMaturityDate) {
+      metadataRows.push([
+        'Maturity Date',
+        this.toExcelDate(loanInfo.timeline.expectedMaturityDate)]);
+    }
+    if (loanInfo.annualInterestRate != null) {
+      metadataRows.push([
+        'Interest Rate',
+        this.toPercentage(loanInfo.annualInterestRate)]);
+    } else if (loanInfo.interestRatePerPeriod != null) {
+      metadataRows.push([
+        'Interest Rate',
+        this.toPercentage(loanInfo.interestRatePerPeriod)]);
+    }
+
+    return metadataRows;
+  }
+
+  private getRepaymentScheduleExportColumns(): any[] {
+    return this.displayedColumns
+      .filter((column) => column !== 'check')
+      .map((column) => this.getRepaymentScheduleExportColumn(column))
+      .filter((column) => !!column);
+  }
+
+  private getRepaymentScheduleExportColumn(column: string): any {
+    const moneyFormat = '#,##0.000';
+    const numberFormat = '0';
+    const dateFormat = 'dd mmm yyyy';
+    const emiTotal = () =>
+      this.isLineOfCreditReceivable()
+        ? this.toNumber(this.repaymentScheduleDetails.totalPrincipalExpected) +
+          this.toNumber(this.repaymentScheduleDetails.totalInterestCharged) +
+          this.getDisplayTotalFees() +
+          this.getDisplayTotalTaxes()
+        : this.toNumber(this.repaymentScheduleDetails.totalPrincipalExpected) +
+          this.toNumber(this.repaymentScheduleDetails.totalInterestCharged);
+
+    const columns: any = {
+      number: { header: '#', value: (item: any) => item.period ?? '', format: numberFormat },
+      days: {
+        header: this.getPlainIntervalLabel(),
+        value: (item: any) => this.getIntervalValue(item),
+        total: () => 'Total',
+        format: numberFormat
+      },
+      balanceOfLoan: {
+        header: this.isLineOfCreditReceivable() ? 'PreDisbursal Amount' : 'Principal O/S',
+        value: (item: any) => this.toNumber(item.principalLoanBalanceOutstanding),
+        total: () => this.getDisplayedTotalOutstanding(),
+        format: moneyFormat
+      },
+      date: { header: 'Due Date', value: (item: any) => this.toExcelDate(item.dueDate), format: dateFormat },
+      emiAmount: {
+        header: this.getPlainEmiLabel(),
+        value: (item: any) =>
+          this.isLineOfCreditReceivable() || this.isLoanFactorRateEnabled()
+            ? this.toNumber(item.principalDue) +
+              this.toNumber(item.interestOriginalDue) +
+              this.getDisplayFeeForPeriod(item) +
+              this.getDisplayTaxForPeriod(item)
+            : this.toNumber(item.principalDue) + this.toNumber(item.interestOriginalDue),
+        total: emiTotal,
+        format: moneyFormat
+      },
+      principalDue: {
+        header: 'Principal Due',
+        value: (item: any) => this.toNumber(item.principalDue),
+        total: () => this.toNumber(this.repaymentScheduleDetails.totalPrincipalExpected),
+        format: moneyFormat
+      },
+      interest: {
+        header: this.isLineOfCreditReceivable() ? 'Expected Interest' : 'Interest',
+        value: (item: any) => this.toNumber(item.interestOriginalDue),
+        total: () => this.toNumber(this.repaymentScheduleDetails.totalInterestCharged),
+        format: moneyFormat
+      },
+      fees: {
+        header: 'Fees',
+        value: (item: any) =>
+          item.feeChargesReversed && item.feeChargesReversed > 0
+            ? this.toNumber(item.feeChargesReversed)
+            : this.getDisplayFeeForPeriod(item),
+        total: () => this.getDisplayTotalFees(),
+        format: moneyFormat
+      },
+      taxes: {
+        header: 'Taxes',
+        value: (item: any) => this.getDisplayTaxForPeriod(item),
+        total: () => this.getDisplayTotalTaxes(),
+        format: moneyFormat
+      },
+      penalties: {
+        header: 'Overdue Interest',
+        value: (item: any) =>
+          item.reversedPenaltyChargesDue && item.reversedPenaltyChargesDue > 0
+            ? this.toNumber(item.reversedPenaltyChargesDue)
+            : this.toNumber(item.penaltyChargesDue),
+        total: () => this.toNumber(this.repaymentScheduleDetails.totalPenaltyChargesCharged),
+        format: moneyFormat
+      },
+      waived: {
+        header: 'Waived Amount',
+        value: (item: any) => (this.isWaived ? this.toNumber(item.totalWaivedForPeriod) : ''),
+        total: () => (this.isWaived ? this.toNumber(this.repaymentScheduleDetails.totalWaived) : ''),
+        format: moneyFormat
+      },
+      status: {
+        header: 'Status',
+        value: (item: any) =>
+          item.interestOriginalDue === 0 && item.principalDue === 0
+            ? 'GRACE_PERIOD_APPLIED'
+            : this.getDisplayStatus(item)
+      },
+      paiddate: {
+        header: 'Paid Date',
+        value: (item: any) =>
+          item.interestOriginalDue === 0 && item.principalDue === 0 ? '' : this.toExcelDate(item.obligationsMetOnDate),
+        format: dateFormat
+      },
+      due: {
+        header: 'Due Payment',
+        value: (item: any) => this.toNumber(item.totalDueForPeriod),
+        total: () => this.toNumber(this.repaymentScheduleDetails.totalRepaymentExpected),
+        format: moneyFormat
+      },
+      paid: {
+        header: 'Amount Paid',
+        value: (item: any) => this.toNumber(item.totalPaidForPeriod),
+        total: () => this.toNumber(this.repaymentScheduleDetails.totalRepayment),
+        format: moneyFormat
+      },
+      inadvance: {
+        header: 'Advance Paid',
+        value: (item: any) => this.toNumber(item.totalPaidInAdvanceForPeriod),
+        total: () => this.toNumber(this.repaymentScheduleDetails.totalPaidInAdvance),
+        format: moneyFormat
+      },
+      late: {
+        header: 'Late Paid',
+        value: (item: any) => this.toNumber(item.totalPaidLateForPeriod),
+        total: () => this.toNumber(this.repaymentScheduleDetails.totalPaidLate),
+        format: moneyFormat
+      },
+      outstanding: {
+        header: 'Outstanding Amount',
+        value: (item: any) =>
+          !this.isLoanOverpaid() && this.shouldShowOutstanding(item)
+            ? this.toNumber(item.totalOutstandingForPeriod)
+            : '',
+        format: moneyFormat
+      },
+      disbursedAmount: {
+        header: 'Disbursed Amount',
+        value: (item: any) => this.getDisbursedAmount(item),
+        format: moneyFormat
+      },
+      refundAmount: {
+        header: 'Refund Amount',
+        value: (item: any) => {
+          const refundAmount = this.getRefundAmount(item);
+          return refundAmount > 0 ? refundAmount : '';
+        },
+        format: moneyFormat
+      }
+    };
+
+    return columns[column];
+  }
+
+  private applyRepaymentScheduleExcelFormatting(
+    worksheet: XLSX.WorkSheet,
+    totalRows: number,
+    tableColumns: any[]
+  ): void {
+    const headerRowIndex = 0;
+    const totalRowIndex = totalRows - 1;
+    const tableDataStartIndex = 1;
+    const moneyFormat = '#,##0.000';
+
+    this.setRowStyle(worksheet, headerRowIndex, tableColumns.length, { bold: true, fill: 'EDEDED' });
+    this.setRowStyle(worksheet, totalRowIndex, tableColumns.length, { bold: true, fill: 'F5F5F5' });
+
+    tableColumns.forEach((column, columnIndex) => {
+      for (let rowIndex = tableDataStartIndex; rowIndex < totalRows; rowIndex++) {
+        this.setCellFormat(worksheet, rowIndex, columnIndex, column.format);
+      }
+      if (column.total && !column.format) {
+        this.setCellFormat(worksheet, totalRowIndex, columnIndex, moneyFormat);
+      }
+    });
+  }
+
+  private setRowStyle(worksheet: XLSX.WorkSheet, rowIndex: number, columnCount: number, style: any): void {
+    for (let columnIndex = 0; columnIndex < columnCount; columnIndex++) {
+      this.setCellStyle(worksheet, rowIndex, columnIndex, style);
+    }
+  }
+
+  private setCellStyle(worksheet: XLSX.WorkSheet, rowIndex: number, columnIndex: number, style: any): void {
+    const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex });
+    if (!worksheet[cellAddress]) {
+      worksheet[cellAddress] = { t: 's', v: '' };
+    }
+    worksheet[cellAddress].s = {
+      font: style.bold ? { bold: true } : undefined,
+      fill: style.fill ? { fgColor: { rgb: style.fill } } : undefined
+    };
+  }
+
+  private setCellFormat(worksheet: XLSX.WorkSheet, rowIndex: number, columnIndex: number, format?: string): void {
+    if (!format) {
+      return;
+    }
+    const cellAddress = XLSX.utils.encode_cell({ r: rowIndex, c: columnIndex });
+    if (worksheet[cellAddress]) {
+      worksheet[cellAddress].z = format;
+    }
+  }
+
+  private getRepaymentScheduleColumnWidths(rows: any[][]): any[] {
+    const columnCount = Math.max(...rows.map((row) => row.length));
+    return Array.from({ length: columnCount }, (_, columnIndex) => {
+      const width = rows.reduce((maxWidth, row) => {
+        const value = row[columnIndex];
+        if (value instanceof Date) {
+          return Math.max(maxWidth, 12);
+        }
+        return Math.max(maxWidth, String(value ?? '').length + 2);
+      }, 10);
+      return { wch: Math.min(Math.max(width, 10), 28) };
+    });
+  }
+
+  private getLoanIdentifier(): string {
+    const loanInfo = this.loanData || this.loanDetailsData || {};
+    return String(loanInfo.id ?? loanInfo.accountNo ?? 'loan').replace(/[^A-Za-z0-9_-]/g, '');
+  }
+
+  private formatDateForFileName(date: Date): string {
+    const year = date.getFullYear();
+    const month = `${date.getMonth() + 1}`.padStart(2, '0');
+    const day = `${date.getDate()}`.padStart(2, '0');
+    return `${year}${month}${day}`;
+  }
+
+  private toExcelDate(value: any): Date | '' {
+    if (!value) {
+      return '';
+    }
+    if (value instanceof Date) {
+      return value;
+    }
+    if (Array.isArray(value) && value.length >= 3) {
+      return new Date(value[0], value[1] - 1, value[2]);
+    }
+    return this.dateUtils.parseDate(value);
+  }
+
+  private toNumber(value: any): number {
+    const numericValue = Number(value ?? 0);
+    return Number.isFinite(numericValue) ? numericValue : 0;
+  }
+
+  private toPercentage(value: any): number {
+    const numericValue = this.toNumber(value);
+    return Math.abs(numericValue) > 1 ? numericValue / 100 : numericValue;
+  }
+
+  private getPlainEmiLabel(): string {
+    const repaymentFrequencyTypeId = this.getRepaymentFrequencyTypeId();
+    switch (repaymentFrequencyTypeId) {
+      case 0:
+        return this.isAnyLineOfCredit() ? 'EMI Amount' : 'EDI Amount';
+      case 1:
+        return 'EWI Amount';
+      case 2:
+        return 'EMI Amount';
+      case 3:
+        return 'EAI Amount';
+      default:
+        return 'EMI Amount';
+    }
+  }
+
+  private getPlainIntervalLabel(): string {
+    switch (this.getRepaymentFrequencyTypeId()) {
+      case 1:
+        return 'Weeks';
+      case 2:
+        return 'Months';
+      default:
+        return 'Days';
+    }
+  }
+
   /**
    * Exports the accrual report using "Generate Loan Monthly Accrual Summations" data from the backend.
    * Falls back to client-side calculation if the API is unavailable.
    */
   exportAccrualReport() {
-    const loanId = this.loanDetailsData?.id ?? this.loanData?.id;
-    if (loanId) {
-      this.loansService.getAccrualReport(String(loanId)).subscribe({
-        next: (response) => {
-          const periods = response?.periods ?? [];
-          if (periods.length > 0) {
-            const accrualData = periods.map((p: AccrualReportPeriod) => ({
-              Index: p.index,
-              'End of Month': p.endOfMonth,
-              'Opening Principal': this.formatCurrency(Number(p.openingPrincipal)),
-              'Closing Principal': this.formatCurrency(Number(p.closingPrincipal)),
-              'Interest Accrued': this.formatCurrency(Number(p.interestAccrued)),
-              'Actual Interest Accrued':
-                p.actualInterestAccrued != null ? this.formatCurrency(Number(p.actualInterestAccrued)) : ''
-            }));
-            this.exportAccrualToExcel(accrualData, new Date());
-          } else {
-            this.exportAccrualReportFromSchedule();
-          }
-        },
-        error: () => this.exportAccrualReportFromSchedule()
-      });
-    } else {
-      this.exportAccrualReportFromSchedule();
-    }
+    this.exportAccrualReportFromSchedule();
   }
 
   /**
@@ -278,63 +768,9 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   /**
-   * Returns the number of days between two dates (inclusive of both dates).
-   */
-  private getDaysBetween(from: Date, to: Date): number {
-    const fromTime = new Date(from.getFullYear(), from.getMonth(), from.getDate()).getTime();
-    const toTime = new Date(to.getFullYear(), to.getMonth(), to.getDate()).getTime();
-    return Math.round((toTime - fromTime) / (24 * 60 * 60 * 1000)) + 1;
-  }
-
-  /**
-   * Gets the start date of a schedule period (day after previous due, or fromDate, or loan start).
-   */
-  private getPeriodStartDate(
-    period: RepaymentSchedulePeriod,
-    periodIndex: number,
-    periods: RepaymentSchedulePeriod[],
-    startDate: Date
-  ): Date {
-    if (period.fromDate) {
-      return this.dateUtils.parseDate(period.fromDate);
-    }
-    if (periodIndex > 0 && periods[periodIndex - 1].dueDate) {
-      const prevDue = this.dateUtils.parseDate(periods[periodIndex - 1].dueDate);
-      const next = new Date(prevDue);
-      next.setDate(next.getDate() + 1);
-      return next;
-    }
-    return new Date(startDate);
-  }
-
-  /**
-   * Calculates day-weighted interest accrued in a date range from a single period.
-   * Returns (overlapDays / periodDays) * periodInterest.
-   */
-  private getDayWeightedInterestForRange(
-    periodStart: Date,
-    periodDue: Date,
-    periodDays: number,
-    periodInterest: number,
-    rangeStart: Date,
-    rangeEnd: Date
-  ): number {
-    const overlapStart = periodStart > rangeStart ? periodStart : rangeStart;
-    const overlapEnd = periodDue < rangeEnd ? periodDue : rangeEnd;
-    if (overlapStart > overlapEnd) {
-      return 0;
-    }
-    const overlapDays = this.getDaysBetween(overlapStart, overlapEnd);
-    if (periodDays <= 0) {
-      return 0;
-    }
-    return (overlapDays / periodDays) * periodInterest;
-  }
-
-  /**
    * Generates monthly accrual data from repayment schedule periods.
-   * Accrual is calculated month-wise on the basis of number of days: each period's interest
-   * is allocated to calendar months in proportion to how many days of that period fall in each month.
+   * Accrual is calculated month-wise from repayment schedule due dates so the report total
+   * matches the schedule interest exactly.
    */
   private generateAccrualData(periods: RepaymentSchedulePeriod[], startDate: Date, maturityDate: Date): any[] {
     const accrualRows: any[] = [];
@@ -387,64 +823,41 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
         openingPrincipal = initialPrincipal;
       }
 
-      // Interest accrued this month: day-weighted by overlap of each period with this month
-      let interestAccrued = 0;
-      periods.forEach((period, periodIndex) => {
-        if (!period.dueDate || (period.interestOriginalDue ?? 0) === 0) {
-          return;
+      const periodsDueThisMonth = periods.filter((period) => {
+        if (!period.dueDate) {
+          return false;
         }
-        const periodDue = this.dateUtils.parseDate(period.dueDate);
-        const periodStart = this.getPeriodStartDate(period, periodIndex, periods, startDate);
-        if (periodDue < monthStartDate || periodStart > monthEndDate) {
-          return;
-        }
-        const periodDays = period.daysInPeriod ?? Math.max(1, this.getDaysBetween(periodStart, periodDue));
-        interestAccrued += this.getDayWeightedInterestForRange(
-          periodStart,
-          periodDue,
-          periodDays,
-          period.interestOriginalDue ?? 0,
-          monthStartDate,
-          monthEndDate
-        );
+        const dueDate = this.dateUtils.parseDate(period.dueDate);
+        return dueDate >= monthStartDate && dueDate <= monthEndDate;
       });
+
+      // Match the repayment schedule exactly by recognizing each installment's full interest in its due month.
+      const interestAccrued = periodsDueThisMonth.reduce(
+        (sum, period) => sum + this.toNumber(period.interestOriginalDue),
+        0
+      );
 
       // Closing principal
       let closingPrincipal = openingPrincipal;
-      const periodsUpToMonthEnd = periods.filter(
-        (p) => p.dueDate && this.dateUtils.parseDate(p.dueDate) <= monthEndDate
-      );
-      if (periodsUpToMonthEnd.length > 0) {
-        closingPrincipal = periodsUpToMonthEnd[periodsUpToMonthEnd.length - 1].principalLoanBalanceOutstanding ?? 0;
+      if (periodsDueThisMonth.length > 0) {
+        closingPrincipal =
+          periodsDueThisMonth[periodsDueThisMonth.length - 1].principalLoanBalanceOutstanding ?? openingPrincipal;
       }
       if (year === maturityDate.getFullYear() && month === maturityDate.getMonth()) {
         closingPrincipal = 0;
       }
 
-      // Actual interest accrued: for past months = full month (same as Interest Accrued); for current month = accrual up to business date; future = blank
-      let actualInterestAccrued: number | null;
+      // Actual interest accrued follows repayment schedule rows whose due dates have passed.
+      let actualInterestAccrued: number | null = null;
       if (monthEndDate < currentDate) {
         actualInterestAccrued = interestAccrued;
-      } else if (currentDate >= monthStartDate && currentDate <= monthEndDate) {
-        actualInterestAccrued = 0;
-        const effectiveEnd = currentDate;
-        periods.forEach((period, periodIndex) => {
-          if (!period.dueDate || (period.interestOriginalDue ?? 0) === 0) return;
-          const periodDue = this.dateUtils.parseDate(period.dueDate);
-          const periodStart = this.getPeriodStartDate(period, periodIndex, periods, startDate);
-          if (periodDue < monthStartDate || periodStart > effectiveEnd) return;
-          const periodDays = period.daysInPeriod ?? Math.max(1, this.getDaysBetween(periodStart, periodDue));
-          actualInterestAccrued += this.getDayWeightedInterestForRange(
-            periodStart,
-            periodDue,
-            periodDays,
-            period.interestOriginalDue ?? 0,
-            monthStartDate,
-            effectiveEnd
-          );
-        });
-      } else {
-        actualInterestAccrued = null;
+      } else if (currentDate >= monthStartDate) {
+        const duePeriodsThroughBusinessDate = periodsDueThisMonth.filter(
+          (period) => this.dateUtils.parseDate(period.dueDate) <= currentDate
+        );
+        actualInterestAccrued = duePeriodsThroughBusinessDate.length
+          ? duePeriodsThroughBusinessDate.reduce((sum, period) => sum + this.toNumber(period.interestOriginalDue), 0)
+          : null;
       }
 
       const monthEndDateStr = this.dateUtils.formatDate(monthEndDate, Dates.DEFAULT_DATEFORMAT);
@@ -484,8 +897,10 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       return;
     }
 
+    const accrualDataWithTotals = this.addAccrualTotalsRow(accrualData);
+
     // Create worksheet from data
-    const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(accrualData);
+    const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(accrualDataWithTotals);
 
     // Set column widths
     const colWidths = [
@@ -509,7 +924,48 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     const fileName = `Accrual-Report-${loanId}-${businessDate}.xlsx`;
 
     // Save file
-    XLSX.writeFile(wb, fileName);
+    this.writeAccrualWorkbook(wb, fileName, accrualDataWithTotals.length + 1);
+  }
+
+  private addAccrualTotalsRow(accrualData: any[]): any[] {
+    const interestAccruedTotal = accrualData.reduce((sum, row) => sum + this.toNumber(row['Interest Accrued']), 0);
+    const actualInterestAccruedTotal = accrualData.reduce(
+      (sum, row) => sum + this.toNumber(row['Actual Interest Accrued']),
+      0
+    );
+
+    return [
+      ...accrualData,
+      {
+        Index: 'Total',
+        'End of Month': '',
+        'Opening Principal': '',
+        'Closing Principal': '',
+        'Interest Accrued': this.formatCurrency(interestAccruedTotal),
+        'Actual Interest Accrued': this.formatCurrency(actualInterestAccruedTotal)
+      }
+    ];
+  }
+
+  private async writeAccrualWorkbook(workbook: XLSX.WorkBook, fileName: string, totalRowNumber: number): Promise<void> {
+    const workbookData = XLSX.write(workbook, {
+      bookType: 'xlsx',
+      type: 'array',
+      cellDates: true,
+      cellStyles: true
+    });
+    const zip = await JSZip.loadAsync(workbookData);
+
+    await this.applyBoldRowsToWorksheet(zip, 'xl/worksheets/sheet1.xml', [
+      1,
+      totalRowNumber
+    ]);
+
+    const blob = await zip.generateAsync({
+      type: 'blob',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+    this.downloadBlob(blob, fileName);
   }
 
   editInstallment(period: RepaymentSchedulePeriod): void {
