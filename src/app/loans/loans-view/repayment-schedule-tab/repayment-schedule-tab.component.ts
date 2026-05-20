@@ -700,18 +700,29 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   private getPlainEmiLabel(): string {
-    const repaymentFrequencyTypeId = this.getRepaymentFrequencyTypeId();
-    switch (repaymentFrequencyTypeId) {
+    return `${this.getInstallmentAmountLabel()} Amount`;
+  }
+
+  private getInstallmentAmountLabel(): 'EMI' | 'EDI' | 'EWI' | 'EAI' {
+    if (this.isAnyLineOfCredit() || this.isRbfProduct()) {
+      return 'EMI';
+    }
+
+    if (this.isLoanFactorRateEnabled()) {
+      return 'EDI';
+    }
+
+    switch (this.getRepaymentFrequencyTypeId()) {
       case 0:
-        return this.isAnyLineOfCredit() ? 'EMI Amount' : 'EDI Amount';
+        return 'EDI';
       case 1:
-        return 'EWI Amount';
+        return 'EWI';
       case 2:
-        return 'EMI Amount';
+        return 'EMI';
       case 3:
-        return 'EAI Amount';
+        return 'EAI';
       default:
-        return 'EMI Amount';
+        return 'EMI';
     }
   }
 
@@ -1093,6 +1104,20 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     return loanAccountData.factorRateEnabled;
   }
 
+  private isRbfProduct(): boolean {
+    const loanAccountData = this.loanData || this.loanDetailsData;
+    const productName = String(
+      loanAccountData?.loanProductName ??
+        loanAccountData?.productName ??
+        loanAccountData?.product?.name ??
+        loanAccountData?.productShortName ??
+        loanAccountData?.shortName ??
+        ''
+    ).toUpperCase();
+
+    return productName === 'RBF' || productName.includes('RBF');
+  }
+
   private getRepaymentFrequencyTypeId(): number {
     const loanAccountData = this.loanData || this.loanDetailsData;
     const repaymentFrequencyType = loanAccountData?.repaymentFrequencyType;
@@ -1100,19 +1125,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   getEmiLabel(): string {
-    const repaymentFrequencyTypeId = this.getRepaymentFrequencyTypeId();
-    switch (repaymentFrequencyTypeId) {
-      case 0:
-        return this.isAnyLineOfCredit() ? 'labels.inputs.EMI Amount' : 'labels.inputs.EDI Amount';
-      case 1:
-        return 'labels.inputs.EWI Amount';
-      case 2:
-        return 'labels.inputs.EMI Amount';
-      case 3:
-        return 'labels.inputs.EAI Amount';
-      default:
-        return 'labels.inputs.EMI Amount';
-    }
+    return `labels.inputs.${this.getInstallmentAmountLabel()} Amount`;
   }
 
   getIntervalLabel(): string {
