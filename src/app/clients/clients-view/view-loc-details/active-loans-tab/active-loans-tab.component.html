@@ -155,8 +155,7 @@
           color="primary"
           matTooltip="{{ 'tooltips.Make Repayment' | translate }}"
           matTooltipPosition="above"
-          (click)="routeEdit($event)"
-          [routerLink]="['/clients', clientId, 'loans-accounts', element.id, 'actions', 'Make Repayment']"
+          (click)="openTransferFromSavingsDialog(element, $event)"
         >
           <i class="fa fa-dollar"></i>
         </button>

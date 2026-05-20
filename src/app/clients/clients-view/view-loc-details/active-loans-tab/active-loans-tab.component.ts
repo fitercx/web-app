@@ -14,6 +14,7 @@ import {
   BulkDisburseResultsDialogData
 } from './bulk-disburse-results-dialog/bulk-disburse-results-dialog.component';
 import { BulkDisburseLoadingDialogComponent } from './bulk-disburse-loading-dialog/bulk-disburse-loading-dialog.component';
+import { TransferFromSavingsDialogComponent } from '../../general-tab/transfer-from-savings-dialog/transfer-from-savings-dialog.component';
 
 @Component({
   selector: 'mifosx-active-loans-tab',
@@ -198,6 +199,26 @@ export class ActiveLoansTabComponent implements OnInit {
 
   routeEdit($event: MouseEvent) {
     $event.stopPropagation();
+  }
+
+  openTransferFromSavingsDialog(loan: any, event: MouseEvent): void {
+    this.routeEdit(event);
+
+    const dialogRef = this.dialog.open(TransferFromSavingsDialogComponent, {
+      width: '42rem',
+      maxWidth: '95vw',
+      disableClose: false,
+      data: {
+        loan,
+        clientId: this.clientId
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((result: any) => {
+      if (result?.submitted) {
+        this.getLoans();
+      }
+    });
   }
 
   routeTransferFund(loanId: any) {
