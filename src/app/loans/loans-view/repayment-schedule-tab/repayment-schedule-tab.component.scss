@@ -4,7 +4,7 @@
 table {
   width: 100%;
   margin: 2% 0%;
-  min-width: 1200px; // Ensures table maintains minimum width for readability
+  min-width: 1700px; // Ensures table maintains minimum width for readability
 }
 
 .container {
@@ -43,6 +43,71 @@ table {
 
 .status {
   padding-right: 10px;
+}
+
+#repaymentSchedule {
+  th.mat-header-cell,
+  td.mat-cell,
+  td.mat-footer-cell {
+    box-sizing: border-box;
+    padding-left: 12px;
+    padding-right: 12px;
+    vertical-align: middle;
+  }
+
+  th.mat-header-cell {
+    line-height: 1.35;
+    white-space: normal;
+  }
+
+  td.mat-cell,
+  td.mat-footer-cell {
+    white-space: nowrap;
+  }
+
+  .mat-column-number {
+    min-width: 56px;
+    width: 56px;
+  }
+
+  .mat-column-days {
+    min-width: 92px;
+    width: 92px;
+    text-align: center;
+  }
+
+  .mat-column-date,
+  .mat-column-paiddate {
+    min-width: 118px;
+  }
+
+  .mat-column-balanceOfLoan,
+  .mat-column-emiAmount,
+  .mat-column-principalDue,
+  .mat-column-due,
+  .mat-column-paid,
+  .mat-column-inadvance,
+  .mat-column-late,
+  .mat-column-outstanding {
+    min-width: 128px;
+  }
+
+  .mat-column-interest,
+  .mat-column-fees,
+  .mat-column-taxes,
+  .mat-column-penalties,
+  .mat-column-waived {
+    min-width: 104px;
+  }
+
+  .mat-column-status {
+    min-width: 160px;
+  }
+
+  .mat-column-check {
+    min-width: 48px;
+    width: 48px;
+  }
 }
 
 .adjust-date-form {

@@ -471,8 +471,8 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     const columns: any = {
       number: { header: '#', value: (item: any) => item.period ?? '', format: numberFormat },
       days: {
-        header: this.getPlainIntervalLabel(),
-        value: (item: any) => this.getIntervalValue(item),
+        header: 'Days',
+        value: (item: any) => item.daysInPeriod,
         total: () => 'Total',
         format: numberFormat
       },
@@ -723,17 +723,6 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
         return 'EAI';
       default:
         return 'EMI';
-    }
-  }
-
-  private getPlainIntervalLabel(): string {
-    switch (this.getRepaymentFrequencyTypeId()) {
-      case 1:
-        return 'Weeks';
-      case 2:
-        return 'Months';
-      default:
-        return 'Days';
     }
   }
 
@@ -1126,52 +1115,6 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
   getEmiLabel(): string {
     return `labels.inputs.${this.getInstallmentAmountLabel()} Amount`;
-  }
-
-  getIntervalLabel(): string {
-    switch (this.getRepaymentFrequencyTypeId()) {
-      case 1:
-        return 'labels.inputs.Weeks';
-      case 2:
-        return 'labels.inputs.Months';
-      default:
-        return 'labels.inputs.Days';
-    }
-  }
-
-  getIntervalValue(item: any): number | string {
-    switch (this.getRepaymentFrequencyTypeId()) {
-      case 1:
-        return item.daysInPeriod != null ? Math.max(1, Math.round(item.daysInPeriod / 7)) : '';
-      case 2:
-        return this.getMonthsInPeriod(item);
-      default:
-        return item.daysInPeriod;
-    }
-  }
-
-  private getMonthsInPeriod(item: any): number | string {
-    if (!item?.fromDate || !item?.dueDate) {
-      return item?.daysInPeriod ?? '';
-    }
-
-    const fromDate = this.dateUtils.parseDate(item.fromDate);
-    const dueDate = this.dateUtils.parseDate(item.dueDate);
-    const months = (dueDate.getFullYear() - fromDate.getFullYear()) * 12 + dueDate.getMonth() - fromDate.getMonth();
-
-    if (months > 0 && (dueDate.getDate() >= fromDate.getDate() || this.isEndOfMonth(fromDate, dueDate))) {
-      return months;
-    }
-
-    return Math.max(1, months);
-  }
-
-  private isEndOfMonth(fromDate: Date, dueDate: Date): boolean {
-    return this.isLastDayOfMonth(fromDate) && this.isLastDayOfMonth(dueDate);
-  }
-
-  private isLastDayOfMonth(date: Date): boolean {
-    return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate() === date.getDate();
   }
 
   getDisbursedAmount(item: any): number {
