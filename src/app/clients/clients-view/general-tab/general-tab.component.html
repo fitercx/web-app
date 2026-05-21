@@ -414,10 +414,7 @@
                     color="primary"
                     matTooltip="{{ 'tooltips.Make Repayment' | translate }}"
                     matTooltipPosition="above"
-                    (click)="isRBFLoan(element) ? openTransferFromSavingsDialog(element, $event) : routeEdit($event)"
-                    [routerLink]="
-                      isRBFLoan(element) ? null : ['../', 'loans-accounts', element.id, 'actions', 'Make Repayment']
-                    "
+                    (click)="openTransferFromSavingsDialog(element, $event)"
                   >
                     <i class="fa fa-dollar"></i>
                   </button>
@@ -695,8 +692,7 @@
           color="primary"
           matTooltip="{{ 'tooltips.Make Repayment' | translate }}"
           matTooltipPosition="above"
-          (click)="isRBFLoan(element) ? openTransferFromSavingsDialog(element, $event) : routeEdit($event)"
-          [routerLink]="isRBFLoan(element) ? null : ['../', 'loans-accounts', element.id, 'actions', 'Make Repayment']"
+          (click)="openTransferFromSavingsDialog(element, $event)"
         >
           <i class="fa fa-dollar"></i>
         </button>
