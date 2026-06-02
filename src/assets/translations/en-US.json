@@ -1636,6 +1636,8 @@
       "Date of Birth": "Date of Birth",
       "DateTime": "DateTime",
       "Days": "Days",
+      "Weeks": "Weeks",
+      "Months": "Months",
       "Days From": "Days From",
       "Days Till": "Days Till",
       "Days in Year": "Days in Year",

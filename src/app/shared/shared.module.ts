@@ -51,6 +51,7 @@ import { LongTextComponent } from './long-text/long-text.component';
 import { DropdownComponent } from './dropdown/dropdown.component';
 import { InputAmountComponent } from './input-amount/input-amount.component';
 import { InputPasswordComponent } from './input-password/input-password.component';
+import { LoanDownloadsMenuComponent } from './loan-downloads-menu/loan-downloads-menu.component';
 
 /**
  * Shared Module
@@ -108,7 +109,8 @@ import { InputPasswordComponent } from './input-password/input-password.componen
     LongTextComponent,
     DropdownComponent,
     InputAmountComponent,
-    InputPasswordComponent
+    InputPasswordComponent,
+    LoanDownloadsMenuComponent
   ],
   exports: [
     FileUploadComponent,
@@ -143,7 +145,8 @@ import { InputPasswordComponent } from './input-password/input-password.componen
     ThemeToggleComponent,
     LongTextComponent,
     DropdownComponent,
-    InputAmountComponent
+    InputAmountComponent,
+    LoanDownloadsMenuComponent
   ]
 })
 export class SharedModule {}
