@@ -10,6 +10,7 @@ import { FormfieldBase } from 'app/shared/form-dialog/formfield/model/formfield-
 import { InputBase } from 'app/shared/form-dialog/formfield/model/input-base';
 import { AdjustInstallmentDateDialogComponent } from '../custom-dialogs/adjust-installment-date-dialog/adjust-installment-date-dialog.component';
 import { LoansService } from 'app/loans/loans.service';
+import { LoanDownloadType } from 'app/shared/loan-downloads-menu/loan-downloads-menu.component';
 
 import { jsPDF, jsPDFOptions } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -87,6 +88,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
   businessDate: Date = new Date();
   isExportingRepaymentScheduleExcel = false;
+  activeDownloadType: LoanDownloadType | null = null;
 
   /** Tolerance threshold for floating-point comparison when matching principal amounts */
   private static readonly PRINCIPAL_COMPARISON_TOLERANCE = 0.01;
@@ -212,6 +214,23 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       }
     });
     pdf.save(fileName);
+  }
+
+  downloadLoanDocument(type: LoanDownloadType): void {
+    this.activeDownloadType = type;
+    try {
+      if (type === 'repaymentSchedulePdf') {
+        this.exportToPDF();
+      } else if (type === 'repaymentScheduleExcel') {
+        this.exportToExcel();
+      } else if (type === 'accrualReport') {
+        this.exportAccrualReport();
+      }
+    } finally {
+      setTimeout(() => {
+        this.activeDownloadType = null;
+      }, 300);
+    }
   }
 
   exportToExcel(): void {
