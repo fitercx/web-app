@@ -10,7 +10,11 @@ import { FormfieldBase } from 'app/shared/form-dialog/formfield/model/formfield-
 import { InputBase } from 'app/shared/form-dialog/formfield/model/input-base';
 import { AdjustInstallmentDateDialogComponent } from '../custom-dialogs/adjust-installment-date-dialog/adjust-installment-date-dialog.component';
 import { LoansService } from 'app/loans/loans.service';
+import { ProductsService } from 'app/products/products.service';
+import { computeMonthlyAccrualRows } from 'app/loans/accrual-report.util';
 import { LoanDownloadType } from 'app/shared/loan-downloads-menu/loan-downloads-menu.component';
+import { generateKeyFactStatementPdf } from 'app/shared/key-fact-statement/key-fact-statement-pdf';
+import { take } from 'rxjs/operators';
 
 import { jsPDF, jsPDFOptions } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -106,6 +110,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     private dateUtils: Dates,
     private dialog: MatDialog,
     private loansService: LoansService,
+    private productsService: ProductsService,
     private router: Router
   ) {
     this.route.parent.data.subscribe((data: { loanDetailsData: any }) => {
@@ -225,6 +230,8 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
         this.exportToExcel();
       } else if (type === 'accrualReport') {
         this.exportAccrualReport();
+      } else if (type === 'keyFactStatement') {
+        this.exportKeyFactStatement();
       }
     } finally {
       setTimeout(() => {
@@ -745,6 +752,30 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     }
   }
 
+  private exportKeyFactStatement(): void {
+    const loanId = this.loanDetailsData?.id?.toString();
+    if (!loanId) {
+      return;
+    }
+
+    this.loansService.getLoanKeyFactStatement(loanId).subscribe({
+      next: (response: any) => {
+        this.generateKfsPdf(response).catch((error) => console.error('Failed to generate KFS:', error));
+      },
+      error: (error) => console.error('Failed to download KFS:', error)
+    });
+  }
+
+  private generateKfsPdf(kfs: any): Promise<void> {
+    const loan = kfs?.loan ?? {};
+    const businessDate = this.dateUtils.formatDate(this.settingsService.businessDate, Dates.DEFAULT_DATEFORMAT);
+    return generateKeyFactStatementPdf(kfs, {
+      dateOfIssue: businessDate,
+      fallbackLoan: this.loanDetailsData,
+      fileName: `key-fact-statement-${loan.accountNo ?? this.getLoanIdentifier()}.pdf`
+    });
+  }
+
   /**
    * Exports the accrual report using "Generate Loan Monthly Accrual Summations" data from the backend.
    * Falls back to client-side calculation if the API is unavailable.
@@ -782,120 +813,46 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
     const lastPeriod = periods[periods.length - 1];
     const maturityDate = this.dateUtils.parseDate(lastPeriod.dueDate);
-    const accrualData = this.generateAccrualData(periods, startDate, maturityDate);
-    this.exportAccrualToExcel(accrualData, startDate);
+
+    this.resolveProductAnnualRate(loanInfo).then((annualRatePercent) => {
+      const accrualData = computeMonthlyAccrualRows({
+        periods,
+        startDate,
+        maturityDate,
+        businessDate: this.settingsService.businessDate,
+        annualRatePercent,
+        parseDate: (value: any) => this.dateUtils.parseDate(value),
+        formatMonthEnd: (date: Date) => this.dateUtils.formatDate(date, Dates.DEFAULT_DATEFORMAT)
+      });
+      this.exportAccrualToExcel(accrualData, startDate);
+    });
   }
 
   /**
-   * Generates monthly accrual data from repayment schedule periods.
-   * Accrual is calculated month-wise from repayment schedule due dates so the report total
-   * matches the schedule interest exactly.
+   * Resolves the loan PRODUCT's annual nominal (reducing-balance) interest rate used to accrue interest.
+   * Falls back to the loan-level rate if the product id or product rate is unavailable.
    */
-  private generateAccrualData(periods: RepaymentSchedulePeriod[], startDate: Date, maturityDate: Date): any[] {
-    const accrualRows: any[] = [];
-    const currentDate = this.settingsService.businessDate;
-    let index = 1;
-
-    let initialPrincipal = 0;
-    const firstDisbursementPeriod = periods.find((p) => p.principalDisbursed && p.principalDisbursed > 0);
-    if (firstDisbursementPeriod) {
-      initialPrincipal = firstDisbursementPeriod.principalDisbursed;
-    } else if (periods.length > 0) {
-      initialPrincipal = (periods[0].principalLoanBalanceOutstanding || 0) + (periods[0].principalDue || 0);
+  private resolveProductAnnualRate(loanInfo: any): Promise<number> {
+    const fallbackRate = this.toNumber(loanInfo?.annualInterestRate);
+    const loanProductId = loanInfo?.loanProductId;
+    if (loanProductId == null) {
+      console.warn('Accrual report: loanProductId unavailable, using loan-level annualInterestRate');
+      return Promise.resolve(fallbackRate);
     }
-    let previousPrincipalBalance = initialPrincipal;
-
-    let currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-    const finalMonth = new Date(maturityDate.getFullYear(), maturityDate.getMonth(), 1);
-
-    while (currentMonth <= finalMonth) {
-      const year = currentMonth.getFullYear();
-      const month = currentMonth.getMonth();
-
-      let monthEndDate: Date;
-      if (year === maturityDate.getFullYear() && month === maturityDate.getMonth()) {
-        monthEndDate = new Date(maturityDate);
-      } else {
-        monthEndDate = new Date(year, month + 1, 0);
-      }
-
-      let monthStartDate: Date;
-      if (year === startDate.getFullYear() && month === startDate.getMonth()) {
-        monthStartDate = new Date(startDate);
-      } else {
-        monthStartDate = new Date(year, month, 1);
-      }
-
-      // Opening principal
-      let openingPrincipal = previousPrincipalBalance;
-      const periodsBeforeMonth = periods.filter((p) => {
-        if (!p.dueDate) return false;
-        return this.dateUtils.parseDate(p.dueDate) < monthStartDate;
-      });
-      if (periodsBeforeMonth.length > 0) {
-        const lastBefore = periodsBeforeMonth[periodsBeforeMonth.length - 1];
-        openingPrincipal = lastBefore.principalLoanBalanceOutstanding ?? 0;
-        if (lastBefore.principalDisbursed) {
-          openingPrincipal = lastBefore.principalDisbursed;
-        }
-      } else if (year === startDate.getFullYear() && month === startDate.getMonth()) {
-        openingPrincipal = initialPrincipal;
-      }
-
-      const periodsDueThisMonth = periods.filter((period) => {
-        if (!period.dueDate) {
-          return false;
-        }
-        const dueDate = this.dateUtils.parseDate(period.dueDate);
-        return dueDate >= monthStartDate && dueDate <= monthEndDate;
-      });
-
-      // Match the repayment schedule exactly by recognizing each installment's full interest in its due month.
-      const interestAccrued = periodsDueThisMonth.reduce(
-        (sum, period) => sum + this.toNumber(period.interestOriginalDue),
-        0
-      );
-
-      // Closing principal
-      let closingPrincipal = openingPrincipal;
-      if (periodsDueThisMonth.length > 0) {
-        closingPrincipal =
-          periodsDueThisMonth[periodsDueThisMonth.length - 1].principalLoanBalanceOutstanding ?? openingPrincipal;
-      }
-      if (year === maturityDate.getFullYear() && month === maturityDate.getMonth()) {
-        closingPrincipal = 0;
-      }
-
-      // Actual interest accrued follows repayment schedule rows whose due dates have passed.
-      let actualInterestAccrued: number | null = null;
-      if (monthEndDate < currentDate) {
-        actualInterestAccrued = interestAccrued;
-      } else if (currentDate >= monthStartDate) {
-        const duePeriodsThroughBusinessDate = periodsDueThisMonth.filter(
-          (period) => this.dateUtils.parseDate(period.dueDate) <= currentDate
-        );
-        actualInterestAccrued = duePeriodsThroughBusinessDate.length
-          ? duePeriodsThroughBusinessDate.reduce((sum, period) => sum + this.toNumber(period.interestOriginalDue), 0)
-          : null;
-      }
-
-      const monthEndDateStr = this.dateUtils.formatDate(monthEndDate, Dates.DEFAULT_DATEFORMAT);
-
-      accrualRows.push({
-        Index: index,
-        'End of Month': monthEndDateStr,
-        'Opening Principal': this.formatCurrency(openingPrincipal),
-        'Closing Principal': this.formatCurrency(closingPrincipal),
-        'Interest Accrued': this.formatCurrency(interestAccrued),
-        'Actual Interest Accrued': actualInterestAccrued !== null ? this.formatCurrency(actualInterestAccrued) : ''
-      });
-
-      previousPrincipalBalance = closingPrincipal;
-      currentMonth = new Date(year, month + 1, 1);
-      index++;
-    }
-
-    return accrualRows;
+    return new Promise((resolve) => {
+      this.productsService
+        .getLoanProduct(String(loanProductId))
+        .pipe(take(1))
+        .subscribe({
+          next: (product: any) => {
+            resolve(product?.annualInterestRate != null ? this.toNumber(product.annualInterestRate) : fallbackRate);
+          },
+          error: () => {
+            console.warn('Accrual report: failed to fetch loan product rate, using loan-level annualInterestRate');
+            resolve(fallbackRate);
+          }
+        });
+    });
   }
 
   /**

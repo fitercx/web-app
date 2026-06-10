@@ -418,11 +418,13 @@
                   >
                     <i class="fa fa-dollar"></i>
                   </button>
-                  <mifosx-loan-downloads-menu
-                    iconOnly="true"
-                    [activeDownloadType]="getActiveLoanDownloadType(element)"
-                    (downloadSelected)="downloadLoanDocument(element, $event)"
-                  ></mifosx-loan-downloads-menu>
+                  <span (click)="$event.stopPropagation()">
+                    <mifosx-loan-downloads-menu
+                      [iconOnly]="true"
+                      [activeDownloadType]="getActiveLoanDownloadType(element)"
+                      (downloadSelected)="downloadLoanDocument(element, $event)"
+                    ></mifosx-loan-downloads-menu>
+                  </span>
                   <span *ngIf="element.status.pendingApproval">
                     <button
                       class="account-action-button"
@@ -703,11 +705,13 @@
         >
           <i class="fa fa-dollar"></i>
         </button>
-        <mifosx-loan-downloads-menu
-          iconOnly="true"
-          [activeDownloadType]="getActiveLoanDownloadType(element)"
-          (downloadSelected)="downloadLoanDocument(element, $event)"
-        ></mifosx-loan-downloads-menu>
+        <span (click)="$event.stopPropagation()">
+          <mifosx-loan-downloads-menu
+            [iconOnly]="true"
+            [activeDownloadType]="getActiveLoanDownloadType(element)"
+            (downloadSelected)="downloadLoanDocument(element, $event)"
+          ></mifosx-loan-downloads-menu>
+        </span>
         <span *ngIf="element.status.pendingApproval">
           <button
             class="account-action-button"

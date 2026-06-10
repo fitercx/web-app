@@ -3,6 +3,7 @@
   mat-raised-button
   color="primary"
   [matMenuTriggerFor]="downloadsMenu"
+  [matMenuTriggerRestoreFocus]="false"
   [disabled]="disabled || !!activeDownloadType"
 >
   <fa-icon icon="download" class="m-r-10"></fa-icon>
@@ -17,21 +18,74 @@
   matTooltip="Downloads"
   matTooltipPosition="above"
   [matMenuTriggerFor]="downloadsMenu"
+  [matMenuTriggerRestoreFocus]="false"
   [disabled]="disabled || !!activeDownloadType"
-  (click)="$event.stopPropagation()"
+  (mousedown)="$event.stopPropagation()"
 >
   <fa-icon icon="download"></fa-icon>
 </button>
 
-<mat-menu #downloadsMenu="matMenu" xPosition="before" yPosition="below">
+<mat-menu
+  #downloadsMenu="matMenu"
+  class="loan-downloads-menu-panel"
+  [overlapTrigger]="false"
+  xPosition="before"
+  yPosition="below"
+>
   <button
     mat-menu-item
-    *ngFor="let item of downloadItems"
-    [disabled]="disabled || (!!activeDownloadType && activeDownloadType !== item.type)"
-    (click)="selectDownload(item.type, $event)"
+    [disabled]="disabled || (!!activeDownloadType && activeDownloadType !== 'repaymentSchedulePdf')"
+    (click)="selectDownload('repaymentSchedulePdf')"
   >
-    <mat-spinner *ngIf="activeDownloadType === item.type" diameter="18" class="download-spinner"></mat-spinner>
-    <fa-icon *ngIf="activeDownloadType !== item.type" [icon]="item.icon" class="download-menu-icon"></fa-icon>
-    <span>{{ item.label }}</span>
+    <mat-spinner
+      *ngIf="activeDownloadType === 'repaymentSchedulePdf'"
+      diameter="18"
+      class="download-spinner"
+    ></mat-spinner>
+    <fa-icon *ngIf="activeDownloadType !== 'repaymentSchedulePdf'" icon="file-pdf" class="download-menu-icon"></fa-icon>
+    <span>Repayment Schedule (PDF)</span>
+  </button>
+
+  <button
+    mat-menu-item
+    [disabled]="disabled || (!!activeDownloadType && activeDownloadType !== 'repaymentScheduleExcel')"
+    (click)="selectDownload('repaymentScheduleExcel')"
+  >
+    <mat-spinner
+      *ngIf="activeDownloadType === 'repaymentScheduleExcel'"
+      diameter="18"
+      class="download-spinner"
+    ></mat-spinner>
+    <fa-icon
+      *ngIf="activeDownloadType !== 'repaymentScheduleExcel'"
+      icon="file-excel"
+      class="download-menu-icon"
+    ></fa-icon>
+    <span>Repayment Schedule (Excel)</span>
+  </button>
+
+  <button
+    mat-menu-item
+    [disabled]="disabled || (!!activeDownloadType && activeDownloadType !== 'accrualReport')"
+    (click)="selectDownload('accrualReport')"
+  >
+    <mat-spinner *ngIf="activeDownloadType === 'accrualReport'" diameter="18" class="download-spinner"></mat-spinner>
+    <fa-icon *ngIf="activeDownloadType !== 'accrualReport'" icon="file-alt" class="download-menu-icon"></fa-icon>
+    <span>Accrual Report</span>
+  </button>
+
+  <button
+    mat-menu-item
+    [disabled]="disabled || !kfsAvailable || (!!activeDownloadType && activeDownloadType !== 'keyFactStatement')"
+    [attr.title]="!kfsAvailable ? kfsUnavailableTooltip : null"
+    (click)="selectDownload('keyFactStatement')"
+  >
+    <mat-spinner *ngIf="activeDownloadType === 'keyFactStatement'" diameter="18" class="download-spinner"></mat-spinner>
+    <fa-icon
+      *ngIf="activeDownloadType !== 'keyFactStatement'"
+      icon="file-contract"
+      class="download-menu-icon kfs-icon"
+    ></fa-icon>
+    <span>Key Fact Statement (KFS)</span>
   </button>
 </mat-menu>

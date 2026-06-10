@@ -1,17 +1,11 @@
+<div fxLayout="row" class="downloads-toolbar m-t-20" fxLayoutAlign="end center" *ngIf="!forEditing">
+  <mifosx-loan-downloads-menu
+    [activeDownloadType]="activeDownloadType"
+    (downloadSelected)="downloadLoanDocument($event)"
+  ></mifosx-loan-downloads-menu>
+</div>
+
 <div class="container">
-  <div fxLayout="row" class="m-t-20" fxLayoutAlign="space-between center" *ngIf="!forEditing">
-    <div fxLayout="row" fxLayoutGap="12px" fxLayoutAlign="start center">
-      <!-- Adjust Installment Date button moved to More menu -->
-    </div>
-
-    <div fxLayout="row" fxLayoutGap="12px" fxLayoutAlign="end center">
-      <mifosx-loan-downloads-menu
-        [activeDownloadType]="activeDownloadType"
-        (downloadSelected)="downloadLoanDocument($event)"
-      ></mifosx-loan-downloads-menu>
-    </div>
-  </div>
-
   <table mat-table [dataSource]="repaymentScheduleDetails.periods" *ngIf="!forEditing" id="repaymentSchedule">
     <ng-container matColumnDef="number">
       <th mat-header-cell class="center" *matHeaderCellDef>#</th>
