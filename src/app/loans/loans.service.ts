@@ -102,6 +102,10 @@ export class LoansService {
     return this.http.get(`/loans/${loanId}/accrual-report`) as Observable<{ periods: AccrualReportPeriod[] }>;
   }
 
+  getLoanKeyFactStatement(loanId: string): Observable<any> {
+    return this.http.get(`/loans/${loanId}/key-fact-statement`);
+  }
+
   getGuarantorTemplate(loanId: string): Observable<any> {
     return this.http.get(`/loans/${loanId}/guarantors/template`);
   }
@@ -169,7 +173,7 @@ export class LoansService {
    */
   getLoanGeneralTabExpandData(loanId: string): Observable<any> {
     let httpParams = new HttpParams()
-      .set('fields', 'annualInterestRate,interestRatePerPeriod,interestType,numberOfRepayments')
+      .set('fields', 'annualInterestRate,interestRatePerPeriod,interestType,numberOfRepayments,loanProductId')
       .set('associations', 'repaymentSchedule');
     return this.http.get(`/loans/${loanId}`, { params: httpParams });
   }

@@ -36,3 +36,12 @@
     background: #555;
   }
 }
+
+.cdk-overlay-container .cdk-overlay-pane .loan-downloads-menu-panel {
+  pointer-events: auto;
+}
+
+.cdk-overlay-container .cdk-overlay-backdrop + .cdk-overlay-pane .loan-downloads-menu-panel {
+  position: relative;
+  z-index: 1001;
+}

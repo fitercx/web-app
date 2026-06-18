@@ -11,9 +11,12 @@ import * as XLSX from 'xlsx';
 /** Custom Services. */
 import { ClientsService, BulkLoanDisbursementResponse } from 'app/clients/clients.service';
 import { LoansService } from 'app/loans/loans.service';
+import { ProductsService } from 'app/products/products.service';
+import { computeMonthlyAccrualRows } from 'app/loans/accrual-report.util';
 import { Dates } from 'app/core/utils/dates';
 import { SettingsService } from 'app/settings/settings.service';
 import { LoanDownloadType } from 'app/shared/loan-downloads-menu/loan-downloads-menu.component';
+import { generateKeyFactStatementPdf } from 'app/shared/key-fact-statement/key-fact-statement-pdf';
 import { take } from 'rxjs/operators';
 import {
   BulkDisburseDialogComponent,
@@ -244,6 +247,7 @@ export class GeneralTabComponent {
     private router: Router,
     private dialog: MatDialog,
     private loansService: LoansService,
+    private productsService: ProductsService,
     private settingsService: SettingsService,
     private dateUtils: Dates,
     private cdr: ChangeDetectorRef
@@ -393,15 +397,25 @@ export class GeneralTabComponent {
 
     const loanId = Number(loan.id);
     this.activeLoanDownloads.set(loanId, type);
-    this.ensureLoanScheduleForDownload(loan)
-      .then((loanDetails) => {
-        if (type === 'repaymentSchedulePdf') {
-          this.exportLoanRepaymentSchedulePdf(loanDetails);
-        } else if (type === 'repaymentScheduleExcel') {
-          this.exportLoanRepaymentScheduleExcel(loanDetails);
-        } else if (type === 'accrualReport') {
-          this.exportLoanAccrualReport(loanDetails);
-        }
+    this.cdr.markForCheck();
+
+    const downloadTask =
+      type === 'keyFactStatement'
+        ? this.exportLoanKeyFactStatement(loan)
+        : this.ensureLoanScheduleForDownload(loan).then((loanDetails) => {
+            if (type === 'repaymentSchedulePdf') {
+              this.exportLoanRepaymentSchedulePdf(loanDetails);
+            } else if (type === 'repaymentScheduleExcel') {
+              this.exportLoanRepaymentScheduleExcel(loanDetails);
+            } else if (type === 'accrualReport') {
+              return this.exportLoanAccrualReport(loanDetails);
+            }
+            return undefined;
+          });
+
+    downloadTask
+      .catch((error) => {
+        console.error(`Failed to download ${type}:`, error);
       })
       .finally(() => {
         this.activeLoanDownloads.delete(loanId);
@@ -508,7 +522,7 @@ export class GeneralTabComponent {
     XLSX.writeFile(workbook, `RepaymentSchedule_${loanId}_${generationDate}.xlsx`, { cellDates: true });
   }
 
-  private exportLoanAccrualReport(loan: any): void {
+  private async exportLoanAccrualReport(loan: any): Promise<void> {
     const periods = this.getDownloadPeriods(loan);
     if (!periods.length) {
       return;
@@ -518,7 +532,17 @@ export class GeneralTabComponent {
       ? this.dateUtils.parseDate(loan.timeline.actualDisbursementDate)
       : this.dateUtils.parseDate(periods[0].fromDate || periods[0].dueDate);
     const maturityDate = this.dateUtils.parseDate(periods[periods.length - 1].dueDate);
-    const rows = this.generateAccrualRows(periods, startDate, maturityDate);
+
+    const annualRatePercent = await this.resolveProductAnnualRate(loan);
+    const rows = computeMonthlyAccrualRows({
+      periods,
+      startDate,
+      maturityDate,
+      businessDate: this.settingsService.businessDate,
+      annualRatePercent,
+      parseDate: (value: any) => this.dateUtils.parseDate(value),
+      formatMonthEnd: (date: Date) => this.dateUtils.formatDate(date, Dates.DEFAULT_DATEFORMAT)
+    });
     if (!rows.length) {
       return;
     }
@@ -537,6 +561,62 @@ export class GeneralTabComponent {
     XLSX.writeFile(workbook, `Accrual-Report-${loan.id || 'loan'}-${businessDate}.xlsx`, { cellDates: true });
   }
 
+  /**
+   * Resolves the loan PRODUCT's annual nominal (reducing-balance) interest rate used to accrue interest.
+   * Falls back to the loan-level rate if the product id or product rate is unavailable.
+   */
+  private resolveProductAnnualRate(loan: any): Promise<number> {
+    const fallbackRate = this.asNumber(loan?.annualInterestRate);
+    const loanProductId = loan?.loanProductId;
+    if (loanProductId == null) {
+      console.warn('Accrual report: loanProductId unavailable, using loan-level annualInterestRate');
+      return Promise.resolve(fallbackRate);
+    }
+    return new Promise((resolve) => {
+      this.productsService
+        .getLoanProduct(String(loanProductId))
+        .pipe(take(1))
+        .subscribe({
+          next: (product: any) => {
+            resolve(product?.annualInterestRate != null ? this.asNumber(product.annualInterestRate) : fallbackRate);
+          },
+          error: () => {
+            console.warn('Accrual report: failed to fetch loan product rate, using loan-level annualInterestRate');
+            resolve(fallbackRate);
+          }
+        });
+    });
+  }
+
+  private exportLoanKeyFactStatement(loan: any): Promise<void> {
+    return new Promise((resolve, reject) => {
+      this.loansService
+        .getLoanKeyFactStatement(String(loan.id))
+        .pipe(take(1))
+        .subscribe({
+          next: async (response: any) => {
+            try {
+              await this.generateLoanKeyFactStatementPdf(response, loan);
+              resolve();
+            } catch (error) {
+              reject(error);
+            }
+          },
+          error: reject
+        });
+    });
+  }
+
+  private generateLoanKeyFactStatementPdf(kfs: any, fallbackLoan: any): Promise<void> {
+    const loan = kfs?.loan ?? {};
+    const businessDate = this.dateUtils.formatDate(this.settingsService.businessDate, Dates.DEFAULT_DATEFORMAT);
+    return generateKeyFactStatementPdf(kfs, {
+      dateOfIssue: businessDate,
+      fallbackLoan,
+      fileName: `key-fact-statement-${loan.accountNo ?? fallbackLoan?.accountNo ?? loan.id ?? 'loan'}.pdf`
+    });
+  }
+
   private getRepaymentScheduleExportColumns(): any[] {
     return [
       { header: '#', value: (period: any) => period.period || '' },
@@ -553,76 +633,6 @@ export class GeneralTabComponent {
 
   private getDownloadPeriods(loan: any): any[] {
     return Array.isArray(loan?.repaymentSchedule?.periods) ? loan.repaymentSchedule.periods : [];
-  }
-
-  private generateAccrualRows(periods: any[], startDate: Date, maturityDate: Date): any[] {
-    const accrualRows: any[] = [];
-    const currentDate = this.settingsService.businessDate;
-    let index = 1;
-    let previousPrincipalBalance =
-      periods.find((period) => this.asNumber(period.principalDisbursed) > 0)?.principalDisbursed ||
-      this.asNumber(periods[0]?.principalLoanBalanceOutstanding) + this.asNumber(periods[0]?.principalDue);
-
-    let currentMonth = new Date(startDate.getFullYear(), startDate.getMonth(), 1);
-    const finalMonth = new Date(maturityDate.getFullYear(), maturityDate.getMonth(), 1);
-
-    while (currentMonth <= finalMonth) {
-      const year = currentMonth.getFullYear();
-      const month = currentMonth.getMonth();
-      const monthStartDate =
-        year === startDate.getFullYear() && month === startDate.getMonth()
-          ? new Date(startDate)
-          : new Date(year, month, 1);
-      const monthEndDate =
-        year === maturityDate.getFullYear() && month === maturityDate.getMonth()
-          ? new Date(maturityDate)
-          : new Date(year, month + 1, 0);
-
-      const periodsDueThisMonth = periods.filter((period) => {
-        if (!period.dueDate) {
-          return false;
-        }
-        const dueDate = this.dateUtils.parseDate(period.dueDate);
-        return dueDate >= monthStartDate && dueDate <= monthEndDate;
-      });
-      const interestAccrued = periodsDueThisMonth.reduce(
-        (sum, period) => sum + this.asNumber(period.interestOriginalDue ?? period.interestDue),
-        0
-      );
-      let closingPrincipal = previousPrincipalBalance;
-      if (periodsDueThisMonth.length) {
-        closingPrincipal = this.asNumber(
-          periodsDueThisMonth[periodsDueThisMonth.length - 1].principalLoanBalanceOutstanding
-        );
-      }
-      if (year === maturityDate.getFullYear() && month === maturityDate.getMonth()) {
-        closingPrincipal = 0;
-      }
-
-      let actualInterestAccrued: number | null = null;
-      if (monthEndDate < currentDate) {
-        actualInterestAccrued = interestAccrued;
-      } else if (currentDate >= monthStartDate) {
-        actualInterestAccrued = periodsDueThisMonth
-          .filter((period) => this.dateUtils.parseDate(period.dueDate) <= currentDate)
-          .reduce((sum, period) => sum + this.asNumber(period.interestOriginalDue ?? period.interestDue), 0);
-      }
-
-      accrualRows.push({
-        Index: index,
-        'End of Month': this.dateUtils.formatDate(monthEndDate, Dates.DEFAULT_DATEFORMAT),
-        'Opening Principal': previousPrincipalBalance.toFixed(2),
-        'Closing Principal': closingPrincipal.toFixed(2),
-        'Interest Accrued': interestAccrued.toFixed(2),
-        'Actual Interest Accrued': actualInterestAccrued !== null ? actualInterestAccrued.toFixed(2) : ''
-      });
-
-      previousPrincipalBalance = closingPrincipal;
-      currentMonth = new Date(year, month + 1, 1);
-      index++;
-    }
-
-    return accrualRows;
   }
 
   private addAccrualTotalsRow(accrualData: any[]): any[] {
@@ -711,6 +721,9 @@ export class GeneralTabComponent {
           }
           if (data?.numberOfRepayments != null) {
             element.numberOfRepayments = data.numberOfRepayments;
+          }
+          if (data?.loanProductId != null) {
+            element.loanProductId = data.loanProductId;
           }
           if (data?.repaymentSchedule != null) {
             element.repaymentSchedule = data.repaymentSchedule;

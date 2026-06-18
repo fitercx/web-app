@@ -1,7 +1,22 @@
+:host {
+  display: inline-block;
+}
+
+.account-action-button {
+  min-width: 26px;
+  padding: 0 6px;
+  margin: 4px;
+  line-height: 25px;
+}
+
 .download-menu-icon,
 .download-spinner {
   display: inline-flex;
   justify-content: center;
   margin-right: 12px;
   width: 18px;
+}
+
+.download-menu-icon.kfs-icon {
+  color: #1f80c1;
 }
