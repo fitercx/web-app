@@ -14,6 +14,19 @@
 
   .transaction-type-filter {
     width: 220px;
+
+    ::ng-deep .mat-form-field-wrapper {
+      padding-bottom: 0;
+    }
+
+    ::ng-deep .mat-form-field-infix {
+      border-top: 0;
+      padding: 0.25em 0 0.5em;
+    }
+
+    ::ng-deep .mat-form-field-underline {
+      position: static;
+    }
   }
 
   table {
