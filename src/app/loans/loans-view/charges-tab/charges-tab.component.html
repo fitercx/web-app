@@ -168,7 +168,6 @@
           color="warn"
           matTooltip="{{ 'tooltips.Undo Paid Charge' | translate }}"
           *ngIf="
-            charge.paid &&
             (status === 'Active' || status === 'Overpaid') &&
             charge.amountPaid > 0 &&
             charge.name === 'Daily Late Repayment Fee' &&

@@ -24,7 +24,7 @@ export class TransactionsTabComponent implements OnInit {
   transactionsData: LoanTransaction[] = [];
   /** Form control to handle accural parameter */
   hideAccrualsParam: UntypedFormControl;
-  hideReversedParam: UntypedFormControl;
+  showReversedParam: UntypedFormControl;
   /** Stores the status of the loan account */
   status: string;
   /** Columns to be displayed in original schedule table. */
@@ -96,12 +96,8 @@ export class TransactionsTabComponent implements OnInit {
 
   ngOnInit() {
     this.hideAccrualsParam = new UntypedFormControl(true);
-    this.hideReversedParam = new UntypedFormControl(false);
-    if (this.hideAccrualsParam.value) {
-      this.filterTransactions(this.hideReversedParam.value, this.hideAccrualsParam.value);
-    } else {
-      this.setLoanTransactions();
-    }
+    this.showReversedParam = new UntypedFormControl(false);
+    this.filterTransactions(!this.showReversedParam.value, this.hideAccrualsParam.value);
   }
 
   setLoanTransactions() {
@@ -130,11 +126,11 @@ export class TransactionsTabComponent implements OnInit {
   }
 
   hideAccruals() {
-    this.filterTransactions(this.hideReversedParam.value, !this.hideAccrualsParam.value);
+    this.filterTransactions(!this.showReversedParam.value, !this.hideAccrualsParam.value);
   }
 
-  hideReversed() {
-    this.filterTransactions(!this.hideReversedParam.value, this.hideAccrualsParam.value);
+  showReversed(showReversed: boolean) {
+    this.filterTransactions(!showReversed, this.hideAccrualsParam.value);
   }
 
   filterTransactions(hideReversed: boolean, hideAccrual: boolean): void {
