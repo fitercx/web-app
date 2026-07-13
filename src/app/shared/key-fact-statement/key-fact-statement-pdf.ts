@@ -29,14 +29,22 @@ const PDF_LAYOUT = {
     leftMargin: 0.48,
     rightMargin: 0.48
   },
+  logo: {
+    y: 0.28,
+    height: 0.3,
+    // Gap between logo bottom and title / body content
+    bodyGap: 0.35
+  },
   title: {
     fontSize: 20,
-    y: 0.78
+    // Derived at draw time from logo.y + logo.height + logo.bodyGap
+    y: 0.93
   },
   headerY: {
-    start: 1.02,
+    start: 1.17,
     gap: 0.18
   },
+  sectionsStartY: 1.6,
   footer: {
     yOffset: 0.43,
     fontSize: 7,
@@ -54,7 +62,7 @@ export async function generateKeyFactStatementPdf(kfs: any, options: KeyFactStat
   drawTitle(pdf, replacePlaceholders(template.title || DEFAULT_TEMPLATE.title, context));
   drawHeaderRows(pdf, template.headerRows || DEFAULT_TEMPLATE.headerRows, context);
 
-  let startY = 1.45;
+  let startY = PDF_LAYOUT.sectionsStartY;
   (template.sections || []).forEach((section: any) => {
     startY = drawSection(pdf, section, context, kfs?.repaymentSchedule || [], startY);
   });
@@ -147,32 +155,73 @@ function drawScheduleTable(
   schedule: any[],
   startY: number
 ): number {
-  const body = schedule.map((row) => [
-    row.period,
-    formatAmount(row.outstandingPrincipal),
-    formatDate(row.dueDate),
-    formatAmount(row.totalDue),
-    formatAmount(row.principalDue),
-    formatAmount(row.interestDue),
-    row.status || 'SCHEDULED'
-  ]);
+  const isActiveLoan = context.loanActive === 'true';
+  const activeOnlyFields: string[] = section.activeOnlyFields || [];
+  const defaultFields = [
+    'period',
+    'outstandingPrincipal',
+    'dueDate',
+    'totalDue',
+    'principalDue',
+    'interestDue',
+    'status'
+  ];
+  const fields: string[] = (section.fields || defaultFields).filter(
+    (field: string) => isActiveLoan || !activeOnlyFields.includes(field)
+  );
+  const columns: string[] = (section.columns || [])
+    .map((column: string, index: number) => ({
+      column: replacePlaceholders(column, context),
+      field: (section.fields || defaultFields)[index]
+    }))
+    .filter((entry: { column: string; field: string }) => fields.includes(entry.field))
+    .map((entry: { column: string; field: string }) => entry.column);
 
-  const totalRow = (section.totalRow || []).map((cell: string) => replacePlaceholders(cell || '', context));
+  const body = schedule.map((row) => fields.map((field) => formatScheduleCell(row, field)));
+
+  const totalRowSource: string[] = section.totalRow || [];
+  const totalRow = (section.fields || defaultFields)
+    .map((field: string, index: number) => ({
+      field,
+      value: replacePlaceholders(totalRowSource[index] || '', context)
+    }))
+    .filter((entry: { field: string; value: string }) => fields.includes(entry.field))
+    .map((entry: { field: string; value: string }) => entry.value);
   if (totalRow.length) {
     body.push(totalRow);
   }
 
+  const amountFields = new Set([
+    'outstandingPrincipal',
+    'totalDue',
+    'principalDue',
+    'interestDue',
+    'lateFee',
+    'feeChargesDue',
+    'penaltyChargesDue'
+  ]);
+  const columnStyles: Record<number, any> = {
+    0: { cellWidth: 0.35, halign: 'center' }
+  };
+  fields.forEach((field, index) => {
+    if (field === 'dueDate') {
+      columnStyles[index] = { cellWidth: 0.95 };
+    } else if (field === 'status') {
+      columnStyles[index] = { halign: 'center', cellWidth: 0.85 };
+    } else if (amountFields.has(field)) {
+      columnStyles[index] = { halign: 'right' };
+    }
+  });
+
   autoTable(pdf, {
     startY,
-    head: [
-      (section.columns || []).map((column: string) => replacePlaceholders(column, context))
-    ],
+    head: [columns],
     body,
     theme: 'grid',
-    margin: { left: 0.35, right: 0.35, bottom: 0.8 },
+    margin: { left: 0.3, right: 0.3, bottom: 0.8 },
     styles: {
-      fontSize: 8.5,
-      cellPadding: { top: 0.06, right: 0.06, bottom: 0.06, left: 0.06 },
+      fontSize: fields.length > 7 ? 7.5 : 8.5,
+      cellPadding: { top: 0.05, right: 0.04, bottom: 0.05, left: 0.04 },
       lineColor: 40,
       lineWidth: 0.005,
       textColor: 25,
@@ -180,20 +229,17 @@ function drawScheduleTable(
       valign: 'middle',
       minCellHeight: 0.3
     },
-    headStyles: { fillColor: [
+    headStyles: {
+      fillColor: [
         240,
         240,
         240
-      ], textColor: 25, fontStyle: 'bold', minCellHeight: 0.36 },
-    columnStyles: {
-      0: { cellWidth: 0.4, halign: 'center' },
-      1: { halign: 'right' },
-      2: { cellWidth: 1.1 },
-      3: { halign: 'right' },
-      4: { halign: 'right' },
-      5: { halign: 'right' },
-      6: { halign: 'center', cellWidth: 0.95 }
+      ],
+      textColor: 25,
+      fontStyle: 'bold',
+      minCellHeight: 0.36
     },
+    columnStyles,
     didParseCell: (data) => {
       if (data.section === 'body' && data.row.index === body.length - 1 && totalRow.length) {
         data.cell.styles.fontStyle = 'bold';
@@ -202,6 +248,27 @@ function drawScheduleTable(
   });
 
   return (pdf as any).lastAutoTable.finalY + 0.4;
+}
+
+function formatScheduleCell(row: any, field: string): string | number {
+  switch (field) {
+    case 'period':
+      return row.period;
+    case 'outstandingPrincipal':
+    case 'totalDue':
+    case 'principalDue':
+    case 'interestDue':
+    case 'lateFee':
+    case 'feeChargesDue':
+    case 'penaltyChargesDue':
+      return formatAmount(row[field]);
+    case 'dueDate':
+      return formatDate(row.dueDate);
+    case 'status':
+      return row.status || 'SCHEDULED';
+    default:
+      return row[field] ?? '';
+  }
 }
 
 function drawFooter(pdf: jsPDF, footer: string | null | undefined): void {
@@ -229,7 +296,14 @@ async function drawLogo(pdf: jsPDF, logoUrl: string | null | undefined): Promise
 
   try {
     const imageData = await loadImageDataUrl(logoUrl);
-    pdf.addImage(imageData, 'PNG', pdf.internal.pageSize.getWidth() - 2.2, 0.28, 1.65, 0.3);
+    pdf.addImage(
+      imageData,
+      'PNG',
+      pdf.internal.pageSize.getWidth() - 2.2,
+      PDF_LAYOUT.logo.y,
+      1.65,
+      PDF_LAYOUT.logo.height
+    );
   } catch (error) {
     console.error('Failed to load KFS logo:', error);
   }
@@ -254,9 +328,11 @@ function buildContext(kfs: any, options: KeyFactStatementPdfOptions): Record<str
   const schedule = kfs?.repaymentSchedule ?? [];
   const currencyCode = loan.currencyCode ?? loan.currency?.code ?? fallbackLoan.currency?.code ?? '';
   const totalInterest = sum(schedule, 'interestDue');
+  const totalLateFee = sum(schedule, 'lateFee') || sum(schedule, 'penaltyChargesDue');
   const totalPrincipal = sum(schedule, 'principalDue') || toNumber(loan.approvedPrincipal ?? fallbackLoan.loanAmount);
   const totalRepayable = sum(schedule, 'totalDue') || totalPrincipal + totalInterest;
   const repaymentFrequency = frequencyLabel(loan);
+  const loanActive = isLoanActive(loan, fallbackLoan);
 
   return {
     dateOfIssue: options.dateOfIssue,
@@ -265,9 +341,10 @@ function buildContext(kfs: any, options: KeyFactStatementPdfOptions): Record<str
     externalId: loan.externalId || loan.accountNo || fallbackLoan.accountNo || loan.id || '',
     currencyCode,
     approvedAmount: formatAmount(loan.approvedPrincipal ?? fallbackLoan.loanAmount),
-    tenure: loan.numberOfRepayments ? `${loan.numberOfRepayments} ${repaymentFrequency}` : '',
+    tenure: loan.numberOfRepayments ? `${loan.numberOfRepayments} Months` : '',
     repaymentFrequency,
     totalInterest: formatAmount(totalInterest),
+    totalLateFee: formatAmount(totalLateFee),
     interestRate: formatRate(loan.annualInterestRate),
     interestRateBasisLabel:
       loan.interestRateBasisLabel || (loan.productType === 'RBF' ? 'Reducing Interest Rate' : 'Interest Rate'),
@@ -277,11 +354,26 @@ function buildContext(kfs: any, options: KeyFactStatementPdfOptions): Record<str
     totalRepayable: formatAmount(totalRepayable),
     processingFee: formatAmount(charges.feeAmount),
     vatOnProcessingFee: formatAmount(charges.taxAmount),
-    otherFees: formatAmount(toNumber(charges.penaltyAmount)),
+    otherFees: formatAmount(0),
     factorRate: formatRate(loan.factorRate),
     disbursementDate: formatDate(loan.disbursementDate),
-    disbursedAmount: formatAmount(loan.netDisbursalAmount ?? loan.approvedPrincipal ?? fallbackLoan.loanAmount)
+    disbursedAmount: formatAmount(loan.netDisbursalAmount ?? loan.approvedPrincipal ?? fallbackLoan.loanAmount),
+    loanActive: loanActive ? 'true' : 'false'
   };
+}
+
+function isLoanActive(loan: any, fallbackLoan: any): boolean {
+  if (loan?.active === true || loan?.active === 'true') {
+    return true;
+  }
+  if (Number(loan?.loanStatusId) === 300) {
+    return true;
+  }
+  const status = loan?.status ?? fallbackLoan?.status;
+  if (status?.active === true || status?.value === 'Active' || status?.code === 'loanStatusType.active') {
+    return true;
+  }
+  return false;
 }
 
 function replacePlaceholders(value: string, context: Record<string, string>): string {
@@ -293,7 +385,8 @@ function frequencyLabel(loan: any): string {
   if (!frequency) {
     return '';
   }
-  return String(frequency).replace(/s$/, '') + (Number(loan.numberOfRepayments) === 1 ? '' : 's');
+  // Backend already returns a display label (e.g. "Monthly", "90 Days")
+  return String(frequency);
 }
 
 function sum(rows: any[], field: string): number {
