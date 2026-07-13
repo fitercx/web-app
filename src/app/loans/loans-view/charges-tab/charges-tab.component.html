@@ -11,12 +11,12 @@
     <div fxLayout="row" fxLayoutAlign="end center" *ngIf="hasOverdueCharges()">
       <button
         mat-raised-button
-        color="warn"
-        (click)="openBulkRemoveDialog()"
-        matTooltip="{{ 'tooltips.Bulk Remove Overdue Charges' | translate }}"
+        color="primary"
+        (click)="openBulkWaiveDialog()"
+        matTooltip="{{ 'tooltips.Bulk Waive Overdue Charges' | translate }}"
       >
-        <mat-icon>delete_sweep</mat-icon>
-        {{ 'labels.buttons.Bulk Remove Charges' | translate }}
+        <mat-icon>flag</mat-icon>
+        {{ 'labels.buttons.Bulk Waive Charges' | translate }}
       </button>
     </div>
   </div>

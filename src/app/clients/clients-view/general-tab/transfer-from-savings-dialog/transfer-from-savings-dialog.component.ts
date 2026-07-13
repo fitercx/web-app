@@ -8,6 +8,7 @@ import { AccountTransfersService } from 'app/account-transfers/account-transfers
 import { Dates } from 'app/core/utils/dates';
 import { LoansService } from 'app/loans/loans.service';
 import { SettingsService } from 'app/settings/settings.service';
+import { AlertService } from 'app/core/alert/alert.service';
 
 @Component({
   selector: 'mifosx-transfer-from-savings-dialog',
@@ -40,6 +41,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     private accountTransfersService: AccountTransfersService,
     private dateUtils: Dates,
     private settingsService: SettingsService,
+    private alertService: AlertService,
     private dialogRef: MatDialogRef<TransferFromSavingsDialogComponent>,
     @Inject(MAT_DIALOG_DATA) public data: { loan: any; clientId: any }
   ) {}
@@ -306,13 +308,35 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     };
 
     this.accountTransfersService.createAccountTransfer(payload).subscribe({
-      next: () => {
+      next: (response: any) => {
         this.isLoading = false;
+        this.notifyBackdatedLpiWaived(response?.changes);
         this.dialogRef.close({ submitted: true });
       },
       error: () => {
         this.isLoading = false;
       }
+    });
+  }
+
+  /**
+   * When a backdated settlement auto-waives the LPI accrued for the in-between days, the backend returns the
+   * summary in `changes`. Surface it to the operator so the waiver is visible (it is also fully audited on the
+   * loan with proper waive transactions and journal entries).
+   */
+  private notifyBackdatedLpiWaived(changes: any): void {
+    const chargesWaived = Number(changes?.chargesWaived || 0);
+    if (!chargesWaived) {
+      return;
+    }
+    const amount = this.roundAmount(Number(changes?.totalAmountWaived || 0));
+    const days = Number(changes?.daysCovered || 0);
+    const dayText = days === 1 ? '1 day' : `${days} days`;
+    this.alertService.alert({
+      type: 'Backdated Settlement',
+      message:
+        `Backdated settlement: ${this.currencySymbol} ${this.formatAmount(amount)} of late-payment interest ` +
+        `(${chargesWaived} charge(s) over ${dayText}) was automatically waived and recorded on the loan.`
     });
   }
 

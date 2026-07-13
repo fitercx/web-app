@@ -595,12 +595,35 @@ export class LoansService {
   }
 
   /**
+   * Template for the Adjust Installment Date dialog: whether interest recalculation is available for this loan and,
+   * if not, the reason (used to disable the option and show an on-screen message).
+   * @param {string} accountId Loans Account Id
+   * @returns {Observable<any>}
+   */
+  adjustInstallmentDateTemplate(accountId: string): Observable<any> {
+    return this.http.get(`/loan-adjust-installment/${accountId}/template`);
+  }
+
+  /**
    * @param {string} accountId Loans Account Id
    * @param {any} data Deactivate Overdue Charges Data (with dueDate)
    * @returns {Observable<any>}
    */
   deactivateOverdueCharges(accountId: string, data: any): Observable<any> {
     const httpParams = new HttpParams().set('command', 'deactivateOverdue');
+    return this.http.post(`/loans/${accountId}/charges`, data, { params: httpParams });
+  }
+
+  /**
+   * Bulk-waives outstanding overdue charges (LPI). Accepts the same selection payload as
+   * deactivateOverdueCharges (dueDate/toDueDate, removeCompleteEmiOverdue + selectedEmiNumbers, or no filters
+   * for all), but charges are waived via the standard waiver flow instead of destructively deactivated.
+   * @param {string} accountId Loans Account Id
+   * @param {any} data Selection payload
+   * @returns {Observable<any>}
+   */
+  bulkWaiveOverdueCharges(accountId: string, data: any): Observable<any> {
+    const httpParams = new HttpParams().set('command', 'bulkWaiveOverdue');
     return this.http.post(`/loans/${accountId}/charges`, data, { params: httpParams });
   }
 

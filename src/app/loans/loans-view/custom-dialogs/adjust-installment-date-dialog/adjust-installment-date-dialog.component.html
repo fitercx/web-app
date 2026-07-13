@@ -67,13 +67,17 @@
       <mat-checkbox formControlName="adjustWithInterestRecalculation" color="primary">
         {{ 'labels.text.Adjust with recalculation of interest' | translate }}
       </mat-checkbox>
-      <p class="recalc-hint">
+      <p class="recalc-hint" *ngIf="interestRecalculationSupported">
         <small>
           {{
             'labels.text.When enabled the schedule is regenerated and interest is recalculated from the selected installment onwards, following the same approach as Loan Reschedule > Change Repayment Date.'
               | translate
           }}
         </small>
+      </p>
+      <p class="recalc-not-supported" *ngIf="!interestRecalculationSupported">
+        <mat-icon class="warning-icon">info</mat-icon>
+        <small>{{ interestRecalculationNotSupportedReason }}</small>
       </p>
     </div>
 
