@@ -1530,6 +1530,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     const dialogRef = this.dialog.open(AdjustInstallmentDateDialogComponent, {
       width: '500px',
       data: {
+        loanId: this.loanDetailsData?.id,
         installmentNumber: installmentData.period,
         currentDueDate: installmentData.dueDate,
         emiAmount: installmentData.totalDueForPeriod,
@@ -1634,6 +1635,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     const dialogRef = this.dialog.open(AdjustInstallmentDateDialogComponent, {
       width: '500px',
       data: {
+        loanId: this.loanDetailsData?.id,
         adjustableInstallments: adjustableInstallments,
         currencyCode: this.currencyCode,
         disbursementDate: this.loanDetailsData?.timeline?.actualDisbursementDate

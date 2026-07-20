@@ -552,7 +552,8 @@
       "Withdraw": "Withdraw",
       "View Active Charges": "View Active Charges",
       "View Inactive Charges": "View Inactive Charges",
-      "Yes": "Yes"
+      "Yes": "Yes",
+      "Bulk Waive Charges": "Bulk Waive Charges"
     },
     "catalogs": {
       "Interest payment waiver": "Interest Payment Waiver",
@@ -881,8 +882,6 @@
       "Balance": "Balance",
       "Block Savings Account": "Block Savings Account",
       "Bulk Import": "Bulk Import",
-      "Bulk Loan Disbursement": "Bulk Loan Disbursement",
-      "Bulk Disbursement Results": "Bulk Disbursement Results",
       "Bulk Loan Reassignment": "Bulk Loan Reassignment",
       "Business Rule Parameters": "Business Rule Parameters",
       "COB Catch-Up is": "COB Catch-Up is",
@@ -1213,7 +1212,8 @@
       "Grace On Principal": "Grace On Principal",
       "Insert Installment": "Insert Installment",
       "Interest Rate": "Interest Rate",
-      "Principal Amount": "Principal Amount"
+      "Principal Amount": "Principal Amount",
+      "Bulk Waive Overdue Charges": "Bulk Waive Overdue Charges"
     },
     "hints": {
       "remove charges from this date onwards": "Remove all overdue charges from this date onwards",
@@ -1239,7 +1239,7 @@
       "Enable Line of Credit Payable functionality": "Enable Line of Credit Payable functionality",
       "Linked Savings Account (Auto Debit Source)": "Linked Savings Account (Auto Debit Source)",
       "Invoice Number": "Invoice Number",
-      "Invoice No": "Invoice No.",
+      "Invoice No": "Invoice No",
       "Amount in AED": "Amount in AED",
       "Supplier/Buyer Name": "Supplier/Buyer Name",
       "PreDisbursal Amount": "PreDisbursal Amount",
@@ -1283,11 +1283,9 @@
       "Amount Waived": "Amount Waived",
       "Line of Credit ID": "Line of Credit ID",
       "Line of External Id": "Line of External Id",
-      "Invoice No": "Invoice No",
       "Invoice Date": "Invoice Date",
       "Invoice Due Date": "Invoice Due Date",
       "Invoice Amount": "Invoice Amount",
-      "Invoice Currency": "Invoice Currency",
       "Disapproved Amount": "Disapproved Amount",
       "Approved Receivable Amount": "Approved Receivable Amount",
       "Next Instalment Date": "Next Instalment Date",
@@ -1702,7 +1700,6 @@
       "Disbursed On": "Disbursed On",
       "Disbursed On Date": "Disbursed On Date",
       "Disbursed on": "Disbursed on",
-      "Disbursement Date": "Disbursement Date",
       "Disbursement On": "Disbursement On",
       "Disbursement on": "Disbursement on",
       "Display Name": "Display Name",
@@ -2017,7 +2014,6 @@
       "Linked to floating interest rates": "Linked to floating interest rates",
       "List of Accounts": "List of Accounts",
       "Loan": "Loan",
-      "Loan Account": "Loan Account",
       "Loan Account Classification": "Loan Account Classification",
       "Loan Account Number": "Loan Account Number",
       "Loan Account OverView": "Loan Account OverView",
@@ -2256,7 +2252,6 @@
       "Payment Allocation Rule": "Payment Allocation Rule",
       "Payment Due At": "Payment Due At",
       "Payment Details": "Payment Details",
-      "Payment Type": "Payment Type",
       "Payment Type Id": "Payment Type Id",
       "Payment due as of": "Payment due as of",
       "Payment due at": "Payment due at",
@@ -3887,7 +3882,8 @@
     "Yes": "Yes",
     "loan product will be active and available to clients": "The date that the loan product will be active and available to clients. If blank, the loan product will be active as soon as it is created.",
     "loan product will become inactive and unavailable to clients": "The date that the loan product will become inactive and unavailable to clients. If blank, the load product will never become inactive.",
-    "Refund transactions where interest refund will automatically be calculated": "Refund transactions where interest refund will automatically be calculated"
+    "Refund transactions where interest refund will automatically be calculated": "Refund transactions where interest refund will automatically be calculated",
+    "Bulk Waive Overdue Charges": "Bulk Waive Overdue Charges - Waive all outstanding overdue charges (all, by EMI, or by date range)"
   },
   "termFrequency.periodFrequencyType.days": "Days",
   "termFrequency.periodFrequencyType.weeks": "Weeks",

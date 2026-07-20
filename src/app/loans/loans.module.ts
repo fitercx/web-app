@@ -79,7 +79,7 @@ import { ExternalAssetTransferComponent } from './loans-view/external-asset-owne
 import { TranslateModule } from '@ngx-translate/core';
 import { LoanDelinquencyActionDialogComponent } from './custom-dialog/loan-delinquency-action-dialog/loan-delinquency-action-dialog.component';
 import { AdjustInstallmentDateDialogComponent } from './loans-view/custom-dialogs/adjust-installment-date-dialog/adjust-installment-date-dialog.component';
-import { BulkRemoveChargesDialogComponent } from './loans-view/custom-dialogs/bulk-remove-charges-dialog/bulk-remove-charges-dialog.component';
+import { BulkWaiveChargesDialogComponent } from './loans-view/custom-dialogs/bulk-waive-charges-dialog/bulk-waive-charges-dialog.component';
 import { LoanReagingComponent } from './loans-view/loan-account-actions/loan-reaging/loan-reaging.component';
 import { LoanReamortizeComponent } from './loans-view/loan-account-actions/loan-reamortize/loan-reamortize.component';
 import { LoanTermVariationsTabComponent } from './loans-view/loan-term-variations-tab/loan-term-variations-tab.component';
@@ -174,7 +174,7 @@ import { LoanUndoTransactionDialogComponent } from './loans-view/custom-dialogs/
     AddInterestPauseComponent,
     LoansActiveClientMembersComponent,
     AdjustInstallmentDateDialogComponent,
-    BulkRemoveChargesDialogComponent,
+    BulkWaiveChargesDialogComponent,
     LoanUndoTransactionDialogComponent
   ],
   providers: []

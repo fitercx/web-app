@@ -15,7 +15,7 @@ import { SettingsService } from 'app/settings/settings.service';
 import { FormDialogComponent } from 'app/shared/form-dialog/form-dialog.component';
 import { DeleteDialogComponent } from 'app/shared/delete-dialog/delete-dialog.component';
 import { ConfirmationDialogComponent } from 'app/shared/confirmation-dialog/confirmation-dialog.component';
-import { BulkRemoveChargesDialogComponent } from '../custom-dialogs/bulk-remove-charges-dialog/bulk-remove-charges-dialog.component';
+import { BulkWaiveChargesDialogComponent } from '../custom-dialogs/bulk-waive-charges-dialog/bulk-waive-charges-dialog.component';
 
 /** Custom Models */
 import { FormfieldBase } from 'app/shared/form-dialog/formfield/model/formfield-base';
@@ -104,10 +104,16 @@ export class ChargesTabComponent implements OnInit {
         element.amountOutstanding === 0 &&
         element.amountWrittenOff === 0;
       element.isReversed = isReversed;
+      // A charge with nothing outstanding has no waive/edit action left, regardless of its flags.
+      // Guards against legacy waived charges whose backend 'waived' flag was never fully set
+      // (isWaived() requires waived && taxesWaived) - clicking waive again on those corrupted the
+      // waived amount before the backend hard-guard was added.
+      const nothingOutstanding = Number(element.amountOutstanding || 0) === 0;
       if (
         isReversed ||
         element.paid ||
         element.waived ||
+        nothingOutstanding ||
         element.chargeTimeType.value === 'Disbursement' ||
         !loanStatusAllowsChargeActions
       ) {
@@ -350,10 +356,10 @@ export class ChargesTabComponent implements OnInit {
   }
 
   /**
-   * Opens the bulk remove charges dialog
+   * Opens the bulk waive charges dialog
    */
-  openBulkRemoveDialog() {
-    const dialogRef = this.dialog.open(BulkRemoveChargesDialogComponent, {
+  openBulkWaiveDialog() {
+    const dialogRef = this.dialog.open(BulkWaiveChargesDialogComponent, {
       width: '600px',
       data: {
         loanDetails: this.loanDetails
@@ -362,24 +368,24 @@ export class ChargesTabComponent implements OnInit {
 
     dialogRef.afterClosed().subscribe((result: any) => {
       if (result && result.confirm) {
-        if (result.removeAll) {
-          // Option 1: Remove All
-          this.bulkDeactivateAllOverdueCharges();
-        } else if (result.removeEmi) {
-          // Option 2: Remove Complete EMI Overdue Charges
-          this.bulkDeactivateEmiOverdueCharges(result.selectedEmiNumbers);
+        if (result.waiveAll) {
+          // Option 1: Waive All
+          this.bulkWaiveAllOverdueCharges();
+        } else if (result.waiveEmi) {
+          // Option 2: Waive Complete EMI Overdue Charges
+          this.bulkWaiveEmiOverdueCharges(result.selectedEmiNumbers);
         } else if (result.byDateRange) {
-          // Option 3: Remove by Date Range
-          this.bulkDeactivateOverdueCharges(result.startDate, result.endDate, false);
+          // Option 3: Waive by Date Range
+          this.bulkWaiveOverdueChargesByDateRange(result.startDate, result.endDate);
         }
       }
     });
   }
 
   /**
-   * Bulk deactivates overdue charges from the selected date range
+   * Bulk waives overdue charges within the selected due-date range
    */
-  bulkDeactivateOverdueCharges(startDate: Date, endDate?: Date, removeCompleteEmiOverdue: boolean = true) {
+  bulkWaiveOverdueChargesByDateRange(startDate: Date, endDate?: Date) {
     if (!startDate) {
       return;
     }
@@ -389,29 +395,20 @@ export class ChargesTabComponent implements OnInit {
     const startDateStr = this.dateUtils.formatDate(startDate, 'dd MMMM yyyy');
 
     let dialogContext: string;
-    let additionalNotes: string;
-
     if (endDate) {
-      // Date range
       const endDateStr = this.dateUtils.formatDate(endDate, 'dd MMMM yyyy');
-      dialogContext = `Are you sure you want to deactivate all overdue charges with due dates between ${startDateStr} and ${endDateStr}?`;
-      additionalNotes =
-        'This action will permanently deactivate all overdue charges with due dates within the selected date range. This action cannot be undone.';
+      dialogContext = `Are you sure you want to waive all outstanding overdue charges with due dates between ${startDateStr} and ${endDateStr}?`;
     } else {
-      // Single date
-      dialogContext = `Are you sure you want to deactivate all overdue charges with due date on ${startDateStr}?`;
-      additionalNotes =
-        'This action will permanently deactivate all overdue charges with due date on the selected date. This action cannot be undone.';
+      dialogContext = `Are you sure you want to waive all outstanding overdue charges with due date on ${startDateStr}?`;
     }
-    if (removeCompleteEmiOverdue) {
-      additionalNotes += ' Complete EMI overdue charges for impacted EMI(s) will also be removed.';
-    }
+    const additionalNotes =
+      'Only the outstanding amount of each charge is waived; paid portions are preserved. Waive transactions with accounting entries are posted. Repayment schedule dates are not affected.';
 
     const confirmDialogRef = this.dialog.open(ConfirmationDialogComponent, {
       data: {
-        heading: 'Bulk Remove Overdue Charges',
+        heading: 'Bulk Waive Overdue Charges',
         dialogContext: dialogContext,
-        type: 'Dangerous',
+        type: 'Mild',
         additionalNotes: additionalNotes
       }
     });
@@ -422,7 +419,7 @@ export class ChargesTabComponent implements OnInit {
           dueDate: this.dateUtils.formatDate(startDate, dateFormat),
           dateFormat,
           locale,
-          removeCompleteEmiOverdue
+          removeCompleteEmiOverdue: false
         };
 
         // End date provided => range; not provided => exact single date only.
@@ -432,7 +429,7 @@ export class ChargesTabComponent implements OnInit {
           payload.toDueDate = this.dateUtils.formatDate(startDate, dateFormat);
         }
 
-        this.loansService.deactivateOverdueCharges(this.loanDetails.id, payload).subscribe({
+        this.loansService.bulkWaiveOverdueCharges(this.loanDetails.id, payload).subscribe({
           next: () => {
             // Force a full page reload to ensure repayment schedule updates
             setTimeout(() => {
@@ -440,7 +437,7 @@ export class ChargesTabComponent implements OnInit {
             }, 500);
           },
           error: (error) => {
-            console.error('Error deactivating overdue charges:', error);
+            console.error('Error bulk waiving overdue charges:', error);
           }
         });
       }
@@ -448,23 +445,23 @@ export class ChargesTabComponent implements OnInit {
   }
 
   /**
-   * Bulk deactivates complete EMI overdue charges for selected EMI(s)
+   * Bulk waives complete EMI overdue charges for selected EMI(s)
    */
-  bulkDeactivateEmiOverdueCharges(selectedEmiNumbers: number[]) {
+  bulkWaiveEmiOverdueCharges(selectedEmiNumbers: number[]) {
     if (!selectedEmiNumbers || selectedEmiNumbers.length === 0) {
       return;
     }
 
     const emiList = selectedEmiNumbers.join(', ');
-    const dialogContext = `Are you sure you want to deactivate all overdue charges for EMI(s) ${emiList}?`;
+    const dialogContext = `Are you sure you want to waive all outstanding overdue charges for EMI(s) ${emiList}?`;
     const additionalNotes =
-      'This action will permanently deactivate all overdue charges for the selected EMI(s), ensuring repayment schedule remains in sync. This action cannot be undone.';
+      'Only the outstanding amount of each charge is waived; paid portions are preserved. Waive transactions with accounting entries are posted. Repayment schedule dates are not affected.';
 
     const confirmDialogRef = this.dialog.open(ConfirmationDialogComponent, {
       data: {
-        heading: 'Bulk Remove EMI Overdue Charges',
+        heading: 'Bulk Waive EMI Overdue Charges',
         dialogContext: dialogContext,
-        type: 'Dangerous',
+        type: 'Mild',
         additionalNotes: additionalNotes
       }
     });
@@ -482,7 +479,7 @@ export class ChargesTabComponent implements OnInit {
           selectedEmiNumbers: selectedEmiNumbers
         };
 
-        this.loansService.deactivateOverdueCharges(this.loanDetails.id, payload).subscribe({
+        this.loansService.bulkWaiveOverdueCharges(this.loanDetails.id, payload).subscribe({
           next: () => {
             // Force a full page reload to ensure repayment schedule updates
             setTimeout(() => {
@@ -490,7 +487,7 @@ export class ChargesTabComponent implements OnInit {
             }, 500);
           },
           error: (error) => {
-            console.error('Error deactivating EMI overdue charges:', error);
+            console.error('Error bulk waiving EMI overdue charges:', error);
           }
         });
       }
@@ -498,21 +495,18 @@ export class ChargesTabComponent implements OnInit {
   }
 
   /**
-   * Bulk deactivates all overdue charges (no date filter)
+   * Bulk waives all outstanding overdue charges (no filter)
    */
-  bulkDeactivateAllOverdueCharges() {
-    const dialogContext = this.translateService.instant(
-      'labels.dialogContext.Are you sure you want to deactivate all overdue charges for this loan?'
-    );
-    const additionalNotes = this.translateService.instant(
-      'labels.text.This action will permanently deactivate all overdue charges. This action cannot be undone.'
-    );
+  bulkWaiveAllOverdueCharges() {
+    const dialogContext = 'Are you sure you want to waive all outstanding overdue charges for this loan?';
+    const additionalNotes =
+      'Only the outstanding amount of each charge is waived; paid portions are preserved. Waive transactions with accounting entries are posted. Repayment schedule dates are not affected.';
 
     const confirmDialogRef = this.dialog.open(ConfirmationDialogComponent, {
       data: {
-        heading: 'Bulk Remove Overdue Charges',
+        heading: 'Bulk Waive Overdue Charges',
         dialogContext: dialogContext,
-        type: 'Dangerous',
+        type: 'Mild',
         additionalNotes: additionalNotes
       }
     });
@@ -522,13 +516,13 @@ export class ChargesTabComponent implements OnInit {
         const locale = this.settingsService.language.code;
         const dateFormat = this.settingsService.dateFormat;
 
-        // Send empty payload or null dates to indicate "remove all"
+        // Empty payload (no filters) => waive all outstanding overdue charges
         const payload: any = {
           dateFormat,
           locale
         };
 
-        this.loansService.deactivateOverdueCharges(this.loanDetails.id, payload).subscribe({
+        this.loansService.bulkWaiveOverdueCharges(this.loanDetails.id, payload).subscribe({
           next: () => {
             // Force a full page reload to ensure repayment schedule updates
             setTimeout(() => {
@@ -536,7 +530,7 @@ export class ChargesTabComponent implements OnInit {
             }, 500);
           },
           error: (error) => {
-            console.error('Error deactivating overdue charges:', error);
+            console.error('Error bulk waiving overdue charges:', error);
           }
         });
       }

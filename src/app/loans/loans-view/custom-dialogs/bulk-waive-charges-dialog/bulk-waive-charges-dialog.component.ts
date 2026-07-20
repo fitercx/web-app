@@ -6,16 +6,20 @@ import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 
 /**
- * Bulk Remove Charges Dialog Component
+ * Bulk Waive Charges Dialog Component
+ *
+ * Replaces the destructive bulk removal (deactivation) of overdue charges: charges are waived through the
+ * standard waiver flow instead, keeping the audit trail and accounting entries intact and never touching
+ * repayment schedule dates.
  */
 @Component({
-  selector: 'mifosx-bulk-remove-charges-dialog',
-  templateUrl: './bulk-remove-charges-dialog.component.html',
-  styleUrls: ['./bulk-remove-charges-dialog.component.scss']
+  selector: 'mifosx-bulk-waive-charges-dialog',
+  templateUrl: './bulk-waive-charges-dialog.component.html',
+  styleUrls: ['./bulk-waive-charges-dialog.component.scss']
 })
-export class BulkRemoveChargesDialogComponent implements OnInit {
-  /** Bulk Remove Charges Form */
-  bulkRemoveForm: UntypedFormGroup;
+export class BulkWaiveChargesDialogComponent implements OnInit {
+  /** Bulk Waive Charges Form */
+  bulkWaiveForm: UntypedFormGroup;
   /** Minimum date allowed */
   minDate = new Date(2000, 0, 1);
   /** Maximum date allowed */
@@ -30,7 +34,7 @@ export class BulkRemoveChargesDialogComponent implements OnInit {
    * @param {any} data Provides values for the form (if available).
    */
   constructor(
-    public dialogRef: MatDialogRef<BulkRemoveChargesDialogComponent>,
+    public dialogRef: MatDialogRef<BulkWaiveChargesDialogComponent>,
     public formBuilder: UntypedFormBuilder,
     private settingsService: SettingsService,
     private dateUtils: Dates,
@@ -38,12 +42,12 @@ export class BulkRemoveChargesDialogComponent implements OnInit {
   ) {}
 
   /**
-   * Creates the bulk remove charges form.
+   * Creates the bulk waive charges form.
    */
   ngOnInit() {
     this.maxDate = new Date();
-    this.bulkRemoveForm = this.formBuilder.group({
-      removalType: ['removeAll'], // Default to "Remove All"
+    this.bulkWaiveForm = this.formBuilder.group({
+      waiveType: ['waiveAll'], // Default to "Waive All"
       startDate: [''],
       endDate: [''],
       selectedEmis: this.formBuilder.array([])
@@ -54,14 +58,13 @@ export class BulkRemoveChargesDialogComponent implements OnInit {
       this.loadEmisWithOverdueCharges();
     }
 
-    // When removal type changes, handle field visibility and validation
-    this.bulkRemoveForm.get('removalType')?.valueChanges.subscribe((removalType) => {
-      const startDateControl = this.bulkRemoveForm.get('startDate');
-      const endDateControl = this.bulkRemoveForm.get('endDate');
-      const selectedEmisControl = this.bulkRemoveForm.get('selectedEmis') as FormArray;
+    // When waive type changes, handle field visibility and validation
+    this.bulkWaiveForm.get('waiveType')?.valueChanges.subscribe((waiveType) => {
+      const startDateControl = this.bulkWaiveForm.get('startDate');
+      const endDateControl = this.bulkWaiveForm.get('endDate');
 
-      if (removalType === 'removeAll') {
-        // Remove all: clear dates and EMI selection
+      if (waiveType === 'waiveAll') {
+        // Waive all: clear dates and EMI selection
         startDateControl?.setValue('');
         endDateControl?.setValue('');
         startDateControl?.clearValidators();
@@ -69,8 +72,8 @@ export class BulkRemoveChargesDialogComponent implements OnInit {
         startDateControl?.disable();
         endDateControl?.disable();
         this.clearEmiSelection();
-      } else if (removalType === 'removeEmi') {
-        // Remove EMI: clear dates, enable EMI selection
+      } else if (waiveType === 'waiveEmi') {
+        // Waive EMI: clear dates, enable EMI selection
         startDateControl?.setValue('');
         endDateControl?.setValue('');
         startDateControl?.clearValidators();
@@ -78,7 +81,7 @@ export class BulkRemoveChargesDialogComponent implements OnInit {
         startDateControl?.disable();
         endDateControl?.disable();
         this.setupEmiSelection();
-      } else if (removalType === 'byDateRange') {
+      } else if (waiveType === 'byDateRange') {
         // Date range: enable fields and add validators, clear EMI selection
         startDateControl?.enable();
         endDateControl?.enable();
@@ -89,9 +92,9 @@ export class BulkRemoveChargesDialogComponent implements OnInit {
     });
 
     // Update end date min date when start date changes
-    this.bulkRemoveForm.get('startDate')?.valueChanges.subscribe((startDate) => {
-      if (startDate && this.bulkRemoveForm.get('removalType')?.value === 'byDateRange') {
-        const endDateControl = this.bulkRemoveForm.get('endDate');
+    this.bulkWaiveForm.get('startDate')?.valueChanges.subscribe((startDate) => {
+      if (startDate && this.bulkWaiveForm.get('waiveType')?.value === 'byDateRange') {
+        const endDateControl = this.bulkWaiveForm.get('endDate');
         if (endDateControl) {
           endDateControl.updateValueAndValidity();
         }
@@ -102,7 +105,7 @@ export class BulkRemoveChargesDialogComponent implements OnInit {
   /**
    * Loads EMIs with overdue charges from loan details
    * IMPORTANT: Derive EMI options from actual active overdue charges only.
-   * This prevents showing EMIs that have schedule penalty values but no removable charges.
+   * This prevents showing EMIs that have schedule penalty values but no waivable charges.
    */
   loadEmisWithOverdueCharges() {
     if (
@@ -176,7 +179,7 @@ export class BulkRemoveChargesDialogComponent implements OnInit {
       return null;
     };
 
-    // Group only ACTIVE overdue charges by resolved installment number.
+    // Group only ACTIVE overdue charges with an outstanding amount by resolved installment number.
     const emiOverdueMap = new Map<number, any>();
     charges.forEach((charge: any) => {
       const isOverdueCharge = charge?.chargeTimeType?.value?.toLowerCase().includes('overdue');
@@ -216,7 +219,7 @@ export class BulkRemoveChargesDialogComponent implements OnInit {
     );
 
     // Update FormArray to match the number of EMIs
-    const selectedEmisArray = this.bulkRemoveForm.get('selectedEmis') as FormArray;
+    const selectedEmisArray = this.bulkWaiveForm.get('selectedEmis') as FormArray;
     while (selectedEmisArray.length < this.emisWithOverdueCharges.length) {
       selectedEmisArray.push(this.formBuilder.control(false));
     }
@@ -240,10 +243,10 @@ export class BulkRemoveChargesDialogComponent implements OnInit {
    * Sets up EMI selection checkboxes
    */
   setupEmiSelection() {
-    const selectedEmisArray = this.bulkRemoveForm.get('selectedEmis') as FormArray;
+    const selectedEmisArray = this.bulkWaiveForm.get('selectedEmis') as FormArray;
     selectedEmisArray.clear();
 
-    this.emisWithOverdueCharges.forEach((emi) => {
+    this.emisWithOverdueCharges.forEach(() => {
       selectedEmisArray.push(this.formBuilder.control(false));
     });
   }
@@ -252,7 +255,7 @@ export class BulkRemoveChargesDialogComponent implements OnInit {
    * Clears EMI selection
    */
   clearEmiSelection() {
-    const selectedEmisArray = this.bulkRemoveForm.get('selectedEmis') as FormArray;
+    const selectedEmisArray = this.bulkWaiveForm.get('selectedEmis') as FormArray;
     selectedEmisArray.clear();
   }
 
@@ -260,7 +263,7 @@ export class BulkRemoveChargesDialogComponent implements OnInit {
    * Gets the selected EMIs FormArray
    */
   getSelectedEmisFormArray(): FormArray {
-    return this.bulkRemoveForm.get('selectedEmis') as FormArray;
+    return this.bulkWaiveForm.get('selectedEmis') as FormArray;
   }
 
   /**
@@ -283,32 +286,31 @@ export class BulkRemoveChargesDialogComponent implements OnInit {
    * Closes the dialog and returns value of the form.
    */
   submit() {
-    const formValue = this.bulkRemoveForm.getRawValue();
-    const removalType = formValue.removalType || 'removeAll';
+    const formValue = this.bulkWaiveForm.getRawValue();
+    const waiveType = formValue.waiveType || 'waiveAll';
 
     // Form is valid if:
-    // - Remove All is selected, OR
-    // - Remove EMI is selected and at least one EMI is selected, OR
+    // - Waive All is selected, OR
+    // - Waive EMI is selected and at least one EMI is selected, OR
     // - Date range is selected and start date is provided
     let isValid = false;
-    if (removalType === 'removeAll') {
+    if (waiveType === 'waiveAll') {
       isValid = true;
-    } else if (removalType === 'removeEmi') {
+    } else if (waiveType === 'waiveEmi') {
       const selectedEmis = this.getSelectedEmiNumbers();
       isValid = selectedEmis.length > 0;
-    } else if (removalType === 'byDateRange') {
-      isValid = formValue.startDate && this.bulkRemoveForm.get('startDate')?.valid;
+    } else if (waiveType === 'byDateRange') {
+      isValid = formValue.startDate && this.bulkWaiveForm.get('startDate')?.valid;
     }
 
     if (isValid) {
       this.dialogRef.close({
-        removeAll: removalType === 'removeAll',
-        removeEmi: removalType === 'removeEmi',
-        byDateRange: removalType === 'byDateRange',
+        waiveAll: waiveType === 'waiveAll',
+        waiveEmi: waiveType === 'waiveEmi',
+        byDateRange: waiveType === 'byDateRange',
         startDate: formValue.startDate || null,
         endDate: formValue.endDate || null,
-        selectedEmiNumbers: removalType === 'removeEmi' ? this.getSelectedEmiNumbers() : null,
-        removeCompleteEmiOverdue: removalType === 'removeEmi',
+        selectedEmiNumbers: waiveType === 'waiveEmi' ? this.getSelectedEmiNumbers() : null,
         confirm: true
       });
     }

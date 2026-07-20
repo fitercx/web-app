@@ -3,6 +3,7 @@ import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms
 import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
+import { LoansService } from 'app/loans/loans.service';
 
 @Component({
   selector: 'mifosx-adjust-installment-date-dialog',
@@ -16,6 +17,10 @@ export class AdjustInstallmentDateDialogComponent implements OnInit {
   adjustableInstallments: any[] = [];
   selectedInstallment: any = null;
   selectedInstallmentHasOverdueCharges = false;
+  /** Whether interest recalculation is available for this loan (from the backend template). */
+  interestRecalculationSupported = true;
+  /** Reason interest recalculation is unavailable, shown on screen when the option is disabled. */
+  interestRecalculationNotSupportedReason = '';
   private businessDate: Date;
 
   constructor(
@@ -23,7 +28,8 @@ export class AdjustInstallmentDateDialogComponent implements OnInit {
     @Inject(MAT_DIALOG_DATA) public data: any,
     private formBuilder: UntypedFormBuilder,
     private settingsService: SettingsService,
-    private dateUtils: Dates
+    private dateUtils: Dates,
+    private loansService: LoansService
   ) {
     this.minDate = data.disbursementDate ? new Date(data.disbursementDate) : new Date(2000, 0, 1);
     this.maxDate = new Date();
@@ -44,6 +50,26 @@ export class AdjustInstallmentDateDialogComponent implements OnInit {
       ],
       adjustWithInterestRecalculation: [false]
     });
+
+    // Ask the backend whether interest recalculation is allowed for this loan. If not (e.g. advance-substituted
+    // receivable LOC), uncheck + disable the option and show the reason on screen.
+    if (this.data && this.data.loanId != null) {
+      this.loansService.adjustInstallmentDateTemplate(String(this.data.loanId)).subscribe({
+        next: (template: any) => {
+          this.interestRecalculationSupported = template?.interestRecalculationSupported !== false;
+          this.interestRecalculationNotSupportedReason = template?.interestRecalculationNotSupportedReason || '';
+          if (!this.interestRecalculationSupported) {
+            const control = this.adjustDateForm.get('adjustWithInterestRecalculation');
+            control?.setValue(false);
+            control?.disable();
+          }
+        },
+        error: () => {
+          // On template failure, leave the option enabled (backend still guards the write path).
+          this.interestRecalculationSupported = true;
+        }
+      });
+    }
 
     // When installment is selected, pre-fill the new due date
     this.adjustDateForm.get('installmentNumber')?.valueChanges.subscribe((installmentNumber) => {
