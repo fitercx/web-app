@@ -22,6 +22,8 @@ import { LoanTransactionType } from 'app/loans/models/loan-transaction-type.mode
 export class TransactionsTabComponent implements OnInit {
   /** Loan Details Data */
   transactionsData: LoanTransaction[] = [];
+  /** True once transactions were loaded with includeReversed=true */
+  private reversedTransactionsLoaded = false;
   /** Form control to handle accural parameter */
   hideAccrualsParam: UntypedFormControl;
   showReversedParam: UntypedFormControl;
@@ -87,17 +89,19 @@ export class TransactionsTabComponent implements OnInit {
     private translateService: TranslateService,
     private settingsService: SettingsService
   ) {
-    this.route.parent.parent.data.subscribe((data: { loanDetailsData: any }) => {
-      this.transactionsData = data.loanDetailsData.transactions;
-      this.status = data.loanDetailsData.status.value;
-    });
     this.loanId = this.route.parent.parent.snapshot.params['loanId'];
+    this.route.parent.parent.data.subscribe((data: { loanDetailsData: any }) => {
+      this.transactionsData = data.loanDetailsData.transactions || [];
+      this.status = data.loanDetailsData.status.value;
+      this.reversedTransactionsLoaded = false;
+      this.applyTransactionFilters();
+    });
   }
 
   ngOnInit() {
     this.hideAccrualsParam = new UntypedFormControl(true);
     this.showReversedParam = new UntypedFormControl(false);
-    this.filterTransactions(!this.showReversedParam.value, this.hideAccrualsParam.value);
+    this.applyTransactionFilters();
   }
 
   setLoanTransactions() {
@@ -126,11 +130,26 @@ export class TransactionsTabComponent implements OnInit {
   }
 
   hideAccruals() {
-    this.filterTransactions(!this.showReversedParam.value, !this.hideAccrualsParam.value);
+    this.applyTransactionFilters();
   }
 
   showReversed(showReversed: boolean) {
-    this.filterTransactions(!showReversed, this.hideAccrualsParam.value);
+    if (showReversed && !this.reversedTransactionsLoaded) {
+      this.loansService.getLoanTransactions(String(this.loanId), true).subscribe((response: any) => {
+        this.transactionsData = response.transactions || [];
+        this.reversedTransactionsLoaded = true;
+        this.applyTransactionFilters();
+      });
+      return;
+    }
+    this.applyTransactionFilters();
+  }
+
+  applyTransactionFilters(): void {
+    if (!this.showReversedParam || !this.hideAccrualsParam) {
+      return;
+    }
+    this.filterTransactions(!this.showReversedParam.value, this.hideAccrualsParam.value);
   }
 
   filterTransactions(hideReversed: boolean, hideAccrual: boolean): void {

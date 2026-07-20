@@ -218,8 +218,22 @@ export class LoansService {
    * Get Loans details with httpParams
    * @param loanId Loan ID
    */
-  getLoanAccountAssociationDetails(loanId: string) {
-    const httpParams = new HttpParams().set('associations', 'all').set('exclude', 'guarantors,futureSchedule');
+  getLoanAccountAssociationDetails(loanId: string, includeReversed = false) {
+    const httpParams = new HttpParams()
+      .set('associations', 'all')
+      .set('exclude', 'guarantors,futureSchedule')
+      .set('includeReversed', String(includeReversed));
+    return this.http.get(`/loans/${loanId}`, { params: httpParams });
+  }
+
+  /**
+   * Loads loan transactions only. Use includeReversed=true to include system-reversed rows
+   * (e.g. replaced repayments, original charge-adjustment rows).
+   */
+  getLoanTransactions(loanId: string, includeReversed = true): Observable<any> {
+    const httpParams = new HttpParams()
+      .set('associations', 'transactions')
+      .set('includeReversed', String(includeReversed));
     return this.http.get(`/loans/${loanId}`, { params: httpParams });
   }
 

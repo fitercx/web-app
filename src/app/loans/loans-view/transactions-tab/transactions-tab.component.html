@@ -1,12 +1,18 @@
 <div class="container">
-  <div fxLayout="row" fxLayoutAlign="end" fxLayoutGap="20px" class="transaction-buttons" *ngIf="checkStatus()">
+  <div fxLayout="row" fxLayoutAlign="end" fxLayoutGap="20px" class="transaction-buttons">
     <mat-checkbox [formControl]="showReversedParam" (change)="showReversed($event.checked)" class="accruals">
       {{ 'labels.inputs.Show Reversed / Replayed' | translate }}</mat-checkbox
     >
-    <mat-checkbox [formControl]="hideAccrualsParam" (click)="hideAccruals()" class="accruals">
+    <mat-checkbox [formControl]="hideAccrualsParam" (change)="hideAccruals()" class="accruals">
       {{ 'labels.inputs.Hide Accruals' | translate }}</mat-checkbox
     >
-    <button mat-raised-button color="primary" class="transaction-button" [routerLink]="['export']">
+    <button
+      mat-raised-button
+      color="primary"
+      class="transaction-button"
+      [routerLink]="['export']"
+      *ngIf="checkStatus()"
+    >
       {{ 'labels.buttons.Export' | translate }}
     </button>
   </div>
