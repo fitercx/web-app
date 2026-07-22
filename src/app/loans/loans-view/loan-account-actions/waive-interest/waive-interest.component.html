@@ -29,6 +29,22 @@
           >
           </mifosx-input-amount>
 
+          <div class="waive-amount-banner" *ngIf="maxWaivableAmount != null">
+            <mat-icon>info</mat-icon>
+            <span
+              >Currently outstanding interest that can be waived: {{ maxWaivableAmount | number: '1.2-2' }}
+              {{ currency?.code }}</span
+            >
+          </div>
+          <div class="waive-amount-banner waive-amount-banner--blocked" *ngIf="amountExceedsOutstandingInterest">
+            <mat-icon>block</mat-icon>
+            <span>
+              This amount is more than the {{ maxWaivableAmount | number: '1.2-2' }} {{ currency?.code }} of interest
+              actually outstanding on this loan. The server will not reject the excess - it will silently turn the loan
+              into an overpayment instead of forgiving interest. Please re-check the amount before submitting.
+            </span>
+          </div>
+
           <mat-form-field>
             <mat-label>{{ 'labels.inputs.Note' | translate }}</mat-label>
             <textarea matInput formControlName="note" cdkTextareaAutosize cdkAutosizeMinRows="2"></textarea>
@@ -42,7 +58,7 @@
           <button
             mat-raised-button
             color="primary"
-            [disabled]="!loanInterestForm.valid"
+            [disabled]="!loanInterestForm.valid || amountExceedsOutstandingInterest"
             *mifosxHasPermission="'WAIVEINTERESTPORTION_LOAN'"
           >
             {{ 'labels.buttons.Submit' | translate }}

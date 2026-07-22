@@ -3,7 +3,6 @@ import { Component, OnInit, Inject } from '@angular/core';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { UntypedFormBuilder, UntypedFormGroup, Validators, FormArray } from '@angular/forms';
 import { SettingsService } from 'app/settings/settings.service';
-import { Dates } from 'app/core/utils/dates';
 
 /**
  * Bulk Waive Charges Dialog Component
@@ -37,7 +36,6 @@ export class BulkWaiveChargesDialogComponent implements OnInit {
     public dialogRef: MatDialogRef<BulkWaiveChargesDialogComponent>,
     public formBuilder: UntypedFormBuilder,
     private settingsService: SettingsService,
-    private dateUtils: Dates,
     @Inject(MAT_DIALOG_DATA) public data: any
   ) {}
 
@@ -103,120 +101,33 @@ export class BulkWaiveChargesDialogComponent implements OnInit {
   }
 
   /**
-   * Loads EMIs with overdue charges from loan details
-   * IMPORTANT: Derive EMI options from actual active overdue charges only.
-   * This prevents showing EMIs that have schedule penalty values but no waivable charges.
+   * Loads EMIs with overdue charges from loan details.
+   * <p>
+   * IMPORTANT: this reads each installment's OWN `penaltyChargesOutstanding` from the repayment
+   * schedule (backed by `m_loan_repayment_schedule`, kept correct by the backend's authoritative
+   * per-charge -> installment linkage) rather than re-deriving "which installment does this overdue
+   * charge belong to" here in the UI from each charge's own due date. A daily-accruing LPI charge is
+   * by design dated AFTER its own installment's due date (it accrues during the arrears period), so
+   * a naive due-date-window guess in the UI can attribute it to the WRONG (later) installment - see
+   * BUG_REPORT.md Finding #2, which hit the exact same class of mismapping on the backend. Reading
+   * the already-correct per-period aggregate avoids re-implementing (and re-risking) that resolution
+   * logic on the client.
    */
   loadEmisWithOverdueCharges() {
-    if (
-      !this.data.loanDetails ||
-      !this.data.loanDetails.repaymentSchedule ||
-      !this.data.loanDetails.repaymentSchedule.periods
-    ) {
+    const periods = this.data?.loanDetails?.repaymentSchedule?.periods;
+    if (!Array.isArray(periods)) {
       return;
     }
 
-    const periods = (this.data.loanDetails.repaymentSchedule.periods || [])
-      .filter((period: any) => period && period.period && period.dueDate && period.dueDate.length === 3)
-      .sort((a: any, b: any) => Number(a.period) - Number(b.period));
-    const charges = this.data.loanDetails.charges || [];
-
-    const toDate = (value: any): Date | null => {
-      if (Array.isArray(value) && value.length === 3) {
-        const date = new Date(value[0], value[1] - 1, value[2]);
-        if (!Number.isNaN(date.getTime())) {
-          date.setHours(0, 0, 0, 0);
-          return date;
-        }
-      }
-      const parsed = this.dateUtils.parseDate(value);
-      if (parsed) {
-        const date = new Date(parsed);
-        if (!Number.isNaN(date.getTime())) {
-          date.setHours(0, 0, 0, 0);
-          return date;
-        }
-      }
-      return null;
-    };
-
-    const resolveInstallmentNumber = (charge: any): number | null => {
-      if (charge?.installmentNumber) {
-        return Number(charge.installmentNumber);
-      }
-
-      const chargeDueDate = toDate(charge?.dueDate);
-      if (!chargeDueDate) {
-        return null;
-      }
-
-      // IMPORTANT: Use (prevDueDate, currentDueDate] window mapping to match backend and schedule behavior.
-      // - Charge due on Feb 24 should map to EMI due Mar 02 (not EMI due Feb 02).
-      for (let i = 0; i < periods.length; i++) {
-        const current = periods[i];
-        const currentDueDate = toDate(current.dueDate);
-        if (!currentDueDate) {
-          continue;
-        }
-        const currentFromDate = toDate(current.fromDate);
-        const prevDueDate = i - 1 >= 0 ? toDate(periods[i - 1].dueDate) : null;
-
-        // Preferred mapping when fromDate is available: (fromDate, dueDate]
-        if (currentFromDate) {
-          const inFromDueWindow = chargeDueDate > currentFromDate && chargeDueDate <= currentDueDate;
-          if (inFromDueWindow) {
-            return Number(current.period);
-          }
-        }
-
-        const inCurrentWindow = prevDueDate
-          ? chargeDueDate > prevDueDate && chargeDueDate <= currentDueDate
-          : chargeDueDate <= currentDueDate;
-        if (inCurrentWindow) {
-          return Number(current.period);
-        }
-      }
-      return null;
-    };
-
-    // Group only ACTIVE overdue charges with an outstanding amount by resolved installment number.
-    const emiOverdueMap = new Map<number, any>();
-    charges.forEach((charge: any) => {
-      const isOverdueCharge = charge?.chargeTimeType?.value?.toLowerCase().includes('overdue');
-      const outstanding = Number(charge?.amountOutstanding || 0);
-      if (!isOverdueCharge || outstanding <= 0 || charge?.paid || charge?.waived) {
-        return;
-      }
-
-      const installmentNumber = resolveInstallmentNumber(charge);
-      if (!installmentNumber) {
-        return;
-      }
-
-      const matchingPeriod = periods.find((p: any) => Number(p.period) === installmentNumber);
-      if (!matchingPeriod) {
-        return;
-      }
-
-      if (!emiOverdueMap.has(installmentNumber)) {
-        emiOverdueMap.set(installmentNumber, {
-          installmentNumber,
-          dueDate: matchingPeriod.dueDate,
-          dueDateFormatted: this.formatDate(matchingPeriod.dueDate),
-          overdueAmount: 0,
-          chargeCount: 0
-        });
-      }
-
-      const emiData = emiOverdueMap.get(installmentNumber);
-      emiData.overdueAmount += outstanding;
-      emiData.chargeCount += 1;
-    });
-
-    // Convert map to array and sort by installment number
-    this.emisWithOverdueCharges = Array.from(emiOverdueMap.values()).sort(
-      (a, b) => a.installmentNumber - b.installmentNumber
-    );
+    this.emisWithOverdueCharges = periods
+      .filter((period: any) => period && period.period && Number(period.penaltyChargesOutstanding || 0) > 0)
+      .map((period: any) => ({
+        installmentNumber: Number(period.period),
+        dueDate: period.dueDate,
+        dueDateFormatted: this.formatDate(period.dueDate),
+        overdueAmount: Number(period.penaltyChargesOutstanding || 0)
+      }))
+      .sort((a: any, b: any) => a.installmentNumber - b.installmentNumber);
 
     // Update FormArray to match the number of EMIs
     const selectedEmisArray = this.bulkWaiveForm.get('selectedEmis') as FormArray;

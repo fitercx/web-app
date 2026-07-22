@@ -37,7 +37,7 @@
           <mat-checkbox [formControl]="getSelectedEmisFormArray().at(i)">
             <strong>EMI #{{ emi.installmentNumber }}</strong> - {{ emi.dueDateFormatted }}
             <span class="emi-details">
-              ({{ emi.chargeCount }} {{ 'charge(s)' | translate }},
+              ({{ 'Overdue charges' | translate }}:
               {{ emi.overdueAmount | currency: 'AED' : 'symbol-narrow' : '1.2-2' }})
             </span>
           </mat-checkbox>

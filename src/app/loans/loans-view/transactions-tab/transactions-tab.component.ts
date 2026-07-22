@@ -292,7 +292,9 @@ export class TransactionsTabComponent implements OnInit {
       };
     }
 
-    const undoTransactionAccountDialogRef = this.dialog.open(LoanUndoTransactionDialogComponent);
+    const undoTransactionAccountDialogRef = this.dialog.open(LoanUndoTransactionDialogComponent, {
+      data: { hasLaterTransactions: this.hasNonReversedActivityAfter(transaction) }
+    });
     undoTransactionAccountDialogRef.afterClosed().subscribe((response: { confirm: any; comment?: string }) => {
       if (response && response.confirm) {
         const comment = (response.comment || '').trim();
@@ -376,6 +378,24 @@ export class TransactionsTabComponent implements OnInit {
    */
   private isTransactionReversed(transaction: LoanTransaction): boolean {
     return !!transaction.manuallyReversed || !!transaction.reversed;
+  }
+
+  /**
+   * True when this loan has other real (non-reversed, non-disbursement, non-accrual) transactions with
+   * a higher id than `transaction` - i.e. posted chronologically after it. Undoing a transaction that
+   * isn't the most recent one triggers a full reprocess of everything after it, which can reallocate
+   * later repayments/waivers differently than they were originally applied - see
+   * UI_AUDIT_FINDINGS.md. Used to warn the operator before they confirm, rather than blocking outright
+   * (there are legitimate cases for undoing a mid-history transaction, e.g. correcting a data-entry
+   * error), since core Fineract's own reprocessing already keeps the ledger internally consistent.
+   */
+  private hasNonReversedActivityAfter(transaction: LoanTransaction): boolean {
+    return (this.transactionsData || []).some(
+      (other) =>
+        other.id > transaction.id &&
+        !this.isTransactionReversed(other) &&
+        !(other.type && (other.type.disbursement || other.type.accrual))
+    );
   }
 
   viewJournalEntry(transactionType: LoanTransactionType): boolean {

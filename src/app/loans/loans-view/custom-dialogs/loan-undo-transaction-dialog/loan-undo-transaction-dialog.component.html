@@ -1,6 +1,14 @@
 <h1 mat-dialog-title>{{ 'labels.heading.Undo Transaction' | translate }}</h1>
 <div mat-dialog-content>
   <p>{{ 'labels.dialogContext.Are you sure you want to undo this transaction ?' | translate }}</p>
+  <div class="later-transactions-warning" *ngIf="hasLaterTransactions">
+    <mat-icon>warning</mat-icon>
+    <span>
+      This is not the most recent transaction on this loan - other repayments, waivers, or charges were posted after it.
+      Undoing it will reprocess and may shift how ALL of that later activity is applied across installments, not just
+      this one transaction. Double-check this is really the transaction you intend to undo before confirming.
+    </span>
+  </div>
   <mat-form-field appearance="fill" class="w-100">
     <mat-label>{{ 'labels.inputs.Comments' | translate }}</mat-label>
     <textarea

@@ -9,7 +9,6 @@ import { SettingsService } from 'app/settings/settings.service';
 
 /** Custom Dialogs */
 import { FormDialogComponent } from 'app/shared/form-dialog/form-dialog.component';
-import { DeleteDialogComponent } from 'app/shared/delete-dialog/delete-dialog.component';
 import { ConfirmationDialogComponent } from 'app/shared/confirmation-dialog/confirmation-dialog.component';
 
 /** Custom Models */
@@ -167,22 +166,6 @@ export class ViewChargeComponent {
           .subscribe(() => {
             this.reload();
           });
-      }
-    });
-  }
-
-  /**
-   * Deletes the charge
-   */
-  deleteCharge() {
-    const deleteChargeDialogRef = this.dialog.open(DeleteDialogComponent, {
-      data: { deleteContext: `charge id:${this.chargeData.id}` }
-    });
-    deleteChargeDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.loansService.deleteLoansAccountCharge(this.loansAccountData.id, this.chargeData.id).subscribe(() => {
-          this.reload();
-        });
       }
     });
   }

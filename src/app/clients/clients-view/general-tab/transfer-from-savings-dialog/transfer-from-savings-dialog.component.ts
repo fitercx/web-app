@@ -17,8 +17,16 @@ import { AlertService } from 'app/core/alert/alert.service';
 })
 export class TransferFromSavingsDialogComponent implements OnInit {
   transferForm: UntypedFormGroup;
+  /**
+   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS (30) before the business date, or the
+   * loan's disbursement date if that is later (see BackdatedRepaymentValidator#computeEarliestAllowedTransactionDate
+   * on the server). Replaced with the real value once the initial template loads (see loadInitialTemplate), so the
+   * calendar never lets an operator pick a date the server would reject.
+   */
   minDate = new Date(2000, 0, 1);
   maxDate: Date;
+  /** Clear, on-screen explanation of why minDate is where it is — shown next to the transaction date field. */
+  backdateLimitMessage = '';
   currency: any;
   currencySymbol = '';
   linkedSavingsAccountId?: number;
@@ -34,6 +42,22 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   transferTemplate: any;
   isLoading = false;
   isTemplateLoading = false;
+
+  /** Baseline interest/penalty due (business date), captured once the initial template loads. */
+  private baselineInterestOutstanding = 0;
+  private baselinePenaltyOutstanding = 0;
+  /**
+   * Clear, user-facing messages describing how the currently selected transaction date affects
+   * interest and charges, compared to the amounts due on today's business date. Populated only
+   * after the operator actually changes the date.
+   */
+  dateImpactMessages: string[] = [];
+  /**
+   * Set when the selected (backdated) transaction date is not allowed for this loan's product
+   * configuration - mirrors the server-side validateBackdatedRepaymentAllowed guard so the operator
+   * is told proactively, before submitting, rather than only after a rejected API call.
+   */
+  backdateBlockedMessage: string | null = null;
 
   constructor(
     private formBuilder: UntypedFormBuilder,
@@ -97,6 +121,9 @@ export class TransferFromSavingsDialogComponent implements OnInit {
           this.currencySymbol = this.currency?.displaySymbol || this.currency?.code || '';
           this.captureLinkedSavingsAccount(templates.foreclosureTemplate);
           this.applyOutstandingTemplate(templates.penaltyTemplate, templates.repaymentTemplate);
+          this.applyEarliestAllowedDate(templates.penaltyTemplate?.earliestAllowedTransactionDate);
+          this.baselineInterestOutstanding = this.interestOutstanding;
+          this.baselinePenaltyOutstanding = this.penaltyOutstanding;
           this.data.loan.repaymentSchedule =
             templates.loanDetails?.repaymentSchedule || this.data.loan.repaymentSchedule;
           this.dueEmis = this.getDueEmisForDate(this.transferForm.value.transactionDate);
@@ -130,6 +157,14 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     const businessDate = this.settingsService.businessDate;
     const selectedDate = this.dateUtils.parseDate(transactionDate);
     const isFutureDate = selectedDate && businessDate && selectedDate.getTime() > businessDate.getTime();
+    const isBackdated = !!(selectedDate && businessDate && selectedDate.getTime() < businessDate.getTime());
+
+    this.backdateBlockedMessage =
+      isBackdated && this.data.loan?.isInterestRecalculationEnabled
+        ? 'This date is in the past (backdated). Backdated settlements are NOT allowed for this loan because ' +
+          "interest recalculation is enabled on its product - the server will reject this. Please use today's " +
+          'date instead.'
+        : null;
 
     this.isTemplateLoading = true;
     this.loanService
@@ -147,6 +182,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       .subscribe({
         next: ({ penaltyTemplate, futureLpi }: any) => {
           this.applyOutstandingTemplate(penaltyTemplate, null, Number(futureLpi?.totalLPIAmount || 0));
+          this.dateImpactMessages = this.buildDateImpactMessages(transactionDate);
           this.dueEmis = this.getDueEmisForDate(transactionDateValue);
           this.patchDefaultTransactionAmount();
           this.isTemplateLoading = false;
@@ -157,6 +193,27 @@ export class TransferFromSavingsDialogComponent implements OnInit {
           this.validateTransactionAmount();
         }
       });
+  }
+
+  /**
+   * Sets the calendar's minDate from the backend-computed `earliestAllowedTransactionDate` (see
+   * BackdatedRepaymentValidator on the server) and a matching on-screen explanation, so an operator is stopped from
+   * ever picking a date the server would reject, rather than finding out only after submitting.
+   */
+  private applyEarliestAllowedDate(earliestAllowedTransactionDate: any): void {
+    if (!earliestAllowedTransactionDate) {
+      return;
+    }
+    const parsed = this.dateUtils.parseDate(earliestAllowedTransactionDate);
+    if (!parsed) {
+      return;
+    }
+    this.minDate = parsed;
+    const formatted = this.formatDate(parsed);
+    this.backdateLimitMessage =
+      `This settlement can be backdated no earlier than ${formatted} (30 days before today, or this loan's ` +
+      `disbursement date if later) — this protects the repayment schedule and balances from being distorted by ` +
+      `very old backdated entries.`;
   }
 
   private captureLinkedSavingsAccount(source: any): void {
@@ -176,6 +233,39 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     this.feeOutstanding = Number(repaymentTemplate?.feeChargesPortion ?? this.feeOutstanding ?? 0);
     this.penaltyOutstanding = Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalPenalty;
     this.taxOutstanding = Number(repaymentTemplate?.taxChargesPortion ?? this.taxOutstanding ?? 0);
+  }
+
+  /**
+   * Builds clear, plain-language messages explaining how the selected transaction date changes the
+   * interest and penalty/LPI amounts due, compared to what would be due if settled on today's business date.
+   */
+  private buildDateImpactMessages(transactionDate: string): string[] {
+    const messages: string[] = [];
+    const round = (value: number) => Math.round(value * 100) / 100;
+    const formattedDate = transactionDate;
+
+    const interestDelta = round(this.baselineInterestOutstanding - this.interestOutstanding);
+    if (interestDelta > 0.01) {
+      messages.push(
+        `Interest due is reduced by ${this.currencySymbol} ${this.formatAmount(interestDelta)} for settling on ` +
+          `${formattedDate} instead of today, since this is before the installment's due date (early repayment discount).`
+      );
+    }
+
+    const penaltyDelta = round(this.baselinePenaltyOutstanding - this.penaltyOutstanding);
+    if (penaltyDelta > 0.01) {
+      messages.push(
+        `${this.currencySymbol} ${this.formatAmount(penaltyDelta)} of accrued penalty/late-payment charges will be ` +
+          `waived by backdating this transfer to ${formattedDate}.`
+      );
+    } else if (penaltyDelta < -0.01) {
+      messages.push(
+        `Selecting a future date (${formattedDate}) adds ${this.currencySymbol} ${this.formatAmount(Math.abs(penaltyDelta))} ` +
+          `of additional late-payment interest that will accrue between today and then.`
+      );
+    }
+
+    return messages;
   }
 
   private patchDefaultTransactionAmount(): void {
@@ -285,7 +375,13 @@ export class TransferFromSavingsDialogComponent implements OnInit {
 
   submit(): void {
     this.validateTransactionAmount();
-    if (this.transferForm.invalid || this.isLoading || !this.transferTemplate || !this.linkedSavingsAccountId) {
+    if (
+      this.transferForm.invalid ||
+      this.isLoading ||
+      !this.transferTemplate ||
+      !this.linkedSavingsAccountId ||
+      this.backdateBlockedMessage
+    ) {
       return;
     }
 

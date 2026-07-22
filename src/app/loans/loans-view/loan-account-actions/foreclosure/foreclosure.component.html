@@ -38,6 +38,23 @@
             </mat-error>
           </mat-form-field>
 
+          <div class="date-impact-banner date-impact-banner--blocked" *ngIf="dateErrorMessage">
+            <mat-icon>block</mat-icon>
+            <span>{{ dateErrorMessage }}</span>
+          </div>
+
+          <div class="date-impact-banner backdate-limit-note" *ngIf="!dateErrorMessage && backdateLimitMessage">
+            <mat-icon>event_busy</mat-icon>
+            <span>{{ backdateLimitMessage }}</span>
+          </div>
+
+          <div class="date-impact-banner" *ngIf="!dateErrorMessage && dateImpactMessages.length">
+            <mat-icon>info</mat-icon>
+            <ul>
+              <li *ngFor="let message of dateImpactMessages">{{ message }}</li>
+            </ul>
+          </div>
+
           <mat-form-field>
             <mat-label>{{
               (isReceivableLineOfCredit ? 'labels.inputs.Disbursal Amount' : 'labels.inputs.Principal') | translate
@@ -87,7 +104,7 @@
           <button
             mat-raised-button
             color="primary"
-            [disabled]="!foreclosureForm.valid"
+            [disabled]="!foreclosureForm.valid || dateErrorMessage"
             *mifosxHasPermission="'FORECLOSURE_LOAN'"
           >
             {{ 'labels.buttons.Foreclosure' | translate }}

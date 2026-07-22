@@ -13,7 +13,6 @@ import { SettingsService } from 'app/settings/settings.service';
 
 /** Custom Dialogs */
 import { FormDialogComponent } from 'app/shared/form-dialog/form-dialog.component';
-import { DeleteDialogComponent } from 'app/shared/delete-dialog/delete-dialog.component';
 import { ConfirmationDialogComponent } from 'app/shared/confirmation-dialog/confirmation-dialog.component';
 import { BulkWaiveChargesDialogComponent } from '../custom-dialogs/bulk-waive-charges-dialog/bulk-waive-charges-dialog.component';
 
@@ -233,23 +232,6 @@ export class ChargesTabComponent implements OnInit {
           locale
         };
         this.loansService.editLoansAccountCharge(this.loanDetails.id, dataObject, charge.id).subscribe(() => {
-          this.reload();
-        });
-      }
-    });
-  }
-
-  /**
-   * Deletes the charge
-   * @param {any} chargeId Charge Id
-   */
-  deleteCharge(chargeId: any) {
-    const deleteChargeDialogRef = this.dialog.open(DeleteDialogComponent, {
-      data: { deleteContext: `charge id:${chargeId}` }
-    });
-    deleteChargeDialogRef.afterClosed().subscribe((response: any) => {
-      if (response.delete) {
-        this.loansService.deleteLoansAccountCharge(this.loanDetails.id, chargeId).subscribe(() => {
           this.reload();
         });
       }

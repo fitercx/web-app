@@ -38,6 +38,23 @@
         </mat-error>
       </mat-form-field>
 
+      <div class="date-impact-banner date-impact-banner--blocked" *ngIf="backdateBlockedMessage">
+        <mat-icon>block</mat-icon>
+        <span>{{ backdateBlockedMessage }}</span>
+      </div>
+
+      <div class="date-impact-banner backdate-limit-note" *ngIf="!backdateBlockedMessage && backdateLimitMessage">
+        <mat-icon>event_busy</mat-icon>
+        <span>{{ backdateLimitMessage }}</span>
+      </div>
+
+      <div class="date-impact-banner" *ngIf="!backdateBlockedMessage && dateImpactMessages.length">
+        <mat-icon>info</mat-icon>
+        <ul>
+          <li *ngFor="let message of dateImpactMessages">{{ message }}</li>
+        </ul>
+      </div>
+
       <mat-form-field>
         <mat-label>{{ 'labels.inputs.Principal' | translate }}</mat-label>
         <input matInput [value]="principalOutstanding | formatNumber" disabled />
@@ -90,7 +107,14 @@
     type="button"
     mat-raised-button
     color="primary"
-    [disabled]="transferForm.invalid || isLoading || isTemplateLoading || !transferTemplate || !linkedSavingsAccountId"
+    [disabled]="
+      transferForm.invalid ||
+      isLoading ||
+      isTemplateLoading ||
+      !transferTemplate ||
+      !linkedSavingsAccountId ||
+      backdateBlockedMessage
+    "
     *mifosxHasPermission="'CREATE_ACCOUNTTRANSFER'"
     (click)="submit()"
   >
