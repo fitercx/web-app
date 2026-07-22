@@ -27,6 +27,14 @@ export class WaiveInterestComponent implements OnInit {
   /** Maximum Date allowed. */
   maxDate = new Date();
   currency: Currency;
+  /** Currently outstanding interest that can genuinely be waived, as quoted by the server
+   *  (`GET .../transactions/template?command=waiveinterest`, same figure this form's amount field is
+   *  pre-filled with). Waiving materially more than this does not error out server-side - the excess is
+   *  silently absorbed as an overpayment/"unrecognized income" instead of forgiven interest, which is
+   *  very likely an operational typo (e.g. an extra digit) rather than an intended waiver. */
+  maxWaivableAmount: number = null;
+  /** True once the user has entered an amount above `maxWaivableAmount` - blocks submission. */
+  amountExceedsOutstandingInterest = false;
 
   /**
    * Get data from `Resolver`.
@@ -46,6 +54,7 @@ export class WaiveInterestComponent implements OnInit {
 
   ngOnInit() {
     this.maxDate = this.settingsService.businessDate;
+    this.maxWaivableAmount = this.dataObject.amount != null ? Number(this.dataObject.amount) : null;
     this.setLoanInterestForm();
     if (this.dataObject.currency) {
       this.currency = this.dataObject.currency;
@@ -67,12 +76,30 @@ export class WaiveInterestComponent implements OnInit {
       ],
       note: ['']
     });
+    this.loanInterestForm.controls.transactionAmount.valueChanges.subscribe((value: any) =>
+      this.checkAmountAgainstOutstanding(value)
+    );
+    this.checkAmountAgainstOutstanding(this.dataObject.amount);
+  }
+
+  /**
+   * Warns and blocks submission when the entered amount exceeds the loan's actual currently-
+   * outstanding interest - waiving more than what is owed is not rejected by the server, it is instead
+   * silently converted into an overpayment, which is very unlikely to be the operator's intent.
+   */
+  private checkAmountAgainstOutstanding(value: any): void {
+    const enteredAmount = Number(value);
+    this.amountExceedsOutstandingInterest =
+      this.maxWaivableAmount != null && !isNaN(enteredAmount) && enteredAmount > this.maxWaivableAmount + 0.01;
   }
 
   /**
    * Submits loan interest form.
    */
   submit() {
+    if (this.amountExceedsOutstandingInterest) {
+      return;
+    }
     const loanInterestFormData = this.loanInterestForm.value;
     const locale = this.settingsService.language.code;
     const dateFormat = this.settingsService.dateFormat;

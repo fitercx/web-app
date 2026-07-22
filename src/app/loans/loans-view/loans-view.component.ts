@@ -30,6 +30,12 @@ class LoansViewComponent implements OnInit {
   loanDatatables: any;
   /** Recalculate Interest */
   recalculateInterest: any;
+  /** Whether this loan's product configuration can ever satisfy the backend's Re-Age/Re-Amortize
+   *  eligibility rules (progressive schedule + advanced payment allocation + non-interest-bearing) */
+  isReAgeReAmortizeEligible = false;
+  /** True once any real money-movement transaction (repayment, waiver, write-off, refund, etc.) has
+   *  been posted after disbursement - see setConditionalButtons() for why this gates "Undo Disbursal". */
+  hasPostDisbursementActivity = false;
   /** loan Arrears Delinquency config value */
   loanDisplayArrearsDelinquency: number;
   /** Status */
@@ -82,16 +88,54 @@ class LoansViewComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.recalculateInterest = this.loanDetailsData.recalculateInterest || true;
+    // BUG FIX: this used to be `this.loanDetailsData.recalculateInterest || true`. Two separate bugs
+    // compounded here: (1) `recalculateInterest` is not a real field on the loan details API response
+    // (the real field is `isInterestRecalculationEnabled`), so it always read `undefined`; and (2) the
+    // `|| true` then unconditionally forced the result to `true` regardless of what the API returned.
+    // Together this incorrectly showed "Add Interest Pause" on every Active loan, including all of
+    // today's real production products (RBF / Payables Facility / Receivables Facility / Short Term
+    // Loan), none of which have interest recalculation enabled - the backend always rejects the action
+    // with a 403, but ops sees a working-looking button that is guaranteed to dead-end. See
+    // UI_AUDIT_FINDINGS.md.
+    this.recalculateInterest = !!this.loanDetailsData.isInterestRecalculationEnabled;
+    // Re-Age and Re-Amortize are only ever accepted by the backend for loans that are ALL of:
+    // progressive repayment schedule, "Advanced payment allocation" transaction processing strategy,
+    // AND non-interest-bearing (see LoanReAgingValidator / LoanReAmortizationValidator in core
+    // Fineract). None of today's real production loan products satisfy all three - they use a
+    // Cumulative schedule, the standard transaction strategy, and do charge interest - so these buttons
+    // are today a guaranteed dead-end 403 for every real loan. Compute the eligibility once here so both
+    // buttons (and their "Undo" counterparts, which only make sense once the action has actually
+    // happened) can be hidden entirely for products that can never use them, instead of showing an
+    // action that always fails.
+    this.isReAgeReAmortizeEligible =
+      this.loanDetailsData.loanScheduleType?.code === 'PROGRESSIVE' &&
+      this.loanDetailsData.transactionProcessingStrategyCode === 'advanced-payment-allocation-strategy' &&
+      !(this.loanDetailsData.interestRatePerPeriod > 0);
     this.status = this.loanDetailsData.status.value;
-    if (this.loanStatus.active && this.loanDetailsData.multiDisburseLoan) {
-      if (this.loanDetailsData && this.loanDetailsData.transactions) {
+    if (this.loanDetailsData && this.loanDetailsData.transactions) {
+      if (this.loanStatus.active && this.loanDetailsData.multiDisburseLoan) {
         this.loanDetailsData.transactions.forEach((transaction: any) => {
           if (transaction.type.disbursement) {
             this.disburseTransactionNo++;
           }
         });
       }
+      // "Undo Disbursal" resets the loan all the way back to pre-disbursal state and reverses EVERY
+      // transaction on it (see LoanWritePlatformServiceJpaRepositoryImpl#updateLoanToPreDisbursalState).
+      // That is safe on a freshly-disbursed loan with nothing else posted, but on a loan that already
+      // has real repayments/waivers/refunds/write-offs against it, it silently wipes that entire
+      // transaction history back to zero - while the actual cash already collected from/paid into the
+      // customer's linked accounts is NOT symmetrically reversed, leaving the loan's records and the
+      // real-world cash movements out of sync. Detect that case here so the button can be disabled with
+      // a clear explanation instead of allowing a one-click, hard-to-detect data-corrupting mistake.
+      this.hasPostDisbursementActivity = this.loanDetailsData.transactions.some(
+        (transaction: any) =>
+          !transaction.reversed &&
+          !(
+            transaction.type &&
+            (transaction.type.disbursement || transaction.type.accrual || transaction.type.repaymentAtDisbursement)
+          )
+      );
     }
     this.setConditionalButtons();
     if (this.router.url.includes('clients')) {
@@ -107,6 +151,16 @@ class LoansViewComponent implements OnInit {
   // Defines the buttons based on the status of the loan account
   setConditionalButtons() {
     this.buttonConfig = new LoansAccountButtonConfiguration(this.status);
+
+    if (this.status === 'Active' && this.hasPostDisbursementActivity) {
+      this.buttonConfig.disableButton(
+        'Undo Disbursal',
+        'Not available: this loan already has repayments, waivers, refunds, or other transactions ' +
+          'posted after disbursement. Undoing the disbursal would wipe out that entire transaction ' +
+          'history without reversing the matching cash movements already made in the customer\u2019s ' +
+          'linked accounts, leaving the two out of sync.'
+      );
+    }
 
     if (this.status === 'Submitted and pending approval') {
       this.buttonConfig.addOption({
@@ -150,6 +204,9 @@ class LoansViewComponent implements OnInit {
           taskPermissionName: 'DISBURSALLASTUNDO_LOAN'
         });
       }
+      // Interest Pause is only accepted by the backend for progressive + interest-recalculation-enabled
+      // loans (see InterestPauseWritePlatformServiceImpl) - none of today's real production products.
+      // Hidden entirely rather than shown as a button that always 403s.
       if (this.recalculateInterest) {
         this.buttonConfig.addButton({
           name: 'Add Interest Pause',
@@ -167,13 +224,14 @@ class LoansViewComponent implements OnInit {
         });
       }
 
-      if (this.recalculateInterest) {
-        this.buttonConfig.addButton({
-          name: 'Prepay Loan',
-          icon: 'coins',
-          taskPermissionName: 'REPAYMENT_LOAN'
-        });
-      }
+      // Unlike Interest Pause/Re-Age/Re-Amortize, "Prepay Loan" has no backend restriction tying it to
+      // interest recalculation - it works (posts as a normal early full repayment) for every loan
+      // product, so it is intentionally NOT gated on `recalculateInterest` here.
+      this.buttonConfig.addButton({
+        name: 'Prepay Loan',
+        icon: 'coins',
+        taskPermissionName: 'REPAYMENT_LOAN'
+      });
 
       // Allow ChargeOff only If there loan is not already ChargeOff
       if (!this.loanDetailsData.chargedOff) {
@@ -190,33 +248,41 @@ class LoansViewComponent implements OnInit {
         });
       }
 
-      // Allow Re-Ageing only when there is not any Re-Age transaction
-      if (!this.loanReAged) {
-        this.buttonConfig.addButton({
-          name: 'Re-Age',
-          icon: 'calendar',
-          taskPermissionName: 'REAGE_LOAN'
-        });
-      } else {
-        this.buttonConfig.addButton({
-          name: 'Undo Re-Age',
-          icon: 'undo',
-          taskPermissionName: 'UNDO_REAGE_LOAN'
-        });
+      // Re-Age/Re-Amortize are only accepted by the backend for progressive-schedule, advanced-payment-
+      // allocation, non-interest-bearing loans (see LoanReAgingValidator / LoanReAmortizationValidator) -
+      // no real production product qualifies today. Hide the "start" action entirely for ineligible
+      // products (a guaranteed-403 button is worse than no button); still show "Undo" if a re-age/
+      // re-amortize transaction somehow already exists on this loan, so it always stays reversible.
+      if (this.isReAgeReAmortizeEligible || this.loanReAged) {
+        if (!this.loanReAged) {
+          this.buttonConfig.addButton({
+            name: 'Re-Age',
+            icon: 'calendar',
+            taskPermissionName: 'REAGE_LOAN'
+          });
+        } else {
+          this.buttonConfig.addButton({
+            name: 'Undo Re-Age',
+            icon: 'undo',
+            taskPermissionName: 'UNDO_REAGE_LOAN'
+          });
+        }
       }
 
-      if (!this.loanReAmortized) {
-        this.buttonConfig.addButton({
-          name: 'Re-Amortize',
-          icon: 'calendar-alt',
-          taskPermissionName: 'REAMORTIZE_LOAN'
-        });
-      } else {
-        this.buttonConfig.addButton({
-          name: 'Undo Re-Amortize',
-          icon: 'undo',
-          taskPermissionName: 'UNDO_REAMORTIZE_LOAN'
-        });
+      if (this.isReAgeReAmortizeEligible || this.loanReAmortized) {
+        if (!this.loanReAmortized) {
+          this.buttonConfig.addButton({
+            name: 'Re-Amortize',
+            icon: 'calendar-alt',
+            taskPermissionName: 'REAMORTIZE_LOAN'
+          });
+        } else {
+          this.buttonConfig.addButton({
+            name: 'Undo Re-Amortize',
+            icon: 'undo',
+            taskPermissionName: 'UNDO_REAMORTIZE_LOAN'
+          });
+        }
       }
     }
   }

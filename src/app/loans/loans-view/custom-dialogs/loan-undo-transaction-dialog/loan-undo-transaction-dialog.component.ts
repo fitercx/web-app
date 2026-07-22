@@ -1,6 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, Inject, Optional } from '@angular/core';
 import { UntypedFormControl, AbstractControl, ValidatorFn } from '@angular/forms';
-import { MatDialogRef } from '@angular/material/dialog';
+import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 
 @Component({
   selector: 'mifosx-loan-undo-transaction-dialog',
@@ -23,6 +23,12 @@ import { MatDialogRef } from '@angular/material/dialog';
 export class LoanUndoTransactionDialogComponent {
   commentControl = new UntypedFormControl('', [this.nonWhitespaceRequired()]);
 
+  /** True when other real (non-reversed, non-accrual) transactions were posted on this loan AFTER the
+   *  one being undone - undoing it will reprocess/reallocate all of that later activity too, which can
+   *  shift how later repayments were applied across installments in ways that are hard to predict from
+   *  the transaction list alone. Set by the caller via dialog data. */
+  hasLaterTransactions = false;
+
   onCommentInput(): void {
     this.commentControl.markAsTouched();
   }
@@ -34,5 +40,10 @@ export class LoanUndoTransactionDialogComponent {
     };
   }
 
-  constructor(public dialogRef: MatDialogRef<LoanUndoTransactionDialogComponent>) {}
+  constructor(
+    public dialogRef: MatDialogRef<LoanUndoTransactionDialogComponent>,
+    @Optional() @Inject(MAT_DIALOG_DATA) data: { hasLaterTransactions?: boolean }
+  ) {
+    this.hasLaterTransactions = !!data?.hasLaterTransactions;
+  }
 }

@@ -13,3 +13,38 @@
 .right-label {
   padding-right: 25px !important;
 }
+
+.date-impact-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.75rem;
+  border-left: 4px solid #d97706;
+  background: rgb(217 119 6 / 8%);
+  border-radius: 4px;
+  font-size: 0.8rem;
+
+  mat-icon {
+    color: #d97706;
+    flex-shrink: 0;
+  }
+
+  ul {
+    margin: 0;
+    padding-left: 1rem;
+  }
+
+  li {
+    margin: 0.15rem 0;
+  }
+}
+
+.backdate-limit-note {
+  border-left-color: #2563eb;
+  background: rgb(37 99 235 / 8%);
+
+  mat-icon {
+    color: #2563eb;
+  }
+}

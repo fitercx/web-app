@@ -140,7 +140,14 @@
 
       <mat-menu #accountMenu="matMenu">
         <ng-container *ngFor="let item of buttonConfig.singleButtons">
-          <button mat-menu-item *mifosxHasPermission="item.taskPermissionName" (click)="loanAction(item.name)">
+          <button
+            mat-menu-item
+            *mifosxHasPermission="item.taskPermissionName"
+            [disabled]="item.disabled"
+            [matTooltip]="item.disabledReason"
+            matTooltipPosition="left"
+            (click)="!item.disabled && loanAction(item.name)"
+          >
             <mat-icon matListIcon>
               <fa-icon icon="{{ item.icon }}" size="sm"></fa-icon>
             </mat-icon>

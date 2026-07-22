@@ -592,15 +592,6 @@ export class LoansService {
 
   /**
    * @param {string} accountId Loans Account Id
-   * @param {any} chargeId Charge Id
-   * @returns {Observable<any>}
-   */
-  deleteLoansAccountCharge(accountId: string, chargeId: any): Observable<any> {
-    return this.http.delete(`/loans/${accountId}/charges/${chargeId}`);
-  }
-
-  /**
-   * @param {string} accountId Loans Account Id
    * @param {any} data Adjust Installment Date Data
    * @returns {Observable<any>}
    */
@@ -619,19 +610,10 @@ export class LoansService {
   }
 
   /**
-   * @param {string} accountId Loans Account Id
-   * @param {any} data Deactivate Overdue Charges Data (with dueDate)
-   * @returns {Observable<any>}
-   */
-  deactivateOverdueCharges(accountId: string, data: any): Observable<any> {
-    const httpParams = new HttpParams().set('command', 'deactivateOverdue');
-    return this.http.post(`/loans/${accountId}/charges`, data, { params: httpParams });
-  }
-
-  /**
-   * Bulk-waives outstanding overdue charges (LPI). Accepts the same selection payload as
-   * deactivateOverdueCharges (dueDate/toDueDate, removeCompleteEmiOverdue + selectedEmiNumbers, or no filters
-   * for all), but charges are waived via the standard waiver flow instead of destructively deactivated.
+   * Bulk-waives outstanding overdue charges (LPI). Selection payload supports dueDate/toDueDate,
+   * removeCompleteEmiOverdue + selectedEmiNumbers, or no filters (waive all). Charges are waived through the
+   * standard waiver flow so accounting entries and the audit trail are preserved; charges are never
+   * destructively deactivated.
    * @param {string} accountId Loans Account Id
    * @param {any} data Selection payload
    * @returns {Observable<any>}

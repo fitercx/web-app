@@ -122,22 +122,13 @@
           >
             <i class="fa fa-pencil"></i>
           </button>
-          <button
-            class="account-action-button"
-            mat-raised-button
-            color="warn"
-            matTooltip="{{ 'tooltips.Delete Charge' | translate }}"
-            (click)="routeEdit($event); deleteCharge(charge.id)"
-          >
-            <i class="fa fa-trash"></i>
-          </button>
         </span>
         <button
           class="account-action-button"
           mat-raised-button
           color="accent"
           matTooltip="{{ 'tooltips.Adjust Charge' | translate }}"
-          *ngIf="!charge.paid && status === 'Active'"
+          *ngIf="!charge.paid && !charge.waived && charge.amountOutstanding > 0 && status === 'Active'"
           (click)="routeEdit($event); adjustCharge(charge.id)"
         >
           <i class="fa fa-pencil"></i>

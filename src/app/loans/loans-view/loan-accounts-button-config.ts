@@ -14,6 +14,8 @@ export class LoansAccountButtonConfiguration {
     name: string;
     icon: string;
     taskPermissionName?: string;
+    disabled?: boolean;
+    disabledReason?: string;
   }[];
 
   constructor(status: string) {
@@ -284,5 +286,16 @@ export class LoansAccountButtonConfiguration {
 
   addButton(option: { name: string; icon: string; taskPermissionName?: string }) {
     this.buttonsArray.push(option);
+  }
+
+  /** Marks an already-present single button (matched by name) as disabled, with an explanatory reason
+   *  shown to the user (e.g. as a tooltip) - used for actions that are technically permitted but would
+   *  produce incorrect/inconsistent data for this specific loan's current state. */
+  disableButton(name: string, reason: string) {
+    const button = this.buttonsArray.find((b) => b.name === name);
+    if (button) {
+      button.disabled = true;
+      button.disabledReason = reason;
+    }
   }
 }

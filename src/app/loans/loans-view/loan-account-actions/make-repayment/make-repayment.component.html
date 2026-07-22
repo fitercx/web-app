@@ -21,6 +21,18 @@
             </mat-error>
           </mat-form-field>
 
+          <div class="date-impact-banner backdate-limit-note" *ngIf="backdateLimitMessage">
+            <mat-icon>event_busy</mat-icon>
+            <span>{{ backdateLimitMessage }}</span>
+          </div>
+
+          <div class="date-impact-banner" *ngIf="dateImpactMessages.length">
+            <mat-icon>info</mat-icon>
+            <ul>
+              <li *ngFor="let message of dateImpactMessages">{{ message }}</li>
+            </ul>
+          </div>
+
           <div fxLayout="row wrap" class="content">
             <div fxFlex="50%" class="mat-body-strong">
               {{ 'Principal' | translate }}

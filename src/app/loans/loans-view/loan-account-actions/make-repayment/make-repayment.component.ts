@@ -29,10 +29,18 @@ export class MakeRepaymentComponent implements OnInit {
   paymentTypes: any;
   /** Show payment details */
   showPaymentDetails = false;
-  /** Minimum Date allowed. */
+  /**
+   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS (30) before the business date, or the
+   * loan's disbursement date if that is later (see BackdatedRepaymentValidator#computeEarliestAllowedTransactionDate
+   * on the server). Defaults to 30 days back until the resolver-loaded penalty template's
+   * `earliestAllowedTransactionDate` is applied in ngOnInit, so the calendar never lets an operator pick a date the
+   * server will reject anyway.
+   */
   minDate = new Date(2000, 0, 1);
   /** Maximum Date allowed — extended 1 year ahead to allow future repayment date selection. */
   maxDate = new Date();
+  /** Clear, on-screen explanation of why minDate is where it is — shown next to the transaction date field. */
+  backdateLimitMessage = '';
   /** Repayment Loan Form */
   repaymentLoanForm: UntypedFormGroup;
   currency: Currency | null = null;
@@ -47,6 +55,15 @@ export class MakeRepaymentComponent implements OnInit {
    */
   private baselinePrincipalOutstanding: number = 0;
   private baselineInterestOutstanding: number = 0;
+  /** Baseline penalty/LPI due (business date), used to detect waived/accrued charges on date change. */
+  private baselinePenaltyAmountDue: number = 0;
+
+  /**
+   * Clear, user-facing messages describing how the currently selected transaction date affects
+   * interest and charges, compared to the amounts due on today's business date. Populated only
+   * after the operator actually changes the date (see refreshPenaltyTemplate).
+   */
+  dateImpactMessages: string[] = [];
 
   /**
    * @param {FormBuilder} formBuilder Form Builder.
@@ -84,6 +101,8 @@ export class MakeRepaymentComponent implements OnInit {
     if (this.dataObject.penaltyTemplate) {
       this.baselinePrincipalOutstanding = this.dataObject.penaltyTemplate.principalOutstanding || 0;
       this.baselineInterestOutstanding = this.dataObject.penaltyTemplate.interestOutstanding || 0;
+      this.baselinePenaltyAmountDue = this.dataObject.penaltyTemplate.penaltyAmountDue || 0;
+      this.applyEarliestAllowedDate(this.dataObject.penaltyTemplate.earliestAllowedTransactionDate);
     }
 
     this.repaymentLoanForm.get('transactionDate')?.valueChanges.subscribe((newDate: Date) => {
@@ -193,10 +212,75 @@ export class MakeRepaymentComponent implements OnInit {
         this.dataObject.penaltyTemplate.interestOutstanding = interestAmount;
         this.dataObject.penaltyTemplate.penaltyAmountDue = penaltyAmount + additionalLPIAmount;
 
+        this.dateImpactMessages = this.buildDateImpactMessages(
+          interestAmount,
+          penaltyAmount + additionalLPIAmount,
+          transactionDate
+        );
+
         const totalAmount = principalAmount + interestAmount + feesAmount + penaltyAmount + additionalLPIAmount;
         this.repaymentLoanForm.patchValue({
           transactionAmount: Math.round(totalAmount * 100) / 100
         });
       });
+  }
+
+  /**
+   * Sets the calendar's minDate from the backend-computed `earliestAllowedTransactionDate` (see
+   * BackdatedRepaymentValidator on the server) and a matching on-screen explanation, so an operator is stopped from
+   * ever picking a date the server would reject, rather than finding out only after submitting.
+   */
+  private applyEarliestAllowedDate(earliestAllowedTransactionDate: any): void {
+    if (!earliestAllowedTransactionDate) {
+      return;
+    }
+    const parsed = this.dateUtils.parseDate(earliestAllowedTransactionDate);
+    if (!parsed) {
+      return;
+    }
+    this.minDate = parsed;
+    const formatted = this.dateUtils.formatDate(parsed, this.settingsService.dateFormat);
+    this.backdateLimitMessage =
+      `This repayment can be backdated no earlier than ${formatted} (30 days before today, or this loan's ` +
+      `disbursement date if later) — this protects the repayment schedule and balances from being distorted by ` +
+      `very old backdated entries.`;
+  }
+
+  /**
+   * Builds clear, plain-language messages explaining how the selected transaction date changes the
+   * interest and penalty/LPI amounts due, compared to what would be due if repaid on today's business date.
+   */
+  private buildDateImpactMessages(
+    interestAmount: number,
+    totalPenaltyAmount: number,
+    transactionDate: string
+  ): string[] {
+    const messages: string[] = [];
+    const round = (value: number) => Math.round(value * 100) / 100;
+    const currencyLabel = this.currency?.displaySymbol || this.currency?.code || '';
+    const formattedDate = transactionDate;
+
+    const interestDelta = round(this.baselineInterestOutstanding - interestAmount);
+    if (interestDelta > 0.01) {
+      messages.push(
+        `Interest due is reduced by ${currencyLabel} ${interestDelta.toFixed(2)} for repaying on ${formattedDate} ` +
+          `instead of today, since this is before the installment's due date (early repayment discount).`
+      );
+    }
+
+    const penaltyDelta = round(this.baselinePenaltyAmountDue - totalPenaltyAmount);
+    if (penaltyDelta > 0.01) {
+      messages.push(
+        `${currencyLabel} ${penaltyDelta.toFixed(2)} of accrued penalty/late-payment charges will be waived ` +
+          `by backdating this transaction to ${formattedDate}.`
+      );
+    } else if (penaltyDelta < -0.01) {
+      messages.push(
+        `Selecting a future date (${formattedDate}) adds ${currencyLabel} ${Math.abs(penaltyDelta).toFixed(2)} ` +
+          `of additional late-payment interest that will accrue between today and then.`
+      );
+    }
+
+    return messages;
   }
 }
