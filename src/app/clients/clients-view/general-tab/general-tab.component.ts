@@ -737,8 +737,10 @@ export class GeneralTabComponent {
       });
   }
 
-  toggleLOCRow(element: any, event: Event): void {
-    event.stopPropagation();
+  toggleLOCRow(element: any, event?: Event): void {
+    if (event) {
+      event.stopPropagation();
+    }
     this.expandedLOCElement = this.expandedLOCElement === element ? null : element;
   }
 
@@ -776,8 +778,7 @@ export class GeneralTabComponent {
         }
         const maximumAmount = loc.maximumAmount || 0;
         const blockedAmount = loc.blockedAmount || 0;
-        const consumedAmount = loc.consumedAmount || 0;
-        const utilization = maximumAmount > 0 ? Math.round((consumedAmount / maximumAmount) * 100) : 0;
+        const isPayable = (loc.productType || '').toLowerCase() === 'payable' || loc.productType === 'PAYABLE';
         // For legacy fallback when loans not provided, derive from loanAccounts
         const associatedLoans =
           Array.isArray(loansFromPayload) && loansFromPayload.length
@@ -786,6 +787,7 @@ export class GeneralTabComponent {
                 accountNo: l.accountNo,
                 productName: l.productName,
                 originalLoan: l.originalLoan || l.principal,
+                principalOutstanding: l.principalOutstanding ?? l.additionalProperties?.principalOutstanding ?? null,
                 numberOfRepayments: l.numberOfRepayments,
                 loanBalance: l.loanBalance,
                 amountPaid: l.amountPaid,
@@ -799,6 +801,19 @@ export class GeneralTabComponent {
                 totalOverPaidDerived: l.totalOverPaidDerived
               }))
             : this.getLoansForLOC(loc.id);
+
+        let consumedAmount = loc.consumedAmount || 0;
+        let availableBalance = loc.availableBalance;
+        if (isPayable && associatedLoans.length) {
+          consumedAmount = associatedLoans.reduce((sum: number, loan: any) => {
+            const principalOutstanding = Number(
+              loan.principalOutstanding ?? loan.additionalProperties?.principalOutstanding ?? 0
+            );
+            return sum + (principalOutstanding > 0 ? principalOutstanding : 0);
+          }, 0);
+          availableBalance = Math.max(maximumAmount - blockedAmount - consumedAmount, 0);
+        }
+        const utilization = maximumAmount > 0 ? Math.round((consumedAmount / maximumAmount) * 100) : 0;
 
         // Normalize status: backend supplies loc.status {id, code, value} where code expected as status.active|inactive|suspended|closed
         const rawStatus = loc.status || loc.activationStatus || {};
@@ -843,7 +858,7 @@ export class GeneralTabComponent {
           accountNo: loc.accountNumber || loc.externalId || `LOC-${loc.id}`,
           creditLimit: maximumAmount,
           blockedAmount,
-          availableBalance: loc.availableBalance,
+          availableBalance,
           outstanding: consumedAmount,
           type:
             (loc.productType || '').toLowerCase() === 'payable' || loc.productType === 'PAYABLE'

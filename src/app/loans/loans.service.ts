@@ -226,6 +226,11 @@ export class LoansService {
     return this.http.get(`/loans/${loanId}`, { params: httpParams });
   }
 
+  /** Lists all charges on a loan account (including paid/waived history). */
+  getLoanAccountCharges(loanId: string | number): Observable<any> {
+    return this.http.get(`/loans/${loanId}/charges`);
+  }
+
   /**
    * Loads loan transactions only. Use includeReversed=true to include system-reversed rows
    * (e.g. replaced repayments, original charge-adjustment rows).

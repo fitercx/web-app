@@ -1,13 +1,38 @@
 /** Recurring Deposits Account Buttons Configuration */
 export class LoansAccountButtonConfiguration {
+  /** Loan actions that post cash/manual payments and do not debit the linked savings account. */
+  private static readonly CASH_ONLY_ACTIONS = new Set([
+    'Make Repayment',
+    'Prepay Loan',
+    'Close',
+    'Close (as Rescheduled)',
+    'Recovery Payment',
+    'Goodwill Credit',
+    'Interest Payment Waiver',
+    'Payout Refund',
+    'Merchant Issued Refund',
+    'Credit Balance Refund',
+    'Transfer Funds',
+    'Disburse'
+  ]);
+
+  /** Shown on disabled cash-only actions — directs ops to the supported savings transfer flow. */
+  static readonly CASH_ONLY_DISABLED_REASON =
+    'Cash/manual loan payments are not supported. Use Transfer from Savings on the client General tab ' +
+    'to collect repayment from the linked savings account.';
+
   optionArray: {
     name: string;
     taskPermissionName?: string;
+    disabled?: boolean;
+    disabledReason?: string;
   }[];
 
   optionPaymentArray: {
     name: string;
     taskPermissionName?: string;
+    disabled?: boolean;
+    disabledReason?: string;
   }[];
 
   buttonsArray: {
@@ -296,6 +321,28 @@ export class LoansAccountButtonConfiguration {
     if (button) {
       button.disabled = true;
       button.disabledReason = reason;
+    }
+  }
+
+  /** Disables every cash/manual payment action across primary buttons, More, and Payments menus. */
+  disableCashOnlyActions(reason: string = LoansAccountButtonConfiguration.CASH_ONLY_DISABLED_REASON) {
+    for (const button of this.buttonsArray) {
+      if (LoansAccountButtonConfiguration.CASH_ONLY_ACTIONS.has(button.name)) {
+        button.disabled = true;
+        button.disabledReason = reason;
+      }
+    }
+    for (const option of this.optionArray) {
+      if (LoansAccountButtonConfiguration.CASH_ONLY_ACTIONS.has(option.name)) {
+        option.disabled = true;
+        option.disabledReason = reason;
+      }
+    }
+    for (const option of this.optionPaymentArray) {
+      if (LoansAccountButtonConfiguration.CASH_ONLY_ACTIONS.has(option.name)) {
+        option.disabled = true;
+        option.disabledReason = reason;
+      }
     }
   }
 }

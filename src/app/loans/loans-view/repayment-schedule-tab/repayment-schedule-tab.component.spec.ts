@@ -38,4 +38,46 @@ describe('RepaymentScheduleTabComponent', () => {
       expect(component.shouldShowOutstanding(period)).equal(true);
     });
   });
+
+  describe('installmentStyle', () => {
+    beforeEach(() => {
+      component.businessDate = new Date(2026, 6, 27); // 27 Jul 2026
+    });
+
+    it('does not mark past-due rows red when outstanding is zero', () => {
+      const period: any = {
+        complete: false,
+        totalOutstandingForPeriod: 0,
+        fromDate: [
+          2026,
+          6,
+          26
+        ],
+        dueDate: [
+          2026,
+          6,
+          26
+        ]
+      };
+      expect(component.installmentStyle(period)).equal('paid');
+    });
+
+    it('marks past-due rows red when outstanding remains', () => {
+      const period: any = {
+        complete: false,
+        totalOutstandingForPeriod: 5177.97,
+        fromDate: [
+          2026,
+          6,
+          2
+        ],
+        dueDate: [
+          2026,
+          6,
+          2
+        ]
+      };
+      expect(component.installmentStyle(period)).equal('overdued');
+    });
+  });
 });
