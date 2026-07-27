@@ -612,8 +612,9 @@
     <tr
       mat-row
       *matRowDef="let row; columns: locColumns"
-      class="select-row"
+      class="select-row loc-data-row"
       [class.expanded-row]="expandedLOCElement === row"
+      (click)="toggleLOCRow(row, $event)"
     ></tr>
     <tr mat-row *matRowDef="let row; columns: ['expandedLOCDetail']" class="detail-row"></tr>
   </table>

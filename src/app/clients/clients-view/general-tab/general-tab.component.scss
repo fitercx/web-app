@@ -415,6 +415,10 @@
 
 // Add hover effect to main LOC table
 :host ::ng-deep .mat-table {
+  .mat-row.loc-data-row {
+    cursor: pointer;
+  }
+
   .mat-row:hover {
     background-color: rgb(0 0 0 / 4%) !important;
     cursor: pointer;

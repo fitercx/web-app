@@ -160,7 +160,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   installmentStyle(installment: RepaymentSchedulePeriod): string {
-    if (installment.complete) {
+    if (installment.complete || !this.hasPeriodOutstanding(installment)) {
       return 'paid';
     }
     const isCurrent: string = this.isCurrent(installment);
@@ -184,11 +184,22 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       if (fromDate <= this.businessDate && this.businessDate < dueDate) {
         return 'current';
       }
-      if (this.businessDate > dueDate) {
+      if (this.businessDate > dueDate && this.hasPeriodOutstanding(installment)) {
         return 'overdued';
       }
     }
     return '';
+  }
+
+  /** True when the installment still has a positive balance due on the schedule row. */
+  hasPeriodOutstanding(installment: RepaymentSchedulePeriod): boolean {
+    if (!installment) {
+      return false;
+    }
+    if (installment.complete) {
+      return false;
+    }
+    return Number(installment.totalOutstandingForPeriod || 0) > 0;
   }
 
   exportToPDF() {
@@ -1311,18 +1322,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
   /** Determines if outstanding amount should be shown for a period */
   shouldShowOutstanding(item: RepaymentSchedulePeriod): boolean {
-    if (!item) {
-      return false;
-    }
-    // If installment marked complete treat as paid -> hide
-    if (item.complete) {
-      return false;
-    }
-    // If backend already reports zero outstanding, hide
-    if (item.totalOutstandingForPeriod === 0) {
-      return false;
-    }
-    return true;
+    return this.hasPeriodOutstanding(item);
   }
 
   /** Whether loan is overpaid (status or overPaidAmount > 0) */

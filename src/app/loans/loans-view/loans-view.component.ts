@@ -285,6 +285,7 @@ class LoansViewComponent implements OnInit {
         }
       }
     }
+    this.buttonConfig.disableCashOnlyActions();
   }
 
   loanAction(actionName: string) {
@@ -636,6 +637,36 @@ class LoansViewComponent implements OnInit {
       return false;
     }
     return date1[0] === date2[0] && date1[1] === date2[1] && date1[2] === date2[2];
+  }
+
+  /** Show Charges tab when charges exist, or for closed loans with charge history in summary. */
+  showChargesTab(): boolean {
+    if (this.loanDetailsData?.charges?.length) {
+      return true;
+    }
+    if (this.loanDetailsData?.status?.closed) {
+      return this.hasChargeSummaryHistory();
+    }
+    return !!this.loanDetailsData?.charges;
+  }
+
+  private hasChargeSummaryHistory(): boolean {
+    const summary = this.loanDetailsData?.summary;
+    if (!summary) {
+      return false;
+    }
+    const chargeFields = [
+      'feeChargesCharged',
+      'feeChargesPaid',
+      'feeChargesWaived',
+      'penaltyChargesCharged',
+      'penaltyChargesPaid',
+      'penaltyChargesWaived',
+      'taxChargesCharged',
+      'taxChargesPaid',
+      'taxChargesWaived'
+    ];
+    return chargeFields.some((field) => Number(summary[field] || 0) > 0);
   }
 }
 

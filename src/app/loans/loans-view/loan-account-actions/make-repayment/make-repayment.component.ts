@@ -65,6 +65,9 @@ export class MakeRepaymentComponent implements OnInit {
    */
   dateImpactMessages: string[] = [];
 
+  /** Shown when pending LPI is due on the selected date and will be paid with this repayment. */
+  lpiPaymentMessage: string | null = null;
+
   /**
    * @param {FormBuilder} formBuilder Form Builder.
    * @param {LoansService} loanService Loan Service.
@@ -111,6 +114,9 @@ export class MakeRepaymentComponent implements OnInit {
         this.refreshPenaltyTemplate(formattedDate);
       }
     });
+
+    const initialDate = this.dateUtils.formatDate(this.settingsService.businessDate, this.settingsService.dateFormat);
+    this.refreshPenaltyTemplate(initialDate);
   }
 
   /**
@@ -134,9 +140,6 @@ export class MakeRepaymentComponent implements OnInit {
 
   setRepaymentLoanDetails() {
     this.paymentTypes = this.dataObject.repaymentTemplate.paymentTypeOptions;
-    this.repaymentLoanForm.patchValue({
-      transactionAmount: this.dataObject.repaymentTemplate.amount
-    });
   }
 
   /**
@@ -204,23 +207,22 @@ export class MakeRepaymentComponent implements OnInit {
         // baseline values captured from the resolver so the display stays correct.
         const principalAmount = template.principalOutstanding || this.baselinePrincipalOutstanding;
         const interestAmount = template.interestOutstanding || this.baselineInterestOutstanding;
-        const feesAmount = this.dataObject.repaymentTemplate.feeChargesPortion || 0;
+        const feesAmount = Number(this.dataObject.repaymentTemplate.feeChargesPortion || 0);
+        const taxAmount = Number(this.dataObject.repaymentTemplate.taxChargesPortion || 0);
         const penaltyAmount = template.penaltyAmountDue || 0;
         const additionalLPIAmount = Number(futureLPI?.totalLPIAmount || 0);
+        const totalPenaltyAmount = penaltyAmount + additionalLPIAmount;
 
         this.dataObject.penaltyTemplate.principalOutstanding = principalAmount;
         this.dataObject.penaltyTemplate.interestOutstanding = interestAmount;
-        this.dataObject.penaltyTemplate.penaltyAmountDue = penaltyAmount + additionalLPIAmount;
+        this.dataObject.penaltyTemplate.penaltyAmountDue = totalPenaltyAmount;
 
-        this.dateImpactMessages = this.buildDateImpactMessages(
-          interestAmount,
-          penaltyAmount + additionalLPIAmount,
-          transactionDate
-        );
+        this.dateImpactMessages = this.buildDateImpactMessages(interestAmount, totalPenaltyAmount, transactionDate);
+        this.lpiPaymentMessage = this.buildLpiPaymentMessage(totalPenaltyAmount, transactionDate);
 
-        const totalAmount = principalAmount + interestAmount + feesAmount + penaltyAmount + additionalLPIAmount;
+        const totalAmount = principalAmount + interestAmount + feesAmount + taxAmount + totalPenaltyAmount;
         this.repaymentLoanForm.patchValue({
-          transactionAmount: Math.round(totalAmount * 100) / 100
+          transactionAmount: this.roundAmount(totalAmount)
         });
       });
   }
@@ -282,5 +284,24 @@ export class MakeRepaymentComponent implements OnInit {
     }
 
     return messages;
+  }
+
+  /**
+   * Builds a clear notice when pending LPI is due on the selected date so the operator knows it
+   * is included in the suggested transaction amount and will be paid with this repayment.
+   */
+  private buildLpiPaymentMessage(totalPenaltyAmount: number, transactionDate: string): string | null {
+    if (totalPenaltyAmount <= 0.01) {
+      return null;
+    }
+    const currencyLabel = this.currency?.displaySymbol || this.currency?.code || '';
+    return (
+      `Late payment interest (LPI) of ${currencyLabel} ${totalPenaltyAmount.toFixed(2)} accrued up to ` +
+      `${transactionDate} is included in the transaction amount and will be paid with this repayment.`
+    );
+  }
+
+  private roundAmount(value: number): number {
+    return Math.round(value * 100) / 100;
   }
 }

@@ -140,28 +140,35 @@
 
       <mat-menu #accountMenu="matMenu">
         <ng-container *ngFor="let item of buttonConfig.singleButtons">
-          <button
-            mat-menu-item
-            *mifosxHasPermission="item.taskPermissionName"
-            [disabled]="item.disabled"
-            [matTooltip]="item.disabledReason"
-            matTooltipPosition="left"
-            (click)="!item.disabled && loanAction(item.name)"
-          >
-            <mat-icon matListIcon>
-              <fa-icon icon="{{ item.icon }}" size="sm"></fa-icon>
-            </mat-icon>
-            <span>{{ 'labels.menus.' + item.name | translate }}</span>
-          </button>
+          <span [matTooltip]="item.disabled ? item.disabledReason : null" matTooltipPosition="left">
+            <button
+              mat-menu-item
+              *mifosxHasPermission="item.taskPermissionName"
+              [disabled]="item.disabled"
+              (click)="!item.disabled && loanAction(item.name)"
+            >
+              <mat-icon matListIcon>
+                <fa-icon icon="{{ item.icon }}" size="sm"></fa-icon>
+              </mat-icon>
+              <span>{{ 'labels.menus.' + item.name | translate }}</span>
+            </button>
+          </span>
         </ng-container>
 
         <ng-container *ngIf="buttonConfig.optionsPayment.length" class="loan-span">
           <button mat-menu-item [matMenuTriggerFor]="Payments">{{ 'labels.menus.Payments' | translate }}</button>
           <mat-menu #Payments="matMenu">
             <span *ngFor="let item of buttonConfig.optionsPayment">
-              <button mat-menu-item *mifosxHasPermission="item.taskPermissionName" (click)="loanAction(item.name)">
-                {{ 'labels.menus.' + item.name | translate }}
-              </button>
+              <span [matTooltip]="item.disabled ? item.disabledReason : null" matTooltipPosition="left">
+                <button
+                  mat-menu-item
+                  *mifosxHasPermission="item.taskPermissionName"
+                  [disabled]="item.disabled"
+                  (click)="!item.disabled && loanAction(item.name)"
+                >
+                  {{ 'labels.menus.' + item.name | translate }}
+                </button>
+              </span>
             </span>
           </mat-menu>
         </ng-container>
@@ -170,9 +177,16 @@
           <button mat-menu-item [matMenuTriggerFor]="More">{{ 'labels.menus.More' | translate }}</button>
           <mat-menu #More="matMenu">
             <span *ngFor="let item of buttonConfig.options">
-              <button mat-menu-item *mifosxHasPermission="item.taskPermissionName" (click)="loanAction(item.name)">
-                {{ 'labels.menus.' + item.name | translate }}
-              </button>
+              <span [matTooltip]="item.disabled ? item.disabledReason : null" matTooltipPosition="left">
+                <button
+                  mat-menu-item
+                  *mifosxHasPermission="item.taskPermissionName"
+                  [disabled]="item.disabled"
+                  (click)="!item.disabled && loanAction(item.name)"
+                >
+                  {{ 'labels.menus.' + item.name | translate }}
+                </button>
+              </span>
             </span>
           </mat-menu>
         </ng-container>
@@ -308,7 +322,7 @@
           {{ 'labels.inputs.Floating Interest Rates' | translate }}
         </a>
       </ng-container>
-      <ng-container *ngIf="loanDetailsData.charges">
+      <ng-container *ngIf="showChargesTab()">
         <a
           mat-tab-link
           [routerLink]="['./charges']"

@@ -37,8 +37,11 @@ export class ChargesTabComponent implements OnInit {
   chargesData: any;
   /** Status */
   status: any;
+  /** True when the loan is closed — charge history is view-only, no actions. */
+  isReadOnlyView = false;
   /** Columns to be displayed in charges table. */
-  displayedColumns: string[] = [
+  displayedColumns: string[] = [];
+  private readonly editableColumns: string[] = [
     'name',
     'feepenalty',
     'paymentdueat',
@@ -49,6 +52,18 @@ export class ChargesTabComponent implements OnInit {
     'waived',
     'outstanding',
     'actions'
+  ];
+  private readonly readOnlyColumns: string[] = [
+    'name',
+    'feepenalty',
+    'paymentdueat',
+    'dueDate',
+    'calculationtype',
+    'due',
+    'paid',
+    'waived',
+    'outstanding',
+    'status'
   ];
   /** Data source for charges table. */
   dataSource: MatTableDataSource<any>;
@@ -85,17 +100,30 @@ export class ChargesTabComponent implements OnInit {
     this.systemService.getConfigurationByName('charge-accrual-date').subscribe((config: GlobalConfiguration) => {
       this.useDueDate = config.stringValue === 'due-date';
     });
-    this.chargesData = this.loanDetails.charges;
     this.status = this.loanDetails.status.value;
+    this.isReadOnlyView = !!this.loanDetails?.status?.closed;
+    this.displayedColumns = this.isReadOnlyView ? [...this.readOnlyColumns] : [...this.editableColumns];
+
+    const charges = this.loanDetails.charges;
+    if (charges?.length) {
+      this.initializeCharges(charges);
+    } else if (this.isReadOnlyView) {
+      this.loansService.getLoanAccountCharges(this.loanDetails.id).subscribe((data: any) => {
+        this.initializeCharges(Array.isArray(data) ? data : []);
+      });
+    } else {
+      this.initializeCharges([]);
+    }
+  }
+
+  private initializeCharges(charges: any[]) {
     const loanStatusAllowsChargeActions = this.status === 'Active' || this.status === 'Overpaid';
-    let actionFlag;
+    this.chargesData = charges || [];
     this.chargesData.forEach((element: any) => {
       if (element.chargeTimeType.value === 'Disbursement') {
         element.dueDate = this.loanDetails.timeline.actualDisbursementDate;
       }
       element.dueDate = this.dateUtils.parseDate(element.dueDate);
-      // Check if charge is reversed: has amountPaid > 0 but paid = false and outstanding = 0
-      // This indicates a reversed charge where we preserved the original paid amount for display
       const isReversed =
         !element.paid &&
         !element.waived &&
@@ -103,21 +131,17 @@ export class ChargesTabComponent implements OnInit {
         element.amountOutstanding === 0 &&
         element.amountWrittenOff === 0;
       element.isReversed = isReversed;
-      // A charge with nothing outstanding has no waive/edit action left, regardless of its flags.
-      // Guards against legacy waived charges whose backend 'waived' flag was never fully set
-      // (isWaived() requires waived && taxesWaived) - clicking waive again on those corrupted the
-      // waived amount before the backend hard-guard was added.
       const nothingOutstanding = Number(element.amountOutstanding || 0) === 0;
+      let actionFlag = true;
       if (
-        isReversed ||
-        element.paid ||
-        element.waived ||
-        nothingOutstanding ||
-        element.chargeTimeType.value === 'Disbursement' ||
-        !loanStatusAllowsChargeActions
+        !this.isReadOnlyView &&
+        !isReversed &&
+        !element.paid &&
+        !element.waived &&
+        !nothingOutstanding &&
+        element.chargeTimeType.value !== 'Disbursement' &&
+        loanStatusAllowsChargeActions
       ) {
-        actionFlag = true;
-      } else {
         actionFlag = false;
       }
       element.actionFlag = actionFlag;
@@ -128,6 +152,30 @@ export class ChargesTabComponent implements OnInit {
     this.dataSource = new MatTableDataSource(this.chargesData);
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
+  }
+
+  /** Human-readable charge settlement status for read-only closed-loan view. */
+  chargeStatusLabel(charge: any): string {
+    if (charge.isReversed) {
+      return 'Reversed';
+    }
+    if (charge.waived || Number(charge.amountWaived || 0) >= Number(charge.amount || 0)) {
+      return 'Waived';
+    }
+    if (charge.paid || (Number(charge.amountOutstanding || 0) === 0 && Number(charge.amountPaid || 0) > 0)) {
+      return 'Paid';
+    }
+    if (Number(charge.amountWaived || 0) > 0 && Number(charge.amountOutstanding || 0) > 0) {
+      return 'Partially waived';
+    }
+    if (Number(charge.amountPaid || 0) > 0 && Number(charge.amountOutstanding || 0) > 0) {
+      return 'Partially paid';
+    }
+    return 'Outstanding';
+  }
+
+  chargeStatusClass(charge: any): string {
+    return `charge-status--${this.chargeStatusLabel(charge).toLowerCase().replace(/\s+/g, '-')}`;
   }
 
   /**
@@ -325,7 +373,7 @@ export class ChargesTabComponent implements OnInit {
    * @returns {boolean}
    */
   hasOverdueCharges(): boolean {
-    if (!this.chargesData || this.chargesData.length === 0) {
+    if (this.isReadOnlyView || !this.chargesData || this.chargesData.length === 0) {
       return false;
     }
     return this.chargesData.some(

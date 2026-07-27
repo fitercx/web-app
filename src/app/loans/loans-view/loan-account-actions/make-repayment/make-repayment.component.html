@@ -71,8 +71,13 @@
             </div>
 
             <div fxFlex="50%" class="r-amount right-label">
-              {{ dataObject.taxChargesPortion | formatNumber }}
+              {{ dataObject.repaymentTemplate.taxChargesPortion | formatNumber }}
             </div>
+          </div>
+
+          <div class="date-impact-banner lpi-payment-note" *ngIf="lpiPaymentMessage">
+            <mat-icon>payments</mat-icon>
+            <span>{{ lpiPaymentMessage }}</span>
           </div>
 
           <mifosx-input-amount
