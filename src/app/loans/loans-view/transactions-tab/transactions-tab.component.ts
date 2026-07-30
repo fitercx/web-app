@@ -157,7 +157,6 @@ export class TransactionsTabComponent implements OnInit {
 
     if (hideAccrual || hideReversed) {
       transactions = this.transactionsData.filter((t: LoanTransaction) => {
-        // Treat both manually reversed and backend-reversed transactions as "reversed"
         const isReversed = this.isTransactionReversed(t);
         return !(hideReversed && isReversed) && !(hideAccrual && t.type.accrual);
       });
@@ -371,13 +370,11 @@ export class TransactionsTabComponent implements OnInit {
   }
 
   /**
-   * Returns true if a transaction is reversed.
-   * We consider both:
-   * - `manuallyReversed` (explicit undo from UI)
-   * - `reversed` flag coming directly from the backend
+   * Returns true when the backend has reversed this transaction.
+   * `manuallyReversed` / `manually_adjusted_or_reversed` marks a reprocess guard on active repayments.
    */
   private isTransactionReversed(transaction: LoanTransaction): boolean {
-    return !!transaction.manuallyReversed || !!transaction.reversed;
+    return !!transaction.reversed;
   }
 
   /**
