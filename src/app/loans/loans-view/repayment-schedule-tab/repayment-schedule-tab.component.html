@@ -5,6 +5,13 @@
   ></mifosx-loan-downloads-menu>
 </div>
 
+<div *ngIf="!forEditing">
+  <mifosx-foreclosure-unearned-interest-banner
+    [details]="foreclosureUnearnedInterestDetails"
+    [currencyCode]="currencyCode"
+  ></mifosx-foreclosure-unearned-interest-banner>
+</div>
+
 <div class="container">
   <table mat-table [dataSource]="repaymentScheduleDetails.periods" *ngIf="!forEditing" id="repaymentSchedule">
     <ng-container matColumnDef="number">
@@ -106,11 +113,11 @@
         }}
       </th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        {{ item.interestOriginalDue | formatNumber }}
+        {{ getDisplayInterestForPeriod(item) | formatNumber }}
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
         <b>
-          {{ repaymentScheduleDetails.totalInterestCharged | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+          {{ getDisplayTotalInterest() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
         </b>
       </td>
     </ng-container>
@@ -382,7 +389,7 @@
             : ('labels.inputs.Interest' | translate)
         }}
       </th>
-      <td mat-cell class="r-amount" *matCellDef="let item">{{ item.interestOriginalDue | formatNumber }}</td>
+      <td mat-cell class="r-amount" *matCellDef="let item">{{ getDisplayInterestForPeriod(item) | formatNumber }}</td>
     </ng-container>
 
     <ng-container matColumnDef="disbursedAmount">

@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { MatTableDataSource } from '@angular/material/table';
+import { getForeclosureUnearnedInterestDetails } from '../foreclosure-unearned-interest.utils';
 
 @Component({
   selector: 'mifosx-general-tab',
@@ -232,6 +233,22 @@ export class GeneralTabComponent implements OnInit {
         overdue: this.loanDetails.summary.totalOverdue
       }
     ];
+    const foreclosureDetails = getForeclosureUnearnedInterestDetails(this.loanDetails);
+    const unearnedInterestDueToForeclosure = foreclosureDetails?.unearnedInterest ?? 0;
+    if (unearnedInterestDueToForeclosure > 0) {
+      const interestRowIndex = this.loanSummaryTableData.findIndex((row) => row.property === 'Interest');
+      const insertIndex = interestRowIndex >= 0 ? interestRowIndex + 1 : this.loanSummaryTableData.length;
+      this.loanSummaryTableData.splice(insertIndex, 0, {
+        property: 'Unearned Interest (Foreclosure)',
+        original: String(unearnedInterestDueToForeclosure),
+        adjustment: '0',
+        paid: '0',
+        waived: String(unearnedInterestDueToForeclosure),
+        writtenOff: '0',
+        outstanding: '0',
+        overdue: '0'
+      });
+    }
     if (this.loanDetails.factorRateEnabled) {
       this.loanSummaryTableData = this.loanSummaryTableData.filter((item) => item.property !== 'Interest');
     }

@@ -20,6 +20,7 @@ import { RepaymentScheduleTabComponent } from './loans-view/repayment-schedule-t
 import { LoanAccountActionsComponent } from './loans-view/loan-account-actions/loan-account-actions.component';
 import { LoansAccountCloseComponent } from './loans-view/loan-account-actions/loans-account-close/loans-account-close.component';
 import { TransactionsTabComponent } from './loans-view/transactions-tab/transactions-tab.component';
+import { ForeclosureUnearnedInterestBannerComponent } from './loans-view/foreclosure-unearned-interest-banner/foreclosure-unearned-interest-banner.component';
 import { DatatableTabComponent } from './loans-view/datatable-tab/datatable-tab.component';
 import { UndoApprovalComponent } from './loans-view/loan-account-actions/undo-approval/undo-approval.component';
 import { AssignLoanOfficerComponent } from './loans-view/loan-account-actions/assign-loan-officer/assign-loan-officer.component';
@@ -113,6 +114,7 @@ import { LoanUndoTransactionDialogComponent } from './loans-view/custom-dialogs/
     LoanAccountActionsComponent,
     LoansAccountCloseComponent,
     TransactionsTabComponent,
+    ForeclosureUnearnedInterestBannerComponent,
     DatatableTabComponent,
     UndoApprovalComponent,
     AssignLoanOfficerComponent,

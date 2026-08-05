@@ -13,6 +13,8 @@ import { LoanUndoTransactionDialogComponent } from '../custom-dialogs/loan-undo-
 import { TranslateService } from '@ngx-translate/core';
 import { LoanTransaction } from 'app/products/loan-products/models/loan-account.model';
 import { LoanTransactionType } from 'app/loans/models/loan-transaction-type.model';
+import { ForeclosureUnearnedInterestDetails } from 'app/loans/models/foreclosure-unearned-interest.model';
+import { getForeclosureUnearnedInterestDetails } from '../foreclosure-unearned-interest.utils';
 
 @Component({
   selector: 'mifosx-transactions-tab',
@@ -27,6 +29,12 @@ export class TransactionsTabComponent implements OnInit {
   /** Form control to handle accural parameter */
   hideAccrualsParam: UntypedFormControl;
   showReversedParam: UntypedFormControl;
+  /** Loan Details Data */
+  loanDetailsData: any;
+  /** Foreclosure unearned interest details for banner */
+  foreclosureUnearnedInterestDetails: ForeclosureUnearnedInterestDetails | null = null;
+  /** Currency code for banner formatting */
+  currencyCode: string;
   /** Stores the status of the loan account */
   status: string;
   /** Columns to be displayed in original schedule table. */
@@ -91,8 +99,11 @@ export class TransactionsTabComponent implements OnInit {
   ) {
     this.loanId = this.route.parent.parent.snapshot.params['loanId'];
     this.route.parent.parent.data.subscribe((data: { loanDetailsData: any }) => {
+      this.loanDetailsData = data.loanDetailsData;
       this.transactionsData = data.loanDetailsData.transactions || [];
       this.status = data.loanDetailsData.status.value;
+      this.currencyCode = data.loanDetailsData.currency?.code;
+      this.foreclosureUnearnedInterestDetails = getForeclosureUnearnedInterestDetails(data.loanDetailsData);
       this.reversedTransactionsLoaded = false;
       this.applyTransactionFilters();
     });

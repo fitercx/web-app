@@ -1,0 +1,150 @@
+<div class="foreclosure-unearned-interest-banner" *ngIf="hasDetails">
+  <mat-icon class="banner-info-icon">info</mat-icon>
+
+  <div class="banner-body">
+    <button
+      type="button"
+      class="banner-header"
+      (click)="toggleExpanded()"
+      [attr.aria-expanded]="expanded"
+      [attr.aria-label]="
+        (expanded ? 'labels.text.Hide unearned interest details' : 'labels.text.Show unearned interest details')
+          | translate
+      "
+    >
+      <div class="banner-header-text">
+        <strong>{{ titleKey | translate }}:</strong>
+        {{ details.unearnedInterest | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+
+        <span class="banner-summary" *ngIf="!expanded && paymentDate">
+          {{ paymentDateLabelKey | translate }}
+          <strong>{{ paymentDate | dateFormat }}</strong>
+          <ng-container *ngIf="details.interestWaivedDays != null && details.interestWaivedDays > 0">
+            —
+            <strong>{{ details.interestWaivedDays }}</strong>
+            {{ 'labels.text.days before due date' | translate }}
+            <strong>{{ details.originalMaturityDate | dateFormat }}</strong>
+          </ng-container>
+        </span>
+        <span class="banner-summary" *ngIf="!expanded && !paymentDate && details.foreclosureDate">
+          {{ paymentDateLabelKey | translate }}
+          <strong>{{ details.foreclosureDate | dateFormat }}</strong>
+        </span>
+      </div>
+      <mat-icon class="expand-icon">{{ expanded ? 'expand_less' : 'expand_more' }}</mat-icon>
+    </button>
+
+    <div class="banner-details" *ngIf="expanded">
+      <ul class="foreclosure-details-list">
+        <ng-container *ngIf="isEarlyRepayment; else foreclosureSummary">
+          <li *ngIf="paymentDate">
+            {{ paymentDateLabelKey | translate }}
+            <strong>{{ paymentDate | dateFormat }}</strong>
+            <ng-container *ngIf="details.interestWaivedDays != null && details.interestWaivedDays > 0">
+              —
+              <strong>{{ details.interestWaivedDays }}</strong>
+              {{ 'labels.text.days before due date' | translate }}
+              <strong>{{ details.originalMaturityDate | dateFormat }}</strong>
+            </ng-container>
+          </li>
+          <li *ngIf="details.periodDays != null && details.periodStartDate">
+            {{ 'labels.text.Installment period' | translate }}:
+            <strong>{{ details.periodDays }}</strong>
+            {{ 'labels.text.days' | translate }}
+            ({{ details.periodStartDate | dateFormat }} – {{ details.originalMaturityDate | dateFormat }})
+          </li>
+          <li *ngIf="details.interestChargedDays != null && details.periodDays != null">
+            {{ 'labels.text.Interest charged for' | translate }}
+            <strong>{{ details.interestChargedDays }}</strong>
+            {{ 'labels.text.of' | translate }}
+            <strong>{{ details.periodDays }}</strong>
+            {{ 'labels.text.days' | translate }}:
+            <strong>{{ details.interestCollected | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}</strong>
+          </li>
+          <li *ngIf="details.interestWaivedDays != null && details.interestWaivedDays > 0">
+            {{ 'labels.text.Interest waived for remaining' | translate }}
+            <strong>{{ details.interestWaivedDays }}</strong>
+            {{ 'labels.text.days' | translate }}
+            <ng-container *ngIf="paymentDate">
+              ({{ paymentDate | dateFormat }} – {{ details.originalMaturityDate | dateFormat }})
+            </ng-container>
+            :
+            <strong>{{ details.unearnedInterest | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}</strong>
+            <span *ngIf="details.originalScheduleInterest != null">
+              {{ 'labels.text.of scheduled' | translate }}
+              <strong>{{
+                details.originalScheduleInterest | currency: currencyCode : 'symbol-narrow' : '1.2-2'
+              }}</strong>
+            </span>
+          </li>
+        </ng-container>
+
+        <ng-template #foreclosureSummary>
+          <li>
+            {{ paymentDateLabelKey | translate }}
+            <strong>{{ details.foreclosureDate | dateFormat }}</strong>
+            <ng-container *ngIf="details.remainingDays != null && details.remainingDays > 0">
+              —
+              <strong>{{ details.remainingDays }}</strong>
+              {{ 'labels.text.days before original maturity on' | translate }}
+              <strong>{{ details.originalMaturityDate | dateFormat }}</strong>
+            </ng-container>
+          </li>
+          <li *ngIf="details.removedInstallmentCount != null && details.removedInstallmentCount > 0">
+            <strong>{{ details.removedInstallmentCount }}</strong>
+            {{ 'labels.text.future installments removed from schedule' | translate }}
+          </li>
+          <li *ngIf="details.originalScheduleInterest != null && details.interestCollected != null">
+            {{ 'labels.text.Original scheduled interest' | translate }}:
+            <strong>{{ details.originalScheduleInterest | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}</strong>
+            ·
+            {{ 'labels.text.Interest collected at closure' | translate }}:
+            <strong>{{ details.interestCollected | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}</strong>
+          </li>
+        </ng-template>
+      </ul>
+
+      <div class="waived-periods" *ngIf="details.waivedPeriods?.length">
+        <strong>{{ 'labels.text.Interest waived by period' | translate }}</strong>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>{{ 'labels.inputs.From Date' | translate }}</th>
+              <th>{{ 'labels.inputs.Due Date' | translate }}</th>
+              <th *ngIf="isEarlyRepayment">{{ 'labels.inputs.Paid Date' | translate }}</th>
+              <th *ngIf="isEarlyRepayment">{{ 'labels.text.Days charged' | translate }}</th>
+              <th *ngIf="isEarlyRepayment">{{ 'labels.text.Days waived' | translate }}</th>
+              <th class="r-amount">{{ 'labels.text.Scheduled interest' | translate }}</th>
+              <th class="r-amount" *ngIf="isEarlyRepayment">{{ 'labels.text.Interest charged' | translate }}</th>
+              <th class="r-amount">{{ 'labels.text.Interest waived' | translate }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let period of details.waivedPeriods">
+              <td>{{ period.installmentNumber }}</td>
+              <td>{{ period.fromDate | dateFormat }}</td>
+              <td>{{ period.dueDate | dateFormat }}</td>
+              <td *ngIf="isEarlyRepayment">{{ period.paymentDate | dateFormat }}</td>
+              <td *ngIf="isEarlyRepayment">
+                <ng-container *ngIf="period.interestChargedDays != null && period.periodDays != null">
+                  {{ period.interestChargedDays }} / {{ period.periodDays }}
+                </ng-container>
+              </td>
+              <td *ngIf="isEarlyRepayment">{{ period.interestWaivedDays }}</td>
+              <td class="r-amount">
+                {{ period.scheduledInterest | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+              </td>
+              <td class="r-amount" *ngIf="isEarlyRepayment">
+                {{ period.interestCharged | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+              </td>
+              <td class="r-amount">{{ period.waivedInterest | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>{{ explanationKey | translate }}</p>
+    </div>
+  </div>
+</div>
