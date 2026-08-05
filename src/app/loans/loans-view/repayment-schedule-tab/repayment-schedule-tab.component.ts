@@ -1027,6 +1027,23 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     }
   }
 
+  private refreshForeclosureUnearnedInterestDetails(loanDetails: any): void {
+    this.foreclosureUnearnedInterestDetails = getForeclosureUnearnedInterestDetails(loanDetails);
+    this.originalInterestByInstallment = buildOriginalInterestByInstallment(this.foreclosureUnearnedInterestDetails);
+  }
+
+  /** Interest column: show pre-early-repayment scheduled amount when snapshot exists. */
+  getDisplayInterestForPeriod(item: any): number {
+    return getDisplayInterestForPeriod(item, this.originalInterestByInstallment);
+  }
+
+  getDisplayTotalInterest(): number {
+    return getDisplayTotalScheduledInterest(
+      this.foreclosureUnearnedInterestDetails,
+      this.repaymentScheduleDetails?.totalInterestCharged ?? 0
+    );
+  }
+
   numberOnly(inputFormControl: any, event: any): boolean {
     const charCode = event.which ? event.which : event.keyCode;
     if (charCode === 46) {
