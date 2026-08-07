@@ -3,6 +3,13 @@ import { MatDialog } from '@angular/material/dialog';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Dates } from 'app/core/utils/dates';
 import { RepaymentSchedulePeriod } from 'app/loans/models/loan-account.model';
+import { ForeclosureUnearnedInterestDetails } from 'app/loans/models/foreclosure-unearned-interest.model';
+import {
+  buildOriginalInterestByInstallment,
+  getDisplayInterestForPeriod,
+  getDisplayTotalScheduledInterest,
+  getForeclosureUnearnedInterestDetails
+} from '../foreclosure-unearned-interest.utils';
 import { SettingsService } from 'app/settings/settings.service';
 import { FormDialogComponent } from 'app/shared/form-dialog/form-dialog.component';
 import { DatepickerBase } from 'app/shared/form-dialog/formfield/model/datepicker-base';
@@ -48,6 +55,10 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   isWaived: boolean;
   /** Loan details data from parent */
   loanDetailsData: any;
+  /** Foreclosure unearned interest details for banner */
+  foreclosureUnearnedInterestDetails: ForeclosureUnearnedInterestDetails | null = null;
+  /** Original scheduled interest by installment (early repayment snapshot). */
+  private originalInterestByInstallment = new Map<number, number>();
   /** Base columns for regular loans */
   baseDisplayedColumns: string[] = [
     'number',
@@ -117,6 +128,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       if (data.loanDetailsData) {
         this.currencyCode = data.loanDetailsData.currency.code;
         this.loanDetailsData = data.loanDetailsData;
+        this.refreshForeclosureUnearnedInterestDetails(data.loanDetailsData);
       }
       this.loanDetailsDataRepaymentSchedule = data.loanDetailsData ? data.loanDetailsData.repaymentSchedule : [];
     });
@@ -540,8 +552,8 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       },
       interest: {
         header: this.isLineOfCreditReceivable() ? 'Expected Interest' : 'Interest',
-        value: (item: any) => this.toNumber(item.interestOriginalDue),
-        total: () => this.toNumber(this.repaymentScheduleDetails.totalInterestCharged),
+        value: (item: any) => this.getDisplayInterestForPeriod(item),
+        total: () => this.getDisplayTotalInterest(),
         format: moneyFormat
       },
       fees: {
@@ -1013,6 +1025,23 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
         this.totalRepaymentExpected = this.totalRepaymentExpected + item.totalDueForPeriod;
       });
     }
+  }
+
+  private refreshForeclosureUnearnedInterestDetails(loanDetails: any): void {
+    this.foreclosureUnearnedInterestDetails = getForeclosureUnearnedInterestDetails(loanDetails);
+    this.originalInterestByInstallment = buildOriginalInterestByInstallment(this.foreclosureUnearnedInterestDetails);
+  }
+
+  /** Interest column: show pre-early-repayment scheduled amount when snapshot exists. */
+  getDisplayInterestForPeriod(item: any): number {
+    return getDisplayInterestForPeriod(item, this.originalInterestByInstallment);
+  }
+
+  getDisplayTotalInterest(): number {
+    return getDisplayTotalScheduledInterest(
+      this.foreclosureUnearnedInterestDetails,
+      this.repaymentScheduleDetails?.totalInterestCharged ?? 0
+    );
   }
 
   numberOnly(inputFormControl: any, event: any): boolean {

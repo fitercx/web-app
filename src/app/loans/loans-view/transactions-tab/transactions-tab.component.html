@@ -1,4 +1,9 @@
 <div class="container">
+  <mifosx-foreclosure-unearned-interest-banner
+    [details]="foreclosureUnearnedInterestDetails"
+    [currencyCode]="currencyCode"
+  ></mifosx-foreclosure-unearned-interest-banner>
+
   <div fxLayout="row" fxLayoutAlign="end" fxLayoutGap="20px" class="transaction-buttons">
     <mat-checkbox [formControl]="showReversedParam" (change)="showReversed($event.checked)" class="accruals">
       {{ 'labels.inputs.Show Reversed / Replayed' | translate }}</mat-checkbox

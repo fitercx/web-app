@@ -116,4 +116,5 @@ export interface RepaymentSchedulePeriod {
   totalWrittenOffForPeriod?: number;
   totalInstallmentAmountForPeriod?: number;
   status?: string;
+  obligationsMetOnDate?: number[];
 }
