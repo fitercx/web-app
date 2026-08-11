@@ -1,4 +1,6 @@
 import { async, ComponentFixture, TestBed } from '@angular/core/testing';
+import { ActivatedRoute } from '@angular/router';
+import { of } from 'rxjs';
 
 import { AccountDetailsComponent } from './account-details.component';
 
@@ -8,7 +10,25 @@ describe('AccountDetailsComponent', () => {
 
   beforeEach(async(() => {
     TestBed.configureTestingModule({
-      declarations: [AccountDetailsComponent]
+      declarations: [AccountDetailsComponent],
+      providers: [
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            parent: {
+              data: of({
+                loanDetailsData: {
+                  transactionProcessingStrategyName: 'Pro-Rata Penalties, Fees, Interest, Principal order',
+                  additionalProperties: {
+                    dpdPrincipalOnlyActive: true,
+                    effectiveRepaymentStrategyName: 'DPD Principal Only (auto-applied when DPD > threshold)'
+                  }
+                }
+              })
+            }
+          }
+        }
+      ]
     }).compileComponents();
   }));
 
@@ -20,5 +40,9 @@ describe('AccountDetailsComponent', () => {
 
   it('should create', () => {
     expect(component).toBeTruthy();
+  });
+
+  it('shows effective repayment strategy when DPD principal-only is active', () => {
+    expect(component.displayRepaymentStrategyName).toBe('DPD Principal Only (auto-applied when DPD > threshold)');
   });
 });

@@ -16,7 +16,14 @@
 
     <div fxFlexFill>
       <span fxFlex="50%">{{ 'labels.inputs.Repayment Strategy' | translate }}</span>
-      <span fxFlex="50%">{{ loanDetails.transactionProcessingStrategyName | translateKey: 'catalogs' }}</span>
+      <span fxFlex="50%">
+        <ng-container *ngIf="isDpdPrincipalOnlyActive; else productRepaymentStrategy">
+          {{ displayRepaymentStrategyName }}
+        </ng-container>
+        <ng-template #productRepaymentStrategy>
+          {{ loanDetails.transactionProcessingStrategyName | translateKey: 'catalogs' }}
+        </ng-template>
+      </span>
     </div>
 
     <div fxFlexFill>
