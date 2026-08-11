@@ -63,7 +63,7 @@
                     </tr>
                     <tr *ngIf="loanDetailsData.delinquent && loanDetailsData.delinquent.pastDueDays > 0">
                       <td>{{ 'labels.inputs.Past Due Days' | translate }} :</td>
-                      <td>{{ loanDetailsData?.delinquent.pastDueDays | formatNumber }}</td>
+                      <td>{{ loanDetailsData?.delinquent.pastDueDays | number: '1.0-0' }}</td>
                     </tr>
                     <tr
                       *ngIf="
@@ -73,7 +73,7 @@
                       "
                     >
                       <td>{{ 'labels.inputs.Delinquent Days' | translate }} :</td>
-                      <td>{{ loanDetailsData?.delinquent.delinquentDays | formatNumber }}</td>
+                      <td>{{ loanDetailsData?.delinquent.delinquentDays | number: '1.0-0' }}</td>
                     </tr>
                   </tbody>
                 </table>

@@ -63,3 +63,37 @@
     color: #2563eb;
   }
 }
+
+.closure-type-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.75rem;
+  border-left: 4px solid;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+
+  mat-icon {
+    flex-shrink: 0;
+  }
+
+  &--foreclosure {
+    border-left-color: #d97706;
+    background: rgb(217 119 6 / 10%);
+
+    mat-icon {
+      color: #d97706;
+    }
+  }
+
+  &--normal {
+    border-left-color: #16a34a;
+    background: rgb(22 163 74 / 8%);
+
+    mat-icon {
+      color: #16a34a;
+    }
+  }
+}

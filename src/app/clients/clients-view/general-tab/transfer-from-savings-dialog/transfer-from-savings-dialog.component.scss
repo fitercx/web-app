@@ -63,6 +63,35 @@
   }
 }
 
+.lpi-payment-note {
+  border-left-color: #15803d;
+  background: rgb(21 128 61 / 8%);
+
+  mat-icon {
+    color: #15803d;
+  }
+}
+
+.closure-refund-notice {
+  border-left-color: #0f766e;
+  background: rgb(15 118 110 / 10%);
+  font-weight: 600;
+
+  mat-icon {
+    color: #0f766e;
+  }
+}
+
+.overpayment-warning {
+  border-left-color: #dc2626;
+  background: rgb(220 38 38 / 8%);
+  font-weight: 500;
+
+  mat-icon {
+    color: #dc2626;
+  }
+}
+
 .emi-hints {
   display: flex;
   flex-wrap: wrap;

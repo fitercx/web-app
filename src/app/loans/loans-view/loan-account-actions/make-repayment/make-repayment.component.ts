@@ -12,6 +12,7 @@ import { LoansService } from 'app/loans/loans.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 import { Currency } from 'app/shared/models/general.model';
+import { AlertService } from 'app/core/alert/alert.service';
 
 /**
  * Loan Make Repayment Component
@@ -81,7 +82,8 @@ export class MakeRepaymentComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private dateUtils: Dates,
-    private settingsService: SettingsService
+    private settingsService: SettingsService,
+    private alertService: AlertService
   ) {
     this.loanId = this.route.snapshot.params['loanId'];
   }
@@ -179,7 +181,31 @@ export class MakeRepaymentComponent implements OnInit {
     const command = this.dataObject.repaymentTemplate.type.code.split('.')[1];
     data['transactionAmount'] = data['transactionAmount'] * 1;
     this.loanService.submitLoanActionButton(this.loanId, data, command).subscribe((response: any) => {
+      this.notifyBackdatedLpiWaived(response?.changes);
       this.router.navigate(['../../transactions'], { relativeTo: this.route });
+    });
+  }
+
+  /**
+   * When a backdated repayment auto-waives LPI accrued on/after the value date, the backend returns the
+   * summary in `changes`. Surface it so the operator knows the waiver was recorded on the loan (Charges tab
+   * and repayment schedule show the waived rows/amounts after refresh).
+   */
+  private notifyBackdatedLpiWaived(changes: any): void {
+    const chargesWaived = Number(changes?.chargesWaived || 0);
+    if (!chargesWaived) {
+      return;
+    }
+    const currencyLabel = this.currency?.displaySymbol || this.currency?.code || '';
+    const amount = this.roundAmount(Number(changes?.totalAmountWaived || 0));
+    const days = Number(changes?.daysCovered || 0);
+    const dayText = days === 1 ? '1 day' : `${days} days`;
+    this.alertService.alert({
+      type: 'Backdated Settlement',
+      message:
+        `Backdated repayment: ${currencyLabel} ${amount.toFixed(2)} of late-payment interest ` +
+        `(${chargesWaived} charge(s) over ${dayText}) was automatically waived. ` +
+        `See the Charges tab and repayment schedule Waived column for details.`
     });
   }
 

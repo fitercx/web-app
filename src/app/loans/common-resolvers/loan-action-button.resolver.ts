@@ -3,7 +3,8 @@ import { Injectable } from '@angular/core';
 import { Resolve, ActivatedRouteSnapshot } from '@angular/router';
 
 /** rxjs Imports */
-import { forkJoin, Observable } from 'rxjs';
+import { forkJoin, Observable, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 
 /** Custom Services */
 import { LoansService } from '../loans.service';
@@ -74,7 +75,19 @@ export class LoanActionButtonResolver implements Resolve<Object> {
     } else if (loanActionButton === 'Add Loan Charge') {
       return this.loansService.getLoanChargeTemplateResource(loanId);
     } else if (loanActionButton === 'Foreclosure') {
-      return this.loansService.getLoanForeclosureActionTemplate(loanId);
+      return forkJoin([
+        this.loansService.getLoanForeclosureActionTemplate(loanId),
+        this.loansService.getLoanData(loanId).pipe(catchError(() => of(null)))]).pipe(
+        map(
+          ([
+            template,
+            loanData
+          ]) => ({
+            ...template,
+            expectedMaturityDate: loanData?.timeline?.expectedMaturityDate ?? null
+          })
+        )
+      );
     } else if (loanActionButton === 'Charge-Off') {
       return this.loansService.getLoanActionTemplate(loanId, 'charge-off');
     } else {
