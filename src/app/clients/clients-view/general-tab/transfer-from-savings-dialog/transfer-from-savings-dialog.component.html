@@ -18,6 +18,16 @@
     </div>
   </div>
 
+  <div class="date-impact-banner full-outstanding-banner" *ngIf="fullLoanOutstanding > 0">
+    <mat-icon>account_balance</mat-icon>
+    <span>
+      Full loan outstanding (authoritative):
+      <strong>{{ currencySymbol }} {{ fullLoanOutstanding | formatNumber }}</strong>
+      — only an amount at or above this figure will close the loan. The Principal / Interest fields below are the
+      amounts due as of the selected transaction date (not the full loan).
+    </span>
+  </div>
+
   <form [formGroup]="transferForm" (ngSubmit)="submit()">
     <div fxLayout="column">
       <mat-form-field (click)="transactionDatePicker.open()">
@@ -56,12 +66,12 @@
       </div>
 
       <mat-form-field>
-        <mat-label>{{ 'labels.inputs.Principal' | translate }}</mat-label>
+        <mat-label>Principal due as of date</mat-label>
         <input matInput [value]="principalOutstanding | formatNumber" disabled />
       </mat-form-field>
 
       <mat-form-field>
-        <mat-label>{{ 'labels.inputs.Interest' | translate }}</mat-label>
+        <mat-label>Interest due as of date</mat-label>
         <input matInput [value]="interestOutstanding | formatNumber" disabled />
       </mat-form-field>
 
@@ -114,25 +124,31 @@
   </form>
 </mat-dialog-content>
 
-<mat-dialog-actions fxLayout="row" fxLayout.xs="column" fxLayoutAlign="center" fxLayoutGap="5px">
-  <button type="button" mat-raised-button mat-dialog-close>
-    {{ 'labels.buttons.Cancel' | translate }}
-  </button>
-  <button
-    type="button"
-    mat-raised-button
-    color="primary"
-    [disabled]="
-      transferForm.invalid ||
-      isLoading ||
-      isTemplateLoading ||
-      !transferTemplate ||
-      !linkedSavingsAccountId ||
-      backdateBlockedMessage
-    "
-    *mifosxHasPermission="'CREATE_ACCOUNTTRANSFER'"
-    (click)="submit()"
-  >
-    {{ 'labels.buttons.Submit' | translate }}
-  </button>
+<mat-dialog-actions fxLayout="column" fxLayoutAlign="center" fxLayoutGap="5px">
+  <div class="date-impact-banner date-impact-banner--blocked submit-blocked" *ngIf="submitBlockedReason">
+    <mat-icon>info</mat-icon>
+    <span>{{ submitBlockedReason }}</span>
+  </div>
+  <div fxLayout="row" fxLayout.xs="column" fxLayoutAlign="center" fxLayoutGap="5px">
+    <button type="button" mat-raised-button mat-dialog-close>
+      {{ 'labels.buttons.Cancel' | translate }}
+    </button>
+    <button
+      type="button"
+      mat-raised-button
+      color="primary"
+      [disabled]="
+        transferForm.invalid ||
+        isLoading ||
+        isTemplateLoading ||
+        !transferTemplate ||
+        !linkedSavingsAccountId ||
+        backdateBlockedMessage
+      "
+      *mifosxHasPermission="'CREATE_ACCOUNTTRANSFER'"
+      (click)="submit()"
+    >
+      {{ 'labels.buttons.Submit' | translate }}
+    </button>
+  </div>
 </mat-dialog-actions>

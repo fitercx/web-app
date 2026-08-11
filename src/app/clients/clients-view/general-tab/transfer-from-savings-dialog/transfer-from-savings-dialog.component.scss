@@ -72,6 +72,21 @@
   }
 }
 
+.full-outstanding-banner {
+  border-left-color: #4338ca;
+  background: rgb(67 56 202 / 8%);
+
+  mat-icon {
+    color: #4338ca;
+  }
+}
+
+.submit-blocked {
+  width: 100%;
+  margin: 0 0 0.5rem;
+  font-weight: 500;
+}
+
 .closure-refund-notice {
   border-left-color: #0f766e;
   background: rgb(15 118 110 / 10%);

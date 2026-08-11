@@ -33,11 +33,22 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   linkedSavingsAccountAccountNo?: string;
   linkedSavingsAccountProductName?: string;
   linkedSavingsAccountAvailableBalance = 0;
+  /**
+   * Component amounts due as of the selected transaction date (from /template/penalties + schedule).
+   * These are NOT the full loan outstanding — see fullLoanOutstanding.
+   */
   principalOutstanding = 0;
   interestOutstanding = 0;
   feeOutstanding = 0;
   penaltyOutstanding = 0;
   taxOutstanding = 0;
+  /**
+   * Authoritative full loan outstanding from GET /loans/{id}?associations=summary.
+   * Closure messaging and overpayment checks MUST use this — never due-EMI template amounts.
+   * The client general-tab loan row has no `summary` (only loanBalance), which previously caused
+   * false "will close the loan" banners when settling a single due EMI.
+   */
+  fullLoanOutstanding = 0;
   dueEmis: any[] = [];
   transferTemplate: any;
   isLoading = false;
@@ -48,6 +59,8 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   private baselineInterestOutstanding = 0;
   private baselinePenaltyOutstanding = 0;
   private repaymentTemplateData: any;
+  /** Full loan summary loaded from the loan API (not the client accounts list row). */
+  private loanSummary: any;
   /**
    * Clear, user-facing messages describing how the currently selected transaction date affects
    * interest and charges, compared to the amounts due on today's business date. Populated only
@@ -114,7 +127,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         Validators.required
       ],
       note: [
-        '',
+        'Settlement transfer from linked savings',
         [
           Validators.required,
           this.notBlankValidator
@@ -132,7 +145,8 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       repaymentTemplate: this.loanService.getLoanActionTemplate(loanId, 'repayment'),
       penaltyTemplate: this.loanService.getLoanPenaltiesTemplate(loanId, transactionDate),
       foreclosureTemplate: this.loanService.getLoanForeclosureActionTemplate(loanId),
-      loanDetails: this.loanService.getLoanGeneralTabExpandData(loanId)
+      // Client general-tab loan rows have no summary — always load authoritative outstanding here.
+      loanDetails: this.loanService.getLoanAccountResource(loanId, 'summary,repaymentSchedule')
     })
       .pipe(
         switchMap((templates: any) => {
@@ -140,12 +154,10 @@ export class TransferFromSavingsDialogComponent implements OnInit {
           this.currencySymbol = this.currency?.displaySymbol || this.currency?.code || '';
           this.repaymentTemplateData = templates.repaymentTemplate;
           this.captureLinkedSavingsAccount(templates.foreclosureTemplate);
-          // Use loan.summary for principal/interest baselines. The /template/penalties endpoint only returns
-          // penaltyAmountDue; it returns 0 for principalOutstanding/interestOutstanding on overdue loans.
-          // Without this fix the fallback path uses the repayment-schedule's totalOutstandingForPeriod (which
-          // embeds a different penalty value) and the displayed fields don't add up to the transaction amount.
-          this.baselinePrincipalOutstanding = Number(this.data.loan?.summary?.principalOutstanding || 0);
-          this.baselineInterestOutstanding = Number(this.data.loan?.summary?.interestChargesOutstanding || 0);
+          this.applyLoanSummary(templates.loanDetails);
+          // Due-as-of-date baselines from penalty template (installment-level — NOT full loan).
+          this.baselinePrincipalOutstanding = Number(templates.penaltyTemplate?.principalOutstanding || 0);
+          this.baselineInterestOutstanding = Number(templates.penaltyTemplate?.interestOutstanding || 0);
           this.baselinePenaltyOutstanding = Number(templates.penaltyTemplate?.penaltyAmountDue || 0);
           this.applyPenaltyTemplateForDate(templates.penaltyTemplate, 0);
           this.applyEarliestAllowedDate(templates.penaltyTemplate?.earliestAllowedTransactionDate);
@@ -258,17 +270,29 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     this.linkedSavingsAccountAvailableBalance = Number(additional.linkedSavingsAccountAvailableBalance || 0);
   }
 
+  /** Captures full-loan outstanding from the loan API — never from the client accounts list row. */
+  private applyLoanSummary(loanDetails: any): void {
+    this.loanSummary = loanDetails?.summary || null;
+    const fromSummary = Number(this.loanSummary?.totalOutstanding || 0);
+    const fromListBalance = Number(this.data.loan?.loanBalance || 0);
+    this.fullLoanOutstanding = this.roundAmount(fromSummary || fromListBalance || 0);
+    // Keep summary on the dialog loan object so fee/tax helpers can read it.
+    if (this.loanSummary) {
+      this.data.loan.summary = this.loanSummary;
+    }
+  }
+
   private applyPenaltyTemplateForDate(penaltyTemplate: any, additionalPenalty = 0): void {
-    // /template/penalties returns 0 for principal/interest on some future/past date selections;
-    // fall back to the business-date baseline (from loan.summary) so due-date and backdated amounts stay correct.
+    // /template/penalties returns installment-due principal/interest for the selected date — use for
+    // "due as of date" display only. Closure / overpayment must use fullLoanOutstanding.
     this.principalOutstanding = Number(penaltyTemplate?.principalOutstanding || 0) || this.baselinePrincipalOutstanding;
     this.interestOutstanding = Number(penaltyTemplate?.interestOutstanding || 0) || this.baselineInterestOutstanding;
     this.penaltyOutstanding = Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalPenalty;
-    // Use the loan summary's feeChargesOutstanding as the authoritative source; the repayment template's
-    // feeChargesPortion may be 0 for overdue loans, which would cause a mismatch between displayed fields
-    // and the transaction amount.
     this.feeOutstanding = Number(
-      this.data.loan?.summary?.feeChargesOutstanding || this.repaymentTemplateData?.feeChargesPortion || 0
+      this.loanSummary?.feeChargesOutstanding ||
+        this.data.loan?.summary?.feeChargesOutstanding ||
+        this.repaymentTemplateData?.feeChargesPortion ||
+        0
     );
     this.taxOutstanding = Number(this.repaymentTemplateData?.taxChargesPortion || 0);
   }
@@ -284,7 +308,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
    */
   private buildNormalSettlementPreviewMessage(transactionDate: string): string | null {
     const amount = Number(this.transferForm?.get('transactionAmount')?.value || 0);
-    if (this.totalOutstanding <= 0.01) {
+    if (this.fullLoanOutstanding <= 0.01 && this.dueAsOfDateTotal <= 0.01) {
       return null;
     }
     if (!amount || amount <= 0) {
@@ -319,11 +343,31 @@ export class TransferFromSavingsDialogComponent implements OnInit {
 
     if (allocation.unallocated > 0.01) {
       lines.push(this.buildExcessRefundSentence(allocation.unallocated));
-    } else if (this.roundAmount(amount) >= this.effectiveSettlementOutstanding - 0.01) {
-      lines.push(`This payment settles the remaining outstanding and will close the loan (obligations met).`);
+    } else if (this.willCloseLoan(amount)) {
+      lines.push(
+        `This payment covers the full outstanding of ${this.currencySymbol} ${this.formatAmount(this.fullLoanOutstanding)} ` +
+          `and will close the loan (obligations met).`
+      );
+    } else if (this.dueAsOfDateTotal > 0.01 && this.roundAmount(amount) + 0.01 >= this.dueAsOfDateTotal) {
+      const remaining = this.roundAmount(this.fullLoanOutstanding - amount);
+      lines.push(
+        `This payment settles the amount due as of ${transactionDate}. The loan will remain Active with approximately ` +
+          `${this.currencySymbol} ${this.formatAmount(Math.max(remaining, 0))} still outstanding.`
+      );
+    } else if (this.fullLoanOutstanding > 0.01 && this.roundAmount(amount) + 0.01 < this.fullLoanOutstanding) {
+      const remaining = this.roundAmount(this.fullLoanOutstanding - amount);
+      lines.push(
+        `This is a partial payment. The loan will remain Active with approximately ` +
+          `${this.currencySymbol} ${this.formatAmount(Math.max(remaining, 0))} still outstanding after submit.`
+      );
     }
 
     return lines.join(' ');
+  }
+
+  /** True only when entered amount covers the full loan outstanding (authoritative summary). */
+  private willCloseLoan(amount: number): boolean {
+    return this.fullLoanOutstanding > 0.01 && this.roundAmount(amount) + 0.01 >= this.fullLoanOutstanding;
   }
 
   /** Linked savings label used in closure / refund notices. */
@@ -343,14 +387,10 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   }
 
   private buildClosureRefundNotice(amount: number): string | null {
-    const outstanding = this.effectiveSettlementOutstanding;
-    if (outstanding <= 0.01 || !amount || amount <= 0) {
+    if (!this.willCloseLoan(amount)) {
       return null;
     }
-    if (amount + 0.01 < outstanding) {
-      return null;
-    }
-    const excess = this.roundAmount(amount - outstanding);
+    const excess = this.roundAmount(amount - this.fullLoanOutstanding);
     if (excess > 0.01) {
       return (
         `This payment will close the loan. Amount to be refunded to ${this.linkedSavingsLabel()}: ` +
@@ -358,7 +398,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       );
     }
     return (
-      `This payment settles the remaining outstanding of ${this.currencySymbol} ${this.formatAmount(outstanding)} ` +
+      `This payment settles the full outstanding of ${this.currencySymbol} ${this.formatAmount(this.fullLoanOutstanding)} ` +
       `and will close the loan.`
     );
   }
@@ -632,7 +672,12 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     return Math.max(this.roundAmount(due - paid), 0);
   }
 
+  /** Sum of due-as-of-date components (installment-level). Do not use for closure. */
   get totalOutstanding(): number {
+    return this.dueAsOfDateTotal;
+  }
+
+  get dueAsOfDateTotal(): number {
     return this.roundAmount(
       this.principalOutstanding +
         this.interestOutstanding +
@@ -642,8 +687,35 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     );
   }
 
+  /** Full loan outstanding — used for closure / overpayment. */
   get effectiveSettlementOutstanding(): number {
-    return this.totalOutstanding;
+    return this.fullLoanOutstanding > 0.01 ? this.fullLoanOutstanding : this.dueAsOfDateTotal;
+  }
+
+  /** Explains why Submit is disabled so closure banners never look actionable when they are not. */
+  get submitBlockedReason(): string | null {
+    if (this.isTemplateLoading) {
+      return 'Loading settlement details…';
+    }
+    if (!this.linkedSavingsAccountId) {
+      return 'No linked savings account is available for this loan — transfer cannot be submitted.';
+    }
+    if (!this.transferTemplate) {
+      return 'Transfer template is still loading or failed — Submit stays disabled until it is ready.';
+    }
+    if (this.backdateBlockedMessage) {
+      return 'Backdated settlement is not allowed for this loan product — change the transaction date to today.';
+    }
+    if (this.transferForm.get('note')?.invalid) {
+      return 'Enter a Note before submitting.';
+    }
+    if (this.transferForm.get('transactionAmount')?.invalid || this.transferForm.get('transactionDate')?.invalid) {
+      return 'Correct the highlighted fields before submitting.';
+    }
+    if (this.transferForm.invalid) {
+      return 'Complete all required fields before submitting.';
+    }
+    return null;
   }
 
   get amountErrorMessage(): string {
@@ -683,19 +755,19 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       currentErrors.availableBalanceExceeded = true;
       this.overpaymentWarning = null;
       this.closureRefundNotice = null;
-    } else if (this.effectiveSettlementOutstanding > 0 && amount > this.effectiveSettlementOutstanding) {
-      const excess = this.roundAmount(amount - this.effectiveSettlementOutstanding);
+    } else if (this.fullLoanOutstanding > 0 && amount > this.fullLoanOutstanding) {
+      const excess = this.roundAmount(amount - this.fullLoanOutstanding);
       const waiveAmount = this.roundAmount(this.baselinePenaltyOutstanding - this.penaltyOutstanding);
       let msg =
-        `The entered amount (${this.currencySymbol} ${this.formatAmount(amount)}) exceeds total outstanding ` +
-        `(${this.currencySymbol} ${this.formatAmount(this.totalOutstanding)}) by ` +
+        `The entered amount (${this.currencySymbol} ${this.formatAmount(amount)}) exceeds the full loan outstanding ` +
+        `(${this.currencySymbol} ${this.formatAmount(this.fullLoanOutstanding)}) by ` +
         `${this.currencySymbol} ${this.formatAmount(excess)}. ` +
         `If submitted, the loan will close. ${this.buildExcessRefundSentence(excess)}`;
       if (waiveAmount > 0.01) {
         msg +=
           ` Note: ${this.currencySymbol} ${this.formatAmount(waiveAmount)} of late-payment interest will be ` +
-          `waived by this backdated settlement — the recommended amount is ` +
-          `${this.currencySymbol} ${this.formatAmount(this.totalOutstanding)}.`;
+          `waived by this backdated settlement — the recommended full-settlement amount is ` +
+          `${this.currencySymbol} ${this.formatAmount(this.fullLoanOutstanding)}.`;
       }
       this.overpaymentWarning = msg;
       this.closureRefundNotice = this.buildClosureRefundNotice(amount);
