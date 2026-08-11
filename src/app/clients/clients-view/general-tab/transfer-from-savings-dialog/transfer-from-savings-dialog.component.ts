@@ -18,10 +18,11 @@ import { AlertService } from 'app/core/alert/alert.service';
 export class TransferFromSavingsDialogComponent implements OnInit {
   transferForm: UntypedFormGroup;
   /**
-   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS (30) before the business date, or the
+   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS (45) before the business date, or the
    * loan's disbursement date if that is later (see BackdatedRepaymentValidator#computeEarliestAllowedTransactionDate
    * on the server). Replaced with the real value once the initial template loads (see loadInitialTemplate), so the
    * calendar never lets an operator pick a date the server would reject.
+   * Maximum is always the business date — backend rejects future transaction dates.
    */
   minDate = new Date(2000, 0, 1);
   maxDate: Date;
@@ -100,9 +101,8 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    const businessDate = this.settingsService.businessDate;
-    this.maxDate = new Date(businessDate);
-    this.maxDate.setFullYear(this.maxDate.getFullYear() + 1);
+    // Backend rejects future transfer dates ("Transaction date cannot be in the future") — clamp calendar to today.
+    this.maxDate = new Date(this.settingsService.businessDate);
     this.createForm();
     this.loadInitialTemplate();
     this.transferForm.get('transactionDate')?.valueChanges.subscribe((value: Date) => {
@@ -254,9 +254,9 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     this.minDate = parsed;
     const formatted = this.formatDate(parsed);
     this.backdateLimitMessage =
-      `This settlement can be backdated no earlier than ${formatted} (30 days before today, or this loan's ` +
+      `This settlement can be backdated no earlier than ${formatted} (45 days before today, or this loan's ` +
       `disbursement date if later) — this protects the repayment schedule and balances from being distorted by ` +
-      `very old backdated entries.`;
+      `very old backdated entries. Future dates are not allowed.`;
   }
 
   private captureLinkedSavingsAccount(source: any): void {

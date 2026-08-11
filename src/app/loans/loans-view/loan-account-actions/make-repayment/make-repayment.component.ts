@@ -31,14 +31,12 @@ export class MakeRepaymentComponent implements OnInit {
   /** Show payment details */
   showPaymentDetails = false;
   /**
-   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS (30) before the business date, or the
+   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS (45) before the business date, or the
    * loan's disbursement date if that is later (see BackdatedRepaymentValidator#computeEarliestAllowedTransactionDate
-   * on the server). Defaults to 30 days back until the resolver-loaded penalty template's
-   * `earliestAllowedTransactionDate` is applied in ngOnInit, so the calendar never lets an operator pick a date the
-   * server will reject anyway.
+   * on the server). Applied from the resolver-loaded penalty template's `earliestAllowedTransactionDate` in ngOnInit.
+   * Maximum is always the business date — backend rejects future repayment dates.
    */
   minDate = new Date(2000, 0, 1);
-  /** Maximum Date allowed — extended 1 year ahead to allow future repayment date selection. */
   maxDate = new Date();
   /** Clear, on-screen explanation of why minDate is where it is — shown next to the transaction date field. */
   backdateLimitMessage = '';
@@ -93,9 +91,8 @@ export class MakeRepaymentComponent implements OnInit {
    * and initialize with the required values
    */
   ngOnInit() {
-    const businessDate = this.settingsService.businessDate;
-    this.maxDate = new Date(businessDate);
-    this.maxDate.setFullYear(this.maxDate.getFullYear() + 1);
+    // Backend rejects future repayment dates — clamp calendar to business date (no +1 year).
+    this.maxDate = new Date(this.settingsService.businessDate);
     this.createRepaymentLoanForm();
     this.setRepaymentLoanDetails();
     if (this.dataObject.repaymentTemplate.currency) {
@@ -269,9 +266,9 @@ export class MakeRepaymentComponent implements OnInit {
     this.minDate = parsed;
     const formatted = this.dateUtils.formatDate(parsed, this.settingsService.dateFormat);
     this.backdateLimitMessage =
-      `This repayment can be backdated no earlier than ${formatted} (30 days before today, or this loan's ` +
+      `This repayment can be backdated no earlier than ${formatted} (45 days before today, or this loan's ` +
       `disbursement date if later) — this protects the repayment schedule and balances from being distorted by ` +
-      `very old backdated entries.`;
+      `very old backdated entries. Future dates are not allowed.`;
   }
 
   /**
