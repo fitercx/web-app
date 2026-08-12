@@ -95,6 +95,10 @@ export class LoansService {
     return this.http.get(`/loans/${loanId}`, { params: httpParams });
   }
 
+  getLoanData(loanId: string): Observable<any> {
+    return this.http.get(`/loans/${loanId}`);
+  }
+
   /**
    * Retrieves accrual report for a loan (same data as "Generate Loan Monthly Accrual Summations" job).
    */

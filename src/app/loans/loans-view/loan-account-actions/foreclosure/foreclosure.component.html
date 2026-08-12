@@ -43,6 +43,22 @@
             <span>{{ dateErrorMessage }}</span>
           </div>
 
+          <div
+            class="closure-type-banner closure-type-banner--foreclosure"
+            *ngIf="!dateErrorMessage && closureTypeInfo?.type === 'foreclosure'"
+          >
+            <mat-icon>schedule</mat-icon>
+            <span>{{ closureTypeInfo.message }}</span>
+          </div>
+
+          <div
+            class="closure-type-banner closure-type-banner--normal"
+            *ngIf="!dateErrorMessage && closureTypeInfo?.type === 'normal_closure'"
+          >
+            <mat-icon>check_circle</mat-icon>
+            <span>{{ closureTypeInfo.message }}</span>
+          </div>
+
           <div class="date-impact-banner backdate-limit-note" *ngIf="!dateErrorMessage && backdateLimitMessage">
             <mat-icon>event_busy</mat-icon>
             <span>{{ backdateLimitMessage }}</span>

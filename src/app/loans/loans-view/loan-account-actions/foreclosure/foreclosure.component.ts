@@ -18,7 +18,7 @@ export class ForeclosureComponent implements OnInit {
   loanId: any;
   foreclosureForm: UntypedFormGroup;
   /**
-   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS (30) before the business date, or the
+   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS (45) before the business date, or the
    * loan's disbursement date if that is later (see BackdatedRepaymentValidator#computeEarliestAllowedTransactionDate
    * on the server). Replaced with the real value once the foreclosure template loads (see captureLinkedAccount), so
    * the calendar never lets an operator pick a date the server would reject. Note: this is separate from (and
@@ -50,6 +50,10 @@ export class ForeclosureComponent implements OnInit {
    * interest and charges, compared to the amounts due if foreclosed today.
    */
   dateImpactMessages: string[] = [];
+  /** Loan's scheduled maturity date — injected by the resolver alongside the foreclosure template. */
+  maturityDate: Date | null = null;
+  /** Whether the selected date constitutes a true early foreclosure or a normal on-due-date closure. */
+  closureTypeInfo: { type: 'foreclosure' | 'normal_closure'; message: string } | null = null;
 
   /**
    * @param {FormBuilder} formBuilder Form Builder.
@@ -80,6 +84,22 @@ export class ForeclosureComponent implements OnInit {
       this.currencySymbol || this.dataObject.currency?.displaySymbol || this.dataObject.currency?.code;
     this.baselineInterestPortion = Number(this.dataObject.interestPortion || 0);
     this.baselinePenaltyChargesPortion = Number(this.dataObject.penaltyChargesPortion || 0);
+    this.maturityDate = this.parseDateField(this.dataObject.expectedMaturityDate);
+    // Show the closure-type banner immediately on open for the default (business-date) selection, not only
+    // after the operator changes the date. valueChanges does not fire for the form's initial value.
+    this.updateClosureTypeInfo();
+  }
+
+  /** Parses a Fineract date value — either a [year, month, day] array or an ISO string. */
+  private parseDateField(raw: any): Date | null {
+    if (!raw) {
+      return null;
+    }
+    if (Array.isArray(raw) && raw.length >= 3) {
+      return new Date(raw[0], raw[1] - 1, raw[2]);
+    }
+    const parsed = this.dateUtils.parseDate(raw);
+    return parsed || null;
   }
 
   createforeclosureForm() {
@@ -153,6 +173,7 @@ export class ForeclosureComponent implements OnInit {
   /**
    * Builds clear, plain-language messages explaining how the selected transaction date changes the
    * interest and penalty/LPI amounts due, compared to what would be due if foreclosed on today's business date.
+   * Also updates closureTypeInfo to indicate whether this is an early foreclosure or a normal closure.
    */
   private buildDateImpactMessages(transactionDate: string): string[] {
     const messages: string[] = [];
@@ -160,6 +181,9 @@ export class ForeclosureComponent implements OnInit {
     const currencyLabel = this.currencySymbol || '';
     const interestPortion = Number(this.foreclosuredata?.interestPortion || 0);
     const penaltyPortion = Number(this.foreclosuredata?.penaltyChargesPortion || 0);
+
+    // Determine closure type by comparing the selected date against the loan's maturity date.
+    this.updateClosureTypeInfo();
 
     const interestDelta = round(this.baselineInterestPortion - interestPortion);
     if (interestDelta > 0.01) {
@@ -183,6 +207,47 @@ export class ForeclosureComponent implements OnInit {
     }
 
     return messages;
+  }
+
+  /**
+   * Sets closureTypeInfo based on whether the selected transaction date is before (foreclosure)
+   * or on/after (normal closure) the loan's scheduled maturity date.
+   */
+  private updateClosureTypeInfo(): void {
+    if (!this.maturityDate) {
+      this.closureTypeInfo = null;
+      return;
+    }
+    const selectedVal = this.foreclosureForm.get('transactionDate').value;
+    if (!selectedVal) {
+      this.closureTypeInfo = null;
+      return;
+    }
+    const selected = selectedVal instanceof Date ? selectedVal : new Date(selectedVal);
+    // Strip time-of-day for a pure date comparison.
+    const selectedDay = new Date(selected.getFullYear(), selected.getMonth(), selected.getDate());
+    const maturityDay = new Date(
+      this.maturityDate.getFullYear(),
+      this.maturityDate.getMonth(),
+      this.maturityDate.getDate()
+    );
+    const maturityFormatted = this.dateUtils.formatDate(this.maturityDate, this.settingsService.dateFormat);
+
+    if (selectedDay < maturityDay) {
+      this.closureTypeInfo = {
+        type: 'foreclosure',
+        message:
+          `Early Foreclosure — This loan is being closed before its scheduled due date (${maturityFormatted}). ` +
+          `An early-repayment interest discount applies; the amount shown above reflects only interest earned through the selected date.`
+      };
+    } else {
+      this.closureTypeInfo = {
+        type: 'normal_closure',
+        message:
+          `Normal Closure — The selected date is on or after the loan's scheduled due date (${maturityFormatted}). ` +
+          `This is a regular settlement, not an early foreclosure — no early-repayment discount applies.`
+      };
+    }
   }
 
   /** Extract linked savings account details (if present) from a foreclosure template source object. */
@@ -218,9 +283,9 @@ export class ForeclosureComponent implements OnInit {
     this.minDate = parsed;
     const formatted = this.dateUtils.formatDate(parsed, this.settingsService.dateFormat);
     this.backdateLimitMessage =
-      `This foreclosure can be backdated no earlier than ${formatted} (30 days before today, or this loan's ` +
+      `This foreclosure can be backdated no earlier than ${formatted} (45 days before today, or this loan's ` +
       `disbursement date if later, and never before the loan's last recorded transaction) — this protects the ` +
-      `repayment schedule and balances from being distorted by very old backdated entries.`;
+      `repayment schedule and balances from being distorted by very old backdated entries. Future dates are not allowed.`;
   }
 
   submit() {

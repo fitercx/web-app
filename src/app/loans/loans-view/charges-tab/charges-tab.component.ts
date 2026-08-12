@@ -51,6 +51,7 @@ export class ChargesTabComponent implements OnInit {
     'paid',
     'waived',
     'outstanding',
+    'status',
     'actions'
   ];
   private readonly readOnlyColumns: string[] = [
@@ -104,16 +105,20 @@ export class ChargesTabComponent implements OnInit {
     this.isReadOnlyView = !!this.loanDetails?.status?.closed;
     this.displayedColumns = this.isReadOnlyView ? [...this.readOnlyColumns] : [...this.editableColumns];
 
-    const charges = this.loanDetails.charges;
-    if (charges?.length) {
-      this.initializeCharges(charges);
-    } else if (this.isReadOnlyView) {
-      this.loansService.getLoanAccountCharges(this.loanDetails.id).subscribe((data: any) => {
-        this.initializeCharges(Array.isArray(data) ? data : []);
-      });
-    } else {
-      this.initializeCharges([]);
-    }
+    this.loadCharges();
+  }
+
+  /** Loads all charges (including paid/waived history) from the dedicated charges API. */
+  private loadCharges(): void {
+    this.loansService.getLoanAccountCharges(this.loanDetails.id).subscribe({
+      next: (data: any) => {
+        const charges = Array.isArray(data) ? data : this.loanDetails.charges || [];
+        this.initializeCharges(charges);
+      },
+      error: () => {
+        this.initializeCharges(this.loanDetails.charges || []);
+      }
+    });
   }
 
   private initializeCharges(charges: any[]) {

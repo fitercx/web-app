@@ -18,10 +18,11 @@ import { AlertService } from 'app/core/alert/alert.service';
 export class TransferFromSavingsDialogComponent implements OnInit {
   transferForm: UntypedFormGroup;
   /**
-   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS (30) before the business date, or the
+   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS (45) before the business date, or the
    * loan's disbursement date if that is later (see BackdatedRepaymentValidator#computeEarliestAllowedTransactionDate
    * on the server). Replaced with the real value once the initial template loads (see loadInitialTemplate), so the
    * calendar never lets an operator pick a date the server would reject.
+   * Maximum is always the business date — backend rejects future transaction dates.
    */
   minDate = new Date(2000, 0, 1);
   maxDate: Date;
@@ -33,31 +34,60 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   linkedSavingsAccountAccountNo?: string;
   linkedSavingsAccountProductName?: string;
   linkedSavingsAccountAvailableBalance = 0;
+  /**
+   * Component amounts due as of the selected transaction date (from /template/penalties + schedule).
+   * These are NOT the full loan outstanding — see fullLoanOutstanding.
+   */
   principalOutstanding = 0;
   interestOutstanding = 0;
   feeOutstanding = 0;
   penaltyOutstanding = 0;
   taxOutstanding = 0;
+  /**
+   * Authoritative full loan outstanding from GET /loans/{id}?associations=summary.
+   * Closure messaging and overpayment checks MUST use this — never due-EMI template amounts.
+   * The client general-tab loan row has no `summary` (only loanBalance), which previously caused
+   * false "will close the loan" banners when settling a single due EMI.
+   */
+  fullLoanOutstanding = 0;
   dueEmis: any[] = [];
   transferTemplate: any;
   isLoading = false;
   isTemplateLoading = false;
 
-  /** Baseline interest/penalty due (business date), captured once the initial template loads. */
+  /** Baseline amounts from the initial penalties template (business date) for date-change deltas. */
+  private baselinePrincipalOutstanding = 0;
   private baselineInterestOutstanding = 0;
   private baselinePenaltyOutstanding = 0;
+  private repaymentTemplateData: any;
+  /** Full loan summary loaded from the loan API (not the client accounts list row). */
+  private loanSummary: any;
   /**
    * Clear, user-facing messages describing how the currently selected transaction date affects
    * interest and charges, compared to the amounts due on today's business date. Populated only
    * after the operator actually changes the date.
    */
   dateImpactMessages: string[] = [];
+  /** Shown when pending LPI is due on the selected date and will be paid with this settlement. */
+  lpiPaymentMessage: string | null = null;
   /**
    * Set when the selected (backdated) transaction date is not allowed for this loan's product
    * configuration - mirrors the server-side validateBackdatedRepaymentAllowed guard so the operator
    * is told proactively, before submitting, rather than only after a rejected API call.
    */
   backdateBlockedMessage: string | null = null;
+  /**
+   * Warning shown when the entered amount would leave the loan in an overpaid state (amount >
+   * total outstanding). This is a WARNING, not an error — the operator can still submit if they
+   * explicitly want to overpay, but must see clearly what will happen (loan closes and excess is
+   * auto-refunded to the linked savings account).
+   */
+  overpaymentWarning: string | null = null;
+  /**
+   * Visible notice when the entered amount fully settles (or overpays) the loan — the last payment
+   * that drives loan closure. Always includes the refundable excess amount when amount > outstanding.
+   */
+  closureRefundNotice: string | null = null;
 
   constructor(
     private formBuilder: UntypedFormBuilder,
@@ -71,9 +101,8 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    const businessDate = this.settingsService.businessDate;
-    this.maxDate = new Date(businessDate);
-    this.maxDate.setFullYear(this.maxDate.getFullYear() + 1);
+    // Backend rejects future transfer dates ("Transaction date cannot be in the future") — clamp calendar to today.
+    this.maxDate = new Date(this.settingsService.businessDate);
     this.createForm();
     this.loadInitialTemplate();
     this.transferForm.get('transactionDate')?.valueChanges.subscribe((value: Date) => {
@@ -81,7 +110,10 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         this.recomputeForTransactionDate(value);
       }
     });
-    this.transferForm.get('transactionAmount')?.valueChanges.subscribe(() => this.validateTransactionAmount());
+    this.transferForm.get('transactionAmount')?.valueChanges.subscribe(() => {
+      this.validateTransactionAmount();
+      this.updateLpiPaymentMessage(this.formatDate(this.transferForm.value.transactionDate));
+    });
   }
 
   private createForm(): void {
@@ -95,7 +127,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         Validators.required
       ],
       note: [
-        '',
+        'Settlement transfer from linked savings',
         [
           Validators.required,
           this.notBlankValidator
@@ -113,21 +145,31 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       repaymentTemplate: this.loanService.getLoanActionTemplate(loanId, 'repayment'),
       penaltyTemplate: this.loanService.getLoanPenaltiesTemplate(loanId, transactionDate),
       foreclosureTemplate: this.loanService.getLoanForeclosureActionTemplate(loanId),
-      loanDetails: this.loanService.getLoanGeneralTabExpandData(loanId)
+      // Client general-tab loan rows have no summary — always load authoritative outstanding here.
+      loanDetails: this.loanService.getLoanAccountResource(loanId, 'summary,repaymentSchedule')
     })
       .pipe(
         switchMap((templates: any) => {
           this.currency = templates.repaymentTemplate?.currency || templates.foreclosureTemplate?.currency;
           this.currencySymbol = this.currency?.displaySymbol || this.currency?.code || '';
+          this.repaymentTemplateData = templates.repaymentTemplate;
           this.captureLinkedSavingsAccount(templates.foreclosureTemplate);
-          this.applyOutstandingTemplate(templates.penaltyTemplate, templates.repaymentTemplate);
+          this.applyLoanSummary(templates.loanDetails);
+          // Due-as-of-date baselines from penalty template (installment-level — NOT full loan).
+          this.baselinePrincipalOutstanding = Number(templates.penaltyTemplate?.principalOutstanding || 0);
+          this.baselineInterestOutstanding = Number(templates.penaltyTemplate?.interestOutstanding || 0);
+          this.baselinePenaltyOutstanding = Number(templates.penaltyTemplate?.penaltyAmountDue || 0);
+          this.applyPenaltyTemplateForDate(templates.penaltyTemplate, 0);
           this.applyEarliestAllowedDate(templates.penaltyTemplate?.earliestAllowedTransactionDate);
-          this.baselineInterestOutstanding = this.interestOutstanding;
-          this.baselinePenaltyOutstanding = this.penaltyOutstanding;
           this.data.loan.repaymentSchedule =
             templates.loanDetails?.repaymentSchedule || this.data.loan.repaymentSchedule;
           this.dueEmis = this.getDueEmisForDate(this.transferForm.value.transactionDate);
+          this.dateImpactMessages = this.buildDateImpactMessages(
+            this.formatDate(this.transferForm.value.transactionDate)
+          );
           this.patchDefaultTransactionAmount();
+          this.updateLpiPaymentMessage(this.formatDate(this.transferForm.value.transactionDate));
+          this.validateTransactionAmount(true);
 
           if (!this.linkedSavingsAccountId) {
             return of(null);
@@ -142,11 +184,11 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         next: (transferTemplate: any) => {
           this.transferTemplate = transferTemplate;
           this.isTemplateLoading = false;
-          this.validateTransactionAmount();
+          this.validateTransactionAmount(true);
         },
         error: () => {
           this.isTemplateLoading = false;
-          this.validateTransactionAmount();
+          this.validateTransactionAmount(true);
         }
       });
   }
@@ -181,16 +223,17 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       )
       .subscribe({
         next: ({ penaltyTemplate, futureLpi }: any) => {
-          this.applyOutstandingTemplate(penaltyTemplate, null, Number(futureLpi?.totalLPIAmount || 0));
+          this.applyPenaltyTemplateForDate(penaltyTemplate, Number(futureLpi?.totalLPIAmount || 0));
           this.dateImpactMessages = this.buildDateImpactMessages(transactionDate);
           this.dueEmis = this.getDueEmisForDate(transactionDateValue);
           this.patchDefaultTransactionAmount();
+          this.updateLpiPaymentMessage(transactionDate);
           this.isTemplateLoading = false;
-          this.validateTransactionAmount();
+          this.validateTransactionAmount(true);
         },
         error: () => {
           this.isTemplateLoading = false;
-          this.validateTransactionAmount();
+          this.validateTransactionAmount(true);
         }
       });
   }
@@ -211,9 +254,9 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     this.minDate = parsed;
     const formatted = this.formatDate(parsed);
     this.backdateLimitMessage =
-      `This settlement can be backdated no earlier than ${formatted} (30 days before today, or this loan's ` +
+      `This settlement can be backdated no earlier than ${formatted} (45 days before today, or this loan's ` +
       `disbursement date if later) — this protects the repayment schedule and balances from being distorted by ` +
-      `very old backdated entries.`;
+      `very old backdated entries. Future dates are not allowed.`;
   }
 
   private captureLinkedSavingsAccount(source: any): void {
@@ -227,12 +270,307 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     this.linkedSavingsAccountAvailableBalance = Number(additional.linkedSavingsAccountAvailableBalance || 0);
   }
 
-  private applyOutstandingTemplate(penaltyTemplate: any, repaymentTemplate?: any, additionalPenalty = 0): void {
-    this.principalOutstanding = Number(penaltyTemplate?.principalOutstanding || 0);
-    this.interestOutstanding = Number(penaltyTemplate?.interestOutstanding || 0);
-    this.feeOutstanding = Number(repaymentTemplate?.feeChargesPortion ?? this.feeOutstanding ?? 0);
+  /** Captures full-loan outstanding from the loan API — never from the client accounts list row. */
+  private applyLoanSummary(loanDetails: any): void {
+    this.loanSummary = loanDetails?.summary || null;
+    const fromSummary = Number(this.loanSummary?.totalOutstanding || 0);
+    const fromListBalance = Number(this.data.loan?.loanBalance || 0);
+    this.fullLoanOutstanding = this.roundAmount(fromSummary || fromListBalance || 0);
+    // Keep summary on the dialog loan object so fee/tax helpers can read it.
+    if (this.loanSummary) {
+      this.data.loan.summary = this.loanSummary;
+    }
+  }
+
+  private applyPenaltyTemplateForDate(penaltyTemplate: any, additionalPenalty = 0): void {
+    // /template/penalties returns installment-due principal/interest for the selected date — use for
+    // "due as of date" display only. Closure / overpayment must use fullLoanOutstanding.
+    this.principalOutstanding = Number(penaltyTemplate?.principalOutstanding || 0) || this.baselinePrincipalOutstanding;
+    this.interestOutstanding = Number(penaltyTemplate?.interestOutstanding || 0) || this.baselineInterestOutstanding;
     this.penaltyOutstanding = Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalPenalty;
-    this.taxOutstanding = Number(repaymentTemplate?.taxChargesPortion ?? this.taxOutstanding ?? 0);
+    this.feeOutstanding = Number(
+      this.loanSummary?.feeChargesOutstanding ||
+        this.data.loan?.summary?.feeChargesOutstanding ||
+        this.repaymentTemplateData?.feeChargesPortion ||
+        0
+    );
+    this.taxOutstanding = Number(this.repaymentTemplateData?.taxChargesPortion || 0);
+  }
+
+  private updateLpiPaymentMessage(transactionDate: string): void {
+    this.lpiPaymentMessage = this.buildNormalSettlementPreviewMessage(transactionDate);
+  }
+
+  /**
+   * Estimates how the entered amount will be split across penalty, fees, tax, interest, and principal
+   * using the same per-installment waterfall as Fineract-style / pro-rata strategies:
+   * penalty → fee → tax → interest → principal (oldest due installment first).
+   */
+  private buildNormalSettlementPreviewMessage(transactionDate: string): string | null {
+    const amount = Number(this.transferForm?.get('transactionAmount')?.value || 0);
+    if (this.fullLoanOutstanding <= 0.01 && this.dueAsOfDateTotal <= 0.01) {
+      return null;
+    }
+    if (!amount || amount <= 0) {
+      return 'Enter an amount to see how it will be applied to late payment interest, fees, interest, and principal before submitting.';
+    }
+
+    const allocation = this.simulateSettlementAllocation(amount, this.transferForm.value.transactionDate);
+    const parts: string[] = [];
+
+    if (allocation.penalty > 0.01) {
+      parts.push(`${this.currencySymbol} ${this.formatAmount(allocation.penalty)} to late payment interest (LPI)`);
+    }
+    if (allocation.fee > 0.01) {
+      parts.push(`${this.currencySymbol} ${this.formatAmount(allocation.fee)} to fees`);
+    }
+    if (allocation.tax > 0.01) {
+      parts.push(`${this.currencySymbol} ${this.formatAmount(allocation.tax)} to tax`);
+    }
+    if (allocation.interest > 0.01) {
+      parts.push(`${this.currencySymbol} ${this.formatAmount(allocation.interest)} to interest`);
+    }
+    if (allocation.principal > 0.01) {
+      parts.push(`${this.currencySymbol} ${this.formatAmount(allocation.principal)} to principal`);
+    }
+
+    const lines = [
+      `Of the entered amount (${this.currencySymbol} ${this.formatAmount(amount)}), ` +
+        (parts.length
+          ? `${parts.join(', ')} will be applied with this settlement (as at ${transactionDate}).`
+          : `no outstanding balance remains to allocate (as at ${transactionDate}).`)
+    ];
+
+    if (allocation.unallocated > 0.01) {
+      lines.push(this.buildExcessRefundSentence(allocation.unallocated));
+    } else if (this.willCloseLoan(amount)) {
+      lines.push(
+        `This payment covers the full outstanding of ${this.currencySymbol} ${this.formatAmount(this.fullLoanOutstanding)} ` +
+          `and will close the loan (obligations met).`
+      );
+    } else if (this.dueAsOfDateTotal > 0.01 && this.roundAmount(amount) + 0.01 >= this.dueAsOfDateTotal) {
+      const remaining = this.roundAmount(this.fullLoanOutstanding - amount);
+      lines.push(
+        `This payment settles the amount due as of ${transactionDate}. The loan will remain Active with approximately ` +
+          `${this.currencySymbol} ${this.formatAmount(Math.max(remaining, 0))} still outstanding.`
+      );
+    } else if (this.fullLoanOutstanding > 0.01 && this.roundAmount(amount) + 0.01 < this.fullLoanOutstanding) {
+      const remaining = this.roundAmount(this.fullLoanOutstanding - amount);
+      lines.push(
+        `This is a partial payment. The loan will remain Active with approximately ` +
+          `${this.currencySymbol} ${this.formatAmount(Math.max(remaining, 0))} still outstanding after submit.`
+      );
+    }
+
+    return lines.join(' ');
+  }
+
+  /** True only when entered amount covers the full loan outstanding (authoritative summary). */
+  private willCloseLoan(amount: number): boolean {
+    return this.fullLoanOutstanding > 0.01 && this.roundAmount(amount) + 0.01 >= this.fullLoanOutstanding;
+  }
+
+  /** Linked savings label used in closure / refund notices. */
+  private linkedSavingsLabel(): string {
+    if (this.linkedSavingsAccountAccountNo) {
+      const product = this.linkedSavingsAccountProductName ? ` (${this.linkedSavingsAccountProductName})` : '';
+      return `linked savings account ${this.linkedSavingsAccountAccountNo}${product}`;
+    }
+    return 'the linked savings account';
+  }
+
+  private buildExcessRefundSentence(excess: number): string {
+    return (
+      `Excess of ${this.currencySymbol} ${this.formatAmount(excess)} will be auto-refunded to ` +
+      `${this.linkedSavingsLabel()} when the loan is closed.`
+    );
+  }
+
+  private buildClosureRefundNotice(amount: number): string | null {
+    if (!this.willCloseLoan(amount)) {
+      return null;
+    }
+    const excess = this.roundAmount(amount - this.fullLoanOutstanding);
+    if (excess > 0.01) {
+      return (
+        `This payment will close the loan. Amount to be refunded to ${this.linkedSavingsLabel()}: ` +
+        `${this.currencySymbol} ${this.formatAmount(excess)}.`
+      );
+    }
+    return (
+      `This payment settles the full outstanding of ${this.currencySymbol} ${this.formatAmount(this.fullLoanOutstanding)} ` +
+      `and will close the loan.`
+    );
+  }
+
+  private simulateSettlementAllocation(
+    amount: number,
+    transactionDateValue: Date
+  ): { penalty: number; fee: number; tax: number; interest: number; principal: number; unallocated: number } {
+    const allocation = { penalty: 0, fee: 0, tax: 0, interest: 0, principal: 0, unallocated: 0 };
+    let remaining = this.roundAmount(amount);
+    if (remaining <= 0) {
+      return allocation;
+    }
+
+    const buckets = this.getOutstandingInstallmentBuckets(transactionDateValue);
+    const schedulePenalty = buckets.reduce((sum, bucket) => sum + bucket.penalty, 0);
+    const scheduleFees = buckets.reduce((sum, bucket) => sum + bucket.fee, 0);
+    const scheduleTax = buckets.reduce((sum, bucket) => sum + bucket.tax, 0);
+    const scheduleInterest = buckets.reduce((sum, bucket) => sum + bucket.interest, 0);
+    const schedulePrincipal = buckets.reduce((sum, bucket) => sum + bucket.principal, 0);
+
+    const loanLevelPenalty = Math.max(this.roundAmount(this.penaltyOutstanding - schedulePenalty), 0);
+    const loanLevelFee = Math.max(this.roundAmount(this.feeOutstanding - scheduleFees), 0);
+    const loanLevelTax = Math.max(this.roundAmount(this.taxOutstanding - scheduleTax), 0);
+    const loanLevelInterest = Math.max(this.roundAmount(this.interestOutstanding - scheduleInterest), 0);
+    const loanLevelPrincipal = Math.max(this.roundAmount(this.principalOutstanding - schedulePrincipal), 0);
+
+    if (buckets.length === 0) {
+      remaining = this.applyWaterfallToTotals(remaining, allocation, {
+        penalty: this.penaltyOutstanding,
+        fee: this.feeOutstanding,
+        tax: this.taxOutstanding,
+        interest: this.interestOutstanding,
+        principal: this.principalOutstanding
+      });
+      allocation.unallocated = remaining;
+      return allocation;
+    }
+
+    if (loanLevelPenalty > 0) {
+      remaining = this.applyComponentPortion(remaining, loanLevelPenalty, allocation, 'penalty');
+    }
+
+    for (const bucket of buckets) {
+      if (remaining <= 0) {
+        break;
+      }
+      remaining = this.applyComponentPortion(remaining, bucket.penalty, allocation, 'penalty');
+      remaining = this.applyComponentPortion(remaining, bucket.fee, allocation, 'fee');
+      remaining = this.applyComponentPortion(remaining, bucket.tax, allocation, 'tax');
+      remaining = this.applyComponentPortion(remaining, bucket.interest, allocation, 'interest');
+      remaining = this.applyComponentPortion(remaining, bucket.principal, allocation, 'principal');
+    }
+
+    if (loanLevelFee > 0) {
+      remaining = this.applyComponentPortion(remaining, loanLevelFee, allocation, 'fee');
+    }
+    if (loanLevelTax > 0) {
+      remaining = this.applyComponentPortion(remaining, loanLevelTax, allocation, 'tax');
+    }
+    if (loanLevelInterest > 0) {
+      remaining = this.applyComponentPortion(remaining, loanLevelInterest, allocation, 'interest');
+    }
+    if (loanLevelPrincipal > 0) {
+      remaining = this.applyComponentPortion(remaining, loanLevelPrincipal, allocation, 'principal');
+    }
+
+    allocation.unallocated = remaining;
+    return allocation;
+  }
+
+  private getOutstandingInstallmentBuckets(
+    transactionDateValue: Date
+  ): Array<{ period: number; penalty: number; fee: number; tax: number; interest: number; principal: number }> {
+    const periods = this.data.loan?.repaymentSchedule?.periods;
+    if (!Array.isArray(periods)) {
+      return [];
+    }
+
+    const selected = this.toComparableDate(transactionDateValue);
+    if (!selected) {
+      return [];
+    }
+
+    return periods
+      .filter((period: any) => this.isRealOutstandingInstallment(period))
+      .filter((period: any) => {
+        const dueDate = this.toComparableDate(period.dueDate);
+        return dueDate && dueDate.getTime() <= selected.getTime();
+      })
+      .map((period: any) => ({
+        period: Number(period.period),
+        penalty: this.getPeriodComponentOutstanding(period, 'penalty'),
+        fee: this.getPeriodComponentOutstanding(period, 'fee'),
+        tax: this.getPeriodComponentOutstanding(period, 'tax'),
+        interest: this.getPeriodComponentOutstanding(period, 'interest'),
+        principal: this.getPeriodComponentOutstanding(period, 'principal')
+      }))
+      .filter((bucket) => bucket.penalty + bucket.fee + bucket.tax + bucket.interest + bucket.principal > 0.01)
+      .sort((a, b) => a.period - b.period);
+  }
+
+  private getPeriodComponentOutstanding(
+    period: any,
+    component: 'penalty' | 'fee' | 'tax' | 'interest' | 'principal'
+  ): number {
+    const fieldMap: Record<string, [string, string, string]> = {
+      penalty: [
+        'penaltyChargesOutstanding',
+        'penaltyChargesDue',
+        'penaltyChargesPaid'
+      ],
+      fee: [
+        'feeChargesOutstanding',
+        'feeChargesDue',
+        'feeChargesPaid'
+      ],
+      tax: [
+        'taxChargesOutstanding',
+        'taxChargesDue',
+        'taxChargesPaid'
+      ],
+      interest: [
+        'interestOutstanding',
+        'interestDue',
+        'interestPaid'
+      ],
+      principal: [
+        'principalOutstanding',
+        'principalDue',
+        'principalPaid'
+      ]
+    };
+    const [
+      outstandingField,
+      dueField,
+      paidField
+    ] = fieldMap[component];
+    const explicit = Number(period?.[outstandingField] ?? NaN);
+    if (!Number.isNaN(explicit) && explicit > 0) {
+      return this.roundAmount(explicit);
+    }
+    const due = Number(period?.[dueField] ?? 0);
+    const paid = Number(period?.[paidField] ?? 0);
+    return this.roundAmount(Math.max(due - paid, 0));
+  }
+
+  private applyWaterfallToTotals(
+    remaining: number,
+    allocation: { penalty: number; fee: number; tax: number; interest: number; principal: number },
+    totals: { penalty: number; fee: number; tax: number; interest: number; principal: number }
+  ): number {
+    remaining = this.applyComponentPortion(remaining, totals.penalty, allocation, 'penalty');
+    remaining = this.applyComponentPortion(remaining, totals.fee, allocation, 'fee');
+    remaining = this.applyComponentPortion(remaining, totals.tax, allocation, 'tax');
+    remaining = this.applyComponentPortion(remaining, totals.interest, allocation, 'interest');
+    remaining = this.applyComponentPortion(remaining, totals.principal, allocation, 'principal');
+    return remaining;
+  }
+
+  private applyComponentPortion(
+    remaining: number,
+    outstanding: number,
+    allocation: { penalty: number; fee: number; tax: number; interest: number; principal: number },
+    key: 'penalty' | 'fee' | 'tax' | 'interest' | 'principal'
+  ): number {
+    if (remaining <= 0 || outstanding <= 0) {
+      return remaining;
+    }
+    const applied = Math.min(remaining, this.roundAmount(outstanding));
+    allocation[key] = this.roundAmount(allocation[key] + applied);
+    return this.roundAmount(remaining - applied);
   }
 
   /**
@@ -269,10 +607,19 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   }
 
   private patchDefaultTransactionAmount(): void {
-    const defaultAmount = this.roundAmount(
-      this.dueEmis.reduce((sum: number, emi: any) => sum + Number(emi.amount || 0), 0)
+    const componentTotal = this.roundAmount(
+      this.principalOutstanding +
+        this.interestOutstanding +
+        this.feeOutstanding +
+        this.penaltyOutstanding +
+        this.taxOutstanding
     );
-    this.transferForm.patchValue({ transactionAmount: defaultAmount || '' }, { emitEvent: false });
+    if (componentTotal > 0) {
+      this.transferForm.patchValue({ transactionAmount: componentTotal }, { emitEvent: false });
+      return;
+    }
+    const emiTotal = this.roundAmount(this.dueEmis.reduce((sum: number, emi: any) => sum + Number(emi.amount || 0), 0));
+    this.transferForm.patchValue({ transactionAmount: emiTotal || '' }, { emitEvent: false });
   }
 
   private getDueEmisForDate(transactionDateValue: Date): any[] {
@@ -325,7 +672,12 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     return Math.max(this.roundAmount(due - paid), 0);
   }
 
+  /** Sum of due-as-of-date components (installment-level). Do not use for closure. */
   get totalOutstanding(): number {
+    return this.dueAsOfDateTotal;
+  }
+
+  get dueAsOfDateTotal(): number {
     return this.roundAmount(
       this.principalOutstanding +
         this.interestOutstanding +
@@ -333,6 +685,37 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         this.feeOutstanding +
         this.taxOutstanding
     );
+  }
+
+  /** Full loan outstanding — used for closure / overpayment. */
+  get effectiveSettlementOutstanding(): number {
+    return this.fullLoanOutstanding > 0.01 ? this.fullLoanOutstanding : this.dueAsOfDateTotal;
+  }
+
+  /** Explains why Submit is disabled so closure banners never look actionable when they are not. */
+  get submitBlockedReason(): string | null {
+    if (this.isTemplateLoading) {
+      return 'Loading settlement details…';
+    }
+    if (!this.linkedSavingsAccountId) {
+      return 'No linked savings account is available for this loan — transfer cannot be submitted.';
+    }
+    if (!this.transferTemplate) {
+      return 'Transfer template is still loading or failed — Submit stays disabled until it is ready.';
+    }
+    if (this.backdateBlockedMessage) {
+      return 'Backdated settlement is not allowed for this loan product — change the transaction date to today.';
+    }
+    if (this.transferForm.get('note')?.invalid) {
+      return 'Enter a Note before submitting.';
+    }
+    if (this.transferForm.get('transactionAmount')?.invalid || this.transferForm.get('transactionDate')?.invalid) {
+      return 'Correct the highlighted fields before submitting.';
+    }
+    if (this.transferForm.invalid) {
+      return 'Complete all required fields before submitting.';
+    }
+    return null;
   }
 
   get amountErrorMessage(): string {
@@ -345,13 +728,15 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         this.linkedSavingsAccountAvailableBalance
       )})`;
     }
-    if (control?.hasError('totalOutstandingExceeded')) {
-      return 'Amount exceeds total outstanding — consider Foreclosure';
-    }
     return '';
   }
 
-  private validateTransactionAmount(): void {
+  /**
+   * @param showFieldErrors when true, marks the amount control touched/dirty so mat-error is visible
+   * immediately after a programmatic amount update (e.g. transaction date change) without requiring
+   * the operator to click into the field first.
+   */
+  private validateTransactionAmount(showFieldErrors = false): void {
     const control = this.transferForm.get('transactionAmount');
     if (!control) {
       return;
@@ -364,17 +749,44 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     const amount = Number(control.value || 0);
     if (!amount || amount <= 0) {
       currentErrors.positiveAmount = true;
+      this.overpaymentWarning = null;
+      this.closureRefundNotice = null;
     } else if (amount > this.linkedSavingsAccountAvailableBalance) {
       currentErrors.availableBalanceExceeded = true;
-    } else if (this.totalOutstanding > 0 && amount > this.totalOutstanding) {
-      currentErrors.totalOutstandingExceeded = true;
+      this.overpaymentWarning = null;
+      this.closureRefundNotice = null;
+    } else if (this.fullLoanOutstanding > 0 && amount > this.fullLoanOutstanding) {
+      const excess = this.roundAmount(amount - this.fullLoanOutstanding);
+      const waiveAmount = this.roundAmount(this.baselinePenaltyOutstanding - this.penaltyOutstanding);
+      let msg =
+        `The entered amount (${this.currencySymbol} ${this.formatAmount(amount)}) exceeds the full loan outstanding ` +
+        `(${this.currencySymbol} ${this.formatAmount(this.fullLoanOutstanding)}) by ` +
+        `${this.currencySymbol} ${this.formatAmount(excess)}. ` +
+        `If submitted, the loan will close. ${this.buildExcessRefundSentence(excess)}`;
+      if (waiveAmount > 0.01) {
+        msg +=
+          ` Note: ${this.currencySymbol} ${this.formatAmount(waiveAmount)} of late-payment interest will be ` +
+          `waived by this backdated settlement — the recommended full-settlement amount is ` +
+          `${this.currencySymbol} ${this.formatAmount(this.fullLoanOutstanding)}.`;
+      }
+      this.overpaymentWarning = msg;
+      this.closureRefundNotice = this.buildClosureRefundNotice(amount);
+      // Intentionally NOT adding totalOutstandingExceeded to errors — overpayment is allowed but warned.
+    } else {
+      this.overpaymentWarning = null;
+      this.closureRefundNotice = this.buildClosureRefundNotice(amount);
     }
 
     control.setErrors(Object.keys(currentErrors).length ? currentErrors : null);
+
+    if (showFieldErrors) {
+      control.markAsDirty();
+      control.markAsTouched();
+    }
   }
 
   submit(): void {
-    this.validateTransactionAmount();
+    this.validateTransactionAmount(true);
     if (
       this.transferForm.invalid ||
       this.isLoading ||

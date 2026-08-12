@@ -139,7 +139,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     if (this.repaymentScheduleDetails == null) {
       this.repaymentScheduleDetails = this.loanDetailsDataRepaymentSchedule;
     }
-    this.isWaived = this.repaymentScheduleDetails.totalWaived > 0;
+    this.refreshWaivedDisplayFlags();
     this.updateDisplayedColumns();
     this.updateEditCache();
 
@@ -212,6 +212,19 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       return false;
     }
     return Number(installment.totalOutstandingForPeriod || 0) > 0;
+  }
+
+  private refreshWaivedDisplayFlags(): void {
+    const periods = this.repaymentScheduleDetails?.periods || [];
+    this.isWaived =
+      Number(this.repaymentScheduleDetails?.totalWaived || 0) > 0 ||
+      periods.some(
+        (period: any) =>
+          Number(period?.penaltyChargesWaived || 0) > 0 ||
+          Number(period?.totalWaivedForPeriod || 0) > 0 ||
+          Number(period?.interestWaived || 0) > 0
+      ) ||
+      Number(this.loanDetailsData?.summary?.penaltyChargesWaived || 0) > 0;
   }
 
   exportToPDF() {
@@ -573,10 +586,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       },
       penalties: {
         header: 'Overdue Interest',
-        value: (item: any) =>
-          item.reversedPenaltyChargesDue && item.reversedPenaltyChargesDue > 0
-            ? this.toNumber(item.reversedPenaltyChargesDue)
-            : this.toNumber(item.penaltyChargesDue),
+        value: (item: any) => this.getDisplayOverdueInterestForPeriod(item),
         total: () => this.toNumber(this.repaymentScheduleDetails.totalPenaltyChargesCharged),
         format: moneyFormat
       },
@@ -1042,6 +1052,23 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       this.foreclosureUnearnedInterestDetails,
       this.repaymentScheduleDetails?.totalInterestCharged ?? 0
     );
+  }
+
+  /** Overdue interest (LPI): show amount due, or waived LPI when due is zero (e.g. grace-period row). */
+  getDisplayOverdueInterestForPeriod(item: any): number {
+    if (Number(item?.reversedPenaltyChargesDue || 0) > 0) {
+      return Number(item.reversedPenaltyChargesDue);
+    }
+    const due = Number(item?.penaltyChargesDue || 0);
+    if (due > 0) {
+      return due;
+    }
+    return Number(item?.penaltyChargesWaived || 0);
+  }
+
+  /** True when the overdue-interest cell should reflect a fully waived LPI amount. */
+  isWaivedOverdueInterestOnly(item: any): boolean {
+    return Number(item?.penaltyChargesDue || 0) <= 0 && Number(item?.penaltyChargesWaived || 0) > 0;
   }
 
   numberOnly(inputFormControl: any, event: any): boolean {

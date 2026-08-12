@@ -63,6 +63,50 @@
   }
 }
 
+.lpi-payment-note {
+  border-left-color: #15803d;
+  background: rgb(21 128 61 / 8%);
+
+  mat-icon {
+    color: #15803d;
+  }
+}
+
+.full-outstanding-banner {
+  border-left-color: #4338ca;
+  background: rgb(67 56 202 / 8%);
+
+  mat-icon {
+    color: #4338ca;
+  }
+}
+
+.submit-blocked {
+  width: 100%;
+  margin: 0 0 0.5rem;
+  font-weight: 500;
+}
+
+.closure-refund-notice {
+  border-left-color: #0f766e;
+  background: rgb(15 118 110 / 10%);
+  font-weight: 600;
+
+  mat-icon {
+    color: #0f766e;
+  }
+}
+
+.overpayment-warning {
+  border-left-color: #dc2626;
+  background: rgb(220 38 38 / 8%);
+  font-weight: 500;
+
+  mat-icon {
+    color: #dc2626;
+  }
+}
+
 .emi-hints {
   display: flex;
   flex-wrap: wrap;

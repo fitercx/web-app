@@ -104,6 +104,18 @@ table {
     min-width: 104px;
   }
 
+  .waived-lpi-amount {
+    color: #2e7d32;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .waived-interest-amount,
+  .waived-fee-amount {
+    color: #558b2f;
+    font-size: 12px;
+  }
+
   .mat-column-status {
     min-width: 160px;
   }

@@ -223,8 +223,11 @@
           </span>
         </ng-container>
         <ng-template #normalPenalty>
-          <ng-container *ngIf="item.penaltyChargesDue > 0">
-            {{ item.penaltyChargesDue | formatNumber }}
+          <ng-container *ngIf="getDisplayOverdueInterestForPeriod(item) > 0">
+            <span [class.waived-lpi-amount]="isWaivedOverdueInterestOnly(item)">
+              {{ getDisplayOverdueInterestForPeriod(item) | formatNumber }}
+              <ng-container *ngIf="isWaivedOverdueInterestOnly(item) && !isWaived"> waived</ng-container>
+            </span>
           </ng-container>
         </ng-template>
       </td>
@@ -281,7 +284,27 @@
       <ng-container matColumnDef="waived">
         <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Waived Amount' | translate }}</th>
         <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-          {{ item.totalWaivedForPeriod | formatNumber }}
+          <ng-container *ngIf="item.period > 0">
+            <div *ngIf="item.penaltyChargesWaived > 0" class="waived-lpi-amount">
+              LPI: {{ item.penaltyChargesWaived | formatNumber }}
+            </div>
+            <div *ngIf="item.interestWaived > 0" class="waived-interest-amount">
+              Interest: {{ item.interestWaived | formatNumber }}
+            </div>
+            <div *ngIf="item.feeChargesWaived > 0" class="waived-fee-amount">
+              Fees: {{ item.feeChargesWaived | formatNumber }}
+            </div>
+            <div
+              *ngIf="
+                item.totalWaivedForPeriod > 0 &&
+                !item.penaltyChargesWaived &&
+                !item.interestWaived &&
+                !item.feeChargesWaived
+              "
+            >
+              {{ item.totalWaivedForPeriod | formatNumber }}
+            </div>
+          </ng-container>
         </td>
         <td mat-footer-cell class="r-amount" *matFooterCellDef>
           <b> {{ repaymentScheduleDetails.totalWaived | currency: currencyCode : 'symbol-narrow' : '1.2-2' }} </b>
