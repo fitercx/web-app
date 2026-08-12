@@ -85,6 +85,9 @@ export class ForeclosureComponent implements OnInit {
     this.baselineInterestPortion = Number(this.dataObject.interestPortion || 0);
     this.baselinePenaltyChargesPortion = Number(this.dataObject.penaltyChargesPortion || 0);
     this.maturityDate = this.parseDateField(this.dataObject.expectedMaturityDate);
+    // Show the closure-type banner immediately on open for the default (business-date) selection, not only
+    // after the operator changes the date. valueChanges does not fire for the form's initial value.
+    this.updateClosureTypeInfo();
   }
 
   /** Parses a Fineract date value — either a [year, month, day] array or an ISO string. */
