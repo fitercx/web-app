@@ -10,21 +10,35 @@
         </span>
       </div>
       <div>
-        {{ 'labels.inputs.Available Balance' | translate }} :
+        Available balance as of {{ selectedTransactionDateLabel }} is
         <span class="linked-savings__account-no">
-          {{ currencySymbol }} {{ linkedSavingsAccountAvailableBalance | formatNumber }}
+          {{ currencySymbol }} {{ availableBalanceAsOfDate | formatNumber }}
         </span>
       </div>
     </div>
   </div>
 
-  <div class="date-impact-banner full-outstanding-banner" *ngIf="fullLoanOutstanding > 0">
+  <div class="date-impact-banner full-outstanding-banner" *ngIf="dueAsOfDateTotal > 0 || outstandingAfterWaiver > 0">
     <mat-icon>account_balance</mat-icon>
     <span>
-      Full loan outstanding (authoritative):
-      <strong>{{ currencySymbol }} {{ fullLoanOutstanding | formatNumber }}</strong>
-      — only an amount at or above this figure will close the loan. The Principal / Interest fields below are the
-      amounts due as of the selected transaction date (not the full loan).
+      Amount due as of {{ selectedTransactionDateLabel }}:
+      <strong>{{ currencySymbol }} {{ dueAsOfDateTotal | formatNumber }}</strong>
+      (this installment / overdue EMIs, interest due, fees, and any LPI still due on this date).
+      <ng-container *ngIf="penaltyWaivedByBackdate > 0.01">
+        {{ currencySymbol }} {{ penaltyWaivedByBackdate | formatNumber }} of late-payment interest posted after this due
+        date (from the next calendar day) will be waived and is <strong>not</strong> included.
+      </ng-container>
+      <ng-container *ngIf="outstandingAfterWaiver > dueAsOfDateTotal + 0.01">
+        Paying the due amount leaves the loan Active. Amount to close:
+        <strong>{{ currencySymbol }} {{ outstandingAfterWaiver | formatNumber }}</strong>
+        (remaining principal + interest due + fees + LPI still due).
+      </ng-container>
+      <ng-container *ngIf="outstandingAfterWaiver <= dueAsOfDateTotal + 0.01">
+        Paying this amount will close the loan (obligations met).
+        <ng-container *ngIf="penaltyWaivedByBackdate > 0.01">
+          Do not add waived LPI or the loan will be overpaid.
+        </ng-container>
+      </ng-container>
     </span>
   </div>
 
@@ -66,23 +80,23 @@
       </div>
 
       <mat-form-field>
-        <mat-label>Principal due as of date</mat-label>
-        <input matInput [value]="principalOutstanding | formatNumber" disabled />
+        <mat-label>Principal</mat-label>
+        <input matInput [value]="displayedPrincipal | formatNumber" disabled />
       </mat-form-field>
 
       <mat-form-field>
-        <mat-label>Interest due as of date</mat-label>
-        <input matInput [value]="interestOutstanding | formatNumber" disabled />
+        <mat-label>Interest</mat-label>
+        <input matInput [value]="displayedInterest | formatNumber" disabled />
       </mat-form-field>
 
       <mat-form-field>
         <mat-label>{{ 'labels.inputs.Fee Amount' | translate }}</mat-label>
-        <input matInput [value]="feeOutstanding | formatNumber" disabled />
+        <input matInput [value]="displayedFee | formatNumber" disabled />
       </mat-form-field>
 
       <mat-form-field>
         <mat-label>{{ 'labels.inputs.Penalty Amount' | translate }}</mat-label>
-        <input matInput [value]="penaltyOutstanding | formatNumber" disabled />
+        <input matInput [value]="displayedPenalty | formatNumber" disabled />
       </mat-form-field>
 
       <mat-form-field>

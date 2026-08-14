@@ -4,8 +4,8 @@ import { UntypedFormGroup, UntypedFormBuilder, Validators, UntypedFormControl } 
 import { ActivatedRoute, Router } from '@angular/router';
 
 /** RxJS Imports */
-import { of } from 'rxjs';
-import { switchMap } from 'rxjs/operators';
+import { forkJoin, of } from 'rxjs';
+import { catchError, switchMap } from 'rxjs/operators';
 
 /** Custom Services */
 import { LoansService } from 'app/loans/loans.service';
@@ -13,6 +13,13 @@ import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 import { Currency } from 'app/shared/models/general.model';
 import { AlertService } from 'app/core/alert/alert.service';
+import { SavingsService } from 'app/savings/savings.service';
+import {
+  allocateSettlement,
+  computePenaltyWaivedByBackdate,
+  computeSavingsBalanceAsOf,
+  computeSettlementRequired
+} from 'app/loans/common/backdated-settlement.util';
 
 /**
  * Loan Make Repayment Component
@@ -31,10 +38,12 @@ export class MakeRepaymentComponent implements OnInit {
   /** Show payment details */
   showPaymentDetails = false;
   /**
-   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS (45) before the business date, or the
+   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS (30) before the business date, or the
    * loan's disbursement date if that is later (see BackdatedRepaymentValidator#computeEarliestAllowedTransactionDate
    * on the server). Applied from the resolver-loaded penalty template's `earliestAllowedTransactionDate` in ngOnInit.
-   * Maximum is always the business date — backend rejects future repayment dates.
+   * Maximum allows FUTURE dates so the ops team can preview the amount a customer would owe on a future pay date
+   * (LPI keeps accruing until then). A repayment can never actually be recorded with a future date — the backend
+   * rejects it — so the Submit button is disabled while a future date is selected (see isFutureDateSelected).
    */
   minDate = new Date(2000, 0, 1);
   maxDate = new Date();
@@ -46,6 +55,15 @@ export class MakeRepaymentComponent implements OnInit {
 
   penaltyTemplate: Number;
 
+  linkedSavingsAccountId?: number;
+  linkedSavingsAccountAccountNo?: string;
+  linkedSavingsAccountProductName?: string;
+  linkedSavingsAccountAvailableBalance = 0;
+  availableBalanceAsOfDate = 0;
+  private savingsTransactions: any[] = [];
+  private loanSummary: any;
+  fullLoanOutstanding = 0;
+
   /**
    * Baseline principal/interest outstanding captured from the resolver's initial
    * penalty template (loaded for business date). The /template/penalties endpoint
@@ -53,6 +71,7 @@ export class MakeRepaymentComponent implements OnInit {
    * so we always fall back to these resolver-loaded values for display.
    */
   private baselinePrincipalOutstanding: number = 0;
+  private baselineRemainingPrincipalOutstanding: number = 0;
   private baselineInterestOutstanding: number = 0;
   /** Baseline penalty/LPI due (business date), used to detect waived/accrued charges on date change. */
   private baselinePenaltyAmountDue: number = 0;
@@ -66,6 +85,10 @@ export class MakeRepaymentComponent implements OnInit {
 
   /** Shown when pending LPI is due on the selected date and will be paid with this repayment. */
   lpiPaymentMessage: string | null = null;
+  /** How the entered amount will be applied — must match the principal/interest/fee/penalty fields. */
+  settlementPreviewMessage: string | null = null;
+  overpaymentWarning: string | null = null;
+  closureRefundNotice: string | null = null;
 
   /**
    * @param {FormBuilder} formBuilder Form Builder.
@@ -81,7 +104,8 @@ export class MakeRepaymentComponent implements OnInit {
     private router: Router,
     private dateUtils: Dates,
     private settingsService: SettingsService,
-    private alertService: AlertService
+    private alertService: AlertService,
+    private savingsService: SavingsService
   ) {
     this.loanId = this.route.snapshot.params['loanId'];
   }
@@ -91,8 +115,11 @@ export class MakeRepaymentComponent implements OnInit {
    * and initialize with the required values
    */
   ngOnInit() {
-    // Backend rejects future repayment dates — clamp calendar to business date (no +1 year).
-    this.maxDate = new Date(this.settingsService.businessDate);
+    // Allow selecting a future date so ops can preview the amount due on a future pay date (LPI accrues until
+    // then). Actual submission with a future date stays blocked — the backend rejects it and the Submit button is
+    // disabled while a future date is selected (see isFutureDateSelected). Generous 5-year window covers any loan.
+    const business = new Date(this.settingsService.businessDate);
+    this.maxDate = new Date(business.getFullYear() + 5, business.getMonth(), business.getDate());
     this.createRepaymentLoanForm();
     this.setRepaymentLoanDetails();
     if (this.dataObject.repaymentTemplate.currency) {
@@ -102,6 +129,8 @@ export class MakeRepaymentComponent implements OnInit {
     // Capture resolver-loaded outstanding amounts as baseline fallback values.
     if (this.dataObject.penaltyTemplate) {
       this.baselinePrincipalOutstanding = this.dataObject.penaltyTemplate.principalOutstanding || 0;
+      this.baselineRemainingPrincipalOutstanding =
+        this.dataObject.penaltyTemplate.remainingPrincipalOutstanding || this.baselinePrincipalOutstanding;
       this.baselineInterestOutstanding = this.dataObject.penaltyTemplate.interestOutstanding || 0;
       this.baselinePenaltyAmountDue = this.dataObject.penaltyTemplate.penaltyAmountDue || 0;
       this.applyEarliestAllowedDate(this.dataObject.penaltyTemplate.earliestAllowedTransactionDate);
@@ -111,11 +140,17 @@ export class MakeRepaymentComponent implements OnInit {
       if (newDate) {
         const formattedDate = this.dateUtils.formatDate(newDate, this.settingsService.dateFormat);
         this.refreshPenaltyTemplate(formattedDate);
+        this.refreshSavingsBalanceAsOfDate(newDate);
       }
+    });
+
+    this.repaymentLoanForm.get('transactionAmount')?.valueChanges.subscribe(() => {
+      this.updateSettlementPreview();
     });
 
     const initialDate = this.dateUtils.formatDate(this.settingsService.businessDate, this.settingsService.dateFormat);
     this.refreshPenaltyTemplate(initialDate);
+    this.loadLinkedSavingsAndSummary();
   }
 
   /**
@@ -225,10 +260,11 @@ export class MakeRepaymentComponent implements OnInit {
         })
       )
       .subscribe(({ template, futureLPI }: { template: any; futureLPI: any }) => {
-        // /template/penalties returns 0 for principal/interest when no installment falls
-        // on the selected date (always the case for future dates). Fall back to the
-        // baseline values captured from the resolver so the display stays correct.
-        const principalAmount = template.principalOutstanding || this.baselinePrincipalOutstanding;
+        // Amount due = this EMI (and any earlier overdue EMIs), not remaining principal of later EMIs.
+        // Overnight LPI posted after the due date is already excluded from penaltyAmountDue.
+        const installmentPrincipal = template.principalOutstanding || this.baselinePrincipalOutstanding;
+        const remainingPrincipal =
+          template.remainingPrincipalOutstanding || this.loanSummary?.principalOutstanding || installmentPrincipal;
         const interestAmount = template.interestOutstanding || this.baselineInterestOutstanding;
         const feesAmount = Number(this.dataObject.repaymentTemplate.feeChargesPortion || 0);
         const taxAmount = Number(this.dataObject.repaymentTemplate.taxChargesPortion || 0);
@@ -236,17 +272,24 @@ export class MakeRepaymentComponent implements OnInit {
         const additionalLPIAmount = Number(futureLPI?.totalLPIAmount || 0);
         const totalPenaltyAmount = penaltyAmount + additionalLPIAmount;
 
-        this.dataObject.penaltyTemplate.principalOutstanding = principalAmount;
+        this.dataObject.penaltyTemplate.principalOutstanding = installmentPrincipal;
+        this.dataObject.penaltyTemplate.remainingPrincipalOutstanding = remainingPrincipal;
         this.dataObject.penaltyTemplate.interestOutstanding = interestAmount;
         this.dataObject.penaltyTemplate.penaltyAmountDue = totalPenaltyAmount;
 
         this.dateImpactMessages = this.buildDateImpactMessages(interestAmount, totalPenaltyAmount, transactionDate);
         this.lpiPaymentMessage = this.buildLpiPaymentMessage(totalPenaltyAmount, transactionDate);
 
-        const totalAmount = principalAmount + interestAmount + feesAmount + taxAmount + totalPenaltyAmount;
-        this.repaymentLoanForm.patchValue({
-          transactionAmount: this.roundAmount(totalAmount)
-        });
+        const totalAmount = this.roundAmount(
+          Number(installmentPrincipal || 0) + interestAmount + feesAmount + taxAmount + totalPenaltyAmount
+        );
+        this.repaymentLoanForm.patchValue(
+          {
+            transactionAmount: totalAmount
+          },
+          { emitEvent: false }
+        );
+        this.updateSettlementPreview(transactionDate);
       });
   }
 
@@ -266,9 +309,10 @@ export class MakeRepaymentComponent implements OnInit {
     this.minDate = parsed;
     const formatted = this.dateUtils.formatDate(parsed, this.settingsService.dateFormat);
     this.backdateLimitMessage =
-      `This repayment can be backdated no earlier than ${formatted} (45 days before today, or this loan's ` +
+      `This repayment can be backdated no earlier than ${formatted} (30 days before today, or this loan's ` +
       `disbursement date if later) — this protects the repayment schedule and balances from being distorted by ` +
-      `very old backdated entries. Future dates are not allowed.`;
+      `very old backdated entries. A future date can be selected to preview the amount due, but a repayment ` +
+      `cannot be recorded with a future date.`;
   }
 
   /**
@@ -312,6 +356,7 @@ export class MakeRepaymentComponent implements OnInit {
   /**
    * Builds a clear notice when pending LPI is due on the selected date so the operator knows it
    * is included in the suggested transaction amount and will be paid with this repayment.
+   * Hidden when penalty as of the selected date is 0 (e.g. settlement on the due date).
    */
   private buildLpiPaymentMessage(totalPenaltyAmount: number, transactionDate: string): string | null {
     if (totalPenaltyAmount <= 0.01) {
@@ -322,6 +367,269 @@ export class MakeRepaymentComponent implements OnInit {
       `Late payment interest (LPI) of ${currencyLabel} ${totalPenaltyAmount.toFixed(2)} accrued up to ` +
       `${transactionDate} is included in the transaction amount and will be paid with this repayment.`
     );
+  }
+
+  private loadLinkedSavingsAndSummary(): void {
+    forkJoin({
+      foreclosure: this.loanService.getLoanForeclosureActionTemplate(this.loanId).pipe(catchError(() => of(null))),
+      loanDetails: this.loanService.getLoanAccountResource(this.loanId, 'summary').pipe(catchError(() => of(null)))
+    })
+      .pipe(
+        switchMap((result: any) => {
+          this.applyLoanSummary(result.loanDetails);
+          this.captureLinkedSavings(result.foreclosure);
+          this.updateSettlementPreview();
+          if (!this.linkedSavingsAccountId) {
+            return of(null);
+          }
+          return this.savingsService
+            .getSavingsAccountData(String(this.linkedSavingsAccountId))
+            .pipe(catchError(() => of(null)));
+        })
+      )
+      .subscribe({
+        next: (savingsAccount: any) => {
+          this.captureSavingsTransactions(savingsAccount);
+          this.refreshSavingsBalanceAsOfDate();
+        }
+      });
+  }
+
+  private applyLoanSummary(loanDetails: any): void {
+    this.loanSummary = loanDetails?.summary || null;
+    this.fullLoanOutstanding = this.roundAmount(Number(this.loanSummary?.totalOutstanding || 0));
+  }
+
+  private captureLinkedSavings(source: any): void {
+    const additional = source?.additionalAttributes;
+    if (!additional) {
+      return;
+    }
+    this.linkedSavingsAccountId = additional.linkedSavingsAccountId;
+    this.linkedSavingsAccountAccountNo = additional.linkedSavingsAccountAccountNo;
+    this.linkedSavingsAccountProductName = additional.linkedSavingsAccountProductName;
+    this.linkedSavingsAccountAvailableBalance = Number(additional.linkedSavingsAccountAvailableBalance || 0);
+    this.availableBalanceAsOfDate = this.linkedSavingsAccountAvailableBalance;
+  }
+
+  private captureSavingsTransactions(savingsAccount: any): void {
+    if (!savingsAccount) {
+      return;
+    }
+    this.savingsTransactions = Array.isArray(savingsAccount.transactions) ? savingsAccount.transactions : [];
+    const currentAvailable = Number(
+      savingsAccount.summary?.availableBalance ??
+        savingsAccount.summary?.accountBalance ??
+        this.linkedSavingsAccountAvailableBalance
+    );
+    if (currentAvailable > 0) {
+      this.linkedSavingsAccountAvailableBalance = currentAvailable;
+    }
+  }
+
+  private refreshSavingsBalanceAsOfDate(
+    transactionDateValue: Date = this.repaymentLoanForm?.value?.transactionDate
+  ): void {
+    this.availableBalanceAsOfDate = computeSavingsBalanceAsOf(
+      this.savingsTransactions,
+      this.toComparableDate(transactionDateValue),
+      (value) => this.toComparableDate(value),
+      this.linkedSavingsAccountAvailableBalance
+    );
+  }
+
+  private toComparableDate(value: any): Date | null {
+    if (!value) {
+      return null;
+    }
+    if (value instanceof Date) {
+      return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+    }
+    if (Array.isArray(value)) {
+      return new Date(value[0], value[1] - 1, value[2]);
+    }
+    const parsed = this.dateUtils.parseDate(value);
+    return parsed ? new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()) : null;
+  }
+
+  get selectedTransactionDateLabel(): string {
+    const value = this.repaymentLoanForm?.value?.transactionDate;
+    return value ? this.dateUtils.formatDate(value, this.settingsService.dateFormat) : '';
+  }
+
+  /**
+   * True when the selected transaction date is after the business date. A future date is preview-only: the amounts
+   * shown reflect what the customer would owe on that date (with LPI accrued until then), but a repayment cannot be
+   * recorded in the future — the backend rejects it — so the Submit button is disabled while this is true.
+   */
+  get isFutureDateSelected(): boolean {
+    const selected = this.toComparableDate(this.repaymentLoanForm?.value?.transactionDate);
+    const business = this.toComparableDate(this.settingsService.businessDate);
+    return !!(selected && business && selected.getTime() > business.getTime());
+  }
+
+  /** Principal of EMIs due on or before the selected date (the required due, not full remaining P). */
+  get principalAsOfDate(): number {
+    return Number(this.dataObject?.penaltyTemplate?.principalOutstanding || this.baselinePrincipalOutstanding || 0);
+  }
+
+  /** Remaining principal across every EMI — used as the close-amount / allocation cap. */
+  get remainingPrincipalAsOfDate(): number {
+    return Number(
+      this.dataObject?.penaltyTemplate?.remainingPrincipalOutstanding ||
+        this.loanSummary?.principalOutstanding ||
+        this.baselineRemainingPrincipalOutstanding ||
+        this.principalAsOfDate
+    );
+  }
+
+  get interestAsOfDate(): number {
+    return Number(this.dataObject?.penaltyTemplate?.interestOutstanding || 0);
+  }
+
+  get feeAsOfDate(): number {
+    return Number(this.dataObject?.repaymentTemplate?.feeChargesPortion || 0);
+  }
+
+  get taxAsOfDate(): number {
+    return Number(this.dataObject?.repaymentTemplate?.taxChargesPortion || 0);
+  }
+
+  get penaltyAsOfDate(): number {
+    return Number(this.dataObject?.penaltyTemplate?.penaltyAmountDue || 0);
+  }
+
+  get dueAsOfDateTotal(): number {
+    return this.roundAmount(
+      this.principalAsOfDate + this.interestAsOfDate + this.feeAsOfDate + this.taxAsOfDate + this.penaltyAsOfDate
+    );
+  }
+
+  get penaltyInSummary(): number {
+    return Number(this.loanSummary?.penaltyChargesOutstanding ?? this.baselinePenaltyAmountDue);
+  }
+
+  get penaltyWaivedByBackdate(): number {
+    return computePenaltyWaivedByBackdate(this.penaltyInSummary, this.penaltyAsOfDate);
+  }
+
+  get outstandingAfterWaiver(): number {
+    return computeSettlementRequired({
+      principal: this.remainingPrincipalAsOfDate,
+      interest: this.interestAsOfDate,
+      fee: this.feeAsOfDate,
+      tax: this.taxAsOfDate,
+      penalty: this.penaltyAsOfDate
+    });
+  }
+
+  get displayedPrincipal(): number {
+    return this.currentSettlementAllocation.principal;
+  }
+
+  get displayedInterest(): number {
+    return this.currentSettlementAllocation.interest;
+  }
+
+  get displayedFee(): number {
+    return this.currentSettlementAllocation.fee;
+  }
+
+  get displayedPenalty(): number {
+    return this.currentSettlementAllocation.penalty;
+  }
+
+  get displayedTax(): number {
+    return this.currentSettlementAllocation.tax;
+  }
+
+  private get currentSettlementAllocation() {
+    const amount = Number(this.repaymentLoanForm?.get('transactionAmount')?.value || 0);
+    return allocateSettlement(amount, {
+      penalty: this.penaltyAsOfDate,
+      fee: this.feeAsOfDate,
+      tax: this.taxAsOfDate,
+      interest: this.interestAsOfDate,
+      principal: this.remainingPrincipalAsOfDate
+    });
+  }
+
+  get currencyLabel(): string {
+    return this.currency?.displaySymbol || this.currency?.code || '';
+  }
+
+  private updateSettlementPreview(transactionDate?: string): void {
+    const dateLabel = transactionDate || this.selectedTransactionDateLabel;
+    const amount = Number(this.repaymentLoanForm?.get('transactionAmount')?.value || 0);
+    this.overpaymentWarning = null;
+    this.closureRefundNotice = null;
+
+    if (!amount || amount <= 0) {
+      this.settlementPreviewMessage =
+        'Enter an amount to see how it will be applied to principal, interest, fees and any late-payment interest still due on the selected date.';
+      return;
+    }
+
+    const allocation = allocateSettlement(amount, {
+      penalty: this.penaltyAsOfDate,
+      fee: this.feeAsOfDate,
+      tax: this.taxAsOfDate,
+      interest: this.interestAsOfDate,
+      principal: this.remainingPrincipalAsOfDate
+    });
+
+    const parts: string[] = [];
+    if (allocation.penalty > 0.01) {
+      parts.push(`${this.currencyLabel} ${allocation.penalty.toFixed(2)} to late payment interest (LPI)`);
+    }
+    if (allocation.fee > 0.01) {
+      parts.push(`${this.currencyLabel} ${allocation.fee.toFixed(2)} to fees`);
+    }
+    if (allocation.tax > 0.01) {
+      parts.push(`${this.currencyLabel} ${allocation.tax.toFixed(2)} to tax`);
+    }
+    if (allocation.interest > 0.01) {
+      parts.push(`${this.currencyLabel} ${allocation.interest.toFixed(2)} to interest`);
+    }
+    if (allocation.principal > 0.01) {
+      parts.push(`${this.currencyLabel} ${allocation.principal.toFixed(2)} to principal`);
+    }
+
+    const lines = [
+      `Of the entered amount (${this.currencyLabel} ${amount.toFixed(2)}), ` +
+        (parts.length
+          ? `${parts.join(', ')} will be applied with this repayment (as at ${dateLabel}).`
+          : `no outstanding balance remains to allocate (as at ${dateLabel}).`)
+    ];
+
+    const closesLoan =
+      this.outstandingAfterWaiver > 0.01 && this.roundAmount(amount) + 0.01 >= this.outstandingAfterWaiver;
+    if (allocation.unallocated > 0.01) {
+      lines.push(
+        `Excess of ${this.currencyLabel} ${allocation.unallocated.toFixed(2)} will overpay the loan. ` +
+          `The required amount as of ${dateLabel} is ${this.currencyLabel} ${this.outstandingAfterWaiver.toFixed(2)}.`
+      );
+      this.overpaymentWarning = lines[lines.length - 1];
+      this.closureRefundNotice = `This payment will close the loan overpaid by ${this.currencyLabel} ${allocation.unallocated.toFixed(2)}.`;
+    } else if (closesLoan) {
+      const closeLine =
+        `This payment covers the amount required as of ${dateLabel} ` +
+        `(${this.currencyLabel} ${this.outstandingAfterWaiver.toFixed(2)}) and will close the loan.`;
+      if (this.penaltyWaivedByBackdate > 0.01) {
+        lines.push(`${closeLine} Late-payment interest accrued after this date is waived and is not charged.`);
+      } else {
+        lines.push(closeLine);
+      }
+      this.closureRefundNotice = `This payment will close the loan (obligations met).`;
+    } else if (this.dueAsOfDateTotal > 0.01 && this.roundAmount(amount) + 0.01 >= this.dueAsOfDateTotal) {
+      const remaining = this.roundAmount(this.outstandingAfterWaiver - amount);
+      lines.push(
+        `This payment settles the amount due as of ${dateLabel}. The loan will remain Active with approximately ` +
+          `${this.currencyLabel} ${Math.max(remaining, 0).toFixed(2)} still outstanding.`
+      );
+    }
+
+    this.settlementPreviewMessage = lines.join(' ');
   }
 
   private roundAmount(value: number): number {
