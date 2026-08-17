@@ -57,23 +57,6 @@ export function computeSettlementRequired(components: SettlementComponents): num
 }
 
 /**
- * Outstanding that will remain after backdated LPI is waived.
- * Never drops below the as-of-date due total (principal + interest + fees + remaining penalty).
- * Prefer {@link computeSettlementRequired} for multi-EMI close amount — this helper can still
- * include future EMI interest when `fullLoanOutstanding` is the loan summary total.
- */
-export function computeOutstandingAfterWaiver(
-  fullLoanOutstanding: number,
-  penaltyInSummary: number,
-  penaltyAsOfDate: number,
-  dueAsOfDateTotal: number
-): number {
-  const waived = computePenaltyWaivedByBackdate(penaltyInSummary, penaltyAsOfDate);
-  const afterWaiver = roundAmount(Math.max(Number(fullLoanOutstanding || 0) - waived, 0));
-  return Math.max(afterWaiver, roundAmount(dueAsOfDateTotal));
-}
-
-/**
  * Waterfall allocation capped to as-of-date component totals.
  * Principal budget is remaining principal (all EMIs), matching mifos-standard in-advance
  * application. Penalty/interest budgets come from /template/penalties so waived LPI is not previewed.

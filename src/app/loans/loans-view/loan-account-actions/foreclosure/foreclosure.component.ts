@@ -283,9 +283,9 @@ export class ForeclosureComponent implements OnInit {
     this.minDate = parsed;
     const formatted = this.dateUtils.formatDate(parsed, this.settingsService.dateFormat);
     this.backdateLimitMessage =
-      `This foreclosure can be backdated no earlier than ${formatted} (30 days before today, or this loan's ` +
-      `disbursement date if later, and never before the loan's last recorded transaction) — this protects the ` +
-      `repayment schedule and balances from being distorted by very old backdated entries. Future dates are not allowed.`;
+      `This foreclosure can be backdated no earlier than ${formatted} (and never before the loan's last ` +
+      `recorded transaction) — this protects the repayment schedule and balances from being distorted by ` +
+      `very old backdated entries. Future dates are not allowed.`;
   }
 
   submit() {

@@ -266,6 +266,8 @@ export class MakeRepaymentComponent implements OnInit {
         const remainingPrincipal =
           template.remainingPrincipalOutstanding || this.loanSummary?.principalOutstanding || installmentPrincipal;
         const interestAmount = template.interestOutstanding || this.baselineInterestOutstanding;
+        // /template/penalties does not return fee/tax (DTO is P / remaining P / I / LPI only).
+        // Fee and tax come from the repayment template and are date-invariant for this screen.
         const feesAmount = Number(this.dataObject.repaymentTemplate.feeChargesPortion || 0);
         const taxAmount = Number(this.dataObject.repaymentTemplate.taxChargesPortion || 0);
         const penaltyAmount = template.penaltyAmountDue || 0;
@@ -309,10 +311,9 @@ export class MakeRepaymentComponent implements OnInit {
     this.minDate = parsed;
     const formatted = this.dateUtils.formatDate(parsed, this.settingsService.dateFormat);
     this.backdateLimitMessage =
-      `This repayment can be backdated no earlier than ${formatted} (30 days before today, or this loan's ` +
-      `disbursement date if later) — this protects the repayment schedule and balances from being distorted by ` +
-      `very old backdated entries. A future date can be selected to preview the amount due, but a repayment ` +
-      `cannot be recorded with a future date.`;
+      `This repayment can be backdated no earlier than ${formatted} — this protects the repayment schedule ` +
+      `and balances from being distorted by very old backdated entries. A future date can be selected to ` +
+      `preview the amount due, but a repayment cannot be recorded with a future date.`;
   }
 
   /**
@@ -422,7 +423,7 @@ export class MakeRepaymentComponent implements OnInit {
         savingsAccount.summary?.accountBalance ??
         this.linkedSavingsAccountAvailableBalance
     );
-    if (currentAvailable > 0) {
+    if (!Number.isNaN(currentAvailable)) {
       this.linkedSavingsAccountAvailableBalance = currentAvailable;
     }
   }
@@ -487,10 +488,12 @@ export class MakeRepaymentComponent implements OnInit {
     return Number(this.dataObject?.penaltyTemplate?.interestOutstanding || 0);
   }
 
+  /** Fee from the repayment template — not date-scoped; /template/penalties does not return fees. */
   get feeAsOfDate(): number {
     return Number(this.dataObject?.repaymentTemplate?.feeChargesPortion || 0);
   }
 
+  /** Tax from the repayment template — not date-scoped; /template/penalties does not return tax. */
   get taxAsOfDate(): number {
     return Number(this.dataObject?.repaymentTemplate?.taxChargesPortion || 0);
   }
@@ -543,6 +546,11 @@ export class MakeRepaymentComponent implements OnInit {
     return this.currentSettlementAllocation.tax;
   }
 
+  /**
+   * Flat as-of-date allocation (no installment buckets). This screen does not load the repayment
+   * schedule; transfer-from-savings uses buckets because it already has periods for the due-EMI list.
+   * Component totals still use the same as-of-date budgets. Backend allocation on submit is authoritative.
+   */
   private get currentSettlementAllocation() {
     const amount = Number(this.repaymentLoanForm?.get('transactionAmount')?.value || 0);
     return allocateSettlement(amount, {

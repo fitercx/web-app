@@ -282,9 +282,8 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     this.minDate = parsed;
     const formatted = this.formatDate(parsed);
     this.backdateLimitMessage =
-      `This settlement can be backdated no earlier than ${formatted} (30 days before today, or this loan's ` +
-      `disbursement date if later) — this protects the repayment schedule and balances from being distorted by ` +
-      `very old backdated entries. Future dates are not allowed.`;
+      `This settlement can be backdated no earlier than ${formatted} — this protects the repayment schedule ` +
+      `and balances from being distorted by very old backdated entries. Future dates are not allowed.`;
   }
 
   private captureLinkedSavingsAccount(source: any): void {
@@ -309,7 +308,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         savingsAccount.summary?.accountBalance ??
         this.linkedSavingsAccountAvailableBalance
     );
-    if (currentAvailable > 0) {
+    if (!Number.isNaN(currentAvailable)) {
       this.linkedSavingsAccountAvailableBalance = currentAvailable;
     }
   }
@@ -346,6 +345,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       this.principalOutstanding;
     this.interestOutstanding = Number(penaltyTemplate?.interestOutstanding || 0) || this.baselineInterestOutstanding;
     this.penaltyOutstanding = Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalPenalty;
+    // /template/penalties does not return fee/tax. Use loan summary / repayment template (date-invariant).
     this.feeOutstanding = Number(
       this.loanSummary?.feeChargesOutstanding ||
         this.data.loan?.summary?.feeChargesOutstanding ||

@@ -1,10 +1,8 @@
 import {
   allocateSettlement,
-  computeOutstandingAfterWaiver,
   computePenaltyWaivedByBackdate,
   computeSavingsBalanceAsOf,
-  computeSettlementRequired,
-  roundAmount
+  computeSettlementRequired
 } from './backdated-settlement.util';
 
 describe('backdated-settlement.util', () => {
@@ -35,18 +33,29 @@ describe('backdated-settlement.util', () => {
   });
 
   it('treats paying principal+interest on the due date as a full settlement after LPI waiver', () => {
-    const dueAsOfDate = 81984.11;
-    const outstandingAfterWaiver = computeOutstandingAfterWaiver(82182, 197.89, 0, dueAsOfDate);
-
-    expect(roundAmount(outstandingAfterWaiver)).toBe(81984.11);
+    expect(
+      computeSettlementRequired({
+        principal: 78500,
+        interest: 3484.11,
+        fee: 0,
+        tax: 0,
+        penalty: 0
+      })
+    ).toBe(81984.11);
     expect(computePenaltyWaivedByBackdate(197.89, 0)).toBe(197.89);
   });
 
-  it('never recommends less than the as-of-date due total when summary LPI is larger than remaining outstanding', () => {
-    const dueAsOfDate = 81984.11;
-    const outstandingAfterWaiver = computeOutstandingAfterWaiver(82182, 259.88, 0, dueAsOfDate);
-
-    expect(outstandingAfterWaiver).toBe(81984.11);
+  it('close amount is remaining principal plus as-of-date interest, not today summary minus waived LPI', () => {
+    // Today's summary 82182 minus waived 259.88 would be 81922.12 — below the due total.
+    expect(
+      computeSettlementRequired({
+        principal: 78500,
+        interest: 3484.11,
+        fee: 0,
+        tax: 0,
+        penalty: 0
+      })
+    ).toBe(81984.11);
   });
 
   it('full settlement required is remaining principal plus interest as of date, not schedule outstanding', () => {
