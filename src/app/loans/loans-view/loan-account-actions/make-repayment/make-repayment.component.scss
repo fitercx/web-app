@@ -57,3 +57,58 @@
     color: #059669;
   }
 }
+
+.future-preview-note {
+  border-left-color: #7c3aed;
+  background: rgb(124 58 237 / 8%);
+  font-weight: 500;
+
+  mat-icon {
+    color: #7c3aed;
+  }
+}
+
+.linked-savings {
+  display: flex;
+  align-items: flex-start;
+  padding: 0.75rem 0 0.5rem 0.75rem;
+  border-left: 4px solid var(--color-primary, #3f51b5);
+  margin: 0.75rem 0.75rem 0;
+  background: rgb(63 81 181 / 6%);
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.linked-savings__account-no {
+  font-style: italic;
+  font-weight: bold;
+}
+
+.full-outstanding-banner {
+  border-left-color: #4338ca;
+  background: rgb(67 56 202 / 8%);
+
+  mat-icon {
+    color: #4338ca;
+  }
+}
+
+.closure-refund-notice {
+  border-left-color: #0f766e;
+  background: rgb(15 118 110 / 10%);
+  font-weight: 600;
+
+  mat-icon {
+    color: #0f766e;
+  }
+}
+
+.overpayment-warning {
+  border-left-color: #dc2626;
+  background: rgb(220 38 38 / 8%);
+  font-weight: 500;
+
+  mat-icon {
+    color: #dc2626;
+  }
+}

@@ -18,7 +18,7 @@ export class ForeclosureComponent implements OnInit {
   loanId: any;
   foreclosureForm: UntypedFormGroup;
   /**
-   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS (45) before the business date, or the
+   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS (30) before the business date, or the
    * loan's disbursement date if that is later (see BackdatedRepaymentValidator#computeEarliestAllowedTransactionDate
    * on the server). Replaced with the real value once the foreclosure template loads (see captureLinkedAccount), so
    * the calendar never lets an operator pick a date the server would reject. Note: this is separate from (and
@@ -283,9 +283,9 @@ export class ForeclosureComponent implements OnInit {
     this.minDate = parsed;
     const formatted = this.dateUtils.formatDate(parsed, this.settingsService.dateFormat);
     this.backdateLimitMessage =
-      `This foreclosure can be backdated no earlier than ${formatted} (45 days before today, or this loan's ` +
-      `disbursement date if later, and never before the loan's last recorded transaction) — this protects the ` +
-      `repayment schedule and balances from being distorted by very old backdated entries. Future dates are not allowed.`;
+      `This foreclosure can be backdated no earlier than ${formatted} (and never before the loan's last ` +
+      `recorded transaction) — this protects the repayment schedule and balances from being distorted by ` +
+      `very old backdated entries. Future dates are not allowed.`;
   }
 
   submit() {
