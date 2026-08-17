@@ -74,7 +74,10 @@ export class ForeclosureComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.maxDate = this.settingsService.businessDate;
+    // Allow selecting a future date for amount/LPI preview. Foreclosure cannot be recorded in the future —
+    // backend rejects it — so Submit stays disabled while a future date is selected.
+    const business = new Date(this.settingsService.businessDate);
+    this.maxDate = new Date(business.getFullYear() + 5, business.getMonth(), business.getDate());
     this.createforeclosureForm();
     this.onChanges();
     this.setupMutualExclusion(); // 👈 Added here
@@ -285,10 +288,31 @@ export class ForeclosureComponent implements OnInit {
     this.backdateLimitMessage =
       `This foreclosure can be backdated no earlier than ${formatted} (and never before the loan's last ` +
       `recorded transaction) — this protects the repayment schedule and balances from being distorted by ` +
-      `very old backdated entries. Future dates are not allowed.`;
+      `very old backdated entries. A future date can be selected to preview amounts, but foreclosure cannot ` +
+      `be recorded with a future date.`;
+  }
+
+  get isFutureDateSelected(): boolean {
+    const raw = this.foreclosureForm?.value?.transactionDate;
+    const selected =
+      raw instanceof Date ? new Date(raw.getFullYear(), raw.getMonth(), raw.getDate()) : this.parseDateField(raw);
+    const businessRaw = this.settingsService.businessDate;
+    const business =
+      businessRaw instanceof Date
+        ? new Date(businessRaw.getFullYear(), businessRaw.getMonth(), businessRaw.getDate())
+        : this.parseDateField(businessRaw);
+    return !!(selected && business && selected.getTime() > business.getTime());
+  }
+
+  get selectedTransactionDateLabel(): string {
+    const value = this.foreclosureForm?.value?.transactionDate;
+    return value ? this.dateUtils.formatDate(value, this.settingsService.dateFormat) : '';
   }
 
   submit() {
+    if (this.isFutureDateSelected || this.dateErrorMessage) {
+      return;
+    }
     const foreclosureFormData = this.foreclosureForm.value;
     const locale = this.settingsService.language.code;
     const dateFormat = this.settingsService.dateFormat;

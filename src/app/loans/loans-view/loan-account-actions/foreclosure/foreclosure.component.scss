@@ -64,6 +64,15 @@
   }
 }
 
+.future-preview-note {
+  border-left-color: #7c3aed;
+  background: rgb(124 58 237 / 8%);
+
+  mat-icon {
+    color: #7c3aed;
+  }
+}
+
 .closure-type-banner {
   display: flex;
   align-items: flex-start;

@@ -25,11 +25,12 @@ import { SavingsService } from 'app/savings/savings.service';
 export class TransferFromSavingsDialogComponent implements OnInit {
   transferForm: UntypedFormGroup;
   /**
-   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS (30) before the business date, or the
+   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS before the business date, or the
    * loan's disbursement date if that is later (see BackdatedRepaymentValidator#computeEarliestAllowedTransactionDate
-   * on the server). Replaced with the real value once the initial template loads (see loadInitialTemplate), so the
-   * calendar never lets an operator pick a date the server would reject.
-   * Maximum is always the business date — backend rejects future transaction dates.
+   * on the server). Replaced with the real value once the initial template loads (see loadInitialTemplate).
+   * Maximum allows FUTURE dates so ops can preview LPI that would accrue until a future pay date.
+   * A transfer cannot actually be recorded with a future date — the backend rejects it — so Submit is
+   * disabled while a future date is selected (see isFutureDateSelected).
    */
   minDate = new Date(2000, 0, 1);
   maxDate: Date;
@@ -114,8 +115,10 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    // Backend rejects future transfer dates ("Transaction date cannot be in the future") — clamp calendar to today.
-    this.maxDate = new Date(this.settingsService.businessDate);
+    // Allow selecting a future date so ops can preview LPI that would accrue until then. Submission with a
+    // future date stays blocked — the backend rejects it and Submit is disabled (see isFutureDateSelected).
+    const business = new Date(this.settingsService.businessDate);
+    this.maxDate = new Date(business.getFullYear() + 5, business.getMonth(), business.getDate());
     this.createForm();
     this.loadInitialTemplate();
     this.transferForm.get('transactionDate')?.valueChanges.subscribe((value: Date) => {
@@ -220,6 +223,9 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       });
   }
 
+  /** Additional future LPI returned by /future-charges for the selected date (0 when not future). */
+  private additionalFutureLpiAmount = 0;
+
   private recomputeForTransactionDate(transactionDateValue: Date): void {
     const loanId = String(this.data.loan.id);
     const transactionDate = this.formatDate(transactionDateValue);
@@ -250,7 +256,8 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       )
       .subscribe({
         next: ({ penaltyTemplate, futureLpi }: any) => {
-          this.applyPenaltyTemplateForDate(penaltyTemplate, Number(futureLpi?.totalLPIAmount || 0));
+          this.additionalFutureLpiAmount = Number(futureLpi?.totalLPIAmount || 0);
+          this.applyPenaltyTemplateForDate(penaltyTemplate, this.additionalFutureLpiAmount);
           this.dateImpactMessages = this.buildDateImpactMessages(transactionDate);
           this.dueEmis = this.getDueEmisForDate(transactionDateValue);
           this.refreshSavingsBalanceAsOfDate(transactionDateValue);
@@ -260,6 +267,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
           this.validateTransactionAmount(true);
         },
         error: () => {
+          this.additionalFutureLpiAmount = 0;
           this.isTemplateLoading = false;
           this.validateTransactionAmount(true);
         }
@@ -283,7 +291,8 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     const formatted = this.formatDate(parsed);
     this.backdateLimitMessage =
       `This settlement can be backdated no earlier than ${formatted} — this protects the repayment schedule ` +
-      `and balances from being distorted by very old backdated entries. Future dates are not allowed.`;
+      `and balances from being distorted by very old backdated entries. A future date can be selected to ` +
+      `preview how much late-payment interest (LPI) would accrue, but a transfer cannot be recorded with a future date.`;
   }
 
   private captureLinkedSavingsAccount(source: any): void {
@@ -584,13 +593,28 @@ export class TransferFromSavingsDialogComponent implements OnInit {
           `waived by backdating this transfer to ${formattedDate}.`
       );
     } else if (penaltyDelta < -0.01) {
+      const daysAhead = this.daysFromBusinessDate(transactionDate);
+      const dayText = daysAhead === 1 ? '1 day' : `${daysAhead} days`;
+      const additional =
+        this.additionalFutureLpiAmount > 0.01 ? this.additionalFutureLpiAmount : Math.abs(penaltyDelta);
       messages.push(
-        `Selecting a future date (${formattedDate}) adds ${this.currencySymbol} ${this.formatAmount(Math.abs(penaltyDelta))} ` +
-          `of additional late-payment interest that will accrue between today and then.`
+        `Selecting a future date (${formattedDate}, ${dayText} after today) adds ` +
+          `${this.currencySymbol} ${this.formatAmount(additional)} of additional late-payment interest (LPI) ` +
+          `that would accrue between today and then. This is a preview only — the backend cannot record a future-dated transfer.`
       );
     }
 
     return messages;
+  }
+
+  /** Calendar-day difference between business date and selected date (0 if not future / unparseable). */
+  private daysFromBusinessDate(transactionDate: string): number {
+    const selected = this.toComparableDate(this.dateUtils.parseDate(transactionDate) || transactionDate);
+    const business = this.toComparableDate(this.settingsService.businessDate);
+    if (!selected || !business || selected.getTime() <= business.getTime()) {
+      return 0;
+    }
+    return Math.round((selected.getTime() - business.getTime()) / (24 * 60 * 60 * 1000));
   }
 
   private patchDefaultTransactionAmount(): void {
@@ -754,10 +778,27 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     return value ? this.formatDate(value) : '';
   }
 
+  /**
+   * True when the selected transaction date is after the business date. Preview-only: amounts reflect what
+   * would be owed on that date (with LPI accrued until then), but a transfer cannot be recorded in the future.
+   */
+  get isFutureDateSelected(): boolean {
+    const selected = this.toComparableDate(this.transferForm?.value?.transactionDate);
+    const business = this.toComparableDate(this.settingsService.businessDate);
+    return !!(selected && business && selected.getTime() > business.getTime());
+  }
+
   /** Explains why Submit is disabled so closure banners never look actionable when they are not. */
   get submitBlockedReason(): string | null {
     if (this.isTemplateLoading) {
       return 'Loading settlement details…';
+    }
+    if (this.isFutureDateSelected) {
+      return (
+        `No future-dated payment can be done — the backend does not support recording a transfer after today ` +
+        `(${this.formatDate(this.settingsService.businessDate)}). Change the transaction date to today (or earlier) to submit. ` +
+        `The amounts above are a preview of what would be due if paid on ${this.selectedTransactionDateLabel}.`
+      );
     }
     if (!this.linkedSavingsAccountId) {
       return 'No linked savings account is available for this loan — transfer cannot be submitted.';
@@ -854,7 +895,8 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       this.isLoading ||
       !this.transferTemplate ||
       !this.linkedSavingsAccountId ||
-      this.backdateBlockedMessage
+      this.backdateBlockedMessage ||
+      this.isFutureDateSelected
     ) {
       return;
     }

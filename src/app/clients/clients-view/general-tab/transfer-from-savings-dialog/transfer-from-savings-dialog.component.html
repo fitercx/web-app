@@ -72,6 +72,16 @@
         <span>{{ backdateLimitMessage }}</span>
       </div>
 
+      <div class="date-impact-banner future-preview-note" *ngIf="isFutureDateSelected">
+        <mat-icon>visibility</mat-icon>
+        <span>
+          <strong>Preview only</strong> — you selected a future date ({{ selectedTransactionDateLabel }}). The amounts
+          below show what would be due if paid on that date, including late-payment interest (LPI) accruing until then.
+          No future-dated payment can be done — the backend does not support it. Change the date to today (or earlier)
+          to submit.
+        </span>
+      </div>
+
       <div class="date-impact-banner" *ngIf="!backdateBlockedMessage && dateImpactMessages.length">
         <mat-icon>info</mat-icon>
         <ul>
@@ -157,7 +167,8 @@
         isTemplateLoading ||
         !transferTemplate ||
         !linkedSavingsAccountId ||
-        backdateBlockedMessage
+        backdateBlockedMessage ||
+        isFutureDateSelected
       "
       *mifosxHasPermission="'CREATE_ACCOUNTTRANSFER'"
       (click)="submit()"

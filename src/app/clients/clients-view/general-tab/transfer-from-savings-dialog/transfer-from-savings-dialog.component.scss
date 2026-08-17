@@ -72,6 +72,16 @@
   }
 }
 
+.future-preview-note {
+  border-left-color: #7c3aed;
+  background: rgb(124 58 237 / 8%);
+  font-weight: 500;
+
+  mat-icon {
+    color: #7c3aed;
+  }
+}
+
 .full-outstanding-banner {
   border-left-color: #4338ca;
   background: rgb(67 56 202 / 8%);
