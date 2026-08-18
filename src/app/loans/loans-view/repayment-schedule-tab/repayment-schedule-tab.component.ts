@@ -10,6 +10,22 @@ import {
   getDisplayTotalScheduledInterest,
   getForeclosureUnearnedInterestDetails
 } from '../foreclosure-unearned-interest.utils';
+import {
+  buildForeclosureScheduleDisplayPeriods,
+  getForeclosureDisplayStatus,
+  hasForeclosureActualOverlay,
+  isForeclosureScheduleOverlayActive,
+  isForeclosureClosureActual,
+  isForeclosurePaidAsScheduled,
+  isForeclosureRemovedRow,
+  showForeclosureAmountPaidOverlay,
+  showForeclosureDueDateOverlay,
+  showForeclosureEmiOverlay,
+  showForeclosureInterestOverlay,
+  showForeclosurePaidDateOverlay,
+  showForeclosurePrincipalOverlay
+} from '../foreclosure-schedule-display.utils';
+import { ForeclosureScheduleDisplayPeriod } from 'app/loans/models/foreclosure-unearned-interest.model';
 import { SettingsService } from 'app/settings/settings.service';
 import { FormDialogComponent } from 'app/shared/form-dialog/form-dialog.component';
 import { DatepickerBase } from 'app/shared/form-dialog/formfield/model/datepicker-base';
@@ -59,6 +75,9 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   foreclosureUnearnedInterestDetails: ForeclosureUnearnedInterestDetails | null = null;
   /** Original scheduled interest by installment (early repayment snapshot). */
   private originalInterestByInstallment = new Map<number, number>();
+  /** Foreclosed loans: original schedule rows with actual-closure overlay metadata. */
+  displaySchedulePeriods: ForeclosureScheduleDisplayPeriod[] = [];
+  foreclosureScheduleOverlayActive = false;
   /** Base columns for regular loans */
   baseDisplayedColumns: string[] = [
     'number',
@@ -139,6 +158,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     if (this.repaymentScheduleDetails == null) {
       this.repaymentScheduleDetails = this.loanDetailsDataRepaymentSchedule;
     }
+    this.refreshForeclosureScheduleDisplay();
     this.refreshWaivedDisplayFlags();
     this.updateDisplayedColumns();
     this.updateEditCache();
@@ -160,6 +180,9 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
+    if (changes['repaymentScheduleDetails']) {
+      this.refreshForeclosureScheduleDisplay();
+    }
     this.totalRepaymentExpected = 0;
     this.listOfData.forEach((item) => {
       this.totalRepaymentExpected = this.totalRepaymentExpected + item.totalDueForPeriod;
@@ -172,6 +195,10 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   installmentStyle(installment: RepaymentSchedulePeriod): string {
+    const display = (installment as ForeclosureScheduleDisplayPeriod).foreclosureDisplay;
+    if (display?.kind === 'removed') {
+      return 'foreclosure-removed';
+    }
     if (installment.complete || !this.hasPeriodOutstanding(installment)) {
       return 'paid';
     }
@@ -1040,6 +1067,100 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   private refreshForeclosureUnearnedInterestDetails(loanDetails: any): void {
     this.foreclosureUnearnedInterestDetails = getForeclosureUnearnedInterestDetails(loanDetails);
     this.originalInterestByInstallment = buildOriginalInterestByInstallment(this.foreclosureUnearnedInterestDetails);
+    this.refreshForeclosureScheduleDisplay();
+  }
+
+  private refreshForeclosureScheduleDisplay(): void {
+    const currentPeriods = this.repaymentScheduleDetails?.periods ?? [];
+    this.foreclosureScheduleOverlayActive = isForeclosureScheduleOverlayActive(this.foreclosureUnearnedInterestDetails);
+    this.displaySchedulePeriods = buildForeclosureScheduleDisplayPeriods(
+      currentPeriods,
+      this.foreclosureUnearnedInterestDetails
+    );
+  }
+
+  get scheduleTablePeriods(): ForeclosureScheduleDisplayPeriod[] {
+    return this.foreclosureScheduleOverlayActive
+      ? this.displaySchedulePeriods
+      : (this.repaymentScheduleDetails?.periods ?? []);
+  }
+
+  hasForeclosureActualOverlay(item: ForeclosureScheduleDisplayPeriod): boolean {
+    return hasForeclosureActualOverlay(item);
+  }
+
+  showForeclosureDueDateOverlay(item: ForeclosureScheduleDisplayPeriod): boolean {
+    return showForeclosureDueDateOverlay(item);
+  }
+
+  showForeclosurePaidDateOverlay(item: ForeclosureScheduleDisplayPeriod): boolean {
+    return showForeclosurePaidDateOverlay(item);
+  }
+
+  showForeclosurePrincipalOverlay(item: ForeclosureScheduleDisplayPeriod): boolean {
+    return showForeclosurePrincipalOverlay(item);
+  }
+
+  showForeclosureInterestOverlay(item: ForeclosureScheduleDisplayPeriod): boolean {
+    return showForeclosureInterestOverlay(item);
+  }
+
+  showForeclosureEmiOverlay(item: ForeclosureScheduleDisplayPeriod): boolean {
+    return showForeclosureEmiOverlay(item);
+  }
+
+  showForeclosureAmountPaidOverlay(item: ForeclosureScheduleDisplayPeriod): boolean {
+    return showForeclosureAmountPaidOverlay(item);
+  }
+
+  isForeclosurePaidAsScheduled(item: ForeclosureScheduleDisplayPeriod): boolean {
+    return isForeclosurePaidAsScheduled(item);
+  }
+
+  isForeclosureClosureActual(item: ForeclosureScheduleDisplayPeriod): boolean {
+    return isForeclosureClosureActual(item);
+  }
+
+  isForeclosureRemovedRow(item: ForeclosureScheduleDisplayPeriod): boolean {
+    return isForeclosureRemovedRow(item);
+  }
+
+  getForeclosureActualPaidDate(item: ForeclosureScheduleDisplayPeriod): any {
+    return item.foreclosureDisplay?.actualPaidDate ?? item.obligationsMetOnDate;
+  }
+
+  getOriginalEmiAmount(item: ForeclosureScheduleDisplayPeriod): number {
+    return this.toNumber(item.principalDue) + this.toNumber(item.interestDue ?? item.interestOriginalDue);
+  }
+
+  getActualEmiAmount(item: ForeclosureScheduleDisplayPeriod): number {
+    const display = item.foreclosureDisplay;
+    if (display?.actualEmiAmount != null) {
+      return display.actualEmiAmount;
+    }
+    return this.getOriginalEmiAmount(item);
+  }
+
+  getDisplayTotalOriginalPrincipal(): number {
+    if (!this.foreclosureScheduleOverlayActive) {
+      return this.toNumber(this.repaymentScheduleDetails?.totalPrincipalExpected);
+    }
+    return this.displaySchedulePeriods
+      .filter((row) => row.period != null && Number(row.period) > 0)
+      .reduce((sum, row) => sum + this.toNumber(row.principalDue), 0);
+  }
+
+  getDisplayTotalOriginalInterest(): number {
+    if (!this.foreclosureScheduleOverlayActive) {
+      return this.getDisplayTotalInterest();
+    }
+    return this.displaySchedulePeriods
+      .filter((row) => row.period != null && Number(row.period) > 0)
+      .reduce((sum, row) => sum + this.toNumber(row.interestDue ?? row.interestOriginalDue), 0);
+  }
+
+  getDisplayTotalOriginalEmi(): number {
+    return this.getDisplayTotalOriginalPrincipal() + this.getDisplayTotalOriginalInterest();
   }
 
   /** Interest column: show pre-early-repayment scheduled amount when snapshot exists. */
@@ -1354,6 +1475,13 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   getDisplayStatus(item: RepaymentSchedulePeriod): string {
+    if (this.foreclosureScheduleOverlayActive && item?.period != null && Number(item.period) > 0) {
+      const foreclosureStatus = getForeclosureDisplayStatus(item as ForeclosureScheduleDisplayPeriod);
+      if (foreclosureStatus) {
+        return foreclosureStatus;
+      }
+    }
+
     // Only apply custom status logic for LOC Receivable loans in pre-disbursement state
     if (this.isLineOfCreditReceivable() && this.isLoanPreDisbursement()) {
       // Check if this is the disbursement period

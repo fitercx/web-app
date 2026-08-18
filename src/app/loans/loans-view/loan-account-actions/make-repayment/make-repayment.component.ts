@@ -18,7 +18,8 @@ import {
   allocateSettlement,
   computePenaltyWaivedByBackdate,
   computeSavingsBalanceAsOf,
-  computeSettlementRequired
+  computeSettlementRequired,
+  computeUnearnedInterest
 } from 'app/loans/common/backdated-settlement.util';
 
 /**
@@ -85,6 +86,8 @@ export class MakeRepaymentComponent implements OnInit {
 
   /** Shown when pending LPI is due on the selected date and will be paid with this repayment. */
   lpiPaymentMessage: string | null = null;
+  /** From /template/penalties — true when the selected date is an installment due date. */
+  onInstallmentDueDate = false;
   /** How the entered amount will be applied — must match the principal/interest/fee/penalty fields. */
   settlementPreviewMessage: string | null = null;
   overpaymentWarning: string | null = null;
@@ -255,14 +258,16 @@ export class MakeRepaymentComponent implements OnInit {
         switchMap((template: any) => {
           this.dataObject.penaltyTemplate = template;
           if (isFutureDate) {
-            return this.loanService
-              .getFutureLPICharges(this.loanId, transactionDate)
-              .pipe(switchMap((futureLPI: any) => of({ template, futureLPI })));
+            return this.loanService.getFutureLPICharges(this.loanId, transactionDate).pipe(
+              switchMap((futureLPI: any) => of({ template, futureLPI })),
+              catchError(() => of({ template, futureLPI: null as any }))
+            );
           }
           return of({ template, futureLPI: null as any });
         })
       )
       .subscribe(({ template, futureLPI }: { template: any; futureLPI: any }) => {
+        this.onInstallmentDueDate = !!template?.onInstallmentDueDate;
         // Amount due = this EMI (and any earlier overdue EMIs), not remaining principal of later EMIs.
         // Overnight LPI posted after the due date is already excluded from penaltyAmountDue.
         const installmentPrincipal = template.principalOutstanding || this.baselinePrincipalOutstanding;
@@ -334,7 +339,7 @@ export class MakeRepaymentComponent implements OnInit {
     const formattedDate = transactionDate;
 
     const interestDelta = round(this.baselineInterestOutstanding - interestAmount);
-    if (interestDelta > 0.01) {
+    if (this.unearnedInterest <= 0.01 && interestDelta > 0.01) {
       messages.push(
         `Interest due is reduced by ${currencyLabel} ${interestDelta.toFixed(2)} for repaying on ${formattedDate} ` +
           `instead of today, since this is before the installment's due date (early repayment discount).`
@@ -342,7 +347,12 @@ export class MakeRepaymentComponent implements OnInit {
     }
 
     const penaltyDelta = round(this.baselinePenaltyAmountDue - totalPenaltyAmount);
-    if (penaltyDelta > 0.01) {
+    if (this.onInstallmentDueDate && totalPenaltyAmount <= 0.01) {
+      messages.push(
+        `This date is an installment due date — no late-payment interest (LPI) applies. ` +
+          `Any LPI posted overnight after this due date will be automatically waived when you submit this repayment.`
+      );
+    } else if (penaltyDelta > 0.01) {
       messages.push(
         `${currencyLabel} ${penaltyDelta.toFixed(2)} of accrued penalty/late-payment charges will be waived ` +
           `by backdating this transaction to ${formattedDate}.`
@@ -499,7 +509,11 @@ export class MakeRepaymentComponent implements OnInit {
     return Number(this.dataObject?.penaltyTemplate?.interestOutstanding || 0);
   }
 
-  /** Fee from the repayment template — not date-scoped; /template/penalties does not return fees. */
+  /** Full-period interest on the ledger minus pro-rated interest due on the selected date. */
+  get unearnedInterest(): number {
+    return computeUnearnedInterest(Number(this.loanSummary?.interestOutstanding ?? 0), this.interestAsOfDate);
+  }
+
   get feeAsOfDate(): number {
     return Number(this.dataObject?.repaymentTemplate?.feeChargesPortion || 0);
   }
@@ -524,7 +538,12 @@ export class MakeRepaymentComponent implements OnInit {
   }
 
   get penaltyWaivedByBackdate(): number {
-    return computePenaltyWaivedByBackdate(this.penaltyInSummary, this.penaltyAsOfDate);
+    const fromTemplate = Number(this.dataObject?.penaltyTemplate?.lpiWaivedOnSettlement || 0);
+    if (fromTemplate > 0.01) {
+      return this.roundAmount(fromTemplate);
+    }
+    const penaltyAsOfToday = Math.max(this.penaltyInSummary, this.baselinePenaltyAmountDue);
+    return computePenaltyWaivedByBackdate(penaltyAsOfToday, this.penaltyAsOfDate);
   }
 
   get outstandingAfterWaiver(): number {

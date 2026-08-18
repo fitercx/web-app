@@ -4,19 +4,36 @@
 
 .linked-savings {
   display: flex;
-  align-items: flex-start;
-  padding: 0.75rem 0 0.5rem;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.65rem 0.75rem;
   border-left: 4px solid var(--color-primary, #3f51b5);
   margin-bottom: 0.75rem;
   background: rgb(63 81 181 / 6%);
   border-radius: 4px;
-  padding-left: 0.75rem;
-  font-size: 0.875rem;
+  font-size: 0.82rem;
+
+  &--compact {
+    margin-top: 0.5rem;
+  }
 }
 
-.linked-savings__account-no {
-  font-style: italic;
-  font-weight: bold;
+.linked-savings__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+
+  dt {
+    margin: 0;
+    color: #64748b;
+    font-weight: 500;
+  }
+
+  dd {
+    margin: 0;
+    font-weight: 600;
+    text-align: right;
+  }
 }
 
 .date-impact-banner {
@@ -67,42 +84,55 @@
 .future-preview-note {
   border-left-color: #7c3aed;
   background: rgb(124 58 237 / 8%);
+  font-weight: 500;
 
   mat-icon {
     color: #7c3aed;
   }
+
+  &--compact {
+    font-size: 0.78rem;
+    padding: 0.45rem 0.65rem;
+  }
 }
 
-.closure-type-banner {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  padding: 0.6rem 0.75rem;
-  margin-bottom: 0.75rem;
-  border-left: 4px solid;
-  border-radius: 4px;
-  font-size: 0.8rem;
-  font-weight: 500;
+.full-outstanding-reference {
+  border-left-color: #475569;
+  background: rgb(71 85 105 / 8%);
 
   mat-icon {
-    flex-shrink: 0;
+    color: #475569;
+  }
+}
+
+.emi-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+}
+
+.emi-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0 0.65rem;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 600;
+
+  &.overdue {
+    background: #dc2626;
   }
 
-  &--foreclosure {
-    border-left-color: #d97706;
-    background: rgb(217 119 6 / 10%);
-
-    mat-icon {
-      color: #d97706;
-    }
+  &.due {
+    background: #d97706;
   }
+}
 
-  &--normal {
-    border-left-color: #16a34a;
-    background: rgb(22 163 74 / 8%);
-
-    mat-icon {
-      color: #16a34a;
-    }
-  }
+.submit-blocked {
+  width: 100%;
+  margin: 0 0 0.5rem;
+  font-weight: 500;
 }

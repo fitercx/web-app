@@ -1,46 +1,16 @@
 <h2 mat-dialog-title>Transfer from Savings Account</h2>
 
 <mat-dialog-content class="transfer-dialog">
-  <div class="linked-savings" *ngIf="linkedSavingsAccountAccountNo">
-    <div>
-      <div>
-        {{ 'labels.inputs.Linked Savings Account (Auto Debit Source)' | translate }} :
-        <span class="linked-savings__account-no">
-          {{ linkedSavingsAccountAccountNo }} - {{ linkedSavingsAccountProductName }}
-        </span>
-      </div>
-      <div>
-        Available balance as of {{ selectedTransactionDateLabel }} is
-        <span class="linked-savings__account-no">
-          {{ currencySymbol }} {{ availableBalanceAsOfDate | formatNumber }}
-        </span>
-      </div>
+  <dl class="linked-savings linked-savings--compact" *ngIf="linkedSavingsAccountAccountNo">
+    <div class="linked-savings__row">
+      <dt>Linked savings</dt>
+      <dd>{{ linkedSavingsAccountAccountNo }} · {{ linkedSavingsAccountProductName }}</dd>
     </div>
-  </div>
-
-  <div class="date-impact-banner full-outstanding-banner" *ngIf="dueAsOfDateTotal > 0 || outstandingAfterWaiver > 0">
-    <mat-icon>account_balance</mat-icon>
-    <span>
-      Amount due as of {{ selectedTransactionDateLabel }}:
-      <strong>{{ currencySymbol }} {{ dueAsOfDateTotal | formatNumber }}</strong>
-      (this installment / overdue EMIs, interest due, fees, and any LPI still due on this date).
-      <ng-container *ngIf="penaltyWaivedByBackdate > 0.01">
-        {{ currencySymbol }} {{ penaltyWaivedByBackdate | formatNumber }} of late-payment interest posted after this due
-        date (from the next calendar day) will be waived and is <strong>not</strong> included.
-      </ng-container>
-      <ng-container *ngIf="outstandingAfterWaiver > dueAsOfDateTotal + 0.01">
-        Paying the due amount leaves the loan Active. Amount to close:
-        <strong>{{ currencySymbol }} {{ outstandingAfterWaiver | formatNumber }}</strong>
-        (remaining principal + interest due + fees + LPI still due).
-      </ng-container>
-      <ng-container *ngIf="outstandingAfterWaiver <= dueAsOfDateTotal + 0.01">
-        Paying this amount will close the loan (obligations met).
-        <ng-container *ngIf="penaltyWaivedByBackdate > 0.01">
-          Do not add waived LPI or the loan will be overpaid.
-        </ng-container>
-      </ng-container>
-    </span>
-  </div>
+    <div class="linked-savings__row">
+      <dt>Available as of {{ selectedTransactionDateLabel }}</dt>
+      <dd>{{ currencySymbol }} {{ availableBalanceAsOfDate | formatNumber }}</dd>
+    </div>
+  </dl>
 
   <form [formGroup]="transferForm" (ngSubmit)="submit()">
     <div fxLayout="column">
@@ -67,47 +37,18 @@
         <span>{{ backdateBlockedMessage }}</span>
       </div>
 
-      <div class="date-impact-banner backdate-limit-note" *ngIf="!backdateBlockedMessage && backdateLimitMessage">
-        <mat-icon>event_busy</mat-icon>
-        <span>{{ backdateLimitMessage }}</span>
-      </div>
-
-      <div class="date-impact-banner future-preview-note" *ngIf="isFutureDateSelected">
+      <div class="date-impact-banner future-preview-note future-preview-note--compact" *ngIf="isFutureDateSelected">
         <mat-icon>visibility</mat-icon>
-        <span>
-          <strong>Preview only</strong> — you selected a future date ({{ selectedTransactionDateLabel }}). The amounts
-          below show what would be due if paid on that date, including late-payment interest (LPI) accruing until then.
-          No future-dated payment can be done — the backend does not support it. Change the date to today (or earlier)
-          to submit.
-        </span>
+        <span><strong>Preview only</strong> — submit disabled until you pick today or an earlier date.</span>
       </div>
 
-      <div class="date-impact-banner" *ngIf="!backdateBlockedMessage && dateImpactMessages.length">
-        <mat-icon>info</mat-icon>
-        <ul>
-          <li *ngFor="let message of dateImpactMessages">{{ message }}</li>
-        </ul>
-      </div>
-
-      <mat-form-field>
-        <mat-label>Principal</mat-label>
-        <input matInput [value]="displayedPrincipal | formatNumber" disabled />
-      </mat-form-field>
-
-      <mat-form-field>
-        <mat-label>Interest</mat-label>
-        <input matInput [value]="displayedInterest | formatNumber" disabled />
-      </mat-form-field>
-
-      <mat-form-field>
-        <mat-label>{{ 'labels.inputs.Fee Amount' | translate }}</mat-label>
-        <input matInput [value]="displayedFee | formatNumber" disabled />
-      </mat-form-field>
-
-      <mat-form-field>
-        <mat-label>{{ 'labels.inputs.Penalty Amount' | translate }}</mat-label>
-        <input matInput [value]="displayedPenalty | formatNumber" disabled />
-      </mat-form-field>
+      <mifosx-expandable-static-hint
+        *ngIf="!backdateBlockedMessage && backdateLimitMessage"
+        label="Backdate &amp; future-date rules"
+      >
+        <p>{{ backdateLimitMessage }}</p>
+        <p>{{ staticFutureDatePolicy }}</p>
+      </mifosx-expandable-static-hint>
 
       <mat-form-field>
         <mat-label>{{ 'labels.inputs.Transaction Amount' | translate }}</mat-label>
@@ -115,22 +56,38 @@
         <mat-error *ngIf="amountErrorMessage">{{ amountErrorMessage }}</mat-error>
       </mat-form-field>
 
-      <div class="date-impact-banner lpi-payment-note" *ngIf="lpiPaymentMessage">
-        <mat-icon>payments</mat-icon>
-        <span>{{ lpiPaymentMessage }}</span>
+      <div class="settlement-mode" *ngIf="!backdateBlockedMessage && canUseManualPreview">
+        <mat-slide-toggle
+          [checked]="isManualSettlementPreview"
+          (change)="onManualPreviewToggle($event.checked)"
+          color="primary"
+        >
+          Preview entered amount allocation
+        </mat-slide-toggle>
+        <span class="settlement-mode__hint" *ngIf="!isManualSettlementPreview">
+          Showing settlement as of {{ selectedTransactionDateLabel }} ({{ currencySymbol }}
+          {{ dueAsOfDateTotal | formatNumber }})
+        </span>
       </div>
 
-      <div class="date-impact-banner closure-refund-notice" *ngIf="closureRefundNotice">
-        <mat-icon>account_balance_wallet</mat-icon>
-        <span>{{ closureRefundNotice }}</span>
-      </div>
+      <mifosx-settlement-summary-card
+        *ngIf="!backdateBlockedMessage"
+        [class.settlement-summary--manual]="isManualSettlementPreview"
+        [currencySymbol]="currencySymbol"
+        [eyebrow]="displaySettlementEyebrow"
+        [dateLabel]="selectedTransactionDateLabel"
+        [totalAmount]="displaySettlementTotal"
+        [lines]="displaySettlementLines"
+        [subtitle]="displaySettlementSubtitle"
+        [footnotes]="displaySettlementFootnotes"
+        [ledgerToday]="displayLedgerToday"
+        [ledgerDelta]="displayLedgerDelta"
+        [businessDateLabel]="businessDateLabel"
+        [loading]="isTemplateLoading"
+        [closesLoan]="displaySettlementClosesLoan"
+      ></mifosx-settlement-summary-card>
 
-      <div class="date-impact-banner overpayment-warning" *ngIf="overpaymentWarning">
-        <mat-icon>warning</mat-icon>
-        <span>{{ overpaymentWarning }}</span>
-      </div>
-
-      <div class="emi-hints" *ngIf="dueEmis.length">
+      <div class="emi-hints" *ngIf="showDueEmiPills">
         <span class="emi-pill" *ngFor="let emi of dueEmis" [ngClass]="emi.state">
           EMI #{{ emi.period }} · {{ emi.dueDate | dateFormat }} · {{ currencySymbol }} {{ emi.amount | formatNumber }}
         </span>
@@ -149,12 +106,16 @@
 </mat-dialog-content>
 
 <mat-dialog-actions fxLayout="column" fxLayoutAlign="center" fxLayoutGap="5px">
+  <div class="date-impact-banner date-impact-banner--blocked submit-blocked" *ngIf="submitErrorMessage">
+    <mat-icon>error</mat-icon>
+    <span>{{ submitErrorMessage }}</span>
+  </div>
   <div class="date-impact-banner date-impact-banner--blocked submit-blocked" *ngIf="submitBlockedReason">
     <mat-icon>info</mat-icon>
     <span>{{ submitBlockedReason }}</span>
   </div>
   <div fxLayout="row" fxLayout.xs="column" fxLayoutAlign="center" fxLayoutGap="5px">
-    <button type="button" mat-raised-button mat-dialog-close>
+    <button type="button" mat-raised-button mat-dialog-close [disabled]="isLoading">
       {{ 'labels.buttons.Cancel' | translate }}
     </button>
     <button
@@ -173,7 +134,7 @@
       *mifosxHasPermission="'CREATE_ACCOUNTTRANSFER'"
       (click)="submit()"
     >
-      {{ 'labels.buttons.Submit' | translate }}
+      {{ isLoading ? 'Submitting…' : ('labels.buttons.Submit' | translate) }}
     </button>
   </div>
 </mat-dialog-actions>

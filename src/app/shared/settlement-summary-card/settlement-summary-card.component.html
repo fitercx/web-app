@@ -1,0 +1,36 @@
+<section class="settlement-summary" *ngIf="!loading && totalAmount > 0.01">
+  <div class="settlement-summary__head">
+    <div>
+      <div class="settlement-summary__eyebrow">{{ eyebrow || 'Settlement as of ' + dateLabel }}</div>
+      <div class="settlement-summary__total">{{ currencySymbol }} {{ totalAmount | formatNumber }}</div>
+      <div class="settlement-summary__subtitle" *ngIf="subtitle">{{ subtitle }}</div>
+      <div class="settlement-summary__subtitle" *ngIf="!subtitle && closesLoan">Closes the loan</div>
+    </div>
+    <span class="settlement-summary__badge" *ngIf="badge">{{ badge }}</span>
+  </div>
+
+  <dl class="settlement-summary__lines" *ngIf="lines.length">
+    <div class="settlement-summary__line" *ngFor="let line of lines">
+      <dt>{{ line.label }}</dt>
+      <dd>{{ currencySymbol }} {{ line.amount | formatNumber }}</dd>
+    </div>
+  </dl>
+
+  <ul class="settlement-summary__footnotes" *ngIf="footnotes.length">
+    <li
+      *ngFor="let note of footnotes"
+      [class.settlement-summary__footnote--negative]="footnoteTone(note) === 'negative'"
+    >
+      {{ footnoteText(note) }}
+    </li>
+  </ul>
+
+  <div class="settlement-summary__ledger" *ngIf="showLedgerFootnote">
+    Account list · {{ businessDateLabel }}: {{ currencySymbol }} {{ ledgerToday | formatNumber }}
+    <ng-container *ngIf="ledgerDelta > 0.01">
+      (+{{ currencySymbol }} {{ ledgerDelta | formatNumber }} LPI excluded)
+    </ng-container>
+  </div>
+</section>
+
+<div class="settlement-summary settlement-summary--loading" *ngIf="loading">Loading settlement…</div>

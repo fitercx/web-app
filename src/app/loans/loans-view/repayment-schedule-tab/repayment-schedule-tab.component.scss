@@ -184,6 +184,60 @@ table {
   line-height: 1.5;
 }
 
+.foreclosure-removed {
+  background-color: rgb(158 158 158 / 8%);
+  color: #9e9e9e;
+}
+
+.foreclosure-closure {
+  color: $status-paid;
+}
+
+.foreclosure-scheduled-muted {
+  color: #9e9e9e;
+  font-size: 12px;
+  font-weight: 400;
+  display: block;
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+.foreclosure-actual-amount {
+  color: #757575;
+  font-size: 12px;
+  font-weight: 400;
+  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.foreclosure-waived-amount {
+  color: #9e9e9e;
+  font-size: 12px;
+  font-weight: 400;
+  margin-top: 2px;
+  display: block;
+  font-style: italic;
+}
+
+.foreclosure-schedule-legend {
+  margin: 0 0 12px;
+  padding: 0 2%;
+  font-size: 13px;
+  color: #616161;
+  line-height: 1.45;
+}
+
+.foreclosure-legend-paid {
+  color: $status-paid;
+  font-weight: 500;
+}
+
+.foreclosure-legend-muted {
+  color: #9e9e9e;
+  font-weight: 500;
+}
+
 .reversed-amount {
   color: #f44336;
   font-weight: 500;

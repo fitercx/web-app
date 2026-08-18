@@ -2,7 +2,10 @@ import {
   allocateSettlement,
   computePenaltyWaivedByBackdate,
   computeSavingsBalanceAsOf,
-  computeSettlementRequired
+  computeSettlementRequired,
+  computeUnearnedInterest,
+  isDummyGraceInstallmentDueOnDate,
+  reconcilePenaltyWithLedger
 } from './backdated-settlement.util';
 
 describe('backdated-settlement.util', () => {
@@ -119,6 +122,10 @@ describe('backdated-settlement.util', () => {
     expect(allocation.unallocated).toBe(0);
   });
 
+  it('computes unearned interest as ledger interest minus pro-rated as-of-date interest', () => {
+    expect(computeUnearnedInterest(2663.01, 2367.12)).toBe(295.89);
+  });
+
   it('returns the savings running balance as of the selected backdate', () => {
     const balance = computeSavingsBalanceAsOf(
       [
@@ -139,5 +146,46 @@ describe('backdated-settlement.util', () => {
     );
 
     expect(balance).toBe(82000);
+  });
+
+  it('adds ledger penalty gap back when dummy grace row caused template to underquote LPI', () => {
+    const periods = [{ period: 2, dueDate: [
+          2026,
+          8,
+          18
+        ], principalDue: 0, interestDue: 0, isAdditional: true }];
+    expect(
+      isDummyGraceInstallmentDueOnDate(periods, new Date(2026, 7, 18), (value) => {
+        if (Array.isArray(value)) {
+          return new Date(value[0], value[1] - 1, value[2]);
+        }
+        return null;
+      })
+    ).toBe(true);
+    expect(
+      reconcilePenaltyWithLedger({
+        penaltyFromTemplate: 1271.55,
+        penaltyInSummary: 1356.32,
+        fullLoanOutstanding: 104489.88,
+        dueWithoutPenaltyReconcile: 103133.56,
+        isBusinessDate: true,
+        onInstallmentDueDate: true,
+        hasRealEmiDueOnDate: false
+      })
+    ).toBe(1356.32);
+  });
+
+  it('does not add penalty gap on a genuine on-time EMI due date', () => {
+    expect(
+      reconcilePenaltyWithLedger({
+        penaltyFromTemplate: 0,
+        penaltyInSummary: 73.97,
+        fullLoanOutstanding: 81984.11,
+        dueWithoutPenaltyReconcile: 81984.11,
+        isBusinessDate: true,
+        onInstallmentDueDate: true,
+        hasRealEmiDueOnDate: true
+      })
+    ).toBe(0);
   });
 });
