@@ -64,6 +64,15 @@
             <span>{{ backdateLimitMessage }}</span>
           </div>
 
+          <div class="date-impact-banner future-preview-note" *ngIf="isFutureDateSelected">
+            <mat-icon>visibility</mat-icon>
+            <span>
+              <strong>Preview only</strong> — you selected a future date ({{ selectedTransactionDateLabel }}). No
+              future-dated foreclosure can be done — the backend does not support it. Change the date to today (or
+              earlier) to submit.
+            </span>
+          </div>
+
           <div class="date-impact-banner" *ngIf="!dateErrorMessage && dateImpactMessages.length">
             <mat-icon>info</mat-icon>
             <ul>
@@ -120,7 +129,7 @@
           <button
             mat-raised-button
             color="primary"
-            [disabled]="!foreclosureForm.valid || dateErrorMessage"
+            [disabled]="!foreclosureForm.valid || dateErrorMessage || isFutureDateSelected"
             *mifosxHasPermission="'FORECLOSURE_LOAN'"
           >
             {{ 'labels.buttons.Foreclosure' | translate }}

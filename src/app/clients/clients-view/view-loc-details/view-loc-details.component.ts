@@ -199,7 +199,7 @@ export class ViewLocDetailsComponent implements OnInit {
       tenorDays: data.tenorDays,
       activeLoans: data.activeLoans,
       totalRepaid: data.totalRepaid,
-      utilization: this.calculateUtilization(data),
+      utilization: data.utilizationPercentage ?? 0,
       avgUtilization: data.avgUtilization,
       performance: data.performance,
       charges: Array.isArray(data.charges) ? data.charges : [],
@@ -283,22 +283,6 @@ export class ViewLocDetailsComponent implements OnInit {
     } else {
       this.strokeDashoffset = this.circumference; // 0% utilization
     }
-  }
-
-  /**
-   * Calculate utilization percentage
-   */
-  private calculateUtilization(data: any): number {
-    // Use the specific field from the API response
-    const maxAmount = data.maximumAmount;
-    const consumedAmount = data.consumedAmount;
-
-    if (maxAmount && maxAmount > 0 && consumedAmount !== null && consumedAmount !== undefined) {
-      const percentage = (consumedAmount / maxAmount) * 100;
-      // Ensure percentage doesn't exceed 100% and is not negative
-      return Math.max(0, Math.min(100, Math.round(percentage * 10) / 10)); // Round to 1 decimal place
-    }
-    return 0;
   }
 
   /**

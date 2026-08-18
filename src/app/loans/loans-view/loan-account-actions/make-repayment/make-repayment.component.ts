@@ -198,6 +198,9 @@ export class MakeRepaymentComponent implements OnInit {
 
   /** Submits the repayment form */
   submit() {
+    if (this.isFutureDateSelected) {
+      return;
+    }
     const repaymentLoanFormData = this.repaymentLoanForm.value;
     const locale = this.settingsService.language.code;
     const dateFormat = this.settingsService.dateFormat;
@@ -345,9 +348,17 @@ export class MakeRepaymentComponent implements OnInit {
           `by backdating this transaction to ${formattedDate}.`
       );
     } else if (penaltyDelta < -0.01) {
+      const selected = this.toComparableDate(this.dateUtils.parseDate(transactionDate) || transactionDate);
+      const business = this.toComparableDate(this.settingsService.businessDate);
+      const daysAhead =
+        selected && business && selected.getTime() > business.getTime()
+          ? Math.round((selected.getTime() - business.getTime()) / (24 * 60 * 60 * 1000))
+          : 0;
+      const dayText = daysAhead === 1 ? '1 day' : `${Math.max(daysAhead, 0)} days`;
       messages.push(
-        `Selecting a future date (${formattedDate}) adds ${currencyLabel} ${Math.abs(penaltyDelta).toFixed(2)} ` +
-          `of additional late-payment interest that will accrue between today and then.`
+        `Selecting a future date (${formattedDate}, ${dayText} after today) adds ${currencyLabel} ${Math.abs(penaltyDelta).toFixed(2)} ` +
+          `of additional late-payment interest (LPI) that would accrue between today and then. Preview only — ` +
+          `the backend cannot record a future-dated repayment.`
       );
     }
 
