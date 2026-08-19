@@ -4,18 +4,36 @@
 
 .linked-savings {
   display: flex;
-  align-items: flex-start;
-  padding: 0.75rem 0 0.5rem 0.75rem;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.65rem 0.75rem;
   border-left: 4px solid var(--color-primary, #3f51b5);
   margin-bottom: 0.75rem;
   background: rgb(63 81 181 / 6%);
   border-radius: 4px;
-  font-size: 0.875rem;
+  font-size: 0.82rem;
+
+  &--compact {
+    margin-top: 0.25rem;
+  }
 }
 
-.linked-savings__account-no {
-  font-style: italic;
-  font-weight: bold;
+.linked-savings__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+
+  dt {
+    margin: 0;
+    color: #64748b;
+    font-weight: 500;
+  }
+
+  dd {
+    margin: 0;
+    font-weight: 600;
+    text-align: right;
+  }
 }
 
 .date-impact-banner {
@@ -80,14 +98,10 @@
   mat-icon {
     color: #7c3aed;
   }
-}
 
-.full-outstanding-banner {
-  border-left-color: #4338ca;
-  background: rgb(67 56 202 / 8%);
-
-  mat-icon {
-    color: #4338ca;
+  &--compact {
+    font-size: 0.78rem;
+    padding: 0.45rem 0.65rem;
   }
 }
 
@@ -95,26 +109,6 @@
   width: 100%;
   margin: 0 0 0.5rem;
   font-weight: 500;
-}
-
-.closure-refund-notice {
-  border-left-color: #0f766e;
-  background: rgb(15 118 110 / 10%);
-  font-weight: 600;
-
-  mat-icon {
-    color: #0f766e;
-  }
-}
-
-.overpayment-warning {
-  border-left-color: #dc2626;
-  background: rgb(220 38 38 / 8%);
-  font-weight: 500;
-
-  mat-icon {
-    color: #dc2626;
-  }
 }
 
 .emi-hints {
@@ -140,6 +134,29 @@
 
   &.due {
     background: #d97706;
+  }
+}
+
+.settlement-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.82rem;
+
+  &__hint {
+    color: #64748b;
+    padding-left: 0.15rem;
+  }
+}
+
+.settlement-summary--manual {
+  display: block;
+  margin-bottom: 0.75rem;
+
+  ::ng-deep .settlement-summary {
+    border-color: #bfdbfe;
+    background: #eff6ff;
   }
 }
 

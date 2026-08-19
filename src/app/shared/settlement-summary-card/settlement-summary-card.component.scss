@@ -1,0 +1,121 @@
+.settlement-summary {
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+
+  &--loading {
+    color: #64748b;
+    font-size: 0.85rem;
+  }
+}
+
+.settlement-summary__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.settlement-summary__eyebrow {
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.settlement-summary__total {
+  margin-top: 0.15rem;
+  font-size: 1.65rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #0f172a;
+}
+
+.settlement-summary__subtitle {
+  margin-top: 0.2rem;
+  font-size: 0.8rem;
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.settlement-summary__badge {
+  flex-shrink: 0;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+  background: #ffedd5;
+  color: #9a3412;
+  font-size: 0.72rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.settlement-summary__lines {
+  margin: 0;
+  padding: 0.65rem 0 0;
+  border-top: 1px solid #e2e8f0;
+}
+
+.settlement-summary__line {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.28rem 0;
+  font-size: 0.82rem;
+
+  dt {
+    margin: 0;
+    color: #475569;
+    font-weight: 500;
+  }
+
+  dd {
+    margin: 0;
+    color: #0f172a;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+
+  &--total {
+    margin-top: 0.35rem;
+    padding-top: 0.45rem;
+    border-top: 1px dashed #cbd5e1;
+    font-size: 0.88rem;
+
+    dt,
+    dd {
+      font-weight: 700;
+      color: #0f172a;
+    }
+  }
+}
+
+.settlement-summary__footnotes {
+  margin: 0.65rem 0 0;
+  padding: 0.55rem 0 0 1rem;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.76rem;
+  line-height: 1.4;
+  color: #475569;
+
+  li {
+    margin: 0.15rem 0;
+  }
+}
+
+.settlement-summary__footnote--negative {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.settlement-summary__ledger {
+  margin-top: 0.55rem;
+  padding-top: 0.55rem;
+  border-top: 1px solid #e2e8f0;
+  font-size: 0.74rem;
+  color: #64748b;
+  line-height: 1.4;
+}

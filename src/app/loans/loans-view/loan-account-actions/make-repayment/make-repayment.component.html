@@ -100,6 +100,10 @@
               {{ displayedInterest | formatNumber }}
             </div>
 
+            <div fxFlex="100%" class="unearned-interest-note" *ngIf="unearnedInterest > 0.01">
+              Unearned interest: −{{ currencyLabel }} {{ unearnedInterest | formatNumber }}
+            </div>
+
             <div fxFlex="50%" class="mat-body-strong">
               {{ 'Fees' | translate }}
             </div>

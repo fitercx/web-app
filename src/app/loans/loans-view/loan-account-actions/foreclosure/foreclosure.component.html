@@ -1,22 +1,5 @@
 <div class="container mat-elevation-z8">
   <mat-card>
-    <div class="linked-savings" *ngIf="linkedSavingsAccountAccountNo">
-      <div>
-        <div>
-          {{ 'labels.inputs.Linked Savings Account (Auto Debit Source)' | translate }} :
-          <span class="linked-savings__account-no"
-            >{{ linkedSavingsAccountAccountNo }} - {{ linkedSavingsAccountProductName }}</span
-          >
-        </div>
-        <div>
-          {{ 'labels.inputs.Available Balance' | translate }} :
-          <span class="linked-savings__account-no"
-            >{{ currencySymbol }} {{ linkedSavingsAccountAvailableBalance | formatNumber }}</span
-          >
-        </div>
-      </div>
-    </div>
-
     <form [formGroup]="foreclosureForm" (ngSubmit)="submit()">
       <mat-card-content>
         <div fxLayout="column">
@@ -38,83 +21,57 @@
             </mat-error>
           </mat-form-field>
 
+          <dl class="linked-savings linked-savings--compact" *ngIf="linkedSavingsAccountAccountNo">
+            <div class="linked-savings__row">
+              <dt>Linked savings</dt>
+              <dd>{{ linkedSavingsAccountAccountNo }} · {{ linkedSavingsAccountProductName }}</dd>
+            </div>
+            <div class="linked-savings__row">
+              <dt>Available as of {{ selectedTransactionDateLabel }}</dt>
+              <dd>{{ currencySymbol }} {{ availableBalanceAsOfDate | formatNumber }}</dd>
+            </div>
+          </dl>
+
           <div class="date-impact-banner date-impact-banner--blocked" *ngIf="dateErrorMessage">
             <mat-icon>block</mat-icon>
             <span>{{ dateErrorMessage }}</span>
           </div>
 
-          <div
-            class="closure-type-banner closure-type-banner--foreclosure"
-            *ngIf="!dateErrorMessage && closureTypeInfo?.type === 'foreclosure'"
-          >
-            <mat-icon>schedule</mat-icon>
-            <span>{{ closureTypeInfo.message }}</span>
-          </div>
-
-          <div
-            class="closure-type-banner closure-type-banner--normal"
-            *ngIf="!dateErrorMessage && closureTypeInfo?.type === 'normal_closure'"
-          >
-            <mat-icon>check_circle</mat-icon>
-            <span>{{ closureTypeInfo.message }}</span>
-          </div>
-
-          <div class="date-impact-banner backdate-limit-note" *ngIf="!dateErrorMessage && backdateLimitMessage">
-            <mat-icon>event_busy</mat-icon>
-            <span>{{ backdateLimitMessage }}</span>
-          </div>
-
-          <div class="date-impact-banner future-preview-note" *ngIf="isFutureDateSelected">
+          <div class="date-impact-banner future-preview-note future-preview-note--compact" *ngIf="isFutureDateSelected">
             <mat-icon>visibility</mat-icon>
-            <span>
-              <strong>Preview only</strong> — you selected a future date ({{ selectedTransactionDateLabel }}). No
-              future-dated foreclosure can be done — the backend does not support it. Change the date to today (or
-              earlier) to submit.
+            <span><strong>Preview only</strong> — submit disabled until you pick today or an earlier date.</span>
+          </div>
+
+          <mifosx-expandable-static-hint
+            *ngIf="!dateErrorMessage && backdateLimitMessage"
+            label="Backdate &amp; future-date rules"
+          >
+            <p>{{ backdateLimitMessage }}</p>
+            <p>{{ staticFutureDatePolicy }}</p>
+          </mifosx-expandable-static-hint>
+
+          <mifosx-settlement-summary-card
+            *ngIf="showSettlementPreview"
+            [currencySymbol]="currencySymbol"
+            [dateLabel]="selectedTransactionDateLabel"
+            [totalAmount]="dueAsOfDateTotal"
+            [lines]="settlementLines"
+            [badge]="settlementBadge"
+            [subtitle]="settlementSubtitle"
+            [footnotes]="summaryFootnotes"
+            [ledgerToday]="settlementLedgerToday"
+            [ledgerDelta]="settlementLedgerDelta"
+            [businessDateLabel]="businessDateLabel"
+            [loading]="isTemplateLoading"
+            [closesLoan]="settlementClosesLoan"
+          ></mifosx-settlement-summary-card>
+
+          <div class="emi-hints" *ngIf="showSettlementPreview && showDueEmiPills">
+            <span class="emi-pill" *ngFor="let emi of dueEmis" [ngClass]="emi.state">
+              EMI #{{ emi.period }} · {{ emi.dueDate | dateFormat }} · {{ currencySymbol }}
+              {{ emi.amount | formatNumber }}
             </span>
           </div>
-
-          <div class="date-impact-banner" *ngIf="!dateErrorMessage && dateImpactMessages.length">
-            <mat-icon>info</mat-icon>
-            <ul>
-              <li *ngFor="let message of dateImpactMessages">{{ message }}</li>
-            </ul>
-          </div>
-
-          <mat-form-field>
-            <mat-label>{{
-              (isReceivableLineOfCredit ? 'labels.inputs.Disbursal Amount' : 'labels.inputs.Principal') | translate
-            }}</mat-label>
-            <input matInput formControlName="outstandingPrincipalPortion" />
-          </mat-form-field>
-
-          <mat-form-field>
-            <mat-label>{{ 'labels.inputs.Interest' | translate }}</mat-label>
-            <input matInput formControlName="outstandingInterestPortion" />
-          </mat-form-field>
-
-          <mat-form-field>
-            <mat-label>{{ 'labels.inputs.Fee Amount' | translate }}</mat-label>
-            <input matInput formControlName="outstandingFeeChargesPortion" />
-          </mat-form-field>
-
-          <mat-form-field>
-            <mat-label>{{ 'labels.inputs.Penalty Amount' | translate }}</mat-label>
-            <input matInput required formControlName="outstandingPenaltyChargesPortion" />
-          </mat-form-field>
-
-          <mat-form-field>
-            <mat-label>{{ 'labels.inputs.Tax Amount' | translate }}</mat-label>
-            <input matInput formControlName="outstandingTaxChargesPortion" />
-          </mat-form-field>
-
-          <mat-form-field>
-            <mat-label>{{ 'labels.inputs.Transaction Amount' | translate }}</mat-label>
-            <input matInput required formControlName="transactionAmount" />
-          </mat-form-field>
-
-          <mat-checkbox formControlName="isForcedClosure" color="primary"> is forced closure </mat-checkbox>
-
-          <mat-checkbox formControlName="isRestructured" color="primary"> is restructured </mat-checkbox>
 
           <mat-form-field>
             <mat-label>{{ 'labels.inputs.Note' | translate }}</mat-label>
@@ -122,18 +79,24 @@
           </mat-form-field>
         </div>
 
-        <mat-card-actions fxLayout="row" fxLayout.xs="column" fxLayoutAlign="center" fxLayoutGap="5px">
-          <button type="button" mat-raised-button [routerLink]="['../../general']">
-            {{ 'labels.buttons.Cancel' | translate }}
-          </button>
-          <button
-            mat-raised-button
-            color="primary"
-            [disabled]="!foreclosureForm.valid || dateErrorMessage || isFutureDateSelected"
-            *mifosxHasPermission="'FORECLOSURE_LOAN'"
-          >
-            {{ 'labels.buttons.Foreclosure' | translate }}
-          </button>
+        <mat-card-actions fxLayout="column" fxLayoutAlign="center" fxLayoutGap="5px">
+          <div class="date-impact-banner date-impact-banner--blocked submit-blocked" *ngIf="submitBlockedReason">
+            <mat-icon>info</mat-icon>
+            <span>{{ submitBlockedReason }}</span>
+          </div>
+          <div fxLayout="row" fxLayout.xs="column" fxLayoutAlign="center" fxLayoutGap="5px">
+            <button type="button" mat-raised-button [routerLink]="['../../general']">
+              {{ 'labels.buttons.Cancel' | translate }}
+            </button>
+            <button
+              mat-raised-button
+              color="primary"
+              [disabled]="!foreclosureForm.valid || dateErrorMessage || isFutureDateSelected || isTemplateLoading"
+              *mifosxHasPermission="'FORECLOSURE_LOAN'"
+            >
+              {{ 'labels.buttons.Foreclosure' | translate }}
+            </button>
+          </div>
         </mat-card-actions>
       </mat-card-content>
     </form>

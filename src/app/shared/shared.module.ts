@@ -52,6 +52,8 @@ import { DropdownComponent } from './dropdown/dropdown.component';
 import { InputAmountComponent } from './input-amount/input-amount.component';
 import { InputPasswordComponent } from './input-password/input-password.component';
 import { LoanDownloadsMenuComponent } from './loan-downloads-menu/loan-downloads-menu.component';
+import { ExpandableStaticHintComponent } from './expandable-static-hint/expandable-static-hint.component';
+import { SettlementSummaryCardComponent } from './settlement-summary-card/settlement-summary-card.component';
 
 /**
  * Shared Module
@@ -110,7 +112,9 @@ import { LoanDownloadsMenuComponent } from './loan-downloads-menu/loan-downloads
     DropdownComponent,
     InputAmountComponent,
     InputPasswordComponent,
-    LoanDownloadsMenuComponent
+    LoanDownloadsMenuComponent,
+    ExpandableStaticHintComponent,
+    SettlementSummaryCardComponent
   ],
   exports: [
     FileUploadComponent,
@@ -146,7 +150,9 @@ import { LoanDownloadsMenuComponent } from './loan-downloads-menu/loan-downloads
     LongTextComponent,
     DropdownComponent,
     InputAmountComponent,
-    LoanDownloadsMenuComponent
+    LoanDownloadsMenuComponent,
+    ExpandableStaticHintComponent,
+    SettlementSummaryCardComponent
   ]
 })
 export class SharedModule {}

@@ -2,10 +2,27 @@ import { Component, Input, OnInit } from '@angular/core';
 import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms';
 import { LoansService } from 'app/loans/loans.service';
 import { ActivatedRoute, Router } from '@angular/router';
+import { forkJoin, of } from 'rxjs';
+import { catchError, map, switchMap } from 'rxjs/operators';
 
 /** Custom Services */
 import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
+import {
+  computePenaltyWaivedByBackdate,
+  computeSavingsBalanceAsOf,
+  computeSettlementRequired,
+  computeUnearnedInterest,
+  isRealEmiDueOnDate,
+  isSameCalendarDate,
+  reconcilePenaltyWithLedger,
+  roundAmount
+} from 'app/loans/common/backdated-settlement.util';
+import {
+  SettlementSummaryFootnote,
+  SettlementSummaryLine
+} from 'app/shared/settlement-summary-card/settlement-summary-card.component';
+import { SavingsService } from 'app/savings/savings.service';
 
 @Component({
   selector: 'mifosx-foreclosure',
@@ -33,27 +50,50 @@ export class ForeclosureComponent implements OnInit {
   backdateLimitMessage = '';
   /** Set when the backend rejects the currently-selected date (e.g. before the loan's last transaction date). */
   dateErrorMessage: string | null = null;
+  /** Policy text shown inside the collapsible hint (not date-specific). */
+  readonly staticFutureDatePolicy =
+    'A future date can be selected to preview amounts, but foreclosure cannot be recorded with a future date — the backend does not support it.';
   foreclosuredata: any;
   /** Linked Savings Account fields (from foreclosure template additionalAttributes) */
   linkedSavingsAccountId?: number;
   linkedSavingsAccountAccountNo?: string;
   linkedSavingsAccountProductName?: string;
   linkedSavingsAccountAvailableBalance?: number;
+  /** Running balance of the linked savings account as of the selected transaction date. */
+  availableBalanceAsOfDate = 0;
+  private savingsTransactions: any[] = [];
+  private savingsAccountLoadStarted = false;
+  private savingsTransactionsLoaded = false;
   isReceivableLineOfCredit?: boolean = false;
+  /** True when this drawdown belongs to a line of credit (payable or receivable). */
+  isLineOfCreditDrawdown = false;
+  /** Earliest unpaid installment due date — foreclosure blocked on/after this for LOC loans. */
+  earliestUnpaidDueDate: Date | null = null;
+  /** Selected date is on/past earliest unpaid due date; show repayment-style preview only. */
+  foreclosureBlockedByDueDate = false;
   currencySymbol?: string;
 
   /** Baseline interest/penalty portions (business date), captured from the initial foreclosure template. */
   private baselineInterestPortion = 0;
   private baselinePenaltyChargesPortion = 0;
-  /**
-   * Clear, user-facing messages describing how the currently selected transaction date affects
-   * interest and charges, compared to the amounts due if foreclosed today.
-   */
-  dateImpactMessages: string[] = [];
   /** Loan's scheduled maturity date — injected by the resolver alongside the foreclosure template. */
   maturityDate: Date | null = null;
+  /** Product penalty grace days after maturity before daily LPI stops (RBF / factor-rate). */
+  penaltyGracePeriodDays: number | null = null;
+  /** Backend hint: closure quote is post-maturity grace-period LPI only. */
+  postMaturityGracePeriodLpiClosure = false;
   /** Whether the selected date constitutes a true early foreclosure or a normal on-due-date closure. */
   closureTypeInfo: { type: 'foreclosure' | 'normal_closure'; message: string } | null = null;
+  /** Full loan summary and schedule — used for due-EMI hints and outstanding reconciliation. */
+  private loanSummary: any;
+  private repaymentSchedule: any;
+  fullLoanOutstanding = 0;
+  dueEmis: Array<{ period: number; dueDate: any; amount: number; state: 'overdue' | 'due' }> = [];
+  isTemplateLoading = false;
+  /** Projected LPI from /future-charges when a future date is selected (preview only). */
+  private additionalFutureLpiAmount = 0;
+  /** Authoritative LPI as of the selected date (from /template/penalties). */
+  private penaltyTemplateData: any;
 
   /**
    * @param {FormBuilder} formBuilder Form Builder.
@@ -68,7 +108,8 @@ export class ForeclosureComponent implements OnInit {
     private route: ActivatedRoute,
     private router: Router,
     private dateUtils: Dates,
-    private settingsService: SettingsService
+    private settingsService: SettingsService,
+    private savingsService: SavingsService
   ) {
     this.loanId = this.route.snapshot.params['loanId'];
   }
@@ -80,17 +121,119 @@ export class ForeclosureComponent implements OnInit {
     this.maxDate = new Date(business.getFullYear() + 5, business.getMonth(), business.getDate());
     this.createforeclosureForm();
     this.onChanges();
-    this.setupMutualExclusion(); // 👈 Added here
     // Capture linked account from initial resolver-provided template (dataObject)
     this.captureLinkedAccount(this.dataObject);
     this.currencySymbol =
       this.currencySymbol || this.dataObject.currency?.displaySymbol || this.dataObject.currency?.code;
     this.baselineInterestPortion = Number(this.dataObject.interestPortion || 0);
     this.baselinePenaltyChargesPortion = Number(this.dataObject.penaltyChargesPortion || 0);
-    this.maturityDate = this.parseDateField(this.dataObject.expectedMaturityDate);
+    this.foreclosuredata = this.dataObject;
+    this.captureTemplateMetadata(this.dataObject);
+    this.maturityDate = this.parseDateField(this.dataObject.expectedMaturityDate) || this.maturityDate;
     // Show the closure-type banner immediately on open for the default (business-date) selection, not only
     // after the operator changes the date. valueChanges does not fire for the form's initial value.
     this.updateClosureTypeInfo();
+    this.loadLoanContext();
+    this.dueEmis = this.getDueEmisForDate(this.foreclosureForm.get('transactionDate').value);
+  }
+
+  /** After schedule/LOC context loads, refresh settlement for the default transaction date. */
+  private refreshSettlementForSelectedDate(): void {
+    const transactionDate = this.foreclosureForm.get('transactionDate').value;
+    const formatted = this.dateUtils.formatDate(transactionDate, this.settingsService.dateFormat);
+    const selected = this.toComparableDate(transactionDate);
+    const businessDate = this.toComparableDate(this.settingsService.businessDate);
+    const isFutureDate = !!(selected && businessDate && selected.getTime() > businessDate.getTime());
+
+    if (this.applyDueDateForeclosureBlock(transactionDate)) {
+      this.loadPenaltiesSettlementPreview(transactionDate, formatted, isFutureDate);
+      return;
+    }
+    this.fetchPenaltiesForInitialDate();
+  }
+
+  /** Loads /template/penalties for the default date so LPI matches make-repayment / transfer. */
+  private fetchPenaltiesForInitialDate(): void {
+    const transactionDate = this.foreclosureForm.get('transactionDate').value;
+    const formatted = this.dateUtils.formatDate(transactionDate, this.settingsService.dateFormat);
+    this.loanService
+      .getLoanPenaltiesTemplate(String(this.loanId), formatted)
+      .pipe(catchError(() => of(null)))
+      .subscribe((penaltyTemplate: any) => {
+        this.penaltyTemplateData = penaltyTemplate;
+        this.patchForeclosureFormFromTemplate(transactionDate);
+        this.updateClosureTypeInfo();
+        this.dueEmis = this.getDueEmisForDate(transactionDate);
+      });
+  }
+
+  /** Loads authoritative loan summary/schedule for outstanding reconciliation and EMI hints. */
+  private loadLoanContext(): void {
+    this.loanService
+      .getLoanAccountResource(String(this.loanId), 'summary,repaymentSchedule,timeline')
+      .subscribe((loanDetails: any) => {
+        this.loanSummary = loanDetails?.summary || null;
+        this.repaymentSchedule = loanDetails?.repaymentSchedule || null;
+        this.isLineOfCreditDrawdown = !!(
+          loanDetails?.lineOfCreditId || loanDetails?.additionalProperties?.lineOfCreditId
+        );
+        this.earliestUnpaidDueDate = this.resolveEarliestUnpaidDueDate();
+        this.applyMaturityDate(loanDetails?.timeline?.expectedMaturityDate);
+        if (loanDetails?.penaltyGracePeriod != null) {
+          this.penaltyGracePeriodDays = Number(loanDetails.penaltyGracePeriod);
+        }
+        this.fullLoanOutstanding = roundAmount(Number(this.loanSummary?.totalOutstanding || 0));
+        this.refreshSettlementForSelectedDate();
+      });
+  }
+
+  /** First unpaid installment due date — mirrors LocForeclosureValidator on the server. */
+  private resolveEarliestUnpaidDueDate(): Date | null {
+    const periods = this.repaymentSchedule?.periods;
+    if (!Array.isArray(periods)) {
+      return null;
+    }
+    const earliest = periods
+      .filter((period: any) => this.isRealOutstandingInstallment(period))
+      .sort((a: any, b: any) => Number(a.period) - Number(b.period))[0];
+    return earliest ? this.toComparableDate(earliest.dueDate) : null;
+  }
+
+  private isForeclosureBlockedByDueDate(selected: Date | null): boolean {
+    if (!this.isLineOfCreditDrawdown || !selected || !this.earliestUnpaidDueDate) {
+      return false;
+    }
+    return selected.getTime() >= this.earliestUnpaidDueDate.getTime();
+  }
+
+  private buildDueDateForeclosureBlockMessage(selectedDateValue: any): string {
+    const dueLabel = this.dateUtils.formatDate(this.earliestUnpaidDueDate, this.settingsService.dateFormat);
+    const selectedLabel = this.dateUtils.formatDate(selectedDateValue, this.settingsService.dateFormat);
+    return (
+      `Loan ${this.loanId} cannot be foreclosed on ${selectedLabel} because it is on or past its earliest ` +
+      `unpaid installment due date (${dueLabel}). Foreclosure is only allowed before the loan is due; record a repayment instead.`
+    );
+  }
+
+  /** Sets dateErrorMessage when LOC foreclosure is blocked on/after the earliest unpaid due date. */
+  private applyDueDateForeclosureBlock(selectedDateValue: any): boolean {
+    const blocked = this.isForeclosureBlockedByDueDate(this.toComparableDate(selectedDateValue));
+    this.foreclosureBlockedByDueDate = blocked;
+    if (blocked) {
+      this.dateErrorMessage = this.buildDueDateForeclosureBlockMessage(selectedDateValue);
+    }
+    return blocked;
+  }
+
+  private isDueDateForeclosureErrorMessage(message: string): boolean {
+    return /cannot be foreclosed on/i.test(message) && /earliest unpaid installment due date/i.test(message);
+  }
+
+  private applyMaturityDate(raw: any): void {
+    const parsed = this.parseDateField(raw);
+    if (parsed) {
+      this.maturityDate = parsed;
+    }
   }
 
   /** Parses a Fineract date value — either a [year, month, day] array or an ISO string. */
@@ -117,8 +260,6 @@ export class ForeclosureComponent implements OnInit {
       outstandingPenaltyChargesPortion: [{ value: this.dataObject.penaltyChargesPortion || 0, disabled: true }],
       outstandingTaxChargesPortion: [{ value: this.dataObject.taxChargesPortion || 0, disabled: true }],
       transactionAmount: [{ value: this.dataObject.amount, disabled: true }],
-      isForcedClosure: [false],
-      isRestructured: [false],
       note: [
         '',
         Validators.required
@@ -142,74 +283,151 @@ export class ForeclosureComponent implements OnInit {
       transactionDate: transactionDateFormatted
     };
     this.dateErrorMessage = null;
-    this.loanService.getForeclosureData(this.loanId, data).subscribe({
-      next: (response: any) => {
-        this.foreclosuredata = response;
-        // Capture linked account from refreshed template
-        this.captureLinkedAccount(this.foreclosuredata);
-        this.currencySymbol =
-          this.currencySymbol || this.foreclosuredata.currency?.displaySymbol || this.foreclosuredata.currency?.code;
+    this.foreclosureBlockedByDueDate = false;
+    this.isTemplateLoading = true;
+    const selectedDate = this.toComparableDate(val);
+    const businessDate = this.toComparableDate(this.settingsService.businessDate);
+    const isFutureDate = !!(selectedDate && businessDate && selectedDate.getTime() > businessDate.getTime());
 
-        this.foreclosureForm.patchValue({
-          outstandingPrincipalPortion: this.foreclosuredata.principalPortion,
-          outstandingInterestPortion: this.foreclosuredata.interestPortion,
-          outstandingFeeChargesPortion: this.foreclosuredata.feeChargesPortion,
-          outstandingPenaltyChargesPortion: this.foreclosuredata.penaltyChargesPortion,
-          outstandingTaxChargesPortion: this.foreclosuredata.taxChargesPortion,
-          transactionAmount: this.foreclosuredata.amount
-        });
+    if (this.applyDueDateForeclosureBlock(val)) {
+      this.loadPenaltiesSettlementPreview(val, transactionDateFormatted, isFutureDate);
+      return;
+    }
 
-        this.dateImpactMessages = this.buildDateImpactMessages(transactionDateFormatted);
+    this.loanService
+      .getForeclosureData(this.loanId, data)
+      .pipe(
+        switchMap((response: any) => {
+          const penaltyTemplate$ = this.loanService
+            .getLoanPenaltiesTemplate(String(this.loanId), transactionDateFormatted)
+            .pipe(catchError(() => of(null)));
+          const futureLpi$ = isFutureDate
+            ? this.loanService
+                .getFutureLPICharges(String(this.loanId), transactionDateFormatted)
+                .pipe(catchError(() => of(null)))
+            : of(null);
+          return forkJoin({ penaltyTemplate: penaltyTemplate$, futureLpi: futureLpi$ }).pipe(
+            map(({ penaltyTemplate, futureLpi }) => ({ response, penaltyTemplate, futureLpi }))
+          );
+        })
+      )
+      .subscribe({
+        next: ({ response, penaltyTemplate, futureLpi }: any) => {
+          this.additionalFutureLpiAmount = Number(futureLpi?.totalLPIAmount || 0);
+          this.penaltyTemplateData = penaltyTemplate;
+          this.foreclosuredata = response;
+          this.captureTemplateMetadata(this.foreclosuredata);
+          this.applyMaturityDate(this.foreclosuredata?.expectedMaturityDate);
+          this.captureLinkedAccount(this.foreclosuredata);
+          this.currencySymbol =
+            this.currencySymbol || this.foreclosuredata.currency?.displaySymbol || this.foreclosuredata.currency?.code;
+
+          this.patchForeclosureFormFromTemplate(val);
+          this.updateClosureTypeInfo();
+          this.dueEmis = this.getDueEmisForDate(val);
+          this.refreshSavingsBalanceAsOfDate(val);
+          this.isTemplateLoading = false;
+        },
+        error: (err: any) => {
+          const message =
+            err?.error?.errors?.[0]?.defaultUserMessage ||
+            err?.error?.defaultUserMessage ||
+            'This foreclosure date is not allowed for this loan. Please choose a different date.';
+          this.dateErrorMessage = message;
+          this.isTemplateLoading = false;
+          if (this.isDueDateForeclosureErrorMessage(message)) {
+            this.foreclosureBlockedByDueDate = true;
+            this.loadPenaltiesSettlementPreview(val, transactionDateFormatted, isFutureDate);
+          }
+        }
+      });
+  }
+
+  /** Settlement preview from /template/penalties when foreclosure is blocked on/after the due date. */
+  private loadPenaltiesSettlementPreview(val: any, transactionDateFormatted: string, isFutureDate: boolean): void {
+    this.isTemplateLoading = true;
+    const penaltyTemplate$ = this.loanService
+      .getLoanPenaltiesTemplate(String(this.loanId), transactionDateFormatted)
+      .pipe(catchError(() => of(null)));
+    const futureLpi$ = isFutureDate
+      ? this.loanService
+          .getFutureLPICharges(String(this.loanId), transactionDateFormatted)
+          .pipe(catchError(() => of(null)))
+      : of(null);
+
+    forkJoin({ penaltyTemplate: penaltyTemplate$, futureLpi: futureLpi$ }).subscribe({
+      next: ({ penaltyTemplate, futureLpi }: any) => {
+        this.additionalFutureLpiAmount = Number(futureLpi?.totalLPIAmount || 0);
+        this.penaltyTemplateData = penaltyTemplate;
+        this.patchDisplayFromPenaltiesTemplate(val);
+        this.dueEmis = this.getDueEmisForDate(val);
+        this.refreshSavingsBalanceAsOfDate(val);
+        this.isTemplateLoading = false;
       },
-      // The backend unconditionally rejects a foreclosure date earlier than the loan's last non-waiver
-      // transaction date (and now also the general MAX_BACKDATE_DAYS floor) - surface that clearly here instead
-      // of leaving the operator looking at a stale, no-longer-matching quote with no explanation.
-      error: (err: any) => {
-        this.dateErrorMessage =
-          err?.error?.errors?.[0]?.defaultUserMessage ||
-          err?.error?.defaultUserMessage ||
-          'This foreclosure date is not allowed for this loan. Please choose a different date.';
+      error: () => {
+        this.isTemplateLoading = false;
       }
     });
   }
 
-  /**
-   * Builds clear, plain-language messages explaining how the selected transaction date changes the
-   * interest and penalty/LPI amounts due, compared to what would be due if foreclosed on today's business date.
-   * Also updates closureTypeInfo to indicate whether this is an early foreclosure or a normal closure.
-   */
-  private buildDateImpactMessages(transactionDate: string): string[] {
-    const messages: string[] = [];
-    const round = (value: number) => Math.round(value * 100) / 100;
-    const currencyLabel = this.currencySymbol || '';
-    const interestPortion = Number(this.foreclosuredata?.interestPortion || 0);
-    const penaltyPortion = Number(this.foreclosuredata?.penaltyChargesPortion || 0);
-
-    // Determine closure type by comparing the selected date against the loan's maturity date.
-    this.updateClosureTypeInfo();
-
-    const interestDelta = round(this.baselineInterestPortion - interestPortion);
-    if (interestDelta > 0.01) {
-      messages.push(
-        `Interest due is reduced by ${currencyLabel} ${interestDelta.toFixed(2)} for foreclosing on ${transactionDate} ` +
-          `instead of today, since this is before the loan's scheduled maturity (early repayment discount).`
-      );
+  /** Patches display-only breakdown fields from the foreclosure template (not penalties / ledger reconcile). */
+  private patchForeclosureFormFromTemplate(transactionDateValue?: any): void {
+    if (!this.foreclosuredata || !this.foreclosureForm) {
+      return;
     }
-
-    const penaltyDelta = round(this.baselinePenaltyChargesPortion - penaltyPortion);
-    if (penaltyDelta > 0.01) {
-      messages.push(
-        `${currencyLabel} ${penaltyDelta.toFixed(2)} of accrued penalty/late-payment charges will be waived ` +
-          `by backdating this foreclosure to ${transactionDate}.`
-      );
-    } else if (penaltyDelta < -0.01) {
-      messages.push(
-        `Selecting a future date (${transactionDate}) adds ${currencyLabel} ${Math.abs(penaltyDelta).toFixed(2)} ` +
-          `of additional late-payment interest that will accrue between today and then.`
-      );
+    if (this.foreclosureBlockedByDueDate) {
+      this.patchDisplayFromPenaltiesTemplate(transactionDateValue);
+      return;
     }
+    this.foreclosureForm.patchValue({
+      outstandingPrincipalPortion: this.foreclosuredata.principalPortion,
+      outstandingInterestPortion: this.foreclosuredata.interestPortion,
+      outstandingFeeChargesPortion: this.foreclosuredata.feeChargesPortion,
+      outstandingPenaltyChargesPortion: this.foreclosuredata.penaltyChargesPortion,
+      outstandingTaxChargesPortion: this.foreclosuredata.taxChargesPortion,
+      transactionAmount: this.foreclosuredata.amount
+    });
+  }
 
-    return messages;
+  /** Authoritative as-of-date settlement from /template/penalties (repayment / transfer path). */
+  private patchDisplayFromPenaltiesTemplate(transactionDateValue: any): void {
+    if (!this.foreclosureForm) {
+      return;
+    }
+    const principal = Number(
+      this.penaltyTemplateData?.principalOutstanding ?? this.foreclosuredata?.principalPortion ?? 0
+    );
+    const interest = Number(
+      this.penaltyTemplateData?.interestOutstanding ?? this.foreclosuredata?.interestPortion ?? 0
+    );
+    const fee = Number(this.loanSummary?.feeChargesOutstanding ?? this.foreclosuredata?.feeChargesPortion ?? 0);
+    const tax = Number(this.loanSummary?.taxChargesOutstanding ?? this.foreclosuredata?.taxChargesPortion ?? 0);
+    const templatePenalty = Number(this.penaltyTemplateData?.penaltyAmountDue || 0) + this.additionalFutureLpiAmount;
+    const dueWithoutPenalty = roundAmount(principal + interest + fee + tax);
+    const penaltyPortion = roundAmount(
+      reconcilePenaltyWithLedger({
+        penaltyFromTemplate: templatePenalty,
+        penaltyInSummary: Number(this.loanSummary?.penaltyChargesOutstanding ?? this.baselinePenaltyChargesPortion),
+        fullLoanOutstanding: this.fullLoanOutstanding,
+        dueWithoutPenaltyReconcile: dueWithoutPenalty,
+        isBusinessDate: isSameCalendarDate(transactionDateValue, this.settingsService.businessDate, (value) =>
+          this.toComparableDate(value)
+        ),
+        onInstallmentDueDate: !!this.penaltyTemplateData?.onInstallmentDueDate,
+        hasRealEmiDueOnDate: isRealEmiDueOnDate(this.repaymentSchedule?.periods, transactionDateValue, (value) =>
+          this.toComparableDate(value)
+        )
+      })
+    );
+    const transactionAmount = roundAmount(dueWithoutPenalty + penaltyPortion);
+    this.foreclosureForm.patchValue({
+      outstandingPrincipalPortion: principal,
+      outstandingInterestPortion: interest,
+      outstandingFeeChargesPortion: fee,
+      outstandingPenaltyChargesPortion: penaltyPortion,
+      outstandingTaxChargesPortion: tax,
+      transactionAmount
+    });
   }
 
   /**
@@ -239,16 +457,12 @@ export class ForeclosureComponent implements OnInit {
     if (selectedDay < maturityDay) {
       this.closureTypeInfo = {
         type: 'foreclosure',
-        message:
-          `Early Foreclosure — This loan is being closed before its scheduled due date (${maturityFormatted}). ` +
-          `An early-repayment interest discount applies; the amount shown above reflects only interest earned through the selected date.`
+        message: `Before scheduled maturity (${maturityFormatted}) — early-repayment interest discount applies.`
       };
     } else {
       this.closureTypeInfo = {
         type: 'normal_closure',
-        message:
-          `Normal Closure — The selected date is on or after the loan's scheduled due date (${maturityFormatted}). ` +
-          `This is a regular settlement, not an early foreclosure — no early-repayment discount applies.`
+        message: `On or after scheduled maturity (${maturityFormatted}) — regular closure, no early discount.`
       };
     }
   }
@@ -264,10 +478,72 @@ export class ForeclosureComponent implements OnInit {
       this.linkedSavingsAccountId = additional.linkedSavingsAccountId;
       this.linkedSavingsAccountAccountNo = additional.linkedSavingsAccountAccountNo;
       this.linkedSavingsAccountProductName = additional.linkedSavingsAccountProductName;
-      this.linkedSavingsAccountAvailableBalance = additional.linkedSavingsAccountAvailableBalance;
+      this.linkedSavingsAccountAvailableBalance = Number(additional.linkedSavingsAccountAvailableBalance || 0);
       this.isReceivableLineOfCredit = additional.isReceivableLineOfCredit;
       this.applyEarliestAllowedDate(additional.earliestAllowedTransactionDate);
+      this.ensureLinkedSavingsTransactionsLoaded();
+      this.refreshSavingsBalanceAsOfDate(this.foreclosureForm?.get('transactionDate')?.value);
     }
+  }
+
+  private ensureLinkedSavingsTransactionsLoaded(): void {
+    if (!this.linkedSavingsAccountId || this.savingsAccountLoadStarted) {
+      return;
+    }
+    this.savingsAccountLoadStarted = true;
+    this.loadLinkedSavingsTransactions();
+  }
+
+  private loadLinkedSavingsTransactions(): void {
+    if (!this.linkedSavingsAccountId) {
+      return;
+    }
+    this.savingsService
+      .getSavingsAccountData(String(this.linkedSavingsAccountId))
+      .pipe(catchError(() => of(null)))
+      .subscribe((savingsAccount: any) => {
+        if (!savingsAccount) {
+          this.savingsAccountLoadStarted = false;
+          return;
+        }
+        this.captureSavingsTransactions(savingsAccount);
+        this.refreshSavingsBalanceAsOfDate(this.foreclosureForm?.get('transactionDate')?.value);
+      });
+  }
+
+  private captureSavingsTransactions(savingsAccount: any): void {
+    if (!savingsAccount) {
+      return;
+    }
+    this.savingsTransactions = Array.isArray(savingsAccount.transactions) ? savingsAccount.transactions : [];
+    this.savingsTransactionsLoaded = true;
+    const currentAvailable = Number(
+      savingsAccount.summary?.availableBalance ??
+        savingsAccount.summary?.accountBalance ??
+        this.linkedSavingsAccountAvailableBalance ??
+        0
+    );
+    if (!Number.isNaN(currentAvailable)) {
+      this.linkedSavingsAccountAvailableBalance = currentAvailable;
+    }
+  }
+
+  private refreshSavingsBalanceAsOfDate(
+    transactionDateValue: Date = this.foreclosureForm?.get('transactionDate')?.value
+  ): void {
+    const asOf = this.toComparableDate(transactionDateValue);
+    const isBusinessDate = isSameCalendarDate(transactionDateValue, this.settingsService.businessDate, (value) =>
+      this.toComparableDate(value)
+    );
+    // Do not show today's balance as a stand-in for a backdate while transaction history is still loading.
+    const fallback =
+      this.savingsTransactionsLoaded || isBusinessDate ? Number(this.linkedSavingsAccountAvailableBalance || 0) : 0;
+    this.availableBalanceAsOfDate = computeSavingsBalanceAsOf(
+      this.savingsTransactions,
+      asOf,
+      (value) => this.toComparableDate(value),
+      fallback
+    );
   }
 
   /**
@@ -285,11 +561,7 @@ export class ForeclosureComponent implements OnInit {
     }
     this.minDate = parsed;
     const formatted = this.dateUtils.formatDate(parsed, this.settingsService.dateFormat);
-    this.backdateLimitMessage =
-      `This foreclosure can be backdated no earlier than ${formatted} (and never before the loan's last ` +
-      `recorded transaction) — this protects the repayment schedule and balances from being distorted by ` +
-      `very old backdated entries. A future date can be selected to preview amounts, but foreclosure cannot ` +
-      `be recorded with a future date.`;
+    this.backdateLimitMessage = `Earliest allowed date: ${formatted}. Cannot be before the loan's last recorded transaction.`;
   }
 
   get isFutureDateSelected(): boolean {
@@ -309,42 +581,460 @@ export class ForeclosureComponent implements OnInit {
     return value ? this.dateUtils.formatDate(value, this.settingsService.dateFormat) : '';
   }
 
+  get isSelectedBusinessDate(): boolean {
+    return isSameCalendarDate(
+      this.foreclosureForm?.value?.transactionDate,
+      this.settingsService.businessDate,
+      (value) => this.toComparableDate(value)
+    );
+  }
+
+  /** Non-future reasons Submit stays disabled (future date uses compact preview banner instead). */
+  get submitBlockedReason(): string | null {
+    if (this.isFutureDateSelected) {
+      return null;
+    }
+    if (this.isTemplateLoading) {
+      return 'Loading foreclosure details…';
+    }
+    if (this.dateErrorMessage) {
+      return this.dateErrorMessage;
+    }
+    if (!this.foreclosureForm?.valid) {
+      return 'Enter a Note before submitting.';
+    }
+    return null;
+  }
+
+  private get formRawValue(): Record<string, any> {
+    return this.foreclosureForm?.getRawValue() || {};
+  }
+
+  /** Foreclosure amount as of the selected date (P + I + fees + tax + LPI still due). */
+  get dueAsOfDateTotal(): number {
+    return roundAmount(Number(this.formRawValue.transactionAmount || this.foreclosuredata?.amount || 0));
+  }
+
+  get penaltyAsOfDate(): number {
+    return roundAmount(Number(this.formRawValue.outstandingPenaltyChargesPortion || 0));
+  }
+
+  get penaltyInSummary(): number {
+    return roundAmount(Number(this.loanSummary?.penaltyChargesOutstanding ?? this.baselinePenaltyChargesPortion));
+  }
+
+  /** LPI on the loan today that is excluded when foreclosing on the selected (earlier) date. */
+  get penaltyWaivedByBackdate(): number {
+    return computePenaltyWaivedByBackdate(this.penaltyInSummary, this.penaltyAsOfDate);
+  }
+
+  get outstandingAfterWaiver(): number {
+    return computeSettlementRequired({
+      principal: Number(this.formRawValue.outstandingPrincipalPortion || 0),
+      interest: Number(this.formRawValue.outstandingInterestPortion || 0),
+      fee: Number(this.formRawValue.outstandingFeeChargesPortion || 0),
+      tax: Number(this.formRawValue.outstandingTaxChargesPortion || 0),
+      penalty: this.penaltyAsOfDate
+    });
+  }
+
+  get settlementLines(): SettlementSummaryLine[] {
+    const principalLabel = this.isReceivableLineOfCredit ? 'Disbursal' : 'Principal';
+    const lines: SettlementSummaryLine[] = [
+      { label: principalLabel, amount: Number(this.formRawValue.outstandingPrincipalPortion || 0) },
+      { label: 'Interest', amount: Number(this.formRawValue.outstandingInterestPortion || 0) },
+      { label: 'Fees', amount: Number(this.formRawValue.outstandingFeeChargesPortion || 0) },
+      { label: 'Tax', amount: Number(this.formRawValue.outstandingTaxChargesPortion || 0) }
+    ];
+    const penalty = Number(this.formRawValue.outstandingPenaltyChargesPortion || 0);
+    if (penalty > 0.01) {
+      lines.splice(3, 0, { label: 'LPI', amount: penalty });
+    }
+    return lines.filter((line) => line.amount > 0.01);
+  }
+
+  /** Early foreclosure vs normal closure — hidden when due-date block applies. */
+  get settlementBadge(): string | null {
+    if (this.foreclosureBlockedByDueDate) {
+      return null;
+    }
+    if (this.isPostMaturityGracePeriodClosure) {
+      return 'Post-maturity LPI';
+    }
+    if (this.closureTypeInfo?.type === 'foreclosure') {
+      return 'Early foreclosure';
+    }
+    if (this.closureTypeInfo?.type === 'normal_closure') {
+      return 'Normal closure';
+    }
+    return null;
+  }
+
+  get settlementSubtitle(): string | null {
+    if (this.foreclosureBlockedByDueDate) {
+      return 'Foreclosure not allowed — record a repayment instead';
+    }
+    if (this.isPostMaturityGracePeriodClosure) {
+      const graceHint =
+        this.penaltyGracePeriodDays != null ? ` (${this.penaltyGracePeriodDays}-day penalty grace after maturity)` : '';
+      return (
+        `Post-maturity LPI closure${graceHint} — remaining grace-period LPI only; ` +
+        'should close as Closed (obligations met), not Overpaid'
+      );
+    }
+    const overpay = this.foreclosureOverpaymentRisk;
+    if (overpay > 0.01) {
+      return (
+        `Closes the loan · ~${this.currencySymbol} ${this.formatAmount(overpay)} ` +
+        'may be refunded to linked savings (quote vs schedule mismatch)'
+      );
+    }
+    return null;
+  }
+
+  /**
+   * After scheduled maturity, RBF/factor-rate products accrue LPI through the penalty grace window.
+   * The schedule shows a GRACE_PERIOD_APPLIED row (P/I zero, LPI only) — normal closure, not early foreclosure.
+   */
+  get isPostMaturityGracePeriodClosure(): boolean {
+    if (this.postMaturityGracePeriodLpiClosure) {
+      return true;
+    }
+    if (this.foreclosureBlockedByDueDate || !this.maturityDate) {
+      return false;
+    }
+    const selected = this.toComparableDate(this.foreclosureForm?.value?.transactionDate);
+    if (!selected || selected.getTime() <= this.maturityDate.getTime()) {
+      return false;
+    }
+    const principal = Number(this.formRawValue.outstandingPrincipalPortion || 0);
+    const interest = Number(this.formRawValue.outstandingInterestPortion || 0);
+    return principal <= 0.01 && interest <= 0.01 && this.penaltyAsOfDate > 0.01;
+  }
+
+  private captureTemplateMetadata(source: any): void {
+    const attrs = source?.additionalAttributes;
+    if (!attrs) {
+      return;
+    }
+    if (attrs.expectedMaturityDate) {
+      this.maturityDate = this.parseDateField(attrs.expectedMaturityDate) || this.maturityDate;
+    }
+    if (attrs.penaltyGracePeriodDays != null) {
+      this.penaltyGracePeriodDays = Number(attrs.penaltyGracePeriodDays);
+    }
+    this.postMaturityGracePeriodLpiClosure = !!attrs.postMaturityGracePeriodLpiClosure;
+  }
+
+  /** Overdue LPI on the schedule (repayment-schedule column), often higher than the foreclosure LPI line. */
+  get scheduleOverduePenaltyOutstanding(): number {
+    const periods = this.repaymentSchedule?.periods;
+    if (!Array.isArray(periods)) {
+      return 0;
+    }
+    const selected = this.toComparableDate(this.foreclosureForm?.value?.transactionDate);
+    if (!selected) {
+      return 0;
+    }
+    return roundAmount(
+      periods
+        .filter((period: any) => this.isRealOutstandingInstallment(period))
+        .filter((period: any) => {
+          const dueDate = this.toComparableDate(period.dueDate);
+          return dueDate && dueDate.getTime() < selected.getTime();
+        })
+        .reduce((sum: number, period: any) => sum + this.getPeriodComponentOutstanding(period, 'penalty'), 0)
+    );
+  }
+
+  /**
+   * Amount the quoted foreclosure total may exceed what the backend allocates — shows up as Overpaid By on closure.
+   * Common when the template principal embeds overdue schedule LPI but execution posts it separately.
+   */
+  get foreclosureOverpaymentRisk(): number {
+    if (this.foreclosureBlockedByDueDate) {
+      return 0;
+    }
+    const quotedPrincipal = Number(this.formRawValue.outstandingPrincipalPortion || 0);
+    const summaryPrincipal = Number(this.loanSummary?.principalOutstanding ?? 0);
+    const principalGap =
+      summaryPrincipal > 0.01 && quotedPrincipal > summaryPrincipal + 0.01
+        ? roundAmount(quotedPrincipal - summaryPrincipal)
+        : 0;
+    const penaltyGap = roundAmount(Math.max(this.scheduleOverduePenaltyOutstanding - this.penaltyAsOfDate, 0));
+    return Math.max(principalGap, penaltyGap);
+  }
+
+  get settlementClosesLoan(): boolean {
+    return !this.foreclosureBlockedByDueDate;
+  }
+
+  get showSettlementPreview(): boolean {
+    return !this.dateErrorMessage || this.foreclosureBlockedByDueDate;
+  }
+
+  /** Account-list reference on today, or waived-LPI context when backdating. */
+  get settlementLedgerToday(): number {
+    if (this.isSelectedBusinessDate) {
+      return this.fullLoanOutstanding;
+    }
+    return this.penaltyWaivedByBackdate > 0.01 ? this.fullLoanOutstanding : 0;
+  }
+
+  get settlementLedgerDelta(): number {
+    if (this.isSelectedBusinessDate) {
+      const delta = this.fullOutstandingVsDueDelta;
+      if (delta <= 0.01) {
+        return 0;
+      }
+      if (this.unearnedInterest > 0.01 && this.penaltyAsOfDate <= 0.01) {
+        return 0;
+      }
+      return Math.max(roundAmount(delta - this.unearnedInterest), 0);
+    }
+    return this.penaltyWaivedByBackdate > 0.01 ? this.penaltyWaivedByBackdate : 0;
+  }
+
+  get summaryFootnotes(): Array<string | SettlementSummaryFootnote> {
+    const notes: Array<string | SettlementSummaryFootnote> = [];
+    if (this.foreclosureBlockedByDueDate) {
+      notes.push('Amounts shown are what would be due via repayment on this date, not a foreclosure quote.');
+    }
+    if (this.isPostMaturityGracePeriodClosure) {
+      notes.push(
+        'GRACE_PERIOD_APPLIED on the schedule is post-maturity penalty grace LPI (no principal/interest due). ' +
+          'All EMIs are already paid — this payment clears remaining LPI only.'
+      );
+    }
+    if (
+      this.unearnedInterest > 0.01 &&
+      this.closureTypeInfo?.type === 'foreclosure' &&
+      !this.foreclosureBlockedByDueDate
+    ) {
+      notes.push({
+        text: `Unearned interest: −${this.currencySymbol} ${this.formatAmount(this.unearnedInterest)}`,
+        tone: 'negative'
+      });
+    }
+    if (this.isRealEmiDueOnSelectedDate && this.penaltyAsOfDate <= 0.01 && this.settlementLedgerDelta <= 0.01) {
+      notes.push('No LPI on installment due date');
+    }
+    const penaltyGap = roundAmount(this.scheduleOverduePenaltyOutstanding - this.penaltyAsOfDate);
+    if (penaltyGap > 0.01 && !this.foreclosureBlockedByDueDate) {
+      notes.push(
+        `Schedule overdue LPI ${this.currencySymbol} ${this.formatAmount(this.scheduleOverduePenaltyOutstanding)} ` +
+          `vs quote LPI ${this.currencySymbol} ${this.formatAmount(this.penaltyAsOfDate)} — ` +
+          `paying the quoted total may overpay by ~${this.currencySymbol} ${this.formatAmount(penaltyGap)}`
+      );
+    }
+    if (this.isFutureDateSelected && this.additionalFutureLpiAmount > 0.01) {
+      notes.push(
+        `+${this.currencySymbol} ${this.formatAmount(this.additionalFutureLpiAmount)} projected LPI (preview)`
+      );
+    }
+    return notes;
+  }
+
+  get isRealEmiDueOnSelectedDate(): boolean {
+    return isRealEmiDueOnDate(this.repaymentSchedule?.periods, this.foreclosureForm?.value?.transactionDate, (value) =>
+      this.toComparableDate(value)
+    );
+  }
+
+  get showDueEmiPills(): boolean {
+    if (this.dueEmis.length === 0) {
+      return false;
+    }
+    if (this.dueEmis.length === 1) {
+      return Math.abs(Number(this.dueEmis[0].amount || 0) - this.dueAsOfDateTotal) > 0.01;
+    }
+    return true;
+  }
+
+  get businessDateLabel(): string {
+    return this.dateUtils.formatDate(this.settingsService.businessDate, this.settingsService.dateFormat);
+  }
+
+  get fullOutstandingVsDueDelta(): number {
+    return roundAmount(this.fullLoanOutstanding - this.dueAsOfDateTotal);
+  }
+
+  /**
+   * Interest waived by early foreclosure — ledger full-period interest minus foreclosure quote interest,
+   * or the account-list vs settlement gap when the template rolls discount into principal only.
+   */
+  get unearnedInterest(): number {
+    const interestAsOfDate = Number(this.formRawValue.outstandingInterestPortion || 0);
+    const fromSummary = computeUnearnedInterest(Number(this.loanSummary?.interestOutstanding ?? 0), interestAsOfDate);
+    if (fromSummary > 0.01) {
+      return fromSummary;
+    }
+    const fromBaseline = roundAmount(this.baselineInterestPortion - interestAsOfDate);
+    if (fromBaseline > 0.01) {
+      return fromBaseline;
+    }
+    if (
+      this.closureTypeInfo?.type === 'foreclosure' &&
+      !this.foreclosureBlockedByDueDate &&
+      this.penaltyAsOfDate <= 0.01
+    ) {
+      return Math.max(this.fullOutstandingVsDueDelta, 0);
+    }
+    return 0;
+  }
+
+  private getDueEmisForDate(
+    transactionDateValue: Date
+  ): Array<{ period: number; dueDate: any; amount: number; state: 'overdue' | 'due' }> {
+    const periods = this.repaymentSchedule?.periods;
+    if (!Array.isArray(periods)) {
+      return [];
+    }
+
+    const selected = this.toComparableDate(transactionDateValue);
+    if (!selected) {
+      return [];
+    }
+
+    let remainingPenalty = this.penaltyAsOfDate;
+    return periods
+      .filter((period: any) => this.isRealOutstandingInstallment(period))
+      .filter((period: any) => {
+        const dueDate = this.toComparableDate(period.dueDate);
+        return dueDate && dueDate.getTime() <= selected.getTime();
+      })
+      .sort((a: any, b: any) => Number(a.period) - Number(b.period))
+      .map((period: any) => {
+        const dueDate = this.toComparableDate(period.dueDate);
+        const schedulePenalty = this.getPeriodComponentOutstanding(period, 'penalty');
+        const penalty = Math.min(schedulePenalty, remainingPenalty);
+        remainingPenalty = roundAmount(remainingPenalty - penalty);
+        const amount = roundAmount(
+          this.getPeriodComponentOutstanding(period, 'principal') +
+            this.getPeriodComponentOutstanding(period, 'interest') +
+            this.getPeriodComponentOutstanding(period, 'fee') +
+            this.getPeriodComponentOutstanding(period, 'tax') +
+            penalty
+        );
+        const state: 'overdue' | 'due' = dueDate && dueDate.getTime() < selected.getTime() ? 'overdue' : 'due';
+        return {
+          period: Number(period.period),
+          dueDate: period.dueDate,
+          amount,
+          state
+        };
+      })
+      .filter((emi) => emi.amount > 0);
+  }
+
+  private isRealOutstandingInstallment(period: any): boolean {
+    if (!period || period.complete || period.obligationsMetOnDate || period.downPaymentPeriod || period.isAdditional) {
+      return false;
+    }
+    const periodNumber = Number(period.period);
+    if (!periodNumber || periodNumber < 1 || Number(period.principalDisbursed || 0) > 0) {
+      return false;
+    }
+    return this.getPeriodOutstandingAmount(period) > 0;
+  }
+
+  private getPeriodOutstandingAmount(period: any): number {
+    const explicitOutstanding = Number(period.totalOutstandingForPeriod ?? 0);
+    if (explicitOutstanding > 0) {
+      return explicitOutstanding;
+    }
+    const due = Number(period.totalDueForPeriod ?? 0);
+    const paid = Number(period.totalPaidForPeriod ?? 0);
+    return Math.max(roundAmount(due - paid), 0);
+  }
+
+  private getPeriodComponentOutstanding(
+    period: any,
+    component: 'penalty' | 'fee' | 'tax' | 'interest' | 'principal'
+  ): number {
+    const fieldMap: Record<string, [string, string, string]> = {
+      penalty: [
+        'penaltyChargesOutstanding',
+        'penaltyChargesDue',
+        'penaltyChargesPaid'
+      ],
+      fee: [
+        'feeChargesOutstanding',
+        'feeChargesDue',
+        'feeChargesPaid'
+      ],
+      tax: [
+        'taxChargesOutstanding',
+        'taxChargesDue',
+        'taxChargesPaid'
+      ],
+      interest: [
+        'interestOutstanding',
+        'interestDue',
+        'interestPaid'
+      ],
+      principal: [
+        'principalOutstanding',
+        'principalDue',
+        'principalPaid'
+      ]
+    };
+    const [
+      outstandingField,
+      dueField,
+      paidField
+    ] = fieldMap[component];
+    const explicit = Number(period?.[outstandingField] ?? NaN);
+    if (!Number.isNaN(explicit) && explicit > 0) {
+      return roundAmount(explicit);
+    }
+    const due = Number(period?.[dueField] ?? 0);
+    const paid = Number(period?.[paidField] ?? 0);
+    return roundAmount(Math.max(due - paid, 0));
+  }
+
+  private toComparableDate(value: any): Date | null {
+    if (!value) {
+      return null;
+    }
+    if (value instanceof Date) {
+      return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+    }
+    if (Array.isArray(value)) {
+      return new Date(value[0], value[1] - 1, value[2]);
+    }
+    const parsed = this.dateUtils.parseDate(value);
+    return parsed ? new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate()) : null;
+  }
+
+  private formatAmount(value: number): string {
+    return roundAmount(value).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  }
+
   submit() {
     if (this.isFutureDateSelected || this.dateErrorMessage) {
       return;
     }
-    const foreclosureFormData = this.foreclosureForm.value;
+    const formValue = this.foreclosureForm.value;
     const locale = this.settingsService.language.code;
     const dateFormat = this.settingsService.dateFormat;
-    const prevTransactionDate = this.foreclosureForm.value.transactionDate;
-    if (foreclosureFormData.transactionDate instanceof Date) {
-      foreclosureFormData.transactionDate = this.dateUtils.formatDate(prevTransactionDate, dateFormat);
+    let transactionDate = formValue.transactionDate;
+    if (transactionDate instanceof Date) {
+      transactionDate = this.dateUtils.formatDate(transactionDate, dateFormat);
     }
+    // Disabled breakdown fields must not be posted.
     const data = {
-      ...foreclosureFormData,
+      transactionDate,
+      note: formValue.note,
       dateFormat,
       locale
     };
 
     this.loanService.loanForclosureData(this.loanId, data).subscribe(() => {
       this.router.navigate([`../../general`], { relativeTo: this.route });
-    });
-  }
-
-  private setupMutualExclusion(): void {
-    const forcedControl = this.foreclosureForm.get('isForcedClosure');
-    const restructuredControl = this.foreclosureForm.get('isRestructured');
-
-    forcedControl.valueChanges.subscribe((isForced) => {
-      if (isForced && restructuredControl.value) {
-        restructuredControl.setValue(false, { emitEvent: false });
-      }
-    });
-
-    restructuredControl.valueChanges.subscribe((isRestructured) => {
-      if (isRestructured && forcedControl.value) {
-        forcedControl.setValue(false, { emitEvent: false });
-      }
     });
   }
 }

@@ -42,6 +42,132 @@ export function computePenaltyWaivedByBackdate(penaltyInSummary: number, penalty
 }
 
 /**
+ * Interest on the loan ledger (full EMI period) minus pro-rated interest due as of the selected date.
+ * Positive when paying before the installment due date — shown as unearned / waived interest.
+ */
+export function computeUnearnedInterest(interestInSummary: number, interestAsOfDate: number): number {
+  return Math.max(roundAmount(Number(interestInSummary || 0) - Number(interestAsOfDate || 0)), 0);
+}
+
+/**
+ * True when {@code date} matches a real EMI installment due date (scheduled P+I &gt; 0).
+ */
+export function isRealEmiDueOnDate(
+  periods:
+    | Array<{
+        period?: number;
+        dueDate?: any;
+        isAdditional?: boolean;
+        downPaymentPeriod?: boolean;
+        principalOriginalDue?: number;
+        principalDue?: number;
+        interestOriginalDue?: number;
+        interestDue?: number;
+      }>
+    | undefined,
+  transactionDateValue: any,
+  toComparableDate: (value: any) => Date | null
+): boolean {
+  const selected = toComparableDate(transactionDateValue);
+  if (!selected || !Array.isArray(periods)) {
+    return false;
+  }
+  return periods.some((period) => {
+    if (!period || period.downPaymentPeriod || period.isAdditional) {
+      return false;
+    }
+    const due = toComparableDate(period.dueDate);
+    if (!due || due.getTime() !== selected.getTime()) {
+      return false;
+    }
+    const scheduledPI =
+      Number(period.principalOriginalDue ?? period.principalDue ?? 0) +
+      Number(period.interestOriginalDue ?? period.interestDue ?? 0);
+    return Number(period.period || 0) > 0 && scheduledPI > 0.01;
+  });
+}
+
+/**
+ * Dummy post-maturity LPI grace row: zero scheduled P+I, due date rolled to latest LPI date.
+ * When the backend treats that date as an EMI due date, same-day LPI is wrongly excluded from /template/penalties.
+ */
+export function isDummyGraceInstallmentDueOnDate(
+  periods:
+    | Array<{
+        period?: number;
+        dueDate?: any;
+        isAdditional?: boolean;
+        downPaymentPeriod?: boolean;
+        principalOriginalDue?: number;
+        principalDue?: number;
+        interestOriginalDue?: number;
+        interestDue?: number;
+      }>
+    | undefined,
+  transactionDateValue: any,
+  toComparableDate: (value: any) => Date | null
+): boolean {
+  const selected = toComparableDate(transactionDateValue);
+  if (!selected || !Array.isArray(periods)) {
+    return false;
+  }
+  return periods.some((period) => {
+    if (!period || period.downPaymentPeriod) {
+      return false;
+    }
+    const due = toComparableDate(period.dueDate);
+    if (!due || due.getTime() !== selected.getTime()) {
+      return false;
+    }
+    if (period.isAdditional) {
+      return true;
+    }
+    const scheduledPI =
+      Number(period.principalOriginalDue ?? period.principalDue ?? 0) +
+      Number(period.interestOriginalDue ?? period.interestDue ?? 0);
+    return Number(period.period || 0) > 0 && scheduledPI <= 0.01;
+  });
+}
+
+/**
+ * When settling on the business date, /template/penalties can underquote LPI vs loan summary because a dummy
+ * grace-row due date was treated as an on-time EMI date. Add the penalty gap back only when the ledger delta
+ * matches and this is not a genuine on-time EMI due-date exclusion.
+ */
+export function reconcilePenaltyWithLedger(params: {
+  penaltyFromTemplate: number;
+  penaltyInSummary: number;
+  fullLoanOutstanding: number;
+  dueWithoutPenaltyReconcile: number;
+  isBusinessDate: boolean;
+  onInstallmentDueDate: boolean;
+  hasRealEmiDueOnDate: boolean;
+}): number {
+  const templatePenalty = roundAmount(params.penaltyFromTemplate);
+  if (!params.isBusinessDate) {
+    return templatePenalty;
+  }
+  const penaltyGap = roundAmount(Number(params.penaltyInSummary || 0) - templatePenalty);
+  if (penaltyGap <= 0.01) {
+    return templatePenalty;
+  }
+  const ledgerGap = roundAmount(params.fullLoanOutstanding - params.dueWithoutPenaltyReconcile);
+  if (Math.abs(ledgerGap - penaltyGap) > 0.02) {
+    return templatePenalty;
+  }
+  if (params.onInstallmentDueDate && params.hasRealEmiDueOnDate) {
+    return templatePenalty;
+  }
+  return roundAmount(templatePenalty + penaltyGap);
+}
+
+export function isSameCalendarDate(a: any, b: any, toComparableDate: (value: any) => Date | null): boolean {
+  const left = toComparableDate(a);
+  const right = toComparableDate(b);
+  return !!(left && right && left.getTime() === right.getTime());
+}
+
+/**
  * Amount required to settle the loan as of the selected date under mifos-standard /
  * pro-rata-mifos-standard: remaining principal (all EMIs) + interest due as of that date
  * (current EMI / pro-rated) + fees + tax + LPI still due. Future EMI interest is not collected.
