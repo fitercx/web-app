@@ -1,7 +1,10 @@
 import {
   allocateSettlement,
+  computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
+  computeProjectedOverpayment,
   computeSavingsBalanceAsOf,
+  computeScheduleCloseCap,
   computeSettlementRequired,
   computeUnearnedInterest,
   isDummyGraceInstallmentDueOnDate,
@@ -214,5 +217,57 @@ describe('backdated-settlement.util', () => {
     expect(reconciled.principal).toBe(20879.01);
     expect(reconciled.interest).toBe(0);
     expect(reconciled.remainingPrincipal).toBe(20879.01);
+  });
+
+  it('schedule close cap is lower than template for bullet PF before maturity (accrual overpay risk)', () => {
+    const periods = [
+      {
+        period: 1,
+        complete: false,
+        dueDate: [
+          2026,
+          7,
+          31
+        ],
+        totalDueForPeriod: 103846.58,
+        totalPaidForPeriod: 0,
+        principalOriginalDue: 100000,
+        interestOriginalDue: 3846.58
+      }
+    ];
+    expect(computeScheduleCloseCap(periods)).toBe(103846.58);
+
+    const cap = computeAuthoritativeSettlementCap({
+      outstandingAfterWaiver: 104438.36,
+      fullLoanOutstanding: 104438.36,
+      scheduleCloseCap: 103846.58,
+      datedRepaymentTemplateAmount: 104438.36
+    });
+    expect(cap).toBe(103846.58);
+    expect(computeProjectedOverpayment(104438.36, cap)).toBe(591.78);
+  });
+
+  it('authoritative cap ignores zero schedule and uses UI figures', () => {
+    expect(
+      computeAuthoritativeSettlementCap({
+        outstandingAfterWaiver: 81984.11,
+        fullLoanOutstanding: 82182,
+        scheduleCloseCap: 0
+      })
+    ).toBe(81984.11);
+  });
+
+  it('partial EMI payment is below schedule close cap so no projected overpayment', () => {
+    const periods = [
+      { period: 1, complete: false, totalOutstandingForPeriod: 27363.33 },
+      { period: 2, complete: false, totalOutstandingForPeriod: 27363.33 },
+      { period: 3, complete: false, totalOutstandingForPeriod: 27363.33 }
+    ];
+    const cap = computeAuthoritativeSettlementCap({
+      outstandingAfterWaiver: 164179,
+      fullLoanOutstanding: 164179,
+      scheduleCloseCap: computeScheduleCloseCap(periods)
+    });
+    expect(computeProjectedOverpayment(27363.33, cap)).toBe(0);
   });
 });
