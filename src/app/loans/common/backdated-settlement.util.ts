@@ -134,6 +134,71 @@ export function isDummyGraceInstallmentDueOnDate(
  * grace-row due date was treated as an on-time EMI date. Add the penalty gap back only when the ledger delta
  * matches and this is not a genuine on-time EMI due-date exclusion.
  */
+export interface ReconciledAsOfDateAmounts extends SettlementComponents {
+  /** Remaining principal budget for allocation / close amount. */
+  remainingPrincipal: number;
+  /** Suggested default transaction amount for the selected date. */
+  defaultTransactionAmount: number;
+}
+
+/**
+ * When backdating before a repayment already recorded on a later date, /template/penalties replays
+ * historical due (pre-payment) while Fineract's repayment template still reflects what can be paid
+ * now. Prefer the repayment template in that case so default amount, settlement card, and EMI pills
+ * stay aligned with loan summary outstanding.
+ */
+export function reconcileAsOfDateAmounts(params: {
+  penaltyTemplate: any;
+  repaymentTemplate: any;
+  loanSummary?: any;
+  feeFallback?: number;
+  taxFallback?: number;
+  isBackdated: boolean;
+  additionalPenalty?: number;
+  reconcilePenalty?: (penaltyFromTemplate: number) => number;
+}): ReconciledAsOfDateAmounts {
+  const feeFallback = Number(params.feeFallback || 0);
+  const taxFallback = Number(params.taxFallback || 0);
+  const additionalPenalty = Number(params.additionalPenalty || 0);
+
+  let principal = Number(params.penaltyTemplate?.principalOutstanding || 0);
+  let remainingPrincipal = Number(
+    params.penaltyTemplate?.remainingPrincipalOutstanding || params.loanSummary?.principalOutstanding || principal
+  );
+  let interest = Number(params.penaltyTemplate?.interestOutstanding || 0);
+  let fee = Number(params.repaymentTemplate?.feeChargesPortion ?? feeFallback);
+  let tax = Number(params.repaymentTemplate?.taxChargesPortion ?? taxFallback);
+  const penaltyFromTemplate = Number(params.penaltyTemplate?.penaltyAmountDue || 0) + additionalPenalty;
+  let penalty = params.reconcilePenalty
+    ? params.reconcilePenalty(penaltyFromTemplate)
+    : roundAmount(penaltyFromTemplate);
+
+  let defaultTransactionAmount = roundAmount(principal + interest + fee + tax + penalty);
+  const repaymentAmount = roundAmount(Number(params.repaymentTemplate?.amount || 0));
+
+  if (params.isBackdated && repaymentAmount > 0.01 && defaultTransactionAmount > repaymentAmount + 0.01) {
+    principal = roundAmount(Number(params.repaymentTemplate?.principalPortion ?? repaymentAmount));
+    interest = roundAmount(Number(params.repaymentTemplate?.interestPortion || 0));
+    fee = roundAmount(Number(params.repaymentTemplate?.feeChargesPortion || 0));
+    tax = roundAmount(Number(params.repaymentTemplate?.taxChargesPortion || 0));
+    penalty = roundAmount(Number(params.repaymentTemplate?.penaltyChargesPortion || 0) + additionalPenalty);
+    remainingPrincipal = roundAmount(Number(params.loanSummary?.principalOutstanding ?? principal));
+    defaultTransactionAmount = roundAmount(
+      repaymentAmount + (additionalPenalty > 0 && penalty <= 0.01 ? additionalPenalty : 0)
+    );
+  }
+
+  return {
+    principal,
+    interest,
+    fee,
+    tax,
+    penalty,
+    remainingPrincipal,
+    defaultTransactionAmount
+  };
+}
+
 export function reconcilePenaltyWithLedger(params: {
   penaltyFromTemplate: number;
   penaltyInSummary: number;
@@ -180,6 +245,107 @@ export function computeSettlementRequired(components: SettlementComponents): num
       Number(components.tax || 0) +
       Number(components.penalty || 0)
   );
+}
+
+export interface SchedulePeriod {
+  period?: number;
+  complete?: boolean;
+  downPaymentPeriod?: boolean;
+  isAdditional?: boolean;
+  dueDate?: any;
+  totalOutstandingForPeriod?: number;
+  totalDueForPeriod?: number;
+  totalPaidForPeriod?: number;
+  principalDue?: number;
+  principalPaid?: number;
+  principalOriginalDue?: number;
+  interestDue?: number;
+  interestPaid?: number;
+  interestOriginalDue?: number;
+  penaltyChargesDue?: number;
+  penaltyChargesPaid?: number;
+  feeChargesDue?: number;
+  feeChargesPaid?: number;
+}
+
+function isRealScheduleInstallment(period: SchedulePeriod): boolean {
+  if (!period || period.downPaymentPeriod || period.isAdditional) {
+    return false;
+  }
+  const scheduledPI =
+    Number(period.principalOriginalDue ?? period.principalDue ?? 0) +
+    Number(period.interestOriginalDue ?? period.interestDue ?? 0);
+  return Number(period.period || 0) > 0 && scheduledPI > 0.01;
+}
+
+function periodOutstandingOnSchedule(period: SchedulePeriod): number {
+  const fromOutstanding = Number(period.totalOutstandingForPeriod ?? 0);
+  if (fromOutstanding > 0.01) {
+    return roundAmount(fromOutstanding);
+  }
+  const fromDuePaid = roundAmount(Number(period.totalDueForPeriod ?? 0) - Number(period.totalPaidForPeriod ?? 0));
+  if (fromDuePaid > 0.01) {
+    return fromDuePaid;
+  }
+  const principal = Math.max(
+    roundAmount(Number(period.principalDue ?? period.principalOriginalDue ?? 0) - Number(period.principalPaid ?? 0)),
+    0
+  );
+  const interest = Math.max(
+    roundAmount(Number(period.interestDue ?? period.interestOriginalDue ?? 0) - Number(period.interestPaid ?? 0)),
+    0
+  );
+  const penalty = Math.max(
+    roundAmount(Number(period.penaltyChargesDue ?? 0) - Number(period.penaltyChargesPaid ?? 0)),
+    0
+  );
+  const fee = Math.max(roundAmount(Number(period.feeChargesDue ?? 0) - Number(period.feeChargesPaid ?? 0)), 0);
+  return roundAmount(principal + interest + penalty + fee);
+}
+
+/**
+ * Sum of every unpaid real installment on the repayment schedule — conservative cap for what the
+ * backend can absorb on a full close (e.g. bullet PF/RF before maturity where the template can
+ * overstate same-day interest vs schedule / accrual posting order).
+ */
+export function computeScheduleCloseCap(periods: SchedulePeriod[] | undefined): number {
+  if (!Array.isArray(periods) || !periods.length) {
+    return 0;
+  }
+  const unpaidReal = periods.filter((period) => isRealScheduleInstallment(period) && !period.complete);
+  if (!unpaidReal.length) {
+    return 0;
+  }
+  return roundAmount(unpaidReal.reduce((sum, period) => sum + periodOutstandingOnSchedule(period), 0));
+}
+
+/** Lowest positive close cap across UI figures — used to detect Overpaid before submit. */
+export function computeAuthoritativeSettlementCap(caps: {
+  outstandingAfterWaiver: number;
+  fullLoanOutstanding: number;
+  scheduleCloseCap: number;
+  datedRepaymentTemplateAmount?: number;
+}): number {
+  const candidates = [
+    caps.outstandingAfterWaiver,
+    caps.fullLoanOutstanding,
+    caps.scheduleCloseCap,
+    caps.datedRepaymentTemplateAmount
+  ]
+    .map((value) => roundAmount(Number(value || 0)))
+    .filter((value) => value > 0.01);
+
+  if (!candidates.length) {
+    return 0;
+  }
+  return Math.min(...candidates);
+}
+
+export function computeProjectedOverpayment(amount: number, settlementCap: number): number {
+  if (!settlementCap || settlementCap <= 0.01) {
+    return 0;
+  }
+  return Math.max(roundAmount(Number(amount || 0) - settlementCap), 0);
 }
 
 /**

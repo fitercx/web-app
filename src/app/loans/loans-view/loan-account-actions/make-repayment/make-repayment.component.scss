@@ -101,13 +101,22 @@
   }
 }
 
-.closure-refund-notice {
+.repayment-outcome-notice {
   border-left-color: #0f766e;
   background: rgb(15 118 110 / 10%);
   font-weight: 600;
 
   mat-icon {
     color: #0f766e;
+  }
+}
+
+.repayment-outcome-notice--overpaid {
+  border-left-color: #b45309;
+  background: rgb(180 83 9 / 10%);
+
+  mat-icon {
+    color: #b45309;
   }
 }
 

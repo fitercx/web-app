@@ -16,10 +16,15 @@ import { AlertService } from 'app/core/alert/alert.service';
 import { SavingsService } from 'app/savings/savings.service';
 import {
   allocateSettlement,
+  computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
+  computeProjectedOverpayment,
   computeSavingsBalanceAsOf,
+  computeScheduleCloseCap,
   computeSettlementRequired,
-  computeUnearnedInterest
+  computeUnearnedInterest,
+  reconcileAsOfDateAmounts,
+  SchedulePeriod
 } from 'app/loans/common/backdated-settlement.util';
 
 /**
@@ -63,6 +68,8 @@ export class MakeRepaymentComponent implements OnInit {
   availableBalanceAsOfDate = 0;
   private savingsTransactions: any[] = [];
   private loanSummary: any;
+  private repaymentSchedulePeriods: SchedulePeriod[] = [];
+  private datedRepaymentTemplateAmount = 0;
   fullLoanOutstanding = 0;
 
   /**
@@ -91,7 +98,8 @@ export class MakeRepaymentComponent implements OnInit {
   /** How the entered amount will be applied — must match the principal/interest/fee/penalty fields. */
   settlementPreviewMessage: string | null = null;
   overpaymentWarning: string | null = null;
-  closureRefundNotice: string | null = null;
+  /** Outcome of this repayment transaction (Active / Closed / Overpaid) — not Early Closure / Foreclosure. */
+  repaymentOutcomeNotice: string | null = null;
 
   /**
    * @param {FormBuilder} formBuilder Form Builder.
@@ -251,48 +259,52 @@ export class MakeRepaymentComponent implements OnInit {
     const businessDate = this.settingsService.businessDate;
     const selectedDate = this.dateUtils.parseDate(transactionDate);
     const isFutureDate = selectedDate && businessDate && selectedDate.getTime() > businessDate.getTime();
+    const isBackdated = !!(selectedDate && businessDate && selectedDate.getTime() < businessDate.getTime());
 
-    this.loanService
-      .getLoanPenaltiesTemplate(this.loanId, transactionDate)
+    forkJoin({
+      penaltyTemplate: this.loanService.getLoanPenaltiesTemplate(this.loanId, transactionDate),
+      repaymentTemplate: this.loanService.getLoanRepaymentTemplate(this.loanId, transactionDate)
+    })
       .pipe(
-        switchMap((template: any) => {
-          this.dataObject.penaltyTemplate = template;
+        switchMap(({ penaltyTemplate, repaymentTemplate }: any) => {
+          this.dataObject.penaltyTemplate = penaltyTemplate;
           if (isFutureDate) {
             return this.loanService.getFutureLPICharges(this.loanId, transactionDate).pipe(
-              switchMap((futureLPI: any) => of({ template, futureLPI })),
-              catchError(() => of({ template, futureLPI: null as any }))
+              switchMap((futureLPI: any) => of({ penaltyTemplate, repaymentTemplate, futureLPI })),
+              catchError(() => of({ penaltyTemplate, repaymentTemplate, futureLPI: null as any }))
             );
           }
-          return of({ template, futureLPI: null as any });
+          return of({ penaltyTemplate, repaymentTemplate, futureLPI: null as any });
         })
       )
-      .subscribe(({ template, futureLPI }: { template: any; futureLPI: any }) => {
-        this.onInstallmentDueDate = !!template?.onInstallmentDueDate;
-        // Amount due = this EMI (and any earlier overdue EMIs), not remaining principal of later EMIs.
-        // Overnight LPI posted after the due date is already excluded from penaltyAmountDue.
-        const installmentPrincipal = template.principalOutstanding || this.baselinePrincipalOutstanding;
-        const remainingPrincipal =
-          template.remainingPrincipalOutstanding || this.loanSummary?.principalOutstanding || installmentPrincipal;
-        const interestAmount = template.interestOutstanding || this.baselineInterestOutstanding;
-        // /template/penalties does not return fee/tax (DTO is P / remaining P / I / LPI only).
-        // Fee and tax come from the repayment template and are date-invariant for this screen.
-        const feesAmount = Number(this.dataObject.repaymentTemplate.feeChargesPortion || 0);
-        const taxAmount = Number(this.dataObject.repaymentTemplate.taxChargesPortion || 0);
-        const penaltyAmount = template.penaltyAmountDue || 0;
+      .subscribe(({ penaltyTemplate, repaymentTemplate, futureLPI }: any) => {
+        this.onInstallmentDueDate = !!penaltyTemplate?.onInstallmentDueDate;
         const additionalLPIAmount = Number(futureLPI?.totalLPIAmount || 0);
-        const totalPenaltyAmount = penaltyAmount + additionalLPIAmount;
+        const reconciled = reconcileAsOfDateAmounts({
+          penaltyTemplate,
+          repaymentTemplate,
+          loanSummary: this.loanSummary,
+          feeFallback: Number(this.dataObject.repaymentTemplate?.feeChargesPortion || 0),
+          taxFallback: Number(this.dataObject.repaymentTemplate?.taxChargesPortion || 0),
+          isBackdated,
+          additionalPenalty: additionalLPIAmount
+        });
 
-        this.dataObject.penaltyTemplate.principalOutstanding = installmentPrincipal;
-        this.dataObject.penaltyTemplate.remainingPrincipalOutstanding = remainingPrincipal;
-        this.dataObject.penaltyTemplate.interestOutstanding = interestAmount;
-        this.dataObject.penaltyTemplate.penaltyAmountDue = totalPenaltyAmount;
+        this.dataObject.penaltyTemplate.principalOutstanding = reconciled.principal;
+        this.dataObject.penaltyTemplate.remainingPrincipalOutstanding = reconciled.remainingPrincipal;
+        this.dataObject.penaltyTemplate.interestOutstanding = reconciled.interest;
+        this.dataObject.penaltyTemplate.penaltyAmountDue = reconciled.penalty;
 
-        this.dateImpactMessages = this.buildDateImpactMessages(interestAmount, totalPenaltyAmount, transactionDate);
-        this.lpiPaymentMessage = this.buildLpiPaymentMessage(totalPenaltyAmount, transactionDate);
-
-        const totalAmount = this.roundAmount(
-          Number(installmentPrincipal || 0) + interestAmount + feesAmount + taxAmount + totalPenaltyAmount
+        this.dateImpactMessages = this.buildDateImpactMessages(
+          reconciled.interest,
+          reconciled.penalty,
+          transactionDate
         );
+        this.lpiPaymentMessage = this.buildLpiPaymentMessage(reconciled.penalty, transactionDate);
+        this.datedRepaymentTemplateAmount = this.roundAmount(Number(repaymentTemplate?.amount || 0));
+
+        const rawSuggested = this.roundAmount(reconciled.defaultTransactionAmount + additionalLPIAmount);
+        const totalAmount = this.capRepaymentAmount(rawSuggested);
         this.repaymentLoanForm.patchValue(
           {
             transactionAmount: totalAmount
@@ -392,14 +404,13 @@ export class MakeRepaymentComponent implements OnInit {
   }
 
   private loadLinkedSavingsAndSummary(): void {
-    forkJoin({
-      foreclosure: this.loanService.getLoanForeclosureActionTemplate(this.loanId).pipe(catchError(() => of(null))),
-      loanDetails: this.loanService.getLoanAccountResource(this.loanId, 'summary').pipe(catchError(() => of(null)))
-    })
+    this.loanService
+      .getLoanAccountResource(this.loanId, 'summary,linkedAccount,repaymentSchedule')
       .pipe(
-        switchMap((result: any) => {
-          this.applyLoanSummary(result.loanDetails);
-          this.captureLinkedSavings(result.foreclosure);
+        catchError(() => of(null)),
+        switchMap((loanDetails: any) => {
+          this.applyLoanSummary(loanDetails);
+          this.captureLinkedSavingsFromLoanDetails(loanDetails);
           this.updateSettlementPreview();
           if (!this.linkedSavingsAccountId) {
             return of(null);
@@ -420,18 +431,43 @@ export class MakeRepaymentComponent implements OnInit {
   private applyLoanSummary(loanDetails: any): void {
     this.loanSummary = loanDetails?.summary || null;
     this.fullLoanOutstanding = this.roundAmount(Number(this.loanSummary?.totalOutstanding || 0));
+    this.repaymentSchedulePeriods = Array.isArray(loanDetails?.repaymentSchedule?.periods)
+      ? loanDetails.repaymentSchedule.periods
+      : [];
+    this.recapTransactionAmountIfOverpayRisk();
   }
 
-  private captureLinkedSavings(source: any): void {
-    const additional = source?.additionalAttributes;
-    if (!additional) {
+  /** After schedule loads, lower a template-prefilled amount so Make Repayment does not post an overpay. */
+  private recapTransactionAmountIfOverpayRisk(): void {
+    const current = Number(this.repaymentLoanForm?.get('transactionAmount')?.value || 0);
+    if (!current) {
       return;
     }
-    this.linkedSavingsAccountId = additional.linkedSavingsAccountId;
-    this.linkedSavingsAccountAccountNo = additional.linkedSavingsAccountAccountNo;
-    this.linkedSavingsAccountProductName = additional.linkedSavingsAccountProductName;
-    this.linkedSavingsAccountAvailableBalance = Number(additional.linkedSavingsAccountAvailableBalance || 0);
-    this.availableBalanceAsOfDate = this.linkedSavingsAccountAvailableBalance;
+    const capped = this.capRepaymentAmount(current);
+    if (capped + 0.01 < current) {
+      this.repaymentLoanForm.patchValue({ transactionAmount: capped }, { emitEvent: false });
+      this.updateSettlementPreview();
+    }
+  }
+
+  /** Caps to repaymentCapWithoutOverpay when schedule/template overstate same-day interest (PF/RF bullet). */
+  private capRepaymentAmount(amount: number): number {
+    const cap = this.repaymentCapWithoutOverpay;
+    if (cap > 0.01 && amount > cap + 0.01) {
+      return cap;
+    }
+    return this.roundAmount(amount);
+  }
+
+  /** Linked savings from GET /loans/{id}?associations=linkedAccount — not foreclosure template (blocked when overdue). */
+  private captureLinkedSavingsFromLoanDetails(loanDetails: any): void {
+    const linked = loanDetails?.linkedAccount;
+    if (!linked?.id) {
+      return;
+    }
+    this.linkedSavingsAccountId = linked.id;
+    this.linkedSavingsAccountAccountNo = linked.accountNo;
+    this.linkedSavingsAccountProductName = linked.productName;
   }
 
   private captureSavingsTransactions(savingsAccount: any): void {
@@ -556,6 +592,39 @@ export class MakeRepaymentComponent implements OnInit {
     });
   }
 
+  /** Repayment schedule total for all unpaid installments — cap for a full repay via Make Repayment. */
+  get scheduleFullRepaymentCap(): number {
+    return computeScheduleCloseCap(this.repaymentSchedulePeriods);
+  }
+
+  /**
+   * Maximum this repayment can apply without moving the loan to Overpaid — uses repayment template,
+   * penalties as-of-date, ledger summary, and schedule (not the Foreclosure / early-closure path).
+   */
+  get repaymentCapWithoutOverpay(): number {
+    return computeAuthoritativeSettlementCap({
+      outstandingAfterWaiver: this.outstandingAfterWaiver,
+      fullLoanOutstanding: this.fullLoanOutstanding,
+      scheduleCloseCap: this.scheduleFullRepaymentCap,
+      datedRepaymentTemplateAmount: this.datedRepaymentTemplateAmount
+    });
+  }
+
+  get projectedOverpaymentAmount(): number {
+    const amount = Number(this.repaymentLoanForm?.get('transactionAmount')?.value || 0);
+    return computeProjectedOverpayment(amount, this.repaymentCapWithoutOverpay);
+  }
+
+  get willBecomeOverpaid(): boolean {
+    return this.projectedOverpaymentAmount > 0.01;
+  }
+
+  /** True when this Make Repayment amount would fully settle outstanding (loan status Closed). */
+  willFullyRepayLoan(amount: number): boolean {
+    const cap = this.repaymentCapWithoutOverpay;
+    return cap > 0.01 && this.roundAmount(amount) + 0.01 >= cap;
+  }
+
   get displayedPrincipal(): number {
     return this.currentSettlementAllocation.principal;
   }
@@ -600,7 +669,7 @@ export class MakeRepaymentComponent implements OnInit {
     const dateLabel = transactionDate || this.selectedTransactionDateLabel;
     const amount = Number(this.repaymentLoanForm?.get('transactionAmount')?.value || 0);
     this.overpaymentWarning = null;
-    this.closureRefundNotice = null;
+    this.repaymentOutcomeNotice = null;
 
     if (!amount || amount <= 0) {
       this.settlementPreviewMessage =
@@ -640,29 +709,41 @@ export class MakeRepaymentComponent implements OnInit {
           : `no outstanding balance remains to allocate (as at ${dateLabel}).`)
     ];
 
-    const closesLoan =
-      this.outstandingAfterWaiver > 0.01 && this.roundAmount(amount) + 0.01 >= this.outstandingAfterWaiver;
-    if (allocation.unallocated > 0.01) {
+    const repaymentCap = this.repaymentCapWithoutOverpay;
+    const projectedOverpay = this.projectedOverpaymentAmount;
+    const excess = Math.max(projectedOverpay, allocation.unallocated);
+    const fullyRepays = this.willFullyRepayLoan(amount);
+
+    if (excess > 0.01) {
+      const capLabel =
+        repaymentCap > 0.01
+          ? `${this.currencyLabel} ${repaymentCap.toFixed(2)}`
+          : `${this.currencyLabel} ${this.outstandingAfterWaiver.toFixed(2)}`;
       lines.push(
-        `Excess of ${this.currencyLabel} ${allocation.unallocated.toFixed(2)} will overpay the loan. ` +
-          `The required amount as of ${dateLabel} is ${this.currencyLabel} ${this.outstandingAfterWaiver.toFixed(2)}.`
+        `Excess of ${this.currencyLabel} ${excess.toFixed(2)} over the maximum this repayment can apply (${capLabel} as at ${dateLabel}).`
       );
-      this.overpaymentWarning = lines[lines.length - 1];
-      this.closureRefundNotice = `This payment will close the loan overpaid by ${this.currencyLabel} ${allocation.unallocated.toFixed(2)}.`;
-    } else if (closesLoan) {
-      const closeLine =
-        `This payment covers the amount required as of ${dateLabel} ` +
-        `(${this.currencyLabel} ${this.outstandingAfterWaiver.toFixed(2)}) and will close the loan.`;
-      if (this.penaltyWaivedByBackdate > 0.01) {
-        lines.push(`${closeLine} Late-payment interest accrued after this date is waived and is not charged.`);
-      } else {
-        lines.push(closeLine);
+      this.overpaymentWarning =
+        `This Make Repayment exceeds what the backend can apply by ${this.currencyLabel} ${excess.toFixed(2)}. ` +
+        `The loan will move to Overpaid status — this is not Early Closure / Foreclosure.`;
+      if (fullyRepays || allocation.unallocated > 0.01) {
+        this.repaymentOutcomeNotice =
+          `After this repayment the loan will become Overpaid by ${this.currencyLabel} ${excess.toFixed(2)} ` +
+          `(status Overpaid, not Closed).`;
       }
-      this.closureRefundNotice = `This payment will close the loan (obligations met).`;
+    } else if (fullyRepays) {
+      const repayLine =
+        `This Make Repayment covers the full outstanding as of ${dateLabel} ` +
+        `(${this.currencyLabel} ${repaymentCap.toFixed(2)}) — the loan status will become Closed.`;
+      if (this.penaltyWaivedByBackdate > 0.01) {
+        lines.push(`${repayLine} Late-payment interest accrued after this date is waived and is not charged.`);
+      } else {
+        lines.push(repayLine);
+      }
+      this.repaymentOutcomeNotice = `After this repayment the loan will be fully repaid (status Closed).`;
     } else if (this.dueAsOfDateTotal > 0.01 && this.roundAmount(amount) + 0.01 >= this.dueAsOfDateTotal) {
       const remaining = this.roundAmount(this.outstandingAfterWaiver - amount);
       lines.push(
-        `This payment settles the amount due as of ${dateLabel}. The loan will remain Active with approximately ` +
+        `This is a partial Make Repayment for the amount due as of ${dateLabel}. The loan will remain Active with approximately ` +
           `${this.currencyLabel} ${Math.max(remaining, 0).toFixed(2)} still outstanding.`
       );
     }

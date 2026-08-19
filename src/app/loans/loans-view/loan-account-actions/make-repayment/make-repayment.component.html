@@ -74,14 +74,23 @@
                 this due date (from the next calendar day) will be waived and is <strong>not</strong> included.
               </ng-container>
               <ng-container *ngIf="outstandingAfterWaiver > dueAsOfDateTotal + 0.01">
-                Paying the due amount leaves the loan Active. Amount to close:
+                Paying only the due amount leaves the loan Active. Amount to fully repay via Make Repayment:
                 <strong>{{ currencyLabel }} {{ outstandingAfterWaiver | formatNumber }}</strong>
                 (remaining principal + interest due + fees + LPI still due).
+                <ng-container
+                  *ngIf="
+                    repaymentCapWithoutOverpay > 0.01 && repaymentCapWithoutOverpay < outstandingAfterWaiver - 0.01
+                  "
+                >
+                  Without moving the loan to Overpaid, this repayment can apply up to
+                  <strong>{{ currencyLabel }} {{ repaymentCapWithoutOverpay | formatNumber }}</strong>
+                  (from the repayment schedule — separate from Early Closure / Foreclosure).
+                </ng-container>
               </ng-container>
               <ng-container *ngIf="outstandingAfterWaiver <= dueAsOfDateTotal + 0.01">
-                Paying this amount will close the loan (obligations met).
+                Paying this amount via Make Repayment will fully repay the loan (status Closed).
                 <ng-container *ngIf="penaltyWaivedByBackdate > 0.01">
-                  Do not add waived LPI or the loan will be overpaid.
+                  Do not add waived LPI or the loan will become Overpaid instead.
                 </ng-container>
               </ng-container>
             </span>
@@ -147,12 +156,35 @@
             <span>{{ settlementPreviewMessage }}</span>
           </div>
 
-          <div class="date-impact-banner closure-refund-notice" *ngIf="closureRefundNotice">
-            <mat-icon>account_balance_wallet</mat-icon>
-            <span>{{ closureRefundNotice }}</span>
+          <div
+            class="date-impact-banner repayment-outcome-notice"
+            *ngIf="repaymentOutcomeNotice && !willBecomeOverpaid"
+          >
+            <mat-icon>payments</mat-icon>
+            <span>{{ repaymentOutcomeNotice }}</span>
           </div>
 
-          <div class="date-impact-banner overpayment-warning" *ngIf="overpaymentWarning">
+          <div class="date-impact-banner overpayment-warning" *ngIf="willBecomeOverpaid">
+            <mat-icon>warning</mat-icon>
+            <span>
+              <strong>Overpaid — Make Repayment</strong> — the entered amount exceeds what this repayment can apply ({{
+                currencyLabel
+              }}
+              {{ repaymentCapWithoutOverpay | formatNumber }}) by {{ currencyLabel }}
+              {{ projectedOverpaymentAmount | formatNumber }}. The loan will move to <strong>Overpaid</strong> status.
+              This is a standard repayment transaction, not Early Closure / Foreclosure. Submit stays enabled.
+            </span>
+          </div>
+
+          <div
+            class="date-impact-banner repayment-outcome-notice repayment-outcome-notice--overpaid"
+            *ngIf="willBecomeOverpaid && willFullyRepayLoan(repaymentLoanForm.value.transactionAmount)"
+          >
+            <mat-icon>info</mat-icon>
+            <span>{{ repaymentOutcomeNotice }}</span>
+          </div>
+
+          <div class="date-impact-banner overpayment-warning" *ngIf="overpaymentWarning && !willBecomeOverpaid">
             <mat-icon>warning</mat-icon>
             <span>{{ overpaymentWarning }}</span>
           </div>
