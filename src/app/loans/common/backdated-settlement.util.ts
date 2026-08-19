@@ -134,6 +134,71 @@ export function isDummyGraceInstallmentDueOnDate(
  * grace-row due date was treated as an on-time EMI date. Add the penalty gap back only when the ledger delta
  * matches and this is not a genuine on-time EMI due-date exclusion.
  */
+export interface ReconciledAsOfDateAmounts extends SettlementComponents {
+  /** Remaining principal budget for allocation / close amount. */
+  remainingPrincipal: number;
+  /** Suggested default transaction amount for the selected date. */
+  defaultTransactionAmount: number;
+}
+
+/**
+ * When backdating before a repayment already recorded on a later date, /template/penalties replays
+ * historical due (pre-payment) while Fineract's repayment template still reflects what can be paid
+ * now. Prefer the repayment template in that case so default amount, settlement card, and EMI pills
+ * stay aligned with loan summary outstanding.
+ */
+export function reconcileAsOfDateAmounts(params: {
+  penaltyTemplate: any;
+  repaymentTemplate: any;
+  loanSummary?: any;
+  feeFallback?: number;
+  taxFallback?: number;
+  isBackdated: boolean;
+  additionalPenalty?: number;
+  reconcilePenalty?: (penaltyFromTemplate: number) => number;
+}): ReconciledAsOfDateAmounts {
+  const feeFallback = Number(params.feeFallback || 0);
+  const taxFallback = Number(params.taxFallback || 0);
+  const additionalPenalty = Number(params.additionalPenalty || 0);
+
+  let principal = Number(params.penaltyTemplate?.principalOutstanding || 0);
+  let remainingPrincipal = Number(
+    params.penaltyTemplate?.remainingPrincipalOutstanding || params.loanSummary?.principalOutstanding || principal
+  );
+  let interest = Number(params.penaltyTemplate?.interestOutstanding || 0);
+  let fee = Number(params.repaymentTemplate?.feeChargesPortion ?? feeFallback);
+  let tax = Number(params.repaymentTemplate?.taxChargesPortion ?? taxFallback);
+  const penaltyFromTemplate = Number(params.penaltyTemplate?.penaltyAmountDue || 0) + additionalPenalty;
+  let penalty = params.reconcilePenalty
+    ? params.reconcilePenalty(penaltyFromTemplate)
+    : roundAmount(penaltyFromTemplate);
+
+  let defaultTransactionAmount = roundAmount(principal + interest + fee + tax + penalty);
+  const repaymentAmount = roundAmount(Number(params.repaymentTemplate?.amount || 0));
+
+  if (params.isBackdated && repaymentAmount > 0.01 && defaultTransactionAmount > repaymentAmount + 0.01) {
+    principal = roundAmount(Number(params.repaymentTemplate?.principalPortion ?? repaymentAmount));
+    interest = roundAmount(Number(params.repaymentTemplate?.interestPortion || 0));
+    fee = roundAmount(Number(params.repaymentTemplate?.feeChargesPortion || 0));
+    tax = roundAmount(Number(params.repaymentTemplate?.taxChargesPortion || 0));
+    penalty = roundAmount(Number(params.repaymentTemplate?.penaltyChargesPortion || 0) + additionalPenalty);
+    remainingPrincipal = roundAmount(Number(params.loanSummary?.principalOutstanding ?? principal));
+    defaultTransactionAmount = roundAmount(
+      repaymentAmount + (additionalPenalty > 0 && penalty <= 0.01 ? additionalPenalty : 0)
+    );
+  }
+
+  return {
+    principal,
+    interest,
+    fee,
+    tax,
+    penalty,
+    remainingPrincipal,
+    defaultTransactionAmount
+  };
+}
+
 export function reconcilePenaltyWithLedger(params: {
   penaltyFromTemplate: number;
   penaltyInSummary: number;

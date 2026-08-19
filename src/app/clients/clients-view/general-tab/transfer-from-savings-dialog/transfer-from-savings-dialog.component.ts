@@ -15,6 +15,7 @@ import {
   computeUnearnedInterest,
   isRealEmiDueOnDate,
   isSameCalendarDate,
+  reconcileAsOfDateAmounts,
   reconcilePenaltyWithLedger
 } from 'app/loans/common/backdated-settlement.util';
 import { SettingsService } from 'app/settings/settings.service';
@@ -185,18 +186,17 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     this.isTemplateLoading = true;
 
     forkJoin({
-      repaymentTemplate: this.loanService.getLoanActionTemplate(loanId, 'repayment'),
+      repaymentTemplate: this.loanService.getLoanRepaymentTemplate(loanId, transactionDate),
       penaltyTemplate: this.loanService.getLoanPenaltiesTemplate(loanId, transactionDate),
-      foreclosureTemplate: this.loanService.getLoanForeclosureActionTemplate(loanId),
       // Client general-tab loan rows have no summary — always load authoritative outstanding here.
-      loanDetails: this.loanService.getLoanAccountResource(loanId, 'summary,repaymentSchedule')
+      loanDetails: this.loanService.getLoanAccountResource(loanId, 'summary,repaymentSchedule,linkedAccount')
     })
       .pipe(
         switchMap((templates: any) => {
-          this.currency = templates.repaymentTemplate?.currency || templates.foreclosureTemplate?.currency;
+          this.currency = templates.repaymentTemplate?.currency;
           this.currencySymbol = this.currency?.displaySymbol || this.currency?.code || '';
           this.repaymentTemplateData = templates.repaymentTemplate;
-          this.captureLinkedSavingsAccount(templates.foreclosureTemplate);
+          this.captureLinkedSavingsFromLoanDetails(templates.loanDetails);
           this.applyLoanSummary(templates.loanDetails);
           // Remaining-principal baseline for full settlement (all EMIs), not current-installment only.
           this.baselinePrincipalOutstanding = Number(templates.penaltyTemplate?.principalOutstanding || 0);
@@ -208,7 +208,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
           );
           this.baselineInterestOutstanding = Number(templates.penaltyTemplate?.interestOutstanding || 0);
           this.baselinePenaltyOutstanding = Number(templates.penaltyTemplate?.penaltyAmountDue || 0);
-          this.applyPenaltyTemplateForDate(templates.penaltyTemplate, 0);
+          this.applyPenaltyTemplateForDate(templates.penaltyTemplate, 0, templates.repaymentTemplate, false);
           this.applyEarliestAllowedDate(templates.penaltyTemplate?.earliestAllowedTransactionDate);
           this.data.loan.repaymentSchedule =
             templates.loanDetails?.repaymentSchedule || this.data.loan.repaymentSchedule;
@@ -265,22 +265,30 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         : null;
 
     this.isTemplateLoading = true;
-    this.loanService
-      .getLoanPenaltiesTemplate(loanId, transactionDate)
+    forkJoin({
+      penaltyTemplate: this.loanService.getLoanPenaltiesTemplate(loanId, transactionDate),
+      repaymentTemplate: this.loanService.getLoanRepaymentTemplate(loanId, transactionDate)
+    })
       .pipe(
-        switchMap((penaltyTemplate: any) => {
+        switchMap(({ penaltyTemplate, repaymentTemplate }: any) => {
+          this.repaymentTemplateData = repaymentTemplate;
           if (isFutureDate) {
             return this.loanService
               .getFutureLPICharges(loanId, transactionDate)
-              .pipe(switchMap((futureLpi: any) => of({ penaltyTemplate, futureLpi })));
+              .pipe(switchMap((futureLpi: any) => of({ penaltyTemplate, repaymentTemplate, futureLpi })));
           }
-          return of({ penaltyTemplate, futureLpi: null });
+          return of({ penaltyTemplate, repaymentTemplate, futureLpi: null });
         })
       )
       .subscribe({
-        next: ({ penaltyTemplate, futureLpi }: any) => {
+        next: ({ penaltyTemplate, futureLpi, repaymentTemplate }: any) => {
           this.additionalFutureLpiAmount = Number(futureLpi?.totalLPIAmount || 0);
-          this.applyPenaltyTemplateForDate(penaltyTemplate, this.additionalFutureLpiAmount);
+          this.applyPenaltyTemplateForDate(
+            penaltyTemplate,
+            this.additionalFutureLpiAmount,
+            repaymentTemplate,
+            isBackdated
+          );
           this.dueEmis = this.getDueEmisForDate(transactionDateValue);
           this.refreshSavingsBalanceAsOfDate(transactionDateValue);
           this.patchDefaultTransactionAmount();
@@ -313,16 +321,15 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     this.backdateLimitMessage = `Earliest allowed date: ${formatted}. Cannot be before the loan's last recorded transaction.`;
   }
 
-  private captureLinkedSavingsAccount(source: any): void {
-    const additional = source?.additionalAttributes;
-    if (!additional) {
+  /** Linked savings from GET /loans/{id}?associations=linkedAccount — not foreclosure template (blocked when overdue). */
+  private captureLinkedSavingsFromLoanDetails(loanDetails: any): void {
+    const linked = loanDetails?.linkedAccount;
+    if (!linked?.id) {
       return;
     }
-    this.linkedSavingsAccountId = additional.linkedSavingsAccountId;
-    this.linkedSavingsAccountAccountNo = additional.linkedSavingsAccountAccountNo;
-    this.linkedSavingsAccountProductName = additional.linkedSavingsAccountProductName;
-    this.linkedSavingsAccountAvailableBalance = Number(additional.linkedSavingsAccountAvailableBalance || 0);
-    this.availableBalanceAsOfDate = this.linkedSavingsAccountAvailableBalance;
+    this.linkedSavingsAccountId = linked.id;
+    this.linkedSavingsAccountAccountNo = linked.accountNo;
+    this.linkedSavingsAccountProductName = linked.productName;
   }
 
   private captureSavingsTransactions(savingsAccount: any): void {
@@ -361,46 +368,64 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     }
   }
 
-  private applyPenaltyTemplateForDate(penaltyTemplate: any, additionalPenalty = 0): void {
+  private applyPenaltyTemplateForDate(
+    penaltyTemplate: any,
+    additionalPenalty = 0,
+    repaymentTemplate: any = this.repaymentTemplateData,
+    isBackdated = this.isSelectedDateBackdated()
+  ): void {
     this.onInstallmentDueDate = !!penaltyTemplate?.onInstallmentDueDate;
-    // Amount due = EMIs on or before the selected date. Overnight LPI posted after a due date is
-    // already excluded from penaltyAmountDue. Remaining principal is only for the close amount.
-    this.principalOutstanding = Number(penaltyTemplate?.principalOutstanding || 0) || this.baselinePrincipalOutstanding;
-    this.remainingPrincipalOutstanding =
-      Number(penaltyTemplate?.remainingPrincipalOutstanding || 0) ||
-      Number(this.loanSummary?.principalOutstanding || 0) ||
-      this.baselineRemainingPrincipalOutstanding ||
-      this.principalOutstanding;
-    this.interestOutstanding = Number(penaltyTemplate?.interestOutstanding || 0) || this.baselineInterestOutstanding;
-    this.feeOutstanding = Number(
-      this.loanSummary?.feeChargesOutstanding ||
-        this.data.loan?.summary?.feeChargesOutstanding ||
-        this.repaymentTemplateData?.feeChargesPortion ||
-        0
-    );
-    this.taxOutstanding = Number(this.repaymentTemplateData?.taxChargesPortion || 0);
-
-    const templatePenalty = Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalPenalty;
-    const dueWithoutPenalty = this.roundAmount(
-      this.principalOutstanding + this.interestOutstanding + this.feeOutstanding + this.taxOutstanding
-    );
-    this.penaltyOutstanding = reconcilePenaltyWithLedger({
-      penaltyFromTemplate: templatePenalty,
-      penaltyInSummary: this.penaltyInSummary,
-      fullLoanOutstanding: this.fullLoanOutstanding,
-      dueWithoutPenaltyReconcile: dueWithoutPenalty,
-      isBusinessDate: isSameCalendarDate(
-        this.transferForm?.value?.transactionDate,
-        this.settingsService.businessDate,
-        (value) => this.toComparableDate(value)
+    const reconciled = reconcileAsOfDateAmounts({
+      penaltyTemplate,
+      repaymentTemplate,
+      loanSummary: this.loanSummary,
+      feeFallback: Number(
+        this.loanSummary?.feeChargesOutstanding ||
+          this.data.loan?.summary?.feeChargesOutstanding ||
+          this.repaymentTemplateData?.feeChargesPortion ||
+          0
       ),
-      onInstallmentDueDate: this.onInstallmentDueDate,
-      hasRealEmiDueOnDate: isRealEmiDueOnDate(
-        this.data.loan?.repaymentSchedule?.periods,
-        this.transferForm?.value?.transactionDate,
-        (value) => this.toComparableDate(value)
-      )
+      taxFallback: Number(this.repaymentTemplateData?.taxChargesPortion || 0),
+      isBackdated,
+      additionalPenalty,
+      reconcilePenalty: (penaltyFromTemplate) =>
+        reconcilePenaltyWithLedger({
+          penaltyFromTemplate,
+          penaltyInSummary: this.penaltyInSummary,
+          fullLoanOutstanding: this.fullLoanOutstanding,
+          dueWithoutPenaltyReconcile: this.roundAmount(
+            Number(penaltyTemplate?.principalOutstanding || 0) + Number(penaltyTemplate?.interestOutstanding || 0)
+          ),
+          isBusinessDate: isSameCalendarDate(
+            this.transferForm?.value?.transactionDate,
+            this.settingsService.businessDate,
+            (value) => this.toComparableDate(value)
+          ),
+          onInstallmentDueDate: this.onInstallmentDueDate,
+          hasRealEmiDueOnDate: isRealEmiDueOnDate(
+            this.data.loan?.repaymentSchedule?.periods,
+            this.transferForm?.value?.transactionDate,
+            (value) => this.toComparableDate(value)
+          )
+        })
     });
+
+    this.principalOutstanding = reconciled.principal;
+    this.remainingPrincipalOutstanding = reconciled.remainingPrincipal;
+    this.interestOutstanding = reconciled.interest;
+    this.feeOutstanding = reconciled.fee;
+    this.taxOutstanding = reconciled.tax;
+    this.penaltyOutstanding = reconciled.penalty;
+    this.suggestedTransactionAmount = this.roundAmount(reconciled.defaultTransactionAmount);
+  }
+
+  /** Pre-filled amount from reconciled as-of-date figures (see applyPenaltyTemplateForDate). */
+  private suggestedTransactionAmount = 0;
+
+  private isSelectedDateBackdated(): boolean {
+    const selected = this.toComparableDate(this.transferForm?.value?.transactionDate);
+    const business = this.toComparableDate(this.settingsService.businessDate);
+    return !!(selected && business && selected.getTime() < business.getTime());
   }
 
   /** True when entered amount covers outstanding as of the selected date (after LPI waiver). */
@@ -518,6 +543,11 @@ export class TransferFromSavingsDialogComponent implements OnInit {
 
   private patchDefaultTransactionAmount(): void {
     this.settlementPreviewMode = 'date';
+    const suggested = this.roundAmount(this.suggestedTransactionAmount + this.additionalFutureLpiAmount);
+    if (suggested > 0) {
+      this.transferForm.patchValue({ transactionAmount: suggested }, { emitEvent: false });
+      return;
+    }
     const componentTotal = this.roundAmount(
       this.principalOutstanding +
         this.interestOutstanding +

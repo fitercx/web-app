@@ -19,7 +19,8 @@ import {
   computePenaltyWaivedByBackdate,
   computeSavingsBalanceAsOf,
   computeSettlementRequired,
-  computeUnearnedInterest
+  computeUnearnedInterest,
+  reconcileAsOfDateAmounts
 } from 'app/loans/common/backdated-settlement.util';
 
 /**
@@ -251,48 +252,50 @@ export class MakeRepaymentComponent implements OnInit {
     const businessDate = this.settingsService.businessDate;
     const selectedDate = this.dateUtils.parseDate(transactionDate);
     const isFutureDate = selectedDate && businessDate && selectedDate.getTime() > businessDate.getTime();
+    const isBackdated = !!(selectedDate && businessDate && selectedDate.getTime() < businessDate.getTime());
 
-    this.loanService
-      .getLoanPenaltiesTemplate(this.loanId, transactionDate)
+    forkJoin({
+      penaltyTemplate: this.loanService.getLoanPenaltiesTemplate(this.loanId, transactionDate),
+      repaymentTemplate: this.loanService.getLoanRepaymentTemplate(this.loanId, transactionDate)
+    })
       .pipe(
-        switchMap((template: any) => {
-          this.dataObject.penaltyTemplate = template;
+        switchMap(({ penaltyTemplate, repaymentTemplate }: any) => {
+          this.dataObject.penaltyTemplate = penaltyTemplate;
           if (isFutureDate) {
             return this.loanService.getFutureLPICharges(this.loanId, transactionDate).pipe(
-              switchMap((futureLPI: any) => of({ template, futureLPI })),
-              catchError(() => of({ template, futureLPI: null as any }))
+              switchMap((futureLPI: any) => of({ penaltyTemplate, repaymentTemplate, futureLPI })),
+              catchError(() => of({ penaltyTemplate, repaymentTemplate, futureLPI: null as any }))
             );
           }
-          return of({ template, futureLPI: null as any });
+          return of({ penaltyTemplate, repaymentTemplate, futureLPI: null as any });
         })
       )
-      .subscribe(({ template, futureLPI }: { template: any; futureLPI: any }) => {
-        this.onInstallmentDueDate = !!template?.onInstallmentDueDate;
-        // Amount due = this EMI (and any earlier overdue EMIs), not remaining principal of later EMIs.
-        // Overnight LPI posted after the due date is already excluded from penaltyAmountDue.
-        const installmentPrincipal = template.principalOutstanding || this.baselinePrincipalOutstanding;
-        const remainingPrincipal =
-          template.remainingPrincipalOutstanding || this.loanSummary?.principalOutstanding || installmentPrincipal;
-        const interestAmount = template.interestOutstanding || this.baselineInterestOutstanding;
-        // /template/penalties does not return fee/tax (DTO is P / remaining P / I / LPI only).
-        // Fee and tax come from the repayment template and are date-invariant for this screen.
-        const feesAmount = Number(this.dataObject.repaymentTemplate.feeChargesPortion || 0);
-        const taxAmount = Number(this.dataObject.repaymentTemplate.taxChargesPortion || 0);
-        const penaltyAmount = template.penaltyAmountDue || 0;
+      .subscribe(({ penaltyTemplate, repaymentTemplate, futureLPI }: any) => {
+        this.onInstallmentDueDate = !!penaltyTemplate?.onInstallmentDueDate;
         const additionalLPIAmount = Number(futureLPI?.totalLPIAmount || 0);
-        const totalPenaltyAmount = penaltyAmount + additionalLPIAmount;
+        const reconciled = reconcileAsOfDateAmounts({
+          penaltyTemplate,
+          repaymentTemplate,
+          loanSummary: this.loanSummary,
+          feeFallback: Number(this.dataObject.repaymentTemplate?.feeChargesPortion || 0),
+          taxFallback: Number(this.dataObject.repaymentTemplate?.taxChargesPortion || 0),
+          isBackdated,
+          additionalPenalty: additionalLPIAmount
+        });
 
-        this.dataObject.penaltyTemplate.principalOutstanding = installmentPrincipal;
-        this.dataObject.penaltyTemplate.remainingPrincipalOutstanding = remainingPrincipal;
-        this.dataObject.penaltyTemplate.interestOutstanding = interestAmount;
-        this.dataObject.penaltyTemplate.penaltyAmountDue = totalPenaltyAmount;
+        this.dataObject.penaltyTemplate.principalOutstanding = reconciled.principal;
+        this.dataObject.penaltyTemplate.remainingPrincipalOutstanding = reconciled.remainingPrincipal;
+        this.dataObject.penaltyTemplate.interestOutstanding = reconciled.interest;
+        this.dataObject.penaltyTemplate.penaltyAmountDue = reconciled.penalty;
 
-        this.dateImpactMessages = this.buildDateImpactMessages(interestAmount, totalPenaltyAmount, transactionDate);
-        this.lpiPaymentMessage = this.buildLpiPaymentMessage(totalPenaltyAmount, transactionDate);
-
-        const totalAmount = this.roundAmount(
-          Number(installmentPrincipal || 0) + interestAmount + feesAmount + taxAmount + totalPenaltyAmount
+        this.dateImpactMessages = this.buildDateImpactMessages(
+          reconciled.interest,
+          reconciled.penalty,
+          transactionDate
         );
+        this.lpiPaymentMessage = this.buildLpiPaymentMessage(reconciled.penalty, transactionDate);
+
+        const totalAmount = this.roundAmount(reconciled.defaultTransactionAmount + additionalLPIAmount);
         this.repaymentLoanForm.patchValue(
           {
             transactionAmount: totalAmount
@@ -392,14 +395,13 @@ export class MakeRepaymentComponent implements OnInit {
   }
 
   private loadLinkedSavingsAndSummary(): void {
-    forkJoin({
-      foreclosure: this.loanService.getLoanForeclosureActionTemplate(this.loanId).pipe(catchError(() => of(null))),
-      loanDetails: this.loanService.getLoanAccountResource(this.loanId, 'summary').pipe(catchError(() => of(null)))
-    })
+    this.loanService
+      .getLoanAccountResource(this.loanId, 'summary,linkedAccount')
       .pipe(
-        switchMap((result: any) => {
-          this.applyLoanSummary(result.loanDetails);
-          this.captureLinkedSavings(result.foreclosure);
+        catchError(() => of(null)),
+        switchMap((loanDetails: any) => {
+          this.applyLoanSummary(loanDetails);
+          this.captureLinkedSavingsFromLoanDetails(loanDetails);
           this.updateSettlementPreview();
           if (!this.linkedSavingsAccountId) {
             return of(null);
@@ -422,16 +424,15 @@ export class MakeRepaymentComponent implements OnInit {
     this.fullLoanOutstanding = this.roundAmount(Number(this.loanSummary?.totalOutstanding || 0));
   }
 
-  private captureLinkedSavings(source: any): void {
-    const additional = source?.additionalAttributes;
-    if (!additional) {
+  /** Linked savings from GET /loans/{id}?associations=linkedAccount — not foreclosure template (blocked when overdue). */
+  private captureLinkedSavingsFromLoanDetails(loanDetails: any): void {
+    const linked = loanDetails?.linkedAccount;
+    if (!linked?.id) {
       return;
     }
-    this.linkedSavingsAccountId = additional.linkedSavingsAccountId;
-    this.linkedSavingsAccountAccountNo = additional.linkedSavingsAccountAccountNo;
-    this.linkedSavingsAccountProductName = additional.linkedSavingsAccountProductName;
-    this.linkedSavingsAccountAvailableBalance = Number(additional.linkedSavingsAccountAvailableBalance || 0);
-    this.availableBalanceAsOfDate = this.linkedSavingsAccountAvailableBalance;
+    this.linkedSavingsAccountId = linked.id;
+    this.linkedSavingsAccountAccountNo = linked.accountNo;
+    this.linkedSavingsAccountProductName = linked.productName;
   }
 
   private captureSavingsTransactions(savingsAccount: any): void {

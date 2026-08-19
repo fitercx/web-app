@@ -5,6 +5,7 @@ import {
   computeSettlementRequired,
   computeUnearnedInterest,
   isDummyGraceInstallmentDueOnDate,
+  reconcileAsOfDateAmounts,
   reconcilePenaltyWithLedger
 } from './backdated-settlement.util';
 
@@ -187,5 +188,31 @@ describe('backdated-settlement.util', () => {
         hasRealEmiDueOnDate: true
       })
     ).toBe(0);
+  });
+
+  it('prefers repayment template when backdating before a later partial repayment', () => {
+    const reconciled = reconcileAsOfDateAmounts({
+      isBackdated: true,
+      penaltyTemplate: {
+        principalOutstanding: 95000,
+        remainingPrincipalOutstanding: 95000,
+        interestOutstanding: 4216.44,
+        penaltyAmountDue: 0
+      },
+      repaymentTemplate: {
+        amount: 20879.01,
+        principalPortion: 20879.01,
+        interestPortion: 0,
+        penaltyChargesPortion: 0,
+        feeChargesPortion: 0,
+        taxChargesPortion: 0
+      },
+      loanSummary: { totalOutstanding: 20879.01, principalOutstanding: 20879.01 }
+    });
+
+    expect(reconciled.defaultTransactionAmount).toBe(20879.01);
+    expect(reconciled.principal).toBe(20879.01);
+    expect(reconciled.interest).toBe(0);
+    expect(reconciled.remainingPrincipal).toBe(20879.01);
   });
 });

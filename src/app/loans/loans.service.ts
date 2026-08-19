@@ -42,6 +42,16 @@ export class LoansService {
     return this.http.get(`/loans/${loanId}/transactions/template`, { params: httpParams });
   }
 
+  /** Repayment template for a specific transaction date (authoritative pay-now amount on the loan). */
+  getLoanRepaymentTemplate(loanId: string, transactionDate: string): Observable<any> {
+    const httpParams = new HttpParams()
+      .set('command', 'repayment')
+      .set('transactionDate', transactionDate)
+      .set('locale', this.settingsService.language.code)
+      .set('dateFormat', this.settingsService.dateFormat);
+    return this.http.get(`/loans/${loanId}/transactions/template`, { params: httpParams });
+  }
+
   getLoanPenaltiesTemplate(loanId: string, transactionDate?: string): Observable<any> {
     let httpParams = new HttpParams()
       .set('locale', this.settingsService.language.code)
