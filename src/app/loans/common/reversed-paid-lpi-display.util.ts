@@ -38,6 +38,7 @@ export function reversedPaidLpiIndicatorForPeriod(loanDetails: any, period: any)
   }
 
   const transactions = Array.isArray(loanDetails?.transactions) ? loanDetails.transactions : [];
+  const periods = Array.isArray(loanDetails?.repaymentSchedule?.periods) ? loanDetails.repaymentSchedule.periods : [];
   const chargesById = new Map(
     (Array.isArray(loanDetails?.charges) ? loanDetails.charges : []).map((charge: any) => [
       charge?.id,
@@ -52,7 +53,9 @@ export function reversedPaidLpiIndicatorForPeriod(loanDetails: any, period: any)
       return total;
     }
     const chargeIds = reversedChargeIdsForTransaction(transaction);
-    const appliesToPeriod = chargeIds.some((chargeId) => chargeMatchesPeriod(chargesById.get(chargeId), period));
+    const appliesToPeriod = chargeIds.some((chargeId) =>
+      chargeMatchesPeriod(chargesById.get(chargeId), period, periods)
+    );
     return appliesToPeriod ? total + Math.abs(penaltyPortion) : total;
   }, 0);
 }
@@ -80,20 +83,56 @@ function reversedChargeIdsForTransaction(transaction: any): number[] {
   );
 }
 
-function chargeMatchesPeriod(charge: any, period: any): boolean {
+function chargeMatchesPeriod(charge: any, period: any, periods: any[]): boolean {
   if (!charge || !period || !period.period) {
     return false;
+  }
+  const owningPeriod = resolveLegacyChargePeriod(charge, periods);
+  return owningPeriod
+    ? Number(owningPeriod.period) === Number(period.period)
+    : isDateWithinPeriod(charge?.dueDate, period);
+}
+
+function resolveLegacyChargePeriod(charge: any, periods: any[]): any {
+  const chargeDate = toDateNumber(charge?.dueDate);
+  if (!chargeDate) {
+    return null;
+  }
+
+  const candidates = periods.filter((candidate: any) => {
+    const dueDate = toDateNumber(candidate?.dueDate);
+    return (
+      candidate?.period &&
+      !candidate?.downPayment &&
+      !candidate?.additional &&
+      !candidate?.recalculatedInterestComponent &&
+      dueDate > 0 &&
+      dueDate <= chargeDate
+    );
+  });
+  if (!candidates.length) {
+    return null;
   }
 
   const chargeBaseAmount = toFiniteNumber(charge?.amountPercentageAppliedTo);
   if (chargeBaseAmount > 0) {
-    return [
-      period?.principalOriginalDue,
-      period?.principalDue
-    ].some((periodPrincipal) => Math.abs(toFiniteNumber(periodPrincipal) - chargeBaseAmount) <= 0.01);
+    const baseMatches = candidates.filter((candidate: any) => [
+        candidate?.principalOriginalDue,
+        candidate?.principalDue
+      ].some((principal) => Math.abs(toFiniteNumber(principal) - chargeBaseAmount) <= 0.01));
+    if (baseMatches.length === 1) {
+      return baseMatches[0];
+    }
   }
 
-  return isDateWithinPeriod(charge?.dueDate, period);
+  return candidates.reduce((latest: any, candidate: any) => {
+    const latestDueDate = toDateNumber(latest?.dueDate);
+    const candidateDueDate = toDateNumber(candidate?.dueDate);
+    return candidateDueDate > latestDueDate ||
+      (candidateDueDate === latestDueDate && Number(candidate.period) > Number(latest.period))
+      ? candidate
+      : latest;
+  });
 }
 
 function isDateWithinPeriod(date: any, period: any): boolean {

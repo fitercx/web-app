@@ -29,10 +29,40 @@ describe('Reversed paid LPI display utility', () => {
     expect(subtractReversedPaidLpi(10, 15.6)).toBe(0);
   });
 
-  it('maps transaction-only reversed LPI back to the original EMI by charge base principal', () => {
-    const period = { period: 2, principalDue: 19213.34 };
+  it('maps a legacy one-day-late LPI date back to the preceding EMI even when principal amounts are equal', () => {
+    const julyPeriod = {
+      period: 1,
+      fromDate: [
+        2026,
+        6,
+        30
+      ],
+      dueDate: [
+        2026,
+        7,
+        31
+      ],
+      principalDue: 19213.34
+    };
+    const augustPeriod = {
+      period: 2,
+      fromDate: [
+        2026,
+        7,
+        31
+      ],
+      dueDate: [
+        2026,
+        8,
+        31
+      ],
+      principalDue: 19213.34
+    };
     const loanDetails = {
-      repaymentSchedule: { periods: [period] },
+      repaymentSchedule: { periods: [
+          julyPeriod,
+          augustPeriod
+        ] },
       charges: [
         {
           id: 10,
@@ -40,7 +70,7 @@ describe('Reversed paid LPI display utility', () => {
           dueDate: [
             2026,
             8,
-            20
+            1
           ]
         }
       ],
@@ -56,7 +86,59 @@ describe('Reversed paid LPI display utility', () => {
     };
 
     expect(reversedPaidLpiForLoan(loanDetails)).toBeCloseTo(15.79, 6);
-    expect(reversedPaidLpiIndicatorForPeriod(loanDetails, period)).toBeCloseTo(15.79, 6);
-    expect(reversedPaidLpiIndicatorForPeriod(loanDetails, { period: 4, principalDue: 20242.51 })).toBe(0);
+    expect(reversedPaidLpiIndicatorForPeriod(loanDetails, julyPeriod)).toBeCloseTo(15.79, 6);
+    expect(reversedPaidLpiIndicatorForPeriod(loanDetails, augustPeriod)).toBe(0);
+  });
+
+  it('keeps an LPI posted on an EMI due date in the period ending on that date', () => {
+    const julyPeriod = {
+      period: 1,
+      fromDate: [
+        2026,
+        6,
+        30
+      ],
+      dueDate: [
+        2026,
+        7,
+        31
+      ]
+    };
+    const augustPeriod = {
+      period: 2,
+      fromDate: [
+        2026,
+        7,
+        31
+      ],
+      dueDate: [
+        2026,
+        8,
+        31
+      ]
+    };
+    const loanDetails = {
+      charges: [
+        {
+          id: 11,
+          dueDate: [
+            2026,
+            7,
+            31
+          ]
+        }
+      ],
+      transactions: [
+        {
+          reversed: false,
+          penaltyChargesPortion: -16.21,
+          type: { chargeAdjustment: true },
+          loanChargePaidByList: [{ chargeId: 11 }]
+        }
+      ]
+    };
+
+    expect(reversedPaidLpiIndicatorForPeriod(loanDetails, julyPeriod)).toBeCloseTo(16.21, 6);
+    expect(reversedPaidLpiIndicatorForPeriod(loanDetails, augustPeriod)).toBe(0);
   });
 });
