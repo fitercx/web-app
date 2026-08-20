@@ -50,15 +50,40 @@
             <p>{{ staticFutureDatePolicy }}</p>
           </mifosx-expandable-static-hint>
 
+          <mifosx-settlement-overpayment-banner
+            *ngIf="showSettlementPreview && !isTemplateLoading"
+            context="foreclosure"
+            [currencyLabel]="currencySymbol"
+            [settlementCapWithoutOverpay]="settlementCapWithoutOverpay"
+            [projectedOverpaymentAmount]="projectedOverpaymentAmount"
+            [outcomeNotice]="foreclosureOutcomeNotice"
+            [showOutcomeNotice]="willBecomeOverpaid"
+          ></mifosx-settlement-overpayment-banner>
+
+          <div class="manual-amount" *ngIf="showSettlementPreview && !isTemplateLoading">
+            <mat-slide-toggle formControlName="manualAmountEnabled" color="primary">
+              Enter amount manually
+            </mat-slide-toggle>
+            <mat-form-field class="manual-amount__field" *ngIf="foreclosureForm.get('manualAmountEnabled').value">
+              <mat-label>Manual foreclosure amount ({{ currencySymbol }})</mat-label>
+              <input matInput type="number" min="0" step="0.01" autocomplete="off" formControlName="manualAmount" />
+              <mat-hint>
+                Shown on the settlement card below for comparison. Foreclosure still collects the system-computed
+                amount.
+              </mat-hint>
+            </mat-form-field>
+          </div>
+
           <mifosx-settlement-summary-card
             *ngIf="showSettlementPreview"
             [currencySymbol]="currencySymbol"
             [dateLabel]="selectedTransactionDateLabel"
-            [totalAmount]="dueAsOfDateTotal"
-            [lines]="settlementLines"
+            [eyebrow]="settlementCardEyebrow"
+            [totalAmount]="settlementCardTotal"
+            [lines]="settlementCardLines"
             [badge]="settlementBadge"
             [subtitle]="settlementSubtitle"
-            [footnotes]="summaryFootnotes"
+            [footnotes]="settlementCardFootnotes"
             [ledgerToday]="settlementLedgerToday"
             [ledgerDelta]="settlementLedgerDelta"
             [businessDateLabel]="businessDateLabel"

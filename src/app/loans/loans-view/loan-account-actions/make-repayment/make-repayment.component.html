@@ -164,25 +164,14 @@
             <span>{{ repaymentOutcomeNotice }}</span>
           </div>
 
-          <div class="date-impact-banner overpayment-warning" *ngIf="willBecomeOverpaid">
-            <mat-icon>warning</mat-icon>
-            <span>
-              <strong>Overpaid — Make Repayment</strong> — the entered amount exceeds what this repayment can apply ({{
-                currencyLabel
-              }}
-              {{ repaymentCapWithoutOverpay | formatNumber }}) by {{ currencyLabel }}
-              {{ projectedOverpaymentAmount | formatNumber }}. The loan will move to <strong>Overpaid</strong> status.
-              This is a standard repayment transaction, not Early Closure / Foreclosure. Submit stays enabled.
-            </span>
-          </div>
-
-          <div
-            class="date-impact-banner repayment-outcome-notice repayment-outcome-notice--overpaid"
-            *ngIf="willBecomeOverpaid && willFullyRepayLoan(repaymentLoanForm.value.transactionAmount)"
-          >
-            <mat-icon>info</mat-icon>
-            <span>{{ repaymentOutcomeNotice }}</span>
-          </div>
+          <mifosx-settlement-overpayment-banner
+            context="make-repayment"
+            [currencyLabel]="currencyLabel"
+            [settlementCapWithoutOverpay]="repaymentCapWithoutOverpay"
+            [projectedOverpaymentAmount]="projectedOverpaymentAmount"
+            [outcomeNotice]="repaymentOutcomeNotice"
+            [showOutcomeNotice]="willBecomeOverpaid && willFullyRepayLoan(repaymentLoanForm.value.transactionAmount)"
+          ></mifosx-settlement-overpayment-banner>
 
           <div class="date-impact-banner overpayment-warning" *ngIf="overpaymentWarning && !willBecomeOverpaid">
             <mat-icon>warning</mat-icon>

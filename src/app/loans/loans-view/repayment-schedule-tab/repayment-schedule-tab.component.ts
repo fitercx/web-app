@@ -35,6 +35,12 @@ import { AdjustInstallmentDateDialogComponent } from '../custom-dialogs/adjust-i
 import { LoansService } from 'app/loans/loans.service';
 import { ProductsService } from 'app/products/products.service';
 import { computeMonthlyAccrualRows } from 'app/loans/accrual-report.util';
+import {
+  reversedPaidLpiForLoan,
+  reversedPaidLpiForPeriod,
+  reversedPaidLpiIndicatorForPeriod,
+  subtractReversedPaidLpi
+} from 'app/loans/common/reversed-paid-lpi-display.util';
 import { LoanDownloadType } from 'app/shared/loan-downloads-menu/loan-downloads-menu.component';
 import { generateKeyFactStatementPdf } from 'app/shared/key-fact-statement/key-fact-statement-pdf';
 import { take } from 'rxjs/operators';
@@ -614,7 +620,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       penalties: {
         header: 'Overdue Interest',
         value: (item: any) => this.getDisplayOverdueInterestForPeriod(item),
-        total: () => this.toNumber(this.repaymentScheduleDetails.totalPenaltyChargesCharged),
+        total: () => this.getDisplayTotalPenaltyChargesCharged(),
         format: moneyFormat
       },
       waived: {
@@ -638,26 +644,26 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       },
       due: {
         header: 'Due Payment',
-        value: (item: any) => this.toNumber(item.totalDueForPeriod),
-        total: () => this.toNumber(this.repaymentScheduleDetails.totalRepaymentExpected),
+        value: (item: any) => this.getDisplayTotalDueForPeriod(item),
+        total: () => this.getDisplayTotalRepaymentExpected(),
         format: moneyFormat
       },
       paid: {
         header: 'Amount Paid',
-        value: (item: any) => this.toNumber(item.totalPaidForPeriod),
-        total: () => this.toNumber(this.repaymentScheduleDetails.totalRepayment),
+        value: (item: any) => this.getDisplayTotalPaidForPeriod(item),
+        total: () => this.getDisplayTotalRepayment(),
         format: moneyFormat
       },
       inadvance: {
         header: 'Advance Paid',
-        value: (item: any) => this.toNumber(item.totalPaidInAdvanceForPeriod),
-        total: () => this.toNumber(this.repaymentScheduleDetails.totalPaidInAdvance),
+        value: (item: any) => this.getDisplayTotalPaidInAdvanceForPeriod(item),
+        total: () => this.getDisplayTotalPaidInAdvance(),
         format: moneyFormat
       },
       late: {
         header: 'Late Paid',
-        value: (item: any) => this.toNumber(item.totalPaidLateForPeriod),
-        total: () => this.toNumber(this.repaymentScheduleDetails.totalPaidLate),
+        value: (item: any) => this.getDisplayTotalPaidLateForPeriod(item),
+        total: () => this.getDisplayTotalPaidLate(),
         format: moneyFormat
       },
       outstanding: {
@@ -1177,14 +1183,131 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
   /** Overdue interest (LPI): show amount due, or waived LPI when due is zero (e.g. grace-period row). */
   getDisplayOverdueInterestForPeriod(item: any): number {
-    if (Number(item?.reversedPenaltyChargesDue || 0) > 0) {
-      return Number(item.reversedPenaltyChargesDue);
-    }
     const due = Number(item?.penaltyChargesDue || 0);
     if (due > 0) {
       return due;
     }
     return Number(item?.penaltyChargesWaived || 0);
+  }
+
+  getReversedPaidLpiForPeriod(item: any): number {
+    return reversedPaidLpiForPeriod(item);
+  }
+
+  getReversedPaidLpiIndicatorForPeriod(item: any): number {
+    return reversedPaidLpiIndicatorForPeriod(this.loanDetailsData, item);
+  }
+
+  hasReversedPaidLpi(item: any): boolean {
+    return this.getReversedPaidLpiIndicatorForPeriod(item) > 0;
+  }
+
+  hasReversedPaidLpiForLoan(): boolean {
+    return this.getReversedPaidLpiAdjustmentTotal() > 0;
+  }
+
+  getReversedPaidLpiAdjustmentTotal(): number {
+    return this.getReversedPaidLpiForSchedule();
+  }
+
+  getDisplayTotalDueForPeriod(item: any): number {
+    return subtractReversedPaidLpi(item?.totalDueForPeriod, this.getReversedPaidLpiForPeriod(item));
+  }
+
+  getDisplayTotalPaidForPeriod(item: any): number {
+    return subtractReversedPaidLpi(
+      item?.totalPaidForPeriod,
+      this.getReversedPaidLpiForPeriod(item) + this.getReversedPaidLpiAllocatedAsAdvanceForPeriod(item)
+    );
+  }
+
+  getDisplayTotalPaidInAdvanceForPeriod(item: any): number {
+    return subtractReversedPaidLpi(
+      item?.totalPaidInAdvanceForPeriod,
+      this.getReversedPaidLpiAllocatedAsAdvanceForPeriod(item)
+    );
+  }
+
+  getDisplayTotalPaidLateForPeriod(item: any): number {
+    const adjustedLatePaid = subtractReversedPaidLpi(
+      item?.totalPaidLateForPeriod,
+      this.getReversedPaidLpiForPeriod(item)
+    );
+    return Math.min(adjustedLatePaid, this.getDisplayTotalPaidForPeriod(item));
+  }
+
+  getDisplayTotalPenaltyChargesCharged(): number {
+    return subtractReversedPaidLpi(
+      this.repaymentScheduleDetails?.totalPenaltyChargesCharged,
+      this.getReversedPaidLpiForSchedule()
+    );
+  }
+
+  getDisplayTotalRepaymentExpected(): number {
+    return subtractReversedPaidLpi(
+      this.repaymentScheduleDetails?.totalRepaymentExpected,
+      this.getReversedPaidLpiForSchedule()
+    );
+  }
+
+  getDisplayTotalRepayment(): number {
+    const periods = this.getRepaymentSchedulePeriods();
+    if (periods.length) {
+      return periods.reduce((total: number, period: any) => total + this.getDisplayTotalPaidForPeriod(period), 0);
+    }
+    return subtractReversedPaidLpi(this.repaymentScheduleDetails?.totalRepayment, this.getReversedPaidLpiForSchedule());
+  }
+
+  getDisplayTotalPaidInAdvance(): number {
+    const periods = this.getRepaymentSchedulePeriods();
+    if (periods.length) {
+      return periods.reduce(
+        (total: number, period: any) => total + this.getDisplayTotalPaidInAdvanceForPeriod(period),
+        0
+      );
+    }
+    return subtractReversedPaidLpi(
+      this.repaymentScheduleDetails?.totalPaidInAdvance,
+      this.getReversedPaidLpiForSchedule()
+    );
+  }
+
+  getDisplayTotalPaidLate(): number {
+    const periods = this.getRepaymentSchedulePeriods();
+    if (periods.length) {
+      return periods.reduce((total: number, period: any) => total + this.getDisplayTotalPaidLateForPeriod(period), 0);
+    }
+    return subtractReversedPaidLpi(this.repaymentScheduleDetails?.totalPaidLate, this.getReversedPaidLpiForSchedule());
+  }
+
+  getReversedPaidLpiAllocatedAsAdvanceForPeriod(item: any): number {
+    let remainingReversedPaidLpi = this.getReversedPaidLpiForSchedule();
+    if (remainingReversedPaidLpi <= 0) {
+      return 0;
+    }
+    for (const period of this.getRepaymentSchedulePeriods()) {
+      const periodAdvancePaid = this.toNumber(period?.totalPaidInAdvanceForPeriod);
+      if (periodAdvancePaid <= 0) {
+        continue;
+      }
+      const allocation = Math.min(periodAdvancePaid, remainingReversedPaidLpi);
+      if (period === item) {
+        return allocation;
+      }
+      remainingReversedPaidLpi = Math.max(remainingReversedPaidLpi - allocation, 0);
+      if (remainingReversedPaidLpi <= 0) {
+        return 0;
+      }
+    }
+    return 0;
+  }
+
+  private getReversedPaidLpiForSchedule(): number {
+    return reversedPaidLpiForLoan(this.loanDetailsData);
+  }
+
+  private getRepaymentSchedulePeriods(): any[] {
+    return Array.isArray(this.repaymentScheduleDetails?.periods) ? this.repaymentScheduleDetails.periods : [];
   }
 
   /** True when the overdue-interest cell should reflect a fully waived LPI amount. */

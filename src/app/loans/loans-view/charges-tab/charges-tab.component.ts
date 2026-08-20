@@ -326,6 +326,9 @@ export class ChargesTabComponent implements OnInit {
               // Debug: Log the response to see its structure
               console.log('Reverse charge response:', response);
 
+              const savingsDepositTransactionId =
+                response?.changes?.savingsDepositTransactionId || response?.savingsDepositTransactionId;
+
               // Get savings account number from response or loan details
               let savingsAccountNo = '';
 
@@ -341,11 +344,14 @@ export class ChargesTabComponent implements OnInit {
               console.log('Savings account number found:', savingsAccountNo);
 
               // Show success message
-              let message = 'Charge reversed to the associated savings accounts';
-              if (savingsAccountNo) {
-                message += `: ${savingsAccountNo}`;
+              let message = '';
+              if (savingsDepositTransactionId) {
+                message = 'Charge reversed and refund posted to the associated savings account';
+                if (savingsAccountNo) {
+                  message += `: ${savingsAccountNo}`;
+                }
               } else {
-                message += '.';
+                message = 'Charge reversed and re-applied to the loan balance. No savings refund was created.';
               }
 
               this.snackBar.open(message, 'Close', {
