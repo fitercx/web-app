@@ -17,6 +17,19 @@ table {
   padding-right: 2%;
 }
 
+.reversed-lpi-banner {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0 2% 12px;
+  padding: 10px 12px;
+  border-left: 4px solid #c62828;
+  background: rgb(198 40 40 / 8%);
+  color: #8e1b1b;
+  font-size: 13px;
+  font-weight: 500;
+}
+
 .check {
   padding-left: 15px;
 }
@@ -108,6 +121,25 @@ table {
     color: #2e7d32;
     font-size: 12px;
     font-weight: 500;
+  }
+
+  .reversed-amount {
+    color: #c62828;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .reversed-lpi-detail {
+    color: #c62828;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+
+  .before-reversal-amount {
+    color: #757575;
+    font-size: 11px;
+    line-height: 1.3;
   }
 
   .waived-interest-amount,
@@ -238,6 +270,8 @@ table {
   font-weight: 500;
 }
 
+// stylelint-disable-next-line no-descending-specificity -- intentional global .reversed-amount base style; the
+// higher-specificity #repaymentSchedule .reversed-amount above is a scoped colour override, not a specificity conflict.
 .reversed-amount {
   color: #f44336;
   font-weight: 500;

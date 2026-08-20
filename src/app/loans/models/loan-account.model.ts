@@ -102,10 +102,12 @@ export interface RepaymentSchedulePeriod {
   interestWaived?: number;
   interestWrittenOff?: number;
   interestOutstanding?: number;
+  feeChargesReversed?: number;
   feeChargesWaived?: number;
   feeChargesWrittenOff?: number;
   penaltyChargesDue?: number;
   penaltyChargesPaid?: number;
+  penaltyChargesReversed?: number;
   penaltyChargesWaived?: number;
   penaltyChargesWrittenOff?: number;
   penaltyChargesOutstanding?: number;

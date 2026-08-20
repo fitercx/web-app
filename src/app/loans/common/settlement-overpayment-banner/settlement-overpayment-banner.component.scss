@@ -1,0 +1,35 @@
+.settlement-overpayment-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.75rem;
+  border-left: 4px solid #dc2626;
+  background: rgb(220 38 38 / 8%);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+
+  mat-icon {
+    color: #dc2626;
+    flex-shrink: 0;
+  }
+}
+
+.settlement-overpayment-outcome {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  margin-bottom: 0.75rem;
+  border-left: 4px solid #b45309;
+  background: rgb(180 83 9 / 10%);
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+
+  mat-icon {
+    color: #b45309;
+    flex-shrink: 0;
+  }
+}

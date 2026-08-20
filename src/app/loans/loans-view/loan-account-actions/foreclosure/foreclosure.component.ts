@@ -9,14 +9,18 @@ import { catchError, map, switchMap } from 'rxjs/operators';
 import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 import {
+  computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
+  computeProjectedOverpayment,
   computeSavingsBalanceAsOf,
+  computeScheduleCloseCap,
   computeSettlementRequired,
   computeUnearnedInterest,
   isRealEmiDueOnDate,
   isSameCalendarDate,
   reconcilePenaltyWithLedger,
-  roundAmount
+  roundAmount,
+  SchedulePeriod
 } from 'app/loans/common/backdated-settlement.util';
 import {
   SettlementSummaryFootnote,
@@ -94,6 +98,8 @@ export class ForeclosureComponent implements OnInit {
   private additionalFutureLpiAmount = 0;
   /** Authoritative LPI as of the selected date (from /template/penalties). */
   private penaltyTemplateData: any;
+  /** Outcome notice when foreclosure quote would close the loan but move it to Overpaid. */
+  foreclosureOutcomeNotice: string | null = null;
 
   /**
    * @param {FormBuilder} formBuilder Form Builder.
@@ -163,6 +169,7 @@ export class ForeclosureComponent implements OnInit {
         this.penaltyTemplateData = penaltyTemplate;
         this.patchForeclosureFormFromTemplate(transactionDate);
         this.updateClosureTypeInfo();
+        this.updateForeclosureOverpaymentPreview();
         this.dueEmis = this.getDueEmisForDate(transactionDate);
       });
   }
@@ -260,11 +267,71 @@ export class ForeclosureComponent implements OnInit {
       outstandingPenaltyChargesPortion: [{ value: this.dataObject.penaltyChargesPortion || 0, disabled: true }],
       outstandingTaxChargesPortion: [{ value: this.dataObject.taxChargesPortion || 0, disabled: true }],
       transactionAmount: [{ value: this.dataObject.amount, disabled: true }],
+      // Optional manual-amount entry for the ops team (off by default). Kept OUT of the submit payload on purpose —
+      // submit() posts only transactionDate + note, so enabling this never changes what the backend collects; it only
+      // drives the settlement-card preview below for verification against an externally-calculated figure.
+      manualAmountEnabled: [false],
+      manualAmount: [null],
       note: [
         '',
         Validators.required
       ]
     });
+  }
+
+  /** True when the operator has toggled manual entry on and typed a positive amount. */
+  get manualAmountActive(): boolean {
+    return !!this.foreclosureForm?.get('manualAmountEnabled')?.value && this.manualAmountValue > 0;
+  }
+
+  get manualAmountValue(): number {
+    return roundAmount(Number(this.foreclosureForm?.get('manualAmount')?.value || 0));
+  }
+
+  /** Manual entered amount minus the system-computed settlement (positive = operator entered more). */
+  get manualVsComputedDelta(): number {
+    return roundAmount(this.manualAmountValue - this.dueAsOfDateTotal);
+  }
+
+  /** Headline total for the settlement card — the entered value when manual mode is active, else the computed total. */
+  get settlementCardTotal(): number {
+    return this.manualAmountActive ? this.manualAmountValue : this.dueAsOfDateTotal;
+  }
+
+  /** Eyebrow shown on the card — flags a manual figure so it is never mistaken for the computed quote. */
+  get settlementCardEyebrow(): string | null {
+    return this.manualAmountActive ? 'Manual amount entered' : null;
+  }
+
+  /**
+   * Card breakdown lines. Hidden in manual mode: the computed component lines sum to the computed total, not the
+   * entered one, so showing them beside a manual headline would look inconsistent.
+   */
+  get settlementCardLines(): SettlementSummaryLine[] {
+    return this.manualAmountActive ? [] : this.settlementLines;
+  }
+
+  /** Footnotes for the card — in manual mode, show the computed settlement, the delta, and the collection caveat. */
+  get settlementCardFootnotes(): Array<string | SettlementSummaryFootnote> {
+    if (!this.manualAmountActive) {
+      return this.summaryFootnotes;
+    }
+    const notes: Array<string | SettlementSummaryFootnote> = [
+      {
+        text: `Computed settlement: ${this.currencySymbol} ${this.formatAmount(this.dueAsOfDateTotal)}`,
+        tone: 'default'
+      }
+    ];
+    const delta = this.manualVsComputedDelta;
+    if (Math.abs(delta) > 0.01) {
+      const sign = delta > 0 ? '+' : '−';
+      notes.push({
+        text: `Difference vs computed: ${sign}${this.currencySymbol} ${this.formatAmount(Math.abs(delta))}`,
+        tone: 'negative'
+      });
+    }
+    notes.push('Manual amount is for reference/verification only — foreclosure collects the system-computed amount.');
+    return notes;
   }
 
   onChanges(): void {
@@ -324,6 +391,7 @@ export class ForeclosureComponent implements OnInit {
 
           this.patchForeclosureFormFromTemplate(val);
           this.updateClosureTypeInfo();
+          this.updateForeclosureOverpaymentPreview();
           this.dueEmis = this.getDueEmisForDate(val);
           this.refreshSavingsBalanceAsOfDate(val);
           this.isTemplateLoading = false;
@@ -360,6 +428,7 @@ export class ForeclosureComponent implements OnInit {
         this.additionalFutureLpiAmount = Number(futureLpi?.totalLPIAmount || 0);
         this.penaltyTemplateData = penaltyTemplate;
         this.patchDisplayFromPenaltiesTemplate(val);
+        this.updateForeclosureOverpaymentPreview();
         this.dueEmis = this.getDueEmisForDate(val);
         this.refreshSavingsBalanceAsOfDate(val);
         this.isTemplateLoading = false;
@@ -682,11 +751,10 @@ export class ForeclosureComponent implements OnInit {
         'should close as Closed (obligations met), not Overpaid'
       );
     }
-    const overpay = this.foreclosureOverpaymentRisk;
-    if (overpay > 0.01) {
+    if (this.willBecomeOverpaid) {
       return (
-        `Closes the loan · ~${this.currencySymbol} ${this.formatAmount(overpay)} ` +
-        'may be refunded to linked savings (quote vs schedule mismatch)'
+        `Quoted total exceeds schedule close cap by ~${this.currencySymbol} ${this.formatAmount(this.projectedOverpaymentAmount)} — ` +
+        'loan may become Overpaid instead of Closed'
       );
     }
     return null;
@@ -747,22 +815,54 @@ export class ForeclosureComponent implements OnInit {
     );
   }
 
+  /** Sum of every unpaid real installment — conservative cap for full close without Overpaid. */
+  get scheduleFullRepaymentCap(): number {
+    const periods = this.repaymentSchedule?.periods as SchedulePeriod[] | undefined;
+    return computeScheduleCloseCap(periods);
+  }
+
   /**
-   * Amount the quoted foreclosure total may exceed what the backend allocates — shows up as Overpaid By on closure.
-   * Common when the template principal embeds overdue schedule LPI but execution posts it separately.
+   * Maximum the backend can absorb on closure without moving the loan to Overpaid — same logic as Make Repayment.
    */
-  get foreclosureOverpaymentRisk(): number {
+  get settlementCapWithoutOverpay(): number {
     if (this.foreclosureBlockedByDueDate) {
       return 0;
     }
-    const quotedPrincipal = Number(this.formRawValue.outstandingPrincipalPortion || 0);
-    const summaryPrincipal = Number(this.loanSummary?.principalOutstanding ?? 0);
-    const principalGap =
-      summaryPrincipal > 0.01 && quotedPrincipal > summaryPrincipal + 0.01
-        ? roundAmount(quotedPrincipal - summaryPrincipal)
-        : 0;
-    const penaltyGap = roundAmount(Math.max(this.scheduleOverduePenaltyOutstanding - this.penaltyAsOfDate, 0));
-    return Math.max(principalGap, penaltyGap);
+    return computeAuthoritativeSettlementCap({
+      outstandingAfterWaiver: this.outstandingAfterWaiver,
+      fullLoanOutstanding: this.fullLoanOutstanding,
+      scheduleCloseCap: this.scheduleFullRepaymentCap,
+      datedRepaymentTemplateAmount: this.datedForeclosureTemplateAmount
+    });
+  }
+
+  /** Raw foreclosure template amount before authoritative cap reconciliation. */
+  get datedForeclosureTemplateAmount(): number {
+    return roundAmount(Number(this.foreclosuredata?.amount || 0));
+  }
+
+  get projectedOverpaymentAmount(): number {
+    return computeProjectedOverpayment(this.dueAsOfDateTotal, this.settlementCapWithoutOverpay);
+  }
+
+  get willBecomeOverpaid(): boolean {
+    return this.projectedOverpaymentAmount > 0.01;
+  }
+
+  /** @deprecated Use projectedOverpaymentAmount — kept for settlement card footnotes. */
+  get foreclosureOverpaymentRisk(): number {
+    return this.projectedOverpaymentAmount;
+  }
+
+  private updateForeclosureOverpaymentPreview(): void {
+    this.foreclosureOutcomeNotice = null;
+    if (!this.willBecomeOverpaid || this.foreclosureBlockedByDueDate) {
+      return;
+    }
+    const excess = this.projectedOverpaymentAmount;
+    this.foreclosureOutcomeNotice =
+      `After foreclosure the loan will become Overpaid by ${this.currencySymbol} ${this.formatAmount(excess)} ` +
+      `(status Overpaid, not Closed).`;
   }
 
   get settlementClosesLoan(): boolean {
@@ -820,11 +920,18 @@ export class ForeclosureComponent implements OnInit {
       notes.push('No LPI on installment due date');
     }
     const penaltyGap = roundAmount(this.scheduleOverduePenaltyOutstanding - this.penaltyAsOfDate);
-    if (penaltyGap > 0.01 && !this.foreclosureBlockedByDueDate) {
+    if (penaltyGap > 0.01 && !this.foreclosureBlockedByDueDate && !this.willBecomeOverpaid) {
       notes.push(
         `Schedule overdue LPI ${this.currencySymbol} ${this.formatAmount(this.scheduleOverduePenaltyOutstanding)} ` +
           `vs quote LPI ${this.currencySymbol} ${this.formatAmount(this.penaltyAsOfDate)} — ` +
           `paying the quoted total may overpay by ~${this.currencySymbol} ${this.formatAmount(penaltyGap)}`
+      );
+    }
+    if (this.willBecomeOverpaid && !this.foreclosureBlockedByDueDate) {
+      notes.push(
+        `Quoted foreclosure total ${this.currencySymbol} ${this.formatAmount(this.dueAsOfDateTotal)} exceeds the ` +
+          `schedule close cap ${this.currencySymbol} ${this.formatAmount(this.settlementCapWithoutOverpay)} by ` +
+          `${this.currencySymbol} ${this.formatAmount(this.projectedOverpaymentAmount)}.`
       );
     }
     if (this.isFutureDateSelected && this.additionalFutureLpiAmount > 0.01) {

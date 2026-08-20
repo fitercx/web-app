@@ -171,7 +171,17 @@
         (click)="showTransactions(transaction)"
         [ngClass]="loanTransactionColor(transaction)"
       >
-        {{ transaction.outstandingLoanBalance | formatNumber }}
+        <ng-container
+          *ngIf="
+            transaction.outstandingLoanBalance !== null && transaction.outstandingLoanBalance !== undefined;
+            else noLoanBalance
+          "
+        >
+          {{ transaction.outstandingLoanBalance | formatNumber }}
+        </ng-container>
+        <ng-template #noLoanBalance>
+          <span class="muted-amount">-</span>
+        </ng-template>
       </td>
     </ng-container>
 
