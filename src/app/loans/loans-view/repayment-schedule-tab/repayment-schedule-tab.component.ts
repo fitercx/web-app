@@ -37,9 +37,7 @@ import { ProductsService } from 'app/products/products.service';
 import { computeMonthlyAccrualRows } from 'app/loans/accrual-report.util';
 import {
   reversedPaidLpiForLoan,
-  reversedPaidLpiForPeriod,
-  reversedPaidLpiIndicatorForPeriod,
-  subtractReversedPaidLpi
+  reversedPaidLpiIndicatorForPeriod
 } from 'app/loans/common/reversed-paid-lpi-display.util';
 import { LoanDownloadType } from 'app/shared/loan-downloads-menu/loan-downloads-menu.component';
 import { generateKeyFactStatementPdf } from 'app/shared/key-fact-statement/key-fact-statement-pdf';
@@ -266,28 +264,122 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
     const options: jsPDFOptions = {
       orientation: 'l',
-      unit: 'in',
+      unit: 'pt',
       format: 'letter',
-      precision: 2,
       compress: true,
       putOnlyUsedFonts: true
     };
     const pdf = new jsPDF(options);
 
+    // Build the table from the same structured columns as the Excel export rather than scraping the
+    // on-screen HTML table. The grouped multi-row header + footer notes made autoTable collapse the
+    // narrow columns and wrap text one character per line, blowing the schedule across many pages.
+    const tableColumns = this.getRepaymentScheduleExportColumns();
+    const head = [tableColumns.map((column) => column.header)];
+    const body = this.scheduleTablePeriods.map((period: any) =>
+      tableColumns.map((column) => this.formatRepaymentSchedulePdfCell(column.value(period), column.format))
+    );
+    const foot = [
+      tableColumns.map((column) =>
+        column.total ? this.formatRepaymentSchedulePdfCell(column.total(), column.format) : ''
+      )
+    ];
+
+    const startY = this.addRepaymentSchedulePdfHeading(pdf);
+
     autoTable(pdf, {
-      html: '#repaymentSchedule',
-      bodyStyles: { lineColor: [
+      head,
+      body,
+      foot,
+      startY,
+      margin: {
+        top: 36,
+        right: 24,
+        bottom: 28,
+        left: 24
+      },
+      tableWidth: 'auto',
+      styles: {
+        fontSize: 6.5,
+        cellPadding: 2,
+        overflow: 'linebreak',
+        halign: 'center',
+        valign: 'middle',
+        lineColor: [
           0,
           0,
           0
-        ] },
-      styles: {
-        fontSize: 8,
-        cellWidth: 'auto',
-        halign: 'center'
+        ],
+        lineWidth: 0.1
+      },
+      headStyles: {
+        fillColor: [
+          41,
+          128,
+          185
+        ],
+        textColor: 255,
+        fontStyle: 'bold',
+        halign: 'center',
+        valign: 'middle'
+      },
+      footStyles: {
+        fillColor: [
+          235,
+          235,
+          235
+        ],
+        textColor: 0,
+        fontStyle: 'bold'
       }
     });
     pdf.save(fileName);
+  }
+
+  /** Draws the PDF title/loan summary line and returns the Y offset where the table should start. */
+  private addRepaymentSchedulePdfHeading(pdf: jsPDF): number {
+    const loanInfo = this.loanData || this.loanDetailsData || {};
+    const marginLeft = 24;
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(12);
+    pdf.text('Repayment Schedule', marginLeft, 24);
+
+    const summaryParts = [
+      `Loan ID: ${this.getLoanIdentifier()}`,
+      loanInfo.accountNo ? `Account No: ${loanInfo.accountNo}` : '',
+      loanInfo.clientName || loanInfo.group?.name ? `Customer: ${loanInfo.clientName || loanInfo.group?.name}` : '',
+      `Generated On: ${this.dateUtils.formatDate(this.settingsService.businessDate, 'dd MMM yyyy')}`
+    ].filter(Boolean);
+
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(8);
+    pdf.text(summaryParts.join('     '), marginLeft, 38);
+    return 46;
+  }
+
+  /** Formats a structured export cell value (number/Date/string) into display text for the PDF table. */
+  private formatRepaymentSchedulePdfCell(value: any, format?: string): string {
+    if (value === '' || value === null || value === undefined) {
+      return '';
+    }
+    if (value instanceof Date) {
+      return this.dateUtils.formatDate(value, 'dd MMM yyyy');
+    }
+    if (typeof value === 'number') {
+      if (!Number.isFinite(value)) {
+        return '';
+      }
+      if (format === '0') {
+        return String(Math.round(value));
+      }
+      const decimals = Number(this.settingsService.decimals);
+      const fractionDigits = Number.isFinite(decimals) ? decimals : 2;
+      return value.toLocaleString('en-US', {
+        minimumFractionDigits: fractionDigits,
+        maximumFractionDigits: fractionDigits
+      });
+    }
+    return String(value);
   }
 
   downloadLoanDocument(type: LoanDownloadType): void {
@@ -470,7 +562,9 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
   private buildRepaymentScheduleWorksheet(): XLSX.WorkSheet {
     const tableColumns = this.getRepaymentScheduleExportColumns();
-    const scheduleRows = this.repaymentScheduleDetails.periods.map((period: any) =>
+    // Mirror the on-screen table: when a foreclosure/closure overlay is active this is the
+    // display schedule (original rows + actual overlay + removed rows), otherwise the raw periods.
+    const scheduleRows = this.scheduleTablePeriods.map((period: any) =>
       tableColumns.map((column) => column.value(period))
     );
     const totalsRow = tableColumns.map((column) => (column.total ? column.total() : ''));
@@ -544,24 +638,57 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   private getRepaymentScheduleExportColumns(): any[] {
-    return this.displayedColumns
+    const columns = this.displayedColumns
       .filter((column) => column !== 'check')
-      .map((column) => this.getRepaymentScheduleExportColumn(column))
+      .map((column) => {
+        const definition = this.getRepaymentScheduleExportColumn(column);
+        return definition ? { ...definition, key: column } : definition;
+      })
       .filter((column) => !!column);
+
+    // The Refunded LPI (reversal) amount is shown in the UI only as a footer note on the
+    // Overdue Interest column. Surface it in the export as its own column so the reversal is captured.
+    if (this.hasReversedPaidLpiForLoan()) {
+      const penaltiesIndex = columns.findIndex((column) => column?.key === 'penalties');
+      const insertIndex = penaltiesIndex >= 0 ? penaltiesIndex + 1 : columns.length;
+      columns.splice(insertIndex, 0, this.getReversedLpiExportColumn());
+    }
+
+    return columns;
+  }
+
+  private getReversedLpiExportColumn(): any {
+    const moneyFormat = '#,##0.000';
+    return {
+      key: 'reversedLpi',
+      header: 'Refunded LPI (Reversal)',
+      value: (item: any) => {
+        const amount = reversedPaidLpiIndicatorForPeriod(this.loanDetailsData, item);
+        return amount > 0 ? amount : '';
+      },
+      total: () => this.getReversedPaidLpiAdjustmentTotal(),
+      format: moneyFormat
+    };
   }
 
   private getRepaymentScheduleExportColumn(column: string): any {
     const moneyFormat = '#,##0.000';
     const numberFormat = '0';
     const dateFormat = 'dd mmm yyyy';
-    const emiTotal = () =>
-      this.isLineOfCreditReceivable()
-        ? this.toNumber(this.repaymentScheduleDetails.totalPrincipalExpected) +
+    const emiTotal = () => {
+      if (this.isLineOfCreditReceivable()) {
+        return (
+          this.toNumber(this.repaymentScheduleDetails.totalPrincipalExpected) +
           this.toNumber(this.repaymentScheduleDetails.totalInterestCharged) +
           this.getDisplayTotalFees() +
           this.getDisplayTotalTaxes()
+        );
+      }
+      return this.foreclosureScheduleOverlayActive
+        ? this.getDisplayTotalOriginalEmi()
         : this.toNumber(this.repaymentScheduleDetails.totalPrincipalExpected) +
-          this.toNumber(this.repaymentScheduleDetails.totalInterestCharged);
+            this.toNumber(this.repaymentScheduleDetails.totalInterestCharged);
+    };
 
     const columns: any = {
       number: { header: '#', value: (item: any) => item.period ?? '', format: numberFormat },
@@ -573,33 +700,59 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       },
       balanceOfLoan: {
         header: this.isLineOfCreditReceivable() ? 'PreDisbursal Amount' : 'Principal O/S',
-        value: (item: any) => this.toNumber(item.principalLoanBalanceOutstanding),
+        value: (item: any) =>
+          this.isForeclosureRemovedRow(item) ? '' : this.toNumber(item.principalLoanBalanceOutstanding),
         total: () => this.getDisplayedTotalOutstanding(),
         format: moneyFormat
       },
-      date: { header: 'Due Date', value: (item: any) => this.toExcelDate(item.dueDate), format: dateFormat },
+      date: {
+        header: 'Due Date',
+        value: (item: any) =>
+          this.isForeclosureClosureActual(item) && this.showForeclosureDueDateOverlay(item)
+            ? this.toExcelDate(item.foreclosureDisplay?.actualDueDate)
+            : this.toExcelDate(item.dueDate),
+        format: dateFormat
+      },
       emiAmount: {
         header: this.getPlainEmiLabel(),
-        value: (item: any) =>
-          this.isLineOfCreditReceivable() || this.isLoanFactorRateEnabled()
-            ? this.toNumber(item.principalDue) +
-              this.toNumber(item.interestOriginalDue) +
+        value: (item: any) => {
+          if (this.isLineOfCreditReceivable() || this.isLoanFactorRateEnabled()) {
+            return (
+              this.toNumber(item.principalDue) +
+              this.getDisplayInterestForPeriod(item) +
               this.getDisplayFeeForPeriod(item) +
               this.getDisplayTaxForPeriod(item)
-            : this.toNumber(item.principalDue) + this.toNumber(item.interestOriginalDue),
+            );
+          }
+          return this.isForeclosureClosureActual(item) && this.showForeclosureEmiOverlay(item)
+            ? this.getActualEmiAmount(item)
+            : this.getOriginalEmiAmount(item);
+        },
         total: emiTotal,
         format: moneyFormat
       },
       principalDue: {
         header: 'Principal Due',
-        value: (item: any) => this.toNumber(item.principalDue),
-        total: () => this.toNumber(this.repaymentScheduleDetails.totalPrincipalExpected),
+        value: (item: any) =>
+          this.isForeclosureClosureActual(item) && this.showForeclosurePrincipalOverlay(item)
+            ? this.toNumber(item.foreclosureDisplay?.actualPrincipalDue)
+            : this.toNumber(item.principalDue),
+        total: () =>
+          this.foreclosureScheduleOverlayActive
+            ? this.getDisplayTotalOriginalPrincipal()
+            : this.toNumber(this.repaymentScheduleDetails.totalPrincipalExpected),
         format: moneyFormat
       },
       interest: {
         header: this.isLineOfCreditReceivable() ? 'Expected Interest' : 'Interest',
-        value: (item: any) => this.getDisplayInterestForPeriod(item),
-        total: () => this.getDisplayTotalInterest(),
+        value: (item: any) =>
+          this.isForeclosureClosureActual(item) && this.showForeclosureInterestOverlay(item)
+            ? this.toNumber(item.foreclosureDisplay?.actualInterestDue)
+            : this.getDisplayInterestForPeriod(item),
+        total: () =>
+          this.foreclosureScheduleOverlayActive
+            ? this.getDisplayTotalOriginalInterest()
+            : this.getDisplayTotalInterest(),
         format: moneyFormat
       },
       fees: {
@@ -638,31 +791,48 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       },
       paiddate: {
         header: 'Paid Date',
-        value: (item: any) =>
-          item.interestOriginalDue === 0 && item.principalDue === 0 ? '' : this.toExcelDate(item.obligationsMetOnDate),
+        value: (item: any) => {
+          if (this.isForeclosureRemovedRow(item)) {
+            return '';
+          }
+          if (item.interestOriginalDue === 0 && item.principalDue === 0 && !this.foreclosureScheduleOverlayActive) {
+            return '';
+          }
+          return this.toExcelDate(item.obligationsMetOnDate);
+        },
         format: dateFormat
       },
       due: {
         header: 'Due Payment',
-        value: (item: any) => this.getDisplayTotalDueForPeriod(item),
+        value: (item: any) => (this.isForeclosureRemovedRow(item) ? '' : this.getDisplayTotalDueForPeriod(item)),
         total: () => this.getDisplayTotalRepaymentExpected(),
         format: moneyFormat
       },
       paid: {
         header: 'Amount Paid',
-        value: (item: any) => this.getDisplayTotalPaidForPeriod(item),
+        value: (item: any) => {
+          if (this.isForeclosureRemovedRow(item)) {
+            return '';
+          }
+          // Closure cases: multiple installments settled in one payment show the actual
+          // amount paid at closure (mirrors the UI overlay), not the scheduled EMI.
+          return this.isForeclosureClosureActual(item) && this.showForeclosureAmountPaidOverlay(item)
+            ? this.toNumber(item.foreclosureDisplay?.actualAmountPaid)
+            : this.getDisplayTotalPaidForPeriod(item);
+        },
         total: () => this.getDisplayTotalRepayment(),
         format: moneyFormat
       },
       inadvance: {
         header: 'Advance Paid',
-        value: (item: any) => this.getDisplayTotalPaidInAdvanceForPeriod(item),
+        value: (item: any) =>
+          this.isForeclosureRemovedRow(item) ? '' : this.getDisplayTotalPaidInAdvanceForPeriod(item),
         total: () => this.getDisplayTotalPaidInAdvance(),
         format: moneyFormat
       },
       late: {
         header: 'Late Paid',
-        value: (item: any) => this.getDisplayTotalPaidLateForPeriod(item),
+        value: (item: any) => (this.isForeclosureRemovedRow(item) ? '' : this.getDisplayTotalPaidLateForPeriod(item)),
         total: () => this.getDisplayTotalPaidLate(),
         format: moneyFormat
       },
@@ -670,7 +840,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
         header: 'Outstanding Amount',
         value: (item: any) =>
           !this.isLoanOverpaid() && this.shouldShowOutstanding(item)
-            ? this.toNumber(item.totalOutstandingForPeriod)
+            ? this.getDisplayTotalOutstandingForPeriod(item)
             : '',
         format: moneyFormat
       },
@@ -1190,18 +1360,6 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     return Number(item?.penaltyChargesWaived || 0);
   }
 
-  getReversedPaidLpiForPeriod(item: any): number {
-    return reversedPaidLpiForPeriod(item);
-  }
-
-  getReversedPaidLpiIndicatorForPeriod(item: any): number {
-    return reversedPaidLpiIndicatorForPeriod(this.loanDetailsData, item);
-  }
-
-  hasReversedPaidLpi(item: any): boolean {
-    return this.getReversedPaidLpiIndicatorForPeriod(item) > 0;
-  }
-
   hasReversedPaidLpiForLoan(): boolean {
     return this.getReversedPaidLpiAdjustmentTotal() > 0;
   }
@@ -1211,43 +1369,35 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   getDisplayTotalDueForPeriod(item: any): number {
-    return subtractReversedPaidLpi(item?.totalDueForPeriod, this.getReversedPaidLpiForPeriod(item));
+    return this.subtractPenaltyComponent(item?.totalDueForPeriod, item?.penaltyChargesDue);
   }
 
   getDisplayTotalPaidForPeriod(item: any): number {
-    return subtractReversedPaidLpi(
-      item?.totalPaidForPeriod,
-      this.getReversedPaidLpiForPeriod(item) + this.getReversedPaidLpiAllocatedAsAdvanceForPeriod(item)
-    );
+    return this.toNumber(item?.totalPaidForPeriod);
   }
 
   getDisplayTotalPaidInAdvanceForPeriod(item: any): number {
-    return subtractReversedPaidLpi(
-      item?.totalPaidInAdvanceForPeriod,
-      this.getReversedPaidLpiAllocatedAsAdvanceForPeriod(item)
-    );
+    return this.toNumber(item?.totalPaidInAdvanceForPeriod);
   }
 
   getDisplayTotalPaidLateForPeriod(item: any): number {
-    const adjustedLatePaid = subtractReversedPaidLpi(
-      item?.totalPaidLateForPeriod,
-      this.getReversedPaidLpiForPeriod(item)
-    );
-    return Math.min(adjustedLatePaid, this.getDisplayTotalPaidForPeriod(item));
+    return Math.min(this.toNumber(item?.totalPaidLateForPeriod), this.getDisplayTotalPaidForPeriod(item));
+  }
+
+  getDisplayTotalOutstandingForPeriod(item: any): number {
+    return this.toNumber(item?.totalOutstandingForPeriod);
   }
 
   getDisplayTotalPenaltyChargesCharged(): number {
-    return subtractReversedPaidLpi(
-      this.repaymentScheduleDetails?.totalPenaltyChargesCharged,
-      this.getReversedPaidLpiForSchedule()
-    );
+    return this.toNumber(this.repaymentScheduleDetails?.totalPenaltyChargesCharged);
   }
 
   getDisplayTotalRepaymentExpected(): number {
-    return subtractReversedPaidLpi(
-      this.repaymentScheduleDetails?.totalRepaymentExpected,
-      this.getReversedPaidLpiForSchedule()
-    );
+    const periods = this.getRepaymentSchedulePeriods();
+    if (periods.length) {
+      return periods.reduce((total: number, period: any) => total + this.getDisplayTotalDueForPeriod(period), 0);
+    }
+    return this.toNumber(this.repaymentScheduleDetails?.totalRepaymentExpected);
   }
 
   getDisplayTotalRepayment(): number {
@@ -1255,7 +1405,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     if (periods.length) {
       return periods.reduce((total: number, period: any) => total + this.getDisplayTotalPaidForPeriod(period), 0);
     }
-    return subtractReversedPaidLpi(this.repaymentScheduleDetails?.totalRepayment, this.getReversedPaidLpiForSchedule());
+    return this.toNumber(this.repaymentScheduleDetails?.totalRepayment);
   }
 
   getDisplayTotalPaidInAdvance(): number {
@@ -1266,10 +1416,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
         0
       );
     }
-    return subtractReversedPaidLpi(
-      this.repaymentScheduleDetails?.totalPaidInAdvance,
-      this.getReversedPaidLpiForSchedule()
-    );
+    return this.toNumber(this.repaymentScheduleDetails?.totalPaidInAdvance);
   }
 
   getDisplayTotalPaidLate(): number {
@@ -1277,29 +1424,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     if (periods.length) {
       return periods.reduce((total: number, period: any) => total + this.getDisplayTotalPaidLateForPeriod(period), 0);
     }
-    return subtractReversedPaidLpi(this.repaymentScheduleDetails?.totalPaidLate, this.getReversedPaidLpiForSchedule());
-  }
-
-  getReversedPaidLpiAllocatedAsAdvanceForPeriod(item: any): number {
-    let remainingReversedPaidLpi = this.getReversedPaidLpiForSchedule();
-    if (remainingReversedPaidLpi <= 0) {
-      return 0;
-    }
-    for (const period of this.getRepaymentSchedulePeriods()) {
-      const periodAdvancePaid = this.toNumber(period?.totalPaidInAdvanceForPeriod);
-      if (periodAdvancePaid <= 0) {
-        continue;
-      }
-      const allocation = Math.min(periodAdvancePaid, remainingReversedPaidLpi);
-      if (period === item) {
-        return allocation;
-      }
-      remainingReversedPaidLpi = Math.max(remainingReversedPaidLpi - allocation, 0);
-      if (remainingReversedPaidLpi <= 0) {
-        return 0;
-      }
-    }
-    return 0;
+    return this.toNumber(this.repaymentScheduleDetails?.totalPaidLate);
   }
 
   private getReversedPaidLpiForSchedule(): number {
@@ -1308,6 +1433,10 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
   private getRepaymentSchedulePeriods(): any[] {
     return Array.isArray(this.repaymentScheduleDetails?.periods) ? this.repaymentScheduleDetails.periods : [];
+  }
+
+  private subtractPenaltyComponent(total: unknown, penalty: unknown): number {
+    return Math.max(this.toNumber(total) - this.toNumber(penalty), 0);
   }
 
   /** True when the overdue-interest cell should reflect a fully waived LPI amount. */

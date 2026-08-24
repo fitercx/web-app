@@ -26,7 +26,20 @@ describe('TransactionsTabComponent', () => {
 
   it('treats manuallyReversed as active when backend reversed flag is false', () => {
     const txn = { reversed: false, manuallyReversed: true } as LoanTransaction;
-    expect((component as any).isTransactionReversed(txn)).toBeFalse();
+    expect((component as any).isTransactionReversed(txn)).toBeFalsy();
+  });
+
+  it('labels a targeted penalty refund and prevents standalone undo', () => {
+    const txn = {
+      manuallyReversed: false,
+      type: { id: 18, code: 'loanTransactionType.refundForActiveLoan', value: 'Refund for Active Loan' },
+      principalPortion: 0,
+      interestPortion: 0,
+      penaltyChargesPortion: 82.19
+    } as LoanTransaction;
+
+    expect(component.transactionTypeLabel(txn)).toBe('Refunded LPI');
+    expect(component.allowUndoTransaction(txn)).toBeFalsy();
   });
 
   it('hides only backend-reversed rows when Show Reversed is off', () => {

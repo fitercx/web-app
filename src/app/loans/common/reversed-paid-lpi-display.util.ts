@@ -15,20 +15,17 @@ export function reversedPaidLpiForSchedule(schedule: any): number {
 export function reversedPaidLpiFromTransactions(loanDetails: any): number {
   const transactions = Array.isArray(loanDetails?.transactions) ? loanDetails.transactions : [];
   return transactions.reduce((total: number, transaction: any) => {
-    const isChargeAdjustment = transaction?.type?.chargeAdjustment || transaction?.type?.id === 26;
-    const penaltyPortion = toFiniteNumber(transaction?.penaltyChargesPortion);
-    if (!transaction?.reversed && isChargeAdjustment && penaltyPortion < 0) {
-      return total + Math.abs(penaltyPortion);
+    const refundAmount = paidLpiRefundAmount(transaction);
+    if (refundAmount > 0) {
+      return total + refundAmount;
     }
     return total;
   }, 0);
 }
 
 export function reversedPaidLpiForLoan(loanDetails: any): number {
-  return Math.max(
-    reversedPaidLpiForSchedule(loanDetails?.repaymentSchedule),
-    reversedPaidLpiFromTransactions(loanDetails)
-  );
+  const scheduleAmount = reversedPaidLpiForSchedule(loanDetails?.repaymentSchedule);
+  return scheduleAmount > 0 ? scheduleAmount : reversedPaidLpiFromTransactions(loanDetails);
 }
 
 export function reversedPaidLpiIndicatorForPeriod(loanDetails: any, period: any): number {
@@ -47,21 +44,20 @@ export function reversedPaidLpiIndicatorForPeriod(loanDetails: any, period: any)
   );
 
   return transactions.reduce((total: number, transaction: any) => {
-    const isChargeAdjustment = transaction?.type?.chargeAdjustment || transaction?.type?.id === 26;
-    const penaltyPortion = toFiniteNumber(transaction?.penaltyChargesPortion);
-    if (transaction?.reversed || !isChargeAdjustment || penaltyPortion >= 0) {
+    const refundAmount = paidLpiRefundAmount(transaction);
+    if (refundAmount <= 0) {
       return total;
+    }
+    const installmentNumbers = refundedInstallmentNumbersForTransaction(transaction);
+    if (installmentNumbers.includes(Number(period?.period))) {
+      return total + refundAmount;
     }
     const chargeIds = reversedChargeIdsForTransaction(transaction);
     const appliesToPeriod = chargeIds.some((chargeId) =>
       chargeMatchesPeriod(chargesById.get(chargeId), period, periods)
     );
-    return appliesToPeriod ? total + Math.abs(penaltyPortion) : total;
+    return appliesToPeriod ? total + refundAmount : total;
   }, 0);
-}
-
-export function subtractReversedPaidLpi(value: any, reversedPaidLpi: number): number {
-  return Math.max(toFiniteNumber(value) - Math.max(toFiniteNumber(reversedPaidLpi), 0), 0);
 }
 
 function reversedChargeIdsForTransaction(transaction: any): number[] {
@@ -81,6 +77,32 @@ function reversedChargeIdsForTransaction(transaction: any): number[] {
         .filter(Boolean)
     )
   );
+}
+
+function refundedInstallmentNumbersForTransaction(transaction: any): number[] {
+  return Array.from(
+    new Set(
+      (Array.isArray(transaction?.loanChargePaidByList) ? transaction.loanChargePaidByList : [])
+        .map((paidBy: any) => Number(paidBy?.installmentNumber))
+        .filter(Boolean)
+    )
+  );
+}
+
+function paidLpiRefundAmount(transaction: any): number {
+  if (transaction?.reversed) {
+    return 0;
+  }
+  const penaltyPortion = toFiniteNumber(transaction?.penaltyChargesPortion);
+  const isTargetedRefund =
+    transaction?.type?.refundForActiveLoan ||
+    transaction?.type?.code === 'loanTransactionType.refundForActiveLoan' ||
+    transaction?.type?.id === 18;
+  if (isTargetedRefund && penaltyPortion > 0) {
+    return penaltyPortion;
+  }
+  const isLegacyChargeAdjustment = transaction?.type?.chargeAdjustment || transaction?.type?.id === 26;
+  return isLegacyChargeAdjustment && penaltyPortion < 0 ? Math.abs(penaltyPortion) : 0;
 }
 
 function chargeMatchesPeriod(charge: any, period: any, periods: any[]): boolean {

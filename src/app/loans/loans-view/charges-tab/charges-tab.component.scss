@@ -83,6 +83,7 @@
 }
 
 .charge-status--paid,
+.charge-status--paid-lpi-reversed-earlier,
 .charge-status--waived {
   background-color: #e8f5e9;
   color: #2e7d32;
@@ -94,7 +95,8 @@
   color: #ef6c00;
 }
 
-.charge-status--outstanding {
+.charge-status--outstanding,
+.charge-status--outstanding-reversed {
   background-color: #fce4ec;
   color: #c62828;
 }
