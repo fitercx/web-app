@@ -10,12 +10,6 @@
     [details]="foreclosureUnearnedInterestDetails"
     [currencyCode]="currencyCode"
   ></mifosx-foreclosure-unearned-interest-banner>
-  <div class="reversed-lpi-banner" *ngIf="hasReversedPaidLpiForLoan()">
-    <fa-icon icon="undo" class="m-r-5"></fa-icon>
-    Reversed paid LPI
-    <strong>{{ getReversedPaidLpiAdjustmentTotal() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}</strong>
-    is shown separately in red and excluded from displayed due/paid totals.
-  </div>
   <p class="foreclosure-schedule-legend" *ngIf="foreclosureScheduleOverlayActive">
     Original scheduled EMIs are preserved below. Paid installments show as
     <span class="foreclosure-legend-paid">PAID</span>
@@ -282,15 +276,20 @@
             <ng-container *ngIf="isWaivedOverdueInterestOnly(item) && !isWaived"> waived</ng-container>
           </div>
         </ng-container>
-        <div class="reversed-lpi-detail" *ngIf="hasReversedPaidLpi(item)">
-          <fa-icon icon="undo" class="m-r-5" [matTooltip]="'tooltips.Reversed Paid Charge' | translate"></fa-icon>
-          Reversed LPI -{{ getReversedPaidLpiIndicatorForPeriod(item) | formatNumber }}
-        </div>
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
         <b>
           {{ getDisplayTotalPenaltyChargesCharged() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
         </b>
+        <div class="reversed-lpi-detail" *ngIf="hasReversedPaidLpiForLoan()">
+          <fa-icon
+            icon="undo"
+            class="m-r-5"
+            matTooltip="Credited to linked savings and restored as outstanding LPI; contractual EMI is unchanged."
+          ></fa-icon>
+          LPI refund restored outstanding
+          {{ getReversedPaidLpiAdjustmentTotal() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+        </div>
       </td>
     </ng-container>
 
@@ -396,11 +395,15 @@
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Outstanding Amount' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item">
         <ng-container *ngIf="!isLoanOverpaid() && shouldShowOutstanding(item); else emptyOutstanding">
-          {{ item.totalOutstandingForPeriod | formatNumber }}
+          {{ getDisplayTotalOutstandingForPeriod(item) | formatNumber }}
         </ng-container>
         <ng-template #emptyOutstanding>&nbsp;</ng-template>
       </td>
-      <td mat-footer-cell class="r-amount" *matFooterCellDef>&nbsp;</td>
+      <td mat-footer-cell class="r-amount" *matFooterCellDef>
+        <b *ngIf="getDisplayedTotalOutstanding() !== null">
+          {{ getDisplayedTotalOutstanding() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+        </b>
+      </td>
     </ng-container>
 
     <ng-container matColumnDef="header">

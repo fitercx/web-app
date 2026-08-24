@@ -303,7 +303,8 @@ export class MakeRepaymentComponent implements OnInit {
         this.lpiPaymentMessage = this.buildLpiPaymentMessage(reconciled.penalty, transactionDate);
         this.datedRepaymentTemplateAmount = this.roundAmount(Number(repaymentTemplate?.amount || 0));
 
-        const rawSuggested = this.roundAmount(reconciled.defaultTransactionAmount + additionalLPIAmount);
+        // reconcileAsOfDateAmounts already includes additionalPenalty in defaultTransactionAmount.
+        const rawSuggested = this.roundAmount(reconciled.defaultTransactionAmount);
         const totalAmount = this.capRepaymentAmount(rawSuggested);
         this.repaymentLoanForm.patchValue(
           {

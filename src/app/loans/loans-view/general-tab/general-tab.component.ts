@@ -1,7 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { MatTableDataSource } from '@angular/material/table';
-import { reversedPaidLpiForLoan, subtractReversedPaidLpi } from 'app/loans/common/reversed-paid-lpi-display.util';
+import { reversedPaidLpiForLoan } from 'app/loans/common/reversed-paid-lpi-display.util';
 import { getForeclosureUnearnedInterestDetails } from '../foreclosure-unearned-interest.utils';
 
 @Component({
@@ -37,7 +37,6 @@ export class GeneralTabComponent implements OnInit {
     outstanding: string | number;
     overdue: string | number;
     reversedPaidLpi?: number;
-    paidBeforeReversedPaidLpi?: number;
   }[];
   loanDetailsTableData: {
     key: string;
@@ -136,10 +135,10 @@ export class GeneralTabComponent implements OnInit {
 
   setloanSummaryTableData() {
     const reversedPaidLpi = reversedPaidLpiForLoan(this.loanDetails);
-    const penaltyOriginalBeforeReversedPaidLpi = this.loanDetails?.multiDisburseLoan
+    const penaltyOriginal = this.loanDetails?.multiDisburseLoan
       ? this.getDisbursedTranchePenalties()
       : this.loanDetails.summary.penaltyChargesCharged;
-    const totalOriginalBeforeReversedPaidLpi = this.loanDetails?.multiDisburseLoan
+    const totalOriginal = this.loanDetails?.multiDisburseLoan
       ? this.getTotalOriginalForMultiTranche()
       : this.loanDetails.summary.totalExpectedRepayment;
     // Use summary for Fees row so fee/tax split from backend is shown (e.g. fee 800 + tax 44)
@@ -212,20 +211,19 @@ export class GeneralTabComponent implements OnInit {
       },
       {
         property: 'Penalties',
-        original: String(subtractReversedPaidLpi(penaltyOriginalBeforeReversedPaidLpi, reversedPaidLpi)),
+        original: String(penaltyOriginal),
         adjustment: '0',
-        paid: subtractReversedPaidLpi(this.loanDetails.summary.penaltyChargesPaid, reversedPaidLpi),
+        paid: this.loanDetails.summary.penaltyChargesPaid,
         waived: this.loanDetails.summary.penaltyChargesWaived,
         writtenOff: this.loanDetails.summary.penaltyChargesWrittenOff,
         outstanding: this.loanDetails.summary.penaltyChargesOutstanding,
-        overdue: this.loanDetails.summary.penaltyChargesOverdue,
-        reversedPaidLpi
+        overdue: this.loanDetails.summary.penaltyChargesOverdue
       },
       {
         property: 'Total',
-        original: String(subtractReversedPaidLpi(totalOriginalBeforeReversedPaidLpi, reversedPaidLpi)),
+        original: String(totalOriginal),
         adjustment: this.loanDetails.summary.principalAdjustments || 0,
-        paid: subtractReversedPaidLpi(this.loanDetails.summary.totalRepayment, reversedPaidLpi),
+        paid: this.loanDetails.summary.totalRepayment,
         waived: this.loanDetails.summary.totalWaived,
         writtenOff: this.loanDetails.summary.totalWrittenOff,
         outstanding: String(
@@ -234,8 +232,7 @@ export class GeneralTabComponent implements OnInit {
             : this.getAdjustedTotalOutstanding()
         ),
         overdue: this.loanDetails.summary.totalOverdue,
-        reversedPaidLpi,
-        paidBeforeReversedPaidLpi: this.loanDetails.summary.totalRepayment
+        reversedPaidLpi
       }
     ];
     const foreclosureDetails = getForeclosureUnearnedInterestDetails(this.loanDetails);

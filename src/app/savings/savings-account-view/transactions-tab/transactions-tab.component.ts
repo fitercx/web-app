@@ -14,6 +14,7 @@ import { SavingsService } from 'app/savings/savings.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { SavingsUndoTransactionDialogComponent } from '../custom-dialogs/savings-undo-transaction-dialog/savings-undo-transaction-dialog.component';
 import { MatDialog } from '@angular/material/dialog';
+import { sortTransactionsByLatest } from 'app/core/utils/transaction-chronology';
 
 /**
  * Transactions Tab Component.
@@ -39,6 +40,7 @@ export class TransactionsTabComponent implements OnInit {
     { value: 'WITHDRAWAL_DISBURSAL', label: 'Withdrawal - Disbursal' },
     { value: 'WITHDRAWAL_REFUND', label: 'Withdrawal - Refund' },
     { value: 'WITHDRAWAL_EMI_TRANSFER', label: 'Withdrawal - EMI Transfer' },
+    { value: 'DEPOSIT_FORECLOSURE_REFUND', label: 'Deposit - Foreclosure Refund' },
     { value: 'CHARGE_REVERSAL', label: 'Charge Reversal' }
   ];
   /** Columns to be displayed in transactions table. */
@@ -91,7 +93,7 @@ export class TransactionsTabComponent implements OnInit {
   }
 
   setTransactions(): void {
-    this.dataSource = new MatTableDataSource(this.transactionsData);
+    this.dataSource = new MatTableDataSource(sortTransactionsByLatest(this.transactionsData));
     this.accountWithTransactions = this.transactionsData && this.transactionsData.length > 0;
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
@@ -213,7 +215,7 @@ export class TransactionsTabComponent implements OnInit {
         this.matchesTransactionTypeFilter(t, transactionTypeFilter)
       );
     });
-    this.dataSource = new MatTableDataSource(transactions);
+    this.dataSource = new MatTableDataSource(sortTransactionsByLatest(transactions));
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
   }
@@ -233,6 +235,9 @@ export class TransactionsTabComponent implements OnInit {
     }
     if (transactionTypeFilter === 'WITHDRAWAL_EMI_TRANSFER') {
       return parentType === 'WITHDRAWAL' && subType === 'EMI_TRANSFER';
+    }
+    if (transactionTypeFilter === 'DEPOSIT_FORECLOSURE_REFUND') {
+      return parentType === 'DEPOSIT' && subType === 'FORECLOSURE_REFUND';
     }
     return parentType === transactionTypeFilter;
   }
@@ -279,6 +284,9 @@ export class TransactionsTabComponent implements OnInit {
     }
     if (subType.code.endsWith('.emiTransfer')) {
       return 'EMI_TRANSFER';
+    }
+    if (subType.code.endsWith('.foreclosureRefund')) {
+      return 'FORECLOSURE_REFUND';
     }
     return (subType.displayName || '').toUpperCase().replace(/ /g, '_');
   }

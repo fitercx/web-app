@@ -104,6 +104,26 @@ describe('backdated-settlement.util', () => {
     ).toBe(115411.74);
   });
 
+  it('includes projected future LPI exactly once in the suggested repayment amount', () => {
+    const reconciled = reconcileAsOfDateAmounts({
+      isBackdated: false,
+      penaltyTemplate: {
+        principalOutstanding: 1000,
+        remainingPrincipalOutstanding: 1000,
+        interestOutstanding: 50,
+        penaltyAmountDue: 20
+      },
+      repaymentTemplate: {
+        feeChargesPortion: 0,
+        taxChargesPortion: 0
+      },
+      additionalPenalty: 12.18
+    });
+
+    expect(reconciled.penalty).toBe(32.18);
+    expect(reconciled.defaultTransactionAmount).toBe(1082.18);
+  });
+
   it('allocates 0 LPI when settling on the installment due date', () => {
     const closeAmount = computeSettlementRequired({
       penalty: 0,

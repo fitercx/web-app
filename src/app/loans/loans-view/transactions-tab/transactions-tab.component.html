@@ -87,7 +87,7 @@
         [ngClass]="loanTransactionColor(transaction)"
         (click)="showTransactions(transaction)"
       >
-        {{ transaction.type.value }}
+        {{ transactionTypeLabel(transaction) }}
       </td>
     </ng-container>
 
