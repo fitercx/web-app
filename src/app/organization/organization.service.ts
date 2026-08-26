@@ -755,6 +755,10 @@ export class OrganizationService {
     return this.http.get(`/standinginstructionrunhistory`, { params: httpParams });
   }
 
+  reverseStandingInstructionExecution(historyId: number, note: string): Observable<any> {
+    return this.http.post(`/standinginstructionrunhistory/${historyId}?command=reverse`, { note });
+  }
+
   /**
    * @param urlSuffix of Bulk-Import
    * @param officeId Office ID for template retrieval

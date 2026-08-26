@@ -92,4 +92,69 @@
       <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
     </table>
   </div>
+
+  <div class="m-b-10">
+    <h3>{{ 'labels.heading.Standing Instruction History' | translate }}</h3>
+  </div>
+
+  <div class="mat-elevation-z1 m-b-25">
+    <table mat-table [dataSource]="historyDataSource">
+      <ng-container matColumnDef="executionTime">
+        <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Execution Time' | translate }}</th>
+        <td mat-cell *matCellDef="let row">{{ row.executionTime }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="amount">
+        <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Amount' | translate }}</th>
+        <td mat-cell *matCellDef="let row">{{ row.amount | formatNumber }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Status' | translate }}</th>
+        <td mat-cell *matCellDef="let row">{{ row.status }}</td>
+      </ng-container>
+
+      <ng-container matColumnDef="errorLog">
+        <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Error Log' | translate }}</th>
+        <td mat-cell *matCellDef="let row">
+          <button *ngIf="row.status === 'failed'" mat-raised-button color="warn" [matTooltip]="row.errorLog">
+            <i class="fa fa-exclamation"></i>
+          </button>
+        </td>
+      </ng-container>
+
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Actions' | translate }}</th>
+        <td mat-cell *matCellDef="let row">
+          <ng-container *ngIf="row.status === 'success' || row.status === 'partial'">
+            <ng-container *ngIf="!row.isReversed; else reversedBadge">
+              <button
+                mat-raised-button
+                color="warn"
+                *mifosxHasPermission="'REVERSE_STANDING_INSTRUCTION_HISTORY'"
+                (click)="reverseHistoryRow(row)"
+              >
+                {{ 'labels.buttons.Reverse' | translate }}
+              </button>
+            </ng-container>
+            <ng-template #reversedBadge>
+              <span
+                class="reversed-badge"
+                [matTooltip]="row.reversedAt ? ('labels.text.Reversed on' | translate) + ' ' + row.reversedAt : ''"
+              >
+                {{ 'labels.text.Reversed' | translate }}
+              </span>
+            </ng-template>
+          </ng-container>
+        </td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="historyDisplayedColumns"></tr>
+      <tr mat-row *matRowDef="let row; columns: historyDisplayedColumns"></tr>
+    </table>
+
+    <div *ngIf="!historyDataSource.data?.length" class="no-history">
+      {{ 'labels.text.No standing instruction history found' | translate }}
+    </div>
+  </div>
 </div>

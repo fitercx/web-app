@@ -554,6 +554,15 @@ export class LoansService {
     return this.http.get(`/standinginstructions`, { params: httpParams });
   }
 
+  getStandingInstructionsHistory(clientId: string, locale: string, dateFormat: string): Observable<any> {
+    const httpParams = new HttpParams().set('clientId', clientId).set('locale', locale).set('dateFormat', dateFormat);
+    return this.http.get(`/standinginstructionrunhistory`, { params: httpParams });
+  }
+
+  reverseStandingInstructionExecution(historyId: number, note: string): Observable<any> {
+    return this.http.post(`/standinginstructionrunhistory/${historyId}?command=reverse`, { note });
+  }
+
   updateLoansAccount(loanId: any, loanData: any): Observable<any> {
     return this.http.put(`/loans/${loanId}`, loanData);
   }

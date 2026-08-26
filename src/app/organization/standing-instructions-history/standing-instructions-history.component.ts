@@ -3,6 +3,7 @@ import { Component, OnInit, ViewChild } from '@angular/core';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource, MatTable } from '@angular/material/table';
+import { MatDialog } from '@angular/material/dialog';
 import { UntypedFormGroup, UntypedFormBuilder, UntypedFormControl } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 
@@ -10,6 +11,10 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { OrganizationService } from '../organization.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
+import { AlertService } from 'app/core/alert/alert.service';
+
+/** Custom Dialogs */
+import { ReverseStandingInstructionDialogComponent } from 'app/shared/reverse-standing-instruction-dialog/reverse-standing-instruction-dialog.component';
 
 /**
  * View Standing Instructions History Component.
@@ -40,8 +45,12 @@ export class StandingInstructionsHistoryComponent implements OnInit {
     'executionTime',
     'amount',
     'status',
-    'errorLog'
+    'errorLog',
+    'actions'
   ];
+
+  /** Stores last search params for table refresh after reversal. */
+  private lastSearchData: any = null;
   /** Data source for instructions table. */
   dataSource: MatTableDataSource<any>;
 
@@ -65,7 +74,9 @@ export class StandingInstructionsHistoryComponent implements OnInit {
     private settingsService: SettingsService,
     private router: Router,
     private route: ActivatedRoute,
-    private dateUtils: Dates
+    private dateUtils: Dates,
+    private dialog: MatDialog,
+    private alertService: AlertService
   ) {
     this.route.data.subscribe((data: { standingInstructionsTemplate: any }) => {
       this.standingInstructionsTemplate = data.standingInstructionsTemplate;
@@ -132,8 +143,58 @@ export class StandingInstructionsHistoryComponent implements OnInit {
       dateFormat,
       locale
     };
+    this.lastSearchData = data;
     this.organizationService.getStandingInstructions(data).subscribe((response: any) => {
       this.setInstructions(response.pageItems);
+    });
+  }
+
+  /**
+   * Opens the reverse confirmation dialog for a history row.
+   * @param instruction The history row data.
+   */
+  reverseExecution(instruction: any) {
+    const dialogRef = this.dialog.open(ReverseStandingInstructionDialogComponent, {
+      width: '500px',
+      data: {
+        historyId: instruction.historyId,
+        amount: instruction.amount,
+        executionTime: instruction.executionTime
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((result: { confirmed: boolean; note: string } | undefined) => {
+      if (!result?.confirmed) {
+        return;
+      }
+      this.organizationService.reverseStandingInstructionExecution(instruction.historyId, result.note).subscribe({
+        next: () => {
+          this.alertService.alert({ type: 'Payment Reversed', message: 'Payment reversed successfully' });
+          if (this.lastSearchData) {
+            this.organizationService.getStandingInstructions(this.lastSearchData).subscribe((response: any) => {
+              this.setInstructions(response.pageItems);
+            });
+          }
+        },
+        error: (err: any) => {
+          const errorCode = err?.error?.errors?.[0]?.userMessageGlobalisationCode;
+          const defaultMessage = err?.error?.errors?.[0]?.defaultUserMessage || 'An unexpected error occurred.';
+          const errorMap: { [key: string]: string } = {
+            'error.msg.standing.instruction.execution.already.reversed': 'This payment has already been reversed.',
+            'error.msg.standing.instruction.reversal.subsequent.transactions.exist':
+              'A later payment exists on this loan. Please reverse that one first, then retry.',
+            'error.msg.standing.instruction.loan.written.off': 'Cannot reverse — the loan has been written off.',
+            'error.msg.standing.instruction.loan.foreclosed': 'Cannot reverse — the loan has been foreclosed.',
+            'error.msg.standing.instruction.transfer.not.found':
+              'The original transfer record could not be found. Contact support.',
+            'error.msg.standing.instruction.transfer.ambiguous':
+              'Multiple transfers match this record. Contact support to resolve.',
+            'error.msg.standing.instruction.reversal.note.required': 'A reason is required.'
+          };
+          const message = errorCode ? errorMap[errorCode] || defaultMessage : defaultMessage;
+          this.alertService.alert({ type: 'Reversal Failed', message });
+        }
+      });
     });
   }
 }

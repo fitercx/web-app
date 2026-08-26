@@ -20,4 +20,21 @@
       line-height: 25px;
     }
   }
+
+  .reversed-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    background-color: #f44336;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: default;
+  }
+
+  .no-history {
+    padding: 12px;
+    text-align: center;
+    color: rgb(0 0 0 / 54%);
+  }
 }
