@@ -287,6 +287,7 @@ export class MakeRepaymentComponent implements OnInit {
           feeFallback: Number(this.dataObject.repaymentTemplate?.feeChargesPortion || 0),
           taxFallback: Number(this.dataObject.repaymentTemplate?.taxChargesPortion || 0),
           isBackdated,
+          isBusinessDate: !isBackdated && !isFutureDate,
           additionalPenalty: additionalLPIAmount
         });
 

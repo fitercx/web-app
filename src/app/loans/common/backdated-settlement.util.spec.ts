@@ -213,6 +213,47 @@ describe('backdated-settlement.util', () => {
     ).toBe(0);
   });
 
+  it('prefers repayment template penalty on business date instead of inflated ledger penalty', () => {
+    const reconciled = reconcileAsOfDateAmounts({
+      isBackdated: false,
+      isBusinessDate: true,
+      penaltyTemplate: {
+        principalOutstanding: 100000,
+        remainingPrincipalOutstanding: 100000,
+        interestOutstanding: 2580.82,
+        penaltyAmountDue: 739.71
+      },
+      repaymentTemplate: {
+        amount: 103238.34,
+        principalPortion: 100000,
+        interestPortion: 2580.82,
+        penaltyChargesPortion: 657.52,
+        feeChargesPortion: 0,
+        taxChargesPortion: 0
+      },
+      loanSummary: { penaltyChargesOutstanding: 739.71, totalOutstanding: 103320.53 }
+    });
+
+    expect(reconciled.penalty).toBe(657.52);
+    expect(reconciled.defaultTransactionAmount).toBe(103238.34);
+    expect(reconciled.principal).toBe(100000);
+    expect(reconciled.interest).toBe(2580.82);
+  });
+
+  it('does not inflate LPI via ledger reconcile when penalties template matches repayment template on business date', () => {
+    expect(
+      reconcilePenaltyWithLedger({
+        penaltyFromTemplate: 657.52,
+        penaltyInSummary: 739.71,
+        fullLoanOutstanding: 103320.53,
+        dueWithoutPenaltyReconcile: 102580.82,
+        isBusinessDate: true,
+        onInstallmentDueDate: false,
+        hasRealEmiDueOnDate: false
+      })
+    ).toBe(739.71);
+  });
+
   it('prefers repayment template when backdating before a later partial repayment', () => {
     const reconciled = reconcileAsOfDateAmounts({
       isBackdated: true,

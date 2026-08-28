@@ -473,20 +473,23 @@ export class ForeclosureComponent implements OnInit {
     const tax = Number(this.loanSummary?.taxChargesOutstanding ?? this.foreclosuredata?.taxChargesPortion ?? 0);
     const templatePenalty = Number(this.penaltyTemplateData?.penaltyAmountDue || 0) + this.additionalFutureLpiAmount;
     const dueWithoutPenalty = roundAmount(principal + interest + fee + tax);
+    const onBusinessDate = isSameCalendarDate(transactionDateValue, this.settingsService.businessDate, (value) =>
+      this.toComparableDate(value)
+    );
     const penaltyPortion = roundAmount(
-      reconcilePenaltyWithLedger({
-        penaltyFromTemplate: templatePenalty,
-        penaltyInSummary: Number(this.loanSummary?.penaltyChargesOutstanding ?? this.baselinePenaltyChargesPortion),
-        fullLoanOutstanding: this.fullLoanOutstanding,
-        dueWithoutPenaltyReconcile: dueWithoutPenalty,
-        isBusinessDate: isSameCalendarDate(transactionDateValue, this.settingsService.businessDate, (value) =>
-          this.toComparableDate(value)
-        ),
-        onInstallmentDueDate: !!this.penaltyTemplateData?.onInstallmentDueDate,
-        hasRealEmiDueOnDate: isRealEmiDueOnDate(this.repaymentSchedule?.periods, transactionDateValue, (value) =>
-          this.toComparableDate(value)
-        )
-      })
+      onBusinessDate
+        ? templatePenalty
+        : reconcilePenaltyWithLedger({
+            penaltyFromTemplate: templatePenalty,
+            penaltyInSummary: Number(this.loanSummary?.penaltyChargesOutstanding ?? this.baselinePenaltyChargesPortion),
+            fullLoanOutstanding: this.fullLoanOutstanding,
+            dueWithoutPenaltyReconcile: dueWithoutPenalty,
+            isBusinessDate: onBusinessDate,
+            onInstallmentDueDate: !!this.penaltyTemplateData?.onInstallmentDueDate,
+            hasRealEmiDueOnDate: isRealEmiDueOnDate(this.repaymentSchedule?.periods, transactionDateValue, (value) =>
+              this.toComparableDate(value)
+            )
+          })
     );
     const transactionAmount = roundAmount(dueWithoutPenalty + penaltyPortion);
     this.foreclosureForm.patchValue({

@@ -13,10 +13,7 @@ import {
   computeSavingsBalanceAsOf,
   computeSettlementRequired,
   computeUnearnedInterest,
-  isRealEmiDueOnDate,
-  isSameCalendarDate,
-  reconcileAsOfDateAmounts,
-  reconcilePenaltyWithLedger
+  reconcileAsOfDateAmounts
 } from 'app/loans/common/backdated-settlement.util';
 import { SettingsService } from 'app/settings/settings.service';
 import { AlertService } from 'app/core/alert/alert.service';
@@ -387,27 +384,8 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       ),
       taxFallback: Number(this.repaymentTemplateData?.taxChargesPortion || 0),
       isBackdated,
-      additionalPenalty,
-      reconcilePenalty: (penaltyFromTemplate) =>
-        reconcilePenaltyWithLedger({
-          penaltyFromTemplate,
-          penaltyInSummary: this.penaltyInSummary,
-          fullLoanOutstanding: this.fullLoanOutstanding,
-          dueWithoutPenaltyReconcile: this.roundAmount(
-            Number(penaltyTemplate?.principalOutstanding || 0) + Number(penaltyTemplate?.interestOutstanding || 0)
-          ),
-          isBusinessDate: isSameCalendarDate(
-            this.transferForm?.value?.transactionDate,
-            this.settingsService.businessDate,
-            (value) => this.toComparableDate(value)
-          ),
-          onInstallmentDueDate: this.onInstallmentDueDate,
-          hasRealEmiDueOnDate: isRealEmiDueOnDate(
-            this.data.loan?.repaymentSchedule?.periods,
-            this.transferForm?.value?.transactionDate,
-            (value) => this.toComparableDate(value)
-          )
-        })
+      isBusinessDate: this.isSelectedDateBusinessDate(),
+      additionalPenalty
     });
 
     this.principalOutstanding = reconciled.principal;
@@ -426,6 +404,12 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     const selected = this.toComparableDate(this.transferForm?.value?.transactionDate);
     const business = this.toComparableDate(this.settingsService.businessDate);
     return !!(selected && business && selected.getTime() < business.getTime());
+  }
+
+  private isSelectedDateBusinessDate(): boolean {
+    const selected = this.toComparableDate(this.transferForm?.value?.transactionDate);
+    const business = this.toComparableDate(this.settingsService.businessDate);
+    return !!(selected && business && selected.getTime() === business.getTime());
   }
 
   /** True when entered amount covers outstanding as of the selected date (after LPI waiver). */

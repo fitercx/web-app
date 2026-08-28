@@ -154,12 +154,42 @@ export function reconcileAsOfDateAmounts(params: {
   feeFallback?: number;
   taxFallback?: number;
   isBackdated: boolean;
+  /** When true, repayment template is authoritative for LPI and default amount (excludes same-day waived LPI). */
+  isBusinessDate?: boolean;
   additionalPenalty?: number;
   reconcilePenalty?: (penaltyFromTemplate: number) => number;
 }): ReconciledAsOfDateAmounts {
   const feeFallback = Number(params.feeFallback || 0);
   const taxFallback = Number(params.taxFallback || 0);
   const additionalPenalty = Number(params.additionalPenalty || 0);
+  const repaymentAmount = roundAmount(Number(params.repaymentTemplate?.amount || 0));
+
+  if (params.isBusinessDate && repaymentAmount > 0.01) {
+    const principal = roundAmount(
+      Number(params.repaymentTemplate?.principalPortion ?? params.penaltyTemplate?.principalOutstanding ?? 0)
+    );
+    const remainingPrincipal = roundAmount(
+      Number(
+        params.penaltyTemplate?.remainingPrincipalOutstanding ?? params.loanSummary?.principalOutstanding ?? principal
+      )
+    );
+    const interest = roundAmount(
+      Number(params.repaymentTemplate?.interestPortion ?? params.penaltyTemplate?.interestOutstanding ?? 0)
+    );
+    const fee = roundAmount(Number(params.repaymentTemplate?.feeChargesPortion ?? feeFallback));
+    const tax = roundAmount(Number(params.repaymentTemplate?.taxChargesPortion ?? taxFallback));
+    const penalty = roundAmount(Number(params.repaymentTemplate?.penaltyChargesPortion ?? 0) + additionalPenalty);
+
+    return {
+      principal,
+      interest,
+      fee,
+      tax,
+      penalty,
+      remainingPrincipal,
+      defaultTransactionAmount: roundAmount(repaymentAmount)
+    };
+  }
 
   let principal = Number(params.penaltyTemplate?.principalOutstanding || 0);
   let remainingPrincipal = Number(
@@ -174,7 +204,6 @@ export function reconcileAsOfDateAmounts(params: {
     : roundAmount(penaltyFromTemplate);
 
   let defaultTransactionAmount = roundAmount(principal + interest + fee + tax + penalty);
-  const repaymentAmount = roundAmount(Number(params.repaymentTemplate?.amount || 0));
 
   if (params.isBackdated && repaymentAmount > 0.01 && defaultTransactionAmount > repaymentAmount + 0.01) {
     principal = roundAmount(Number(params.repaymentTemplate?.principalPortion ?? repaymentAmount));
