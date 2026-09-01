@@ -13,6 +13,7 @@ import { LoansAccountButtonConfiguration } from './loan-accounts-button-config';
 import { ConfirmationDialogComponent } from '../../shared/confirmation-dialog/confirmation-dialog.component';
 import { DeleteDialogComponent } from 'app/shared/delete-dialog/delete-dialog.component';
 import { LoanStatus } from '../models/loan-status.model';
+import { loanDisplayStatus } from '../common/loan-display-status.util';
 import { Currency } from 'app/shared/models/general.model';
 import { DelinquencyPausePeriod } from '../models/loan-account.model';
 import { TranslateService } from '@ngx-translate/core';
@@ -405,6 +406,10 @@ class LoansViewComponent implements OnInit {
       return 'loanStatusType.chargeoff';
     }
     return this.loanDetailsData.status.code;
+  }
+
+  loanDisplayStatus(): string {
+    return loanDisplayStatus(this.loanDetailsData);
   }
 
   /**

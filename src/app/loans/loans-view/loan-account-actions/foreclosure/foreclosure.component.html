@@ -42,12 +42,8 @@
             <span><strong>Preview only</strong> — submit disabled until you pick today or an earlier date.</span>
           </div>
 
-          <mifosx-expandable-static-hint
-            *ngIf="!dateErrorMessage && backdateLimitMessage"
-            label="Backdate &amp; future-date rules"
-          >
+          <mifosx-expandable-static-hint *ngIf="!dateErrorMessage && backdateLimitMessage" label="Backdate rules">
             <p>{{ backdateLimitMessage }}</p>
-            <p>{{ staticFutureDatePolicy }}</p>
           </mifosx-expandable-static-hint>
 
           <mifosx-settlement-overpayment-banner
@@ -59,20 +55,6 @@
             [outcomeNotice]="foreclosureOutcomeNotice"
             [showOutcomeNotice]="willBecomeOverpaid"
           ></mifosx-settlement-overpayment-banner>
-
-          <div class="manual-amount" *ngIf="showSettlementPreview && !isTemplateLoading">
-            <mat-slide-toggle formControlName="manualAmountEnabled" color="primary">
-              Enter amount manually
-            </mat-slide-toggle>
-            <mat-form-field class="manual-amount__field" *ngIf="foreclosureForm.get('manualAmountEnabled').value">
-              <mat-label>Manual foreclosure amount ({{ currencySymbol }})</mat-label>
-              <input matInput type="number" min="0" step="0.01" autocomplete="off" formControlName="manualAmount" />
-              <mat-hint>
-                Shown on the settlement card below for comparison. Foreclosure still collects the system-computed
-                amount.
-              </mat-hint>
-            </mat-form-field>
-          </div>
 
           <mifosx-settlement-summary-card
             *ngIf="showSettlementPreview"
@@ -91,12 +73,9 @@
             [closesLoan]="settlementClosesLoan"
           ></mifosx-settlement-summary-card>
 
-          <div class="emi-hints" *ngIf="showSettlementPreview && showDueEmiPills">
-            <span class="emi-pill" *ngFor="let emi of dueEmis" [ngClass]="emi.state">
-              EMI #{{ emi.period }} · {{ emi.dueDate | dateFormat }} · {{ currencySymbol }}
-              {{ emi.amount | formatNumber }}
-            </span>
-          </div>
+          <mat-checkbox formControlName="isForcedClosure" color="primary"> is forced closure </mat-checkbox>
+
+          <mat-checkbox formControlName="isRestructured" color="primary"> is restructured </mat-checkbox>
 
           <mat-form-field>
             <mat-label>{{ 'labels.inputs.Note' | translate }}</mat-label>

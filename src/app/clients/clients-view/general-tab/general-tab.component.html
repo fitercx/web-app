@@ -488,7 +488,7 @@
                       <div class="details-grid">
                         <div class="detail-item">
                           <span class="detail-label">{{ 'labels.inputs.Loan Status' | translate }}:</span>
-                          <span class="detail-value">{{ loan.status?.value || loan.status?.code || '-' }}</span>
+                          <span class="detail-value">{{ loanDisplayStatus(loan) || '-' }}</span>
                         </div>
                         <div class="detail-item">
                           <span class="detail-label">{{ 'labels.inputs.Invoice Amount' | translate }}:</span>
@@ -972,7 +972,7 @@
                 <div class="detail-item">
                   <span class="detail-label">{{ 'labels.inputs.Loan Status' | translate }}:</span>
                   <span class="detail-value">{{
-                    (element.status?.value || element.status?.code || '-') +
+                    (loanDisplayStatus(element) || '-') +
                       (element.status?.active ? (element.inArrears ? ' - Arrears' : ' - Good standing') : '')
                   }}</span>
                 </div>
@@ -1198,13 +1198,7 @@
               <div class="detail-item">
                 <span class="detail-label">{{ 'labels.inputs.Loan Status' | translate }}:</span>
                 <span class="detail-value">
-                  {{
-                    element.additionalProperties?.isRestructured
-                      ? 'Restructured'
-                      : element.additionalProperties?.isForcedClosure
-                        ? 'Force Closed'
-                        : element.status?.value || element.status?.code || '-'
-                  }}
+                  {{ loanDisplayStatus(element) || '-' }}
                 </span>
               </div>
               <div class="detail-item">
