@@ -21,13 +21,7 @@
               <h3>
                 <i
                   class="fa fa-stop"
-                  [matTooltip]="
-                    loanDetailsData.additionalProperties?.isRestructured
-                      ? ('labels.status.Restructured' | translate)
-                      : loanDetailsData.additionalProperties?.isForcedClosure
-                        ? ('labels.status.Forced Closure' | translate)
-                        : ('labels.status.' + loanDetailsData.status.value | translate)
-                  "
+                  [matTooltip]="'labels.status.' + loanDisplayStatus() | translate"
                   [ngClass]="
                     loanDetailsData.status?.active && loanDetailsData.inArrears
                       ? 'status-active-overdue'

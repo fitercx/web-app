@@ -54,9 +54,6 @@ export class ForeclosureComponent implements OnInit {
   backdateLimitMessage = '';
   /** Set when the backend rejects the currently-selected date (e.g. before the loan's last transaction date). */
   dateErrorMessage: string | null = null;
-  /** Policy text shown inside the collapsible hint (not date-specific). */
-  readonly staticFutureDatePolicy =
-    'A future date can be selected to preview amounts, but foreclosure cannot be recorded with a future date — the backend does not support it.';
   foreclosuredata: any;
   /** Linked Savings Account fields (from foreclosure template additionalAttributes) */
   linkedSavingsAccountId?: number;
@@ -71,10 +68,6 @@ export class ForeclosureComponent implements OnInit {
   isReceivableLineOfCredit?: boolean = false;
   /** True when this drawdown belongs to a line of credit (payable or receivable). */
   isLineOfCreditDrawdown = false;
-  /** Earliest unpaid installment due date — foreclosure blocked on/after this for LOC loans. */
-  earliestUnpaidDueDate: Date | null = null;
-  /** Selected date is on/past earliest unpaid due date; show repayment-style preview only. */
-  foreclosureBlockedByDueDate = false;
   currencySymbol?: string;
 
   /** Baseline interest/penalty portions (business date), captured from the initial foreclosure template. */
@@ -92,7 +85,6 @@ export class ForeclosureComponent implements OnInit {
   private loanSummary: any;
   private repaymentSchedule: any;
   fullLoanOutstanding = 0;
-  dueEmis: Array<{ period: number; dueDate: any; amount: number; state: 'overdue' | 'due' }> = [];
   isTemplateLoading = false;
   /** Projected LPI from /future-charges when a future date is selected (preview only). */
   private additionalFutureLpiAmount = 0;
@@ -127,6 +119,7 @@ export class ForeclosureComponent implements OnInit {
     this.maxDate = new Date(business.getFullYear() + 5, business.getMonth(), business.getDate());
     this.createforeclosureForm();
     this.onChanges();
+    this.setupMutualExclusion();
     // Capture linked account from initial resolver-provided template (dataObject)
     this.captureLinkedAccount(this.dataObject);
     this.currencySymbol =
@@ -140,21 +133,10 @@ export class ForeclosureComponent implements OnInit {
     // after the operator changes the date. valueChanges does not fire for the form's initial value.
     this.updateClosureTypeInfo();
     this.loadLoanContext();
-    this.dueEmis = this.getDueEmisForDate(this.foreclosureForm.get('transactionDate').value);
   }
 
   /** After schedule/LOC context loads, refresh settlement for the default transaction date. */
   private refreshSettlementForSelectedDate(): void {
-    const transactionDate = this.foreclosureForm.get('transactionDate').value;
-    const formatted = this.dateUtils.formatDate(transactionDate, this.settingsService.dateFormat);
-    const selected = this.toComparableDate(transactionDate);
-    const businessDate = this.toComparableDate(this.settingsService.businessDate);
-    const isFutureDate = !!(selected && businessDate && selected.getTime() > businessDate.getTime());
-
-    if (this.applyDueDateForeclosureBlock(transactionDate)) {
-      this.loadPenaltiesSettlementPreview(transactionDate, formatted, isFutureDate);
-      return;
-    }
     this.fetchPenaltiesForInitialDate();
   }
 
@@ -170,7 +152,6 @@ export class ForeclosureComponent implements OnInit {
         this.patchForeclosureFormFromTemplate(transactionDate);
         this.updateClosureTypeInfo();
         this.updateForeclosureOverpaymentPreview();
-        this.dueEmis = this.getDueEmisForDate(transactionDate);
       });
   }
 
@@ -184,7 +165,6 @@ export class ForeclosureComponent implements OnInit {
         this.isLineOfCreditDrawdown = !!(
           loanDetails?.lineOfCreditId || loanDetails?.additionalProperties?.lineOfCreditId
         );
-        this.earliestUnpaidDueDate = this.resolveEarliestUnpaidDueDate();
         this.applyMaturityDate(loanDetails?.timeline?.expectedMaturityDate);
         if (loanDetails?.penaltyGracePeriod != null) {
           this.penaltyGracePeriodDays = Number(loanDetails.penaltyGracePeriod);
@@ -192,48 +172,6 @@ export class ForeclosureComponent implements OnInit {
         this.fullLoanOutstanding = roundAmount(Number(this.loanSummary?.totalOutstanding || 0));
         this.refreshSettlementForSelectedDate();
       });
-  }
-
-  /** First unpaid installment due date — mirrors LocForeclosureValidator on the server. */
-  private resolveEarliestUnpaidDueDate(): Date | null {
-    const periods = this.repaymentSchedule?.periods;
-    if (!Array.isArray(periods)) {
-      return null;
-    }
-    const earliest = periods
-      .filter((period: any) => this.isRealOutstandingInstallment(period))
-      .sort((a: any, b: any) => Number(a.period) - Number(b.period))[0];
-    return earliest ? this.toComparableDate(earliest.dueDate) : null;
-  }
-
-  private isForeclosureBlockedByDueDate(selected: Date | null): boolean {
-    if (!this.isLineOfCreditDrawdown || !selected || !this.earliestUnpaidDueDate) {
-      return false;
-    }
-    return selected.getTime() >= this.earliestUnpaidDueDate.getTime();
-  }
-
-  private buildDueDateForeclosureBlockMessage(selectedDateValue: any): string {
-    const dueLabel = this.dateUtils.formatDate(this.earliestUnpaidDueDate, this.settingsService.dateFormat);
-    const selectedLabel = this.dateUtils.formatDate(selectedDateValue, this.settingsService.dateFormat);
-    return (
-      `Loan ${this.loanId} cannot be foreclosed on ${selectedLabel} because it is on or past its earliest ` +
-      `unpaid installment due date (${dueLabel}). Foreclosure is only allowed before the loan is due; record a repayment instead.`
-    );
-  }
-
-  /** Sets dateErrorMessage when LOC foreclosure is blocked on/after the earliest unpaid due date. */
-  private applyDueDateForeclosureBlock(selectedDateValue: any): boolean {
-    const blocked = this.isForeclosureBlockedByDueDate(this.toComparableDate(selectedDateValue));
-    this.foreclosureBlockedByDueDate = blocked;
-    if (blocked) {
-      this.dateErrorMessage = this.buildDueDateForeclosureBlockMessage(selectedDateValue);
-    }
-    return blocked;
-  }
-
-  private isDueDateForeclosureErrorMessage(message: string): boolean {
-    return /cannot be foreclosed on/i.test(message) && /earliest unpaid installment due date/i.test(message);
   }
 
   private applyMaturityDate(raw: any): void {
@@ -258,7 +196,7 @@ export class ForeclosureComponent implements OnInit {
   createforeclosureForm() {
     this.foreclosureForm = this.formBuilder.group({
       transactionDate: [
-        this.dataObject.date && new Date(this.dataObject.date),
+        this.parseDateField(this.dataObject?.date) || new Date(this.settingsService.businessDate),
         Validators.required
       ],
       outstandingPrincipalPortion: [{ value: this.dataObject.principalPortion || 0, disabled: true }],
@@ -267,11 +205,8 @@ export class ForeclosureComponent implements OnInit {
       outstandingPenaltyChargesPortion: [{ value: this.dataObject.penaltyChargesPortion || 0, disabled: true }],
       outstandingTaxChargesPortion: [{ value: this.dataObject.taxChargesPortion || 0, disabled: true }],
       transactionAmount: [{ value: this.dataObject.amount, disabled: true }],
-      // Optional manual-amount entry for the ops team (off by default). Kept OUT of the submit payload on purpose —
-      // submit() posts only transactionDate + note, so enabling this never changes what the backend collects; it only
-      // drives the settlement-card preview below for verification against an externally-calculated figure.
-      manualAmountEnabled: [false],
-      manualAmount: [null],
+      isForcedClosure: [false],
+      isRestructured: [false],
       note: [
         '',
         Validators.required
@@ -279,59 +214,21 @@ export class ForeclosureComponent implements OnInit {
     });
   }
 
-  /** True when the operator has toggled manual entry on and typed a positive amount. */
-  get manualAmountActive(): boolean {
-    return !!this.foreclosureForm?.get('manualAmountEnabled')?.value && this.manualAmountValue > 0;
-  }
-
-  get manualAmountValue(): number {
-    return roundAmount(Number(this.foreclosureForm?.get('manualAmount')?.value || 0));
-  }
-
-  /** Manual entered amount minus the system-computed settlement (positive = operator entered more). */
-  get manualVsComputedDelta(): number {
-    return roundAmount(this.manualAmountValue - this.dueAsOfDateTotal);
-  }
-
-  /** Headline total for the settlement card — the entered value when manual mode is active, else the computed total. */
+  /** Headline total for the settlement card — always the system-computed foreclosure quote. */
   get settlementCardTotal(): number {
-    return this.manualAmountActive ? this.manualAmountValue : this.dueAsOfDateTotal;
+    return this.dueAsOfDateTotal;
   }
 
-  /** Eyebrow shown on the card — flags a manual figure so it is never mistaken for the computed quote. */
   get settlementCardEyebrow(): string | null {
-    return this.manualAmountActive ? 'Manual amount entered' : null;
+    return null;
   }
 
-  /**
-   * Card breakdown lines. Hidden in manual mode: the computed component lines sum to the computed total, not the
-   * entered one, so showing them beside a manual headline would look inconsistent.
-   */
   get settlementCardLines(): SettlementSummaryLine[] {
-    return this.manualAmountActive ? [] : this.settlementLines;
+    return this.settlementLines;
   }
 
-  /** Footnotes for the card — in manual mode, show the computed settlement, the delta, and the collection caveat. */
   get settlementCardFootnotes(): Array<string | SettlementSummaryFootnote> {
-    if (!this.manualAmountActive) {
-      return this.summaryFootnotes;
-    }
-    const notes: Array<string | SettlementSummaryFootnote> = [
-      {
-        text: `Computed settlement: ${this.currencySymbol} ${this.formatAmount(this.dueAsOfDateTotal)}`,
-        tone: 'default'
-      }
-    ];
-    const delta = this.manualVsComputedDelta;
-    if (Math.abs(delta) > 0.01) {
-      const sign = delta > 0 ? '+' : '−';
-      notes.push({
-        text: `Difference vs computed: ${sign}${this.currencySymbol} ${this.formatAmount(Math.abs(delta))}`,
-        tone: 'negative'
-      });
-    }
-    notes.push('Manual amount is for reference/verification only — foreclosure collects the system-computed amount.');
-    return notes;
+    return this.summaryFootnotes;
   }
 
   onChanges(): void {
@@ -350,16 +247,10 @@ export class ForeclosureComponent implements OnInit {
       transactionDate: transactionDateFormatted
     };
     this.dateErrorMessage = null;
-    this.foreclosureBlockedByDueDate = false;
     this.isTemplateLoading = true;
     const selectedDate = this.toComparableDate(val);
     const businessDate = this.toComparableDate(this.settingsService.businessDate);
     const isFutureDate = !!(selectedDate && businessDate && selectedDate.getTime() > businessDate.getTime());
-
-    if (this.applyDueDateForeclosureBlock(val)) {
-      this.loadPenaltiesSettlementPreview(val, transactionDateFormatted, isFutureDate);
-      return;
-    }
 
     this.loanService
       .getForeclosureData(this.loanId, data)
@@ -392,60 +283,22 @@ export class ForeclosureComponent implements OnInit {
           this.patchForeclosureFormFromTemplate(val);
           this.updateClosureTypeInfo();
           this.updateForeclosureOverpaymentPreview();
-          this.dueEmis = this.getDueEmisForDate(val);
           this.refreshSavingsBalanceAsOfDate(val);
           this.isTemplateLoading = false;
         },
         error: (err: any) => {
-          const message =
+          this.dateErrorMessage =
             err?.error?.errors?.[0]?.defaultUserMessage ||
             err?.error?.defaultUserMessage ||
             'This foreclosure date is not allowed for this loan. Please choose a different date.';
-          this.dateErrorMessage = message;
           this.isTemplateLoading = false;
-          if (this.isDueDateForeclosureErrorMessage(message)) {
-            this.foreclosureBlockedByDueDate = true;
-            this.loadPenaltiesSettlementPreview(val, transactionDateFormatted, isFutureDate);
-          }
         }
       });
-  }
-
-  /** Settlement preview from /template/penalties when foreclosure is blocked on/after the due date. */
-  private loadPenaltiesSettlementPreview(val: any, transactionDateFormatted: string, isFutureDate: boolean): void {
-    this.isTemplateLoading = true;
-    const penaltyTemplate$ = this.loanService
-      .getLoanPenaltiesTemplate(String(this.loanId), transactionDateFormatted)
-      .pipe(catchError(() => of(null)));
-    const futureLpi$ = isFutureDate
-      ? this.loanService
-          .getFutureLPICharges(String(this.loanId), transactionDateFormatted)
-          .pipe(catchError(() => of(null)))
-      : of(null);
-
-    forkJoin({ penaltyTemplate: penaltyTemplate$, futureLpi: futureLpi$ }).subscribe({
-      next: ({ penaltyTemplate, futureLpi }: any) => {
-        this.additionalFutureLpiAmount = Number(futureLpi?.totalLPIAmount || 0);
-        this.penaltyTemplateData = penaltyTemplate;
-        this.patchDisplayFromPenaltiesTemplate(val);
-        this.updateForeclosureOverpaymentPreview();
-        this.dueEmis = this.getDueEmisForDate(val);
-        this.refreshSavingsBalanceAsOfDate(val);
-        this.isTemplateLoading = false;
-      },
-      error: () => {
-        this.isTemplateLoading = false;
-      }
-    });
   }
 
   /** Patches display-only breakdown fields from the foreclosure template (not penalties / ledger reconcile). */
   private patchForeclosureFormFromTemplate(transactionDateValue?: any): void {
     if (!this.foreclosuredata || !this.foreclosureForm) {
-      return;
-    }
-    if (this.foreclosureBlockedByDueDate) {
-      this.patchDisplayFromPenaltiesTemplate(transactionDateValue);
       return;
     }
     this.foreclosureForm.patchValue({
@@ -632,8 +485,7 @@ export class ForeclosureComponent implements OnInit {
       return;
     }
     this.minDate = parsed;
-    const formatted = this.dateUtils.formatDate(parsed, this.settingsService.dateFormat);
-    this.backdateLimitMessage = `Earliest allowed date: ${formatted}. Cannot be before the loan's last recorded transaction.`;
+    this.backdateLimitMessage = 'You cannot backdate a payment by more than 30 days in the past.';
   }
 
   get isFutureDateSelected(): boolean {
@@ -727,9 +579,6 @@ export class ForeclosureComponent implements OnInit {
 
   /** Early foreclosure vs normal closure — hidden when due-date block applies. */
   get settlementBadge(): string | null {
-    if (this.foreclosureBlockedByDueDate) {
-      return null;
-    }
     if (this.isPostMaturityGracePeriodClosure) {
       return 'Post-maturity LPI';
     }
@@ -743,9 +592,6 @@ export class ForeclosureComponent implements OnInit {
   }
 
   get settlementSubtitle(): string | null {
-    if (this.foreclosureBlockedByDueDate) {
-      return 'Foreclosure not allowed — record a repayment instead';
-    }
     if (this.isPostMaturityGracePeriodClosure) {
       const graceHint =
         this.penaltyGracePeriodDays != null ? ` (${this.penaltyGracePeriodDays}-day penalty grace after maturity)` : '';
@@ -771,7 +617,7 @@ export class ForeclosureComponent implements OnInit {
     if (this.postMaturityGracePeriodLpiClosure) {
       return true;
     }
-    if (this.foreclosureBlockedByDueDate || !this.maturityDate) {
+    if (!this.maturityDate) {
       return false;
     }
     const selected = this.toComparableDate(this.foreclosureForm?.value?.transactionDate);
@@ -828,9 +674,6 @@ export class ForeclosureComponent implements OnInit {
    * Maximum the backend can absorb on closure without moving the loan to Overpaid — same logic as Make Repayment.
    */
   get settlementCapWithoutOverpay(): number {
-    if (this.foreclosureBlockedByDueDate) {
-      return 0;
-    }
     return computeAuthoritativeSettlementCap({
       outstandingAfterWaiver: this.outstandingAfterWaiver,
       fullLoanOutstanding: this.fullLoanOutstanding,
@@ -859,7 +702,7 @@ export class ForeclosureComponent implements OnInit {
 
   private updateForeclosureOverpaymentPreview(): void {
     this.foreclosureOutcomeNotice = null;
-    if (!this.willBecomeOverpaid || this.foreclosureBlockedByDueDate) {
+    if (!this.willBecomeOverpaid) {
       return;
     }
     const excess = this.projectedOverpaymentAmount;
@@ -869,11 +712,11 @@ export class ForeclosureComponent implements OnInit {
   }
 
   get settlementClosesLoan(): boolean {
-    return !this.foreclosureBlockedByDueDate;
+    return true;
   }
 
   get showSettlementPreview(): boolean {
-    return !this.dateErrorMessage || this.foreclosureBlockedByDueDate;
+    return !this.dateErrorMessage;
   }
 
   /** Account-list reference on today, or waived-LPI context when backdating. */
@@ -900,20 +743,13 @@ export class ForeclosureComponent implements OnInit {
 
   get summaryFootnotes(): Array<string | SettlementSummaryFootnote> {
     const notes: Array<string | SettlementSummaryFootnote> = [];
-    if (this.foreclosureBlockedByDueDate) {
-      notes.push('Amounts shown are what would be due via repayment on this date, not a foreclosure quote.');
-    }
     if (this.isPostMaturityGracePeriodClosure) {
       notes.push(
         'GRACE_PERIOD_APPLIED on the schedule is post-maturity penalty grace LPI (no principal/interest due). ' +
           'All EMIs are already paid — this payment clears remaining LPI only.'
       );
     }
-    if (
-      this.unearnedInterest > 0.01 &&
-      this.closureTypeInfo?.type === 'foreclosure' &&
-      !this.foreclosureBlockedByDueDate
-    ) {
+    if (this.unearnedInterest > 0.01 && this.closureTypeInfo?.type === 'foreclosure') {
       notes.push({
         text: `Unearned interest: −${this.currencySymbol} ${this.formatAmount(this.unearnedInterest)}`,
         tone: 'negative'
@@ -923,14 +759,14 @@ export class ForeclosureComponent implements OnInit {
       notes.push('No LPI on installment due date');
     }
     const penaltyGap = roundAmount(this.scheduleOverduePenaltyOutstanding - this.penaltyAsOfDate);
-    if (penaltyGap > 0.01 && !this.foreclosureBlockedByDueDate && !this.willBecomeOverpaid) {
+    if (penaltyGap > 0.01 && !this.willBecomeOverpaid) {
       notes.push(
         `Schedule overdue LPI ${this.currencySymbol} ${this.formatAmount(this.scheduleOverduePenaltyOutstanding)} ` +
           `vs quote LPI ${this.currencySymbol} ${this.formatAmount(this.penaltyAsOfDate)} — ` +
           `paying the quoted total may overpay by ~${this.currencySymbol} ${this.formatAmount(penaltyGap)}`
       );
     }
-    if (this.willBecomeOverpaid && !this.foreclosureBlockedByDueDate) {
+    if (this.willBecomeOverpaid) {
       notes.push(
         `Quoted foreclosure total ${this.currencySymbol} ${this.formatAmount(this.dueAsOfDateTotal)} exceeds the ` +
           `schedule close cap ${this.currencySymbol} ${this.formatAmount(this.settlementCapWithoutOverpay)} by ` +
@@ -949,16 +785,6 @@ export class ForeclosureComponent implements OnInit {
     return isRealEmiDueOnDate(this.repaymentSchedule?.periods, this.foreclosureForm?.value?.transactionDate, (value) =>
       this.toComparableDate(value)
     );
-  }
-
-  get showDueEmiPills(): boolean {
-    if (this.dueEmis.length === 0) {
-      return false;
-    }
-    if (this.dueEmis.length === 1) {
-      return Math.abs(Number(this.dueEmis[0].amount || 0) - this.dueAsOfDateTotal) > 0.01;
-    }
-    return true;
   }
 
   get businessDateLabel(): string {
@@ -983,58 +809,10 @@ export class ForeclosureComponent implements OnInit {
     if (fromBaseline > 0.01) {
       return fromBaseline;
     }
-    if (
-      this.closureTypeInfo?.type === 'foreclosure' &&
-      !this.foreclosureBlockedByDueDate &&
-      this.penaltyAsOfDate <= 0.01
-    ) {
+    if (this.closureTypeInfo?.type === 'foreclosure' && this.penaltyAsOfDate <= 0.01) {
       return Math.max(this.fullOutstandingVsDueDelta, 0);
     }
     return 0;
-  }
-
-  private getDueEmisForDate(
-    transactionDateValue: Date
-  ): Array<{ period: number; dueDate: any; amount: number; state: 'overdue' | 'due' }> {
-    const periods = this.repaymentSchedule?.periods;
-    if (!Array.isArray(periods)) {
-      return [];
-    }
-
-    const selected = this.toComparableDate(transactionDateValue);
-    if (!selected) {
-      return [];
-    }
-
-    let remainingPenalty = this.penaltyAsOfDate;
-    return periods
-      .filter((period: any) => this.isRealOutstandingInstallment(period))
-      .filter((period: any) => {
-        const dueDate = this.toComparableDate(period.dueDate);
-        return dueDate && dueDate.getTime() <= selected.getTime();
-      })
-      .sort((a: any, b: any) => Number(a.period) - Number(b.period))
-      .map((period: any) => {
-        const dueDate = this.toComparableDate(period.dueDate);
-        const schedulePenalty = this.getPeriodComponentOutstanding(period, 'penalty');
-        const penalty = Math.min(schedulePenalty, remainingPenalty);
-        remainingPenalty = roundAmount(remainingPenalty - penalty);
-        const amount = roundAmount(
-          this.getPeriodComponentOutstanding(period, 'principal') +
-            this.getPeriodComponentOutstanding(period, 'interest') +
-            this.getPeriodComponentOutstanding(period, 'fee') +
-            this.getPeriodComponentOutstanding(period, 'tax') +
-            penalty
-        );
-        const state: 'overdue' | 'due' = dueDate && dueDate.getTime() < selected.getTime() ? 'overdue' : 'due';
-        return {
-          period: Number(period.period),
-          dueDate: period.dueDate,
-          amount,
-          state
-        };
-      })
-      .filter((emi) => emi.amount > 0);
   }
 
   private isRealOutstandingInstallment(period: any): boolean {
@@ -1139,12 +917,32 @@ export class ForeclosureComponent implements OnInit {
     const data = {
       transactionDate,
       note: formValue.note,
+      isForcedClosure: !!formValue.isForcedClosure,
+      isRestructured: !!formValue.isRestructured,
       dateFormat,
       locale
     };
 
     this.loanService.loanForclosureData(this.loanId, data).subscribe(() => {
       this.router.navigate([`../../general`], { relativeTo: this.route });
+    });
+  }
+
+  /** Forced closure and restructured are mutually exclusive — same as CRED-72 / CRED-108. */
+  private setupMutualExclusion(): void {
+    const forcedControl = this.foreclosureForm.get('isForcedClosure');
+    const restructuredControl = this.foreclosureForm.get('isRestructured');
+
+    forcedControl.valueChanges.subscribe((isForced) => {
+      if (isForced && restructuredControl.value) {
+        restructuredControl.setValue(false, { emitEvent: false });
+      }
+    });
+
+    restructuredControl.valueChanges.subscribe((isRestructured) => {
+      if (isRestructured && forcedControl.value) {
+        forcedControl.setValue(false, { emitEvent: false });
+      }
     });
   }
 }
