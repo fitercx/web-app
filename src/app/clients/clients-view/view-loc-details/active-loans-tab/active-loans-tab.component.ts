@@ -14,7 +14,7 @@ import {
   BulkDisburseResultsDialogData
 } from './bulk-disburse-results-dialog/bulk-disburse-results-dialog.component';
 import { BulkDisburseLoadingDialogComponent } from './bulk-disburse-loading-dialog/bulk-disburse-loading-dialog.component';
-import { TransferFromSavingsDialogComponent } from '../../general-tab/transfer-from-savings-dialog/transfer-from-savings-dialog.component';
+import { TransferFromSavingsDialogComponent } from 'app/shared/transfer-from-savings-dialog/transfer-from-savings-dialog.component';
 
 @Component({
   selector: 'mifosx-active-loans-tab',
