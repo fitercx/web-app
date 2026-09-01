@@ -80,18 +80,10 @@
         [lines]="displaySettlementLines"
         [subtitle]="displaySettlementSubtitle"
         [footnotes]="displaySettlementFootnotes"
-        [ledgerToday]="displayLedgerToday"
-        [ledgerDelta]="displayLedgerDelta"
         [businessDateLabel]="businessDateLabel"
         [loading]="isTemplateLoading"
         [closesLoan]="displaySettlementClosesLoan"
       ></mifosx-settlement-summary-card>
-
-      <div class="emi-hints" *ngIf="showDueEmiPills">
-        <span class="emi-pill" *ngFor="let emi of dueEmis" [ngClass]="emi.state">
-          EMI #{{ emi.period }} · {{ emi.dueDate | dateFormat }} · {{ currencySymbol }} {{ emi.amount | formatNumber }}
-        </span>
-      </div>
 
       <mat-form-field>
         <mat-label>{{ 'labels.inputs.Note' | translate }}</mat-label>

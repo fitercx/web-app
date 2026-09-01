@@ -88,6 +88,7 @@ import { AddInterestPauseComponent } from './loans-view/loan-account-actions/add
 import { LoansActiveClientMembersComponent } from './loans-account-stepper/loans-active-client-members/loans-active-client-members.component';
 import { LoanUndoTransactionDialogComponent } from './loans-view/custom-dialogs/loan-undo-transaction-dialog/loan-undo-transaction-dialog.component';
 import { SettlementOverpaymentBannerComponent } from './common/settlement-overpayment-banner/settlement-overpayment-banner.component';
+import { TransferFromSavingsDialogModule } from 'app/clients/clients-view/general-tab/transfer-from-savings-dialog/transfer-from-savings-dialog.module';
 
 /**
  * Loans Module
@@ -100,7 +101,8 @@ import { SettlementOverpaymentBannerComponent } from './common/settlement-overpa
     DirectivesModule,
     LoansRoutingModule,
     PipesModule,
-    TranslateModule
+    TranslateModule,
+    TransferFromSavingsDialogModule
   ],
   declarations: [
     AddLoanChargeComponent,
