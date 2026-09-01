@@ -17,6 +17,7 @@ import { Currency } from 'app/shared/models/general.model';
 import { DelinquencyPausePeriod } from '../models/loan-account.model';
 import { TranslateService } from '@ngx-translate/core';
 import { LoanTransaction } from 'app/products/loan-products/models/loan-account.model';
+import { TransferFromSavingsDialogComponent } from 'app/clients/clients-view/general-tab/transfer-from-savings-dialog/transfer-from-savings-dialog.component';
 
 @Component({
   selector: 'mifosx-loans-view',
@@ -290,6 +291,9 @@ class LoansViewComponent implements OnInit {
 
   loanAction(actionName: string) {
     switch (actionName) {
+      case 'Make Repayment':
+        this.openMakeRepaymentDialog();
+        break;
       case 'Recover From Guarantor':
         this.recoverFromGuarantor();
         break;
@@ -333,6 +337,25 @@ class LoansViewComponent implements OnInit {
         );
         break;
     }
+  }
+
+  /** Same Transfer from Savings dialog as the client General tab Make Repayment button. */
+  private openMakeRepaymentDialog(): void {
+    const dialogRef = this.dialog.open(TransferFromSavingsDialogComponent, {
+      width: '42rem',
+      maxWidth: '95vw',
+      disableClose: false,
+      data: {
+        loan: this.loanDetailsData,
+        clientId: this.clientId
+      }
+    });
+
+    dialogRef.afterClosed().subscribe((result: any) => {
+      if (result?.submitted) {
+        this.reload();
+      }
+    });
   }
 
   /**

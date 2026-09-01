@@ -306,6 +306,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
    * ever picking a date the server would reject, rather than finding out only after submitting.
    */
   private applyEarliestAllowedDate(earliestAllowedTransactionDate: any): void {
+    this.backdateLimitMessage = 'You cannot backdate a payment by more than 30 days in the past.';
     if (!earliestAllowedTransactionDate) {
       return;
     }
@@ -314,8 +315,6 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       return;
     }
     this.minDate = parsed;
-    const formatted = this.formatDate(parsed);
-    this.backdateLimitMessage = `Earliest allowed date: ${formatted}. Cannot be before the loan's last recorded transaction.`;
   }
 
   /** Linked savings from GET /loans/{id}?associations=linkedAccount — not foreclosure template (blocked when overdue). */
@@ -394,7 +393,17 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     this.feeOutstanding = reconciled.fee;
     this.taxOutstanding = reconciled.tax;
     this.penaltyOutstanding = reconciled.penalty;
-    this.suggestedTransactionAmount = this.roundAmount(reconciled.defaultTransactionAmount);
+    const penaltyDue = this.roundAmount(Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalPenalty);
+    if (!this.onInstallmentDueDate && penaltyDue > this.penaltyOutstanding + 0.01) {
+      this.penaltyOutstanding = penaltyDue;
+    }
+    this.suggestedTransactionAmount = this.roundAmount(
+      this.principalOutstanding +
+        this.interestOutstanding +
+        this.feeOutstanding +
+        this.taxOutstanding +
+        this.penaltyOutstanding
+    );
   }
 
   /** Pre-filled amount from reconciled as-of-date figures (see applyPenaltyTemplateForDate). */
@@ -527,7 +536,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
 
   private patchDefaultTransactionAmount(): void {
     this.settlementPreviewMode = 'date';
-    const suggested = this.roundAmount(this.suggestedTransactionAmount + this.additionalFutureLpiAmount);
+    const suggested = this.dueAsOfDateTotal;
     if (suggested > 0) {
       this.transferForm.patchValue({ transactionAmount: suggested }, { emitEvent: false });
       return;
@@ -558,7 +567,6 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       return [];
     }
 
-    let remainingPenalty = this.penaltyOutstanding;
     return periods
       .filter((period: any) => this.isRealOutstandingInstallment(period))
       .filter((period: any) => {
@@ -568,15 +576,11 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       .sort((a: any, b: any) => Number(a.period) - Number(b.period))
       .map((period: any) => {
         const dueDate = this.toComparableDate(period.dueDate);
-        const schedulePenalty = this.getPeriodComponentOutstanding(period, 'penalty');
-        const penalty = Math.min(schedulePenalty, remainingPenalty);
-        remainingPenalty = this.roundAmount(remainingPenalty - penalty);
         const amount = this.roundAmount(
           this.getPeriodComponentOutstanding(period, 'principal') +
             this.getPeriodComponentOutstanding(period, 'interest') +
             this.getPeriodComponentOutstanding(period, 'fee') +
-            this.getPeriodComponentOutstanding(period, 'tax') +
-            penalty
+            this.getPeriodComponentOutstanding(period, 'tax')
         );
         return {
           period: period.period,
@@ -691,7 +695,6 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       { label: 'Principal', amount: this.principalOutstanding },
       { label: 'Interest', amount: this.interestOutstanding },
       { label: 'Fees', amount: this.feeOutstanding },
-      { label: 'LPI', amount: this.penaltyOutstanding },
       { label: 'Tax', amount: this.taxOutstanding }
     ].filter((line) => line.amount > 0.01);
   }
@@ -702,27 +705,19 @@ export class TransferFromSavingsDialogComponent implements OnInit {
 
   get summaryFootnotes(): Array<string | SettlementSummaryFootnote> {
     const notes: Array<string | SettlementSummaryFootnote> = [];
-    if (this.unearnedInterest > 0.01) {
-      notes.push({
-        text: `Unearned interest: −${this.currencySymbol} ${this.formatAmount(this.unearnedInterest)}`,
-        tone: 'negative'
-      });
-    } else {
-      const interestSaved = this.roundAmount(this.baselineInterestOutstanding - this.interestOutstanding);
-      if (interestSaved > 0.01) {
-        notes.push({
-          text: `Unearned interest: −${this.currencySymbol} ${this.formatAmount(interestSaved)}`,
-          tone: 'negative'
-        });
-      }
-    }
     if (this.isFutureDateSelected && this.additionalFutureLpiAmount > 0.01) {
       notes.push(
         `+${this.currencySymbol} ${this.formatAmount(this.additionalFutureLpiAmount)} projected LPI (preview)`
       );
     }
-    if (this.outstandingAfterWaiver > this.dueAsOfDateTotal + 0.01) {
-      notes.push(`To close: ${this.currencySymbol} ${this.formatAmount(this.outstandingAfterWaiver)}`);
+    if (this.penaltyWaivedByBackdate > 0.01) {
+      notes.push(
+        `${this.currencySymbol} ${this.formatAmount(this.penaltyWaivedByBackdate)} of late-payment interest accrued after this date will be waived and is not charged.`
+      );
+    } else if (this.penaltyOutstanding > 0.01) {
+      notes.push(
+        `Late payment interest of ${this.currencySymbol} ${this.formatAmount(this.penaltyOutstanding)} is included in the amount due.`
+      );
     }
 
     return notes;
@@ -770,11 +765,11 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   }
 
   get displayLedgerToday(): number {
-    return this.isManualSettlementPreview ? 0 : this.fullLoanOutstanding;
+    return 0;
   }
 
   get displayLedgerDelta(): number {
-    return this.isManualSettlementPreview ? 0 : this.settlementLedgerDelta;
+    return 0;
   }
 
   get paymentAllocationLines(): SettlementSummaryLine[] {
@@ -819,15 +814,9 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     return this.willCloseLoan(this.enteredTransactionAmount);
   }
 
-  /** Hide EMI pills when they only repeat the settlement total. */
+  /** EMI chips removed from Make Repayment — installment due is the settlement total. */
   get showDueEmiPills(): boolean {
-    if (this.dueEmis.length === 0) {
-      return false;
-    }
-    if (this.dueEmis.length === 1) {
-      return Math.abs(Number(this.dueEmis[0].amount || 0) - this.dueAsOfDateTotal) > 0.01;
-    }
-    return true;
+    return false;
   }
 
   private get currentSettlementAllocation(): {

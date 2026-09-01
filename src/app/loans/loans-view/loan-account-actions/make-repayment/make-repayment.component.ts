@@ -291,6 +291,11 @@ export class MakeRepaymentComponent implements OnInit {
           additionalPenalty: additionalLPIAmount
         });
 
+        const penaltyDue = this.roundAmount(Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalLPIAmount);
+        if (!this.onInstallmentDueDate && penaltyDue > reconciled.penalty + 0.01) {
+          reconciled.penalty = penaltyDue;
+        }
+
         this.dataObject.penaltyTemplate.principalOutstanding = reconciled.principal;
         this.dataObject.penaltyTemplate.remainingPrincipalOutstanding = reconciled.remainingPrincipal;
         this.dataObject.penaltyTemplate.interestOutstanding = reconciled.interest;
@@ -304,8 +309,7 @@ export class MakeRepaymentComponent implements OnInit {
         this.lpiPaymentMessage = this.buildLpiPaymentMessage(reconciled.penalty, transactionDate);
         this.datedRepaymentTemplateAmount = this.roundAmount(Number(repaymentTemplate?.amount || 0));
 
-        // reconcileAsOfDateAmounts already includes additionalPenalty in defaultTransactionAmount.
-        const rawSuggested = this.roundAmount(reconciled.defaultTransactionAmount);
+        const rawSuggested = this.dueAsOfDateTotal;
         const totalAmount = this.capRepaymentAmount(rawSuggested);
         this.repaymentLoanForm.patchValue(
           {
@@ -323,6 +327,7 @@ export class MakeRepaymentComponent implements OnInit {
    * ever picking a date the server would reject, rather than finding out only after submitting.
    */
   private applyEarliestAllowedDate(earliestAllowedTransactionDate: any): void {
+    this.backdateLimitMessage = 'You cannot backdate a payment by more than 30 days in the past.';
     if (!earliestAllowedTransactionDate) {
       return;
     }
@@ -331,11 +336,6 @@ export class MakeRepaymentComponent implements OnInit {
       return;
     }
     this.minDate = parsed;
-    const formatted = this.dateUtils.formatDate(parsed, this.settingsService.dateFormat);
-    this.backdateLimitMessage =
-      `This repayment can be backdated no earlier than ${formatted} — this protects the repayment schedule ` +
-      `and balances from being distorted by very old backdated entries. A future date can be selected to ` +
-      `preview the amount due, but a repayment cannot be recorded with a future date.`;
   }
 
   /**
@@ -368,8 +368,8 @@ export class MakeRepaymentComponent implements OnInit {
       );
     } else if (penaltyDelta > 0.01) {
       messages.push(
-        `${currencyLabel} ${penaltyDelta.toFixed(2)} of accrued penalty/late-payment charges will be waived ` +
-          `by backdating this transaction to ${formattedDate}.`
+        `${currencyLabel} ${penaltyDelta.toFixed(2)} of late-payment interest accrued after ${formattedDate} ` +
+          `will be waived and is not charged.`
       );
     } else if (penaltyDelta < -0.01) {
       const selected = this.toComparableDate(this.dateUtils.parseDate(transactionDate) || transactionDate);
