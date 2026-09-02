@@ -1368,8 +1368,9 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     return this.getReversedPaidLpiForSchedule();
   }
 
+  /** Due Payment: full period due, including LPI still due (LMS-129). EMI stays installment-only. */
   getDisplayTotalDueForPeriod(item: any): number {
-    return this.subtractPenaltyComponent(item?.totalDueForPeriod, item?.penaltyChargesDue);
+    return this.toNumber(item?.totalDueForPeriod);
   }
 
   getDisplayTotalPaidForPeriod(item: any): number {
@@ -1433,10 +1434,6 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
   private getRepaymentSchedulePeriods(): any[] {
     return Array.isArray(this.repaymentScheduleDetails?.periods) ? this.repaymentScheduleDetails.periods : [];
-  }
-
-  private subtractPenaltyComponent(total: unknown, penalty: unknown): number {
-    return Math.max(this.toNumber(total) - this.toNumber(penalty), 0);
   }
 
   /** True when the overdue-interest cell should reflect a fully waived LPI amount. */

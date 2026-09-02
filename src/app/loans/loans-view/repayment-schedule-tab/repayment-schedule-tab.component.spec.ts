@@ -111,9 +111,53 @@ describe('RepaymentScheduleTabComponent', () => {
       };
 
       expect(component.getOriginalEmiAmount(period)).toBeCloseTo(87619.86, 6);
-      expect(component.getDisplayTotalDueForPeriod(period)).toBeCloseTo(87619.86, 6);
+      expect(component.getDisplayTotalDueForPeriod(period)).toBeCloseTo(88267.95, 6);
       expect(component.getDisplayTotalOutstandingForPeriod(period)).toBeCloseTo(87691.87, 6);
       expect(component.getDisplayedTotalOutstanding()).toBeCloseTo(87691.87, 6);
+    });
+
+    it('includes LPI in Due Payment and footer without changing EMI or Overdue Interest', () => {
+      const overdue: any = {
+        period: 1,
+        principalDue: 85000,
+        interestDue: 2619.86,
+        feeChargesDue: 0,
+        taxChargesDue: 0,
+        penaltyChargesDue: 648.09,
+        penaltyChargesWaived: 0,
+        totalDueForPeriod: 88267.95
+      };
+      const current: any = {
+        period: 2,
+        principalDue: 85000,
+        interestDue: 2000,
+        penaltyChargesDue: 0,
+        totalDueForPeriod: 87000
+      };
+      component.repaymentScheduleDetails = { periods: [
+          overdue,
+          current
+        ] };
+
+      expect(component.getOriginalEmiAmount(overdue)).toBeCloseTo(87619.86, 6);
+      expect(component.getDisplayTotalDueForPeriod(overdue)).toBeCloseTo(88267.95, 6);
+      expect(component.getDisplayOverdueInterestForPeriod(overdue)).toBeCloseTo(648.09, 6);
+      expect(component.getDisplayTotalDueForPeriod(current)).toBeCloseTo(87000, 6);
+      expect(component.getDisplayTotalRepaymentExpected()).toBeCloseTo(175267.95, 6);
+    });
+
+    it('does not add waived LPI into Due Payment', () => {
+      const period: any = {
+        principalDue: 1000,
+        interestDue: 50,
+        penaltyChargesDue: 0,
+        penaltyChargesWaived: 25,
+        totalDueForPeriod: 1050
+      };
+
+      expect(component.getDisplayTotalDueForPeriod(period)).toBeCloseTo(1050, 6);
+      expect(component.getDisplayOverdueInterestForPeriod(period)).toBeCloseTo(25, 6);
+      expect(component.isWaivedOverdueInterestOnly(period)).toBe(true);
     });
 
     it('matches arrears when a refunded LPI is outstanding on an overdue installment', () => {
