@@ -16,6 +16,10 @@ import { LoanTransactionType } from 'app/loans/models/loan-transaction-type.mode
 import { ForeclosureUnearnedInterestDetails } from 'app/loans/models/foreclosure-unearned-interest.model';
 import { getForeclosureUnearnedInterestDetails } from '../foreclosure-unearned-interest.utils';
 import { sortTransactionsByLatest } from 'app/core/utils/transaction-chronology';
+import {
+  displayPenaltyPortion as mapPenaltyPortion,
+  displayTaxPortion as mapTaxPortion
+} from './loan-transaction-display.util';
 
 @Component({
   selector: 'mifosx-transactions-tab',
@@ -42,7 +46,6 @@ export class TransactionsTabComponent implements OnInit {
   displayedColumns: string[] = [
     'row',
     'id',
-    'office',
     'externalId',
     'date',
     'submittedOnDate',
@@ -59,7 +62,6 @@ export class TransactionsTabComponent implements OnInit {
   displayedHeader1Columns: string[] = [
     'h1-row',
     'h1-id',
-    'h1-office',
     'h1-external-id',
     'h1-transaction-date',
     'h1-submitted-date',
@@ -247,6 +249,14 @@ export class TransactionsTabComponent implements OnInit {
 
   transactionTypeLabel(transaction: LoanTransaction): string {
     return this.isPaidLpiRefund(transaction) ? 'Refunded LPI' : transaction.type.value;
+  }
+
+  displayPenaltyPortion(transaction: LoanTransaction): number {
+    return mapPenaltyPortion(transaction);
+  }
+
+  displayTaxPortion(transaction: LoanTransaction): number {
+    return mapTaxPortion(transaction);
   }
 
   private isPaidLpiRefund(transaction: LoanTransaction): boolean {

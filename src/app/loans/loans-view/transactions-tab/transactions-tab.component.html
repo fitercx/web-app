@@ -41,17 +41,6 @@
       </td>
     </ng-container>
 
-    <ng-container matColumnDef="office">
-      <td
-        mat-cell
-        *matCellDef="let transaction"
-        [ngClass]="loanTransactionColor(transaction)"
-        (click)="showTransactions(transaction)"
-      >
-        {{ transaction.officeName }}
-      </td>
-    </ng-container>
-
     <ng-container matColumnDef="externalId">
       <td mat-cell *matCellDef="let transaction" [ngClass]="loanTransactionColor(transaction)">
         <mifosx-external-identifier externalId="{{ transaction.externalId }}"></mifosx-external-identifier>
@@ -147,7 +136,7 @@
         (click)="showTransactions(transaction)"
         [ngClass]="loanTransactionColor(transaction)"
       >
-        {{ transaction.taxChargesPortion | formatNumber }}
+        {{ displayTaxPortion(transaction) | formatNumber }}
       </td>
     </ng-container>
 
@@ -159,7 +148,7 @@
         (click)="showTransactions(transaction)"
         [ngClass]="loanTransactionColor(transaction)"
       >
-        {{ transaction.penaltyChargesPortion | formatNumber }}
+        {{ displayPenaltyPortion(transaction) | formatNumber }}
       </td>
     </ng-container>
 
@@ -261,10 +250,6 @@
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Id' | translate }}</th>
     </ng-container>
 
-    <ng-container matColumnDef="h1-office">
-      <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Office' | translate }}</th>
-    </ng-container>
-
     <ng-container matColumnDef="h1-external-id">
       <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.External Id' | translate }}</th>
     </ng-container>
@@ -301,7 +286,7 @@
 
     <!-- Sub header -->
     <ng-container matColumnDef="h2-space">
-      <th mat-header-cell *matHeaderCellDef [attr.colspan]="7"></th>
+      <th mat-header-cell *matHeaderCellDef [attr.colspan]="6"></th>
     </ng-container>
 
     <ng-container matColumnDef="h2-amount">
