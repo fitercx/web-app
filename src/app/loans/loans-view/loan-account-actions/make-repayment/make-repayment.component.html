@@ -68,30 +68,10 @@
             <span>
               Amount due as of {{ selectedTransactionDateLabel }}:
               <strong>{{ currencyLabel }} {{ dueAsOfDateTotal | formatNumber }}</strong>
-              (this installment / overdue EMIs, interest due, fees, and any LPI still due on this date).
+              (installment plus any late-payment interest still due on this date).
               <ng-container *ngIf="penaltyWaivedByBackdate > 0.01">
-                {{ currencyLabel }} {{ penaltyWaivedByBackdate | formatNumber }} of late-payment interest posted after
-                this due date (from the next calendar day) will be waived and is <strong>not</strong> included.
-              </ng-container>
-              <ng-container *ngIf="outstandingAfterWaiver > dueAsOfDateTotal + 0.01">
-                Paying only the due amount leaves the loan Active. Amount to fully repay via Make Repayment:
-                <strong>{{ currencyLabel }} {{ outstandingAfterWaiver | formatNumber }}</strong>
-                (remaining principal + interest due + fees + LPI still due).
-                <ng-container
-                  *ngIf="
-                    repaymentCapWithoutOverpay > 0.01 && repaymentCapWithoutOverpay < outstandingAfterWaiver - 0.01
-                  "
-                >
-                  Without moving the loan to Overpaid, this repayment can apply up to
-                  <strong>{{ currencyLabel }} {{ repaymentCapWithoutOverpay | formatNumber }}</strong>
-                  (from the repayment schedule — separate from Early Closure / Foreclosure).
-                </ng-container>
-              </ng-container>
-              <ng-container *ngIf="outstandingAfterWaiver <= dueAsOfDateTotal + 0.01">
-                Paying this amount via Make Repayment will fully repay the loan (status Closed).
-                <ng-container *ngIf="penaltyWaivedByBackdate > 0.01">
-                  Do not add waived LPI or the loan will become Overpaid instead.
-                </ng-container>
+                {{ currencyLabel }} {{ penaltyWaivedByBackdate | formatNumber }} of late-payment interest accrued after
+                this date will be waived and is not charged.
               </ng-container>
             </span>
           </div>
@@ -107,10 +87,6 @@
 
             <div fxFlex="50%" class="r-amount right-label">
               {{ displayedInterest | formatNumber }}
-            </div>
-
-            <div fxFlex="100%" class="unearned-interest-note" *ngIf="unearnedInterest > 0.01">
-              Unearned interest: −{{ currencyLabel }} {{ unearnedInterest | formatNumber }}
             </div>
 
             <div fxFlex="50%" class="mat-body-strong">
