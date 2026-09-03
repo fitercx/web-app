@@ -242,7 +242,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     if (installment.complete) {
       return false;
     }
-    return Number(installment.totalOutstandingForPeriod || 0) > 0;
+    return this.getDisplayTotalOutstandingForPeriod(installment) > 0.005;
   }
 
   private refreshWaivedDisplayFlags(): void {
@@ -956,6 +956,10 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     return Number.isFinite(numericValue) ? numericValue : 0;
   }
 
+  private roundScheduleAmount(value: number): number {
+    return Math.round(this.toNumber(value) * 100) / 100;
+  }
+
   private toPercentage(value: any): number {
     const numericValue = this.toNumber(value);
     return Math.abs(numericValue) > 1 ? numericValue / 100 : numericValue;
@@ -1368,9 +1372,21 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     return this.getReversedPaidLpiForSchedule();
   }
 
-  /** Due Payment: full period due, including LPI still due (LMS-129). EMI stays installment-only. */
+  /**
+   * Due Payment = Principal + Interest + Fees + Taxes + Overdue Interest (charged LPI) − Waived.
+   * EMI stays P+I only. Waived LPI that was never charged (grace row) is not subtracted from the EMI.
+   */
   getDisplayTotalDueForPeriod(item: any): number {
-    return this.toNumber(item?.totalDueForPeriod);
+    const principal = this.toNumber(item?.principalDue);
+    const interest = this.getDisplayInterestForPeriod(item);
+    const fees = this.getDisplayFeeForPeriod(item);
+    const taxes = this.getDisplayTaxForPeriod(item);
+    const overdueInterest = this.toNumber(item?.penaltyChargesDue);
+    const charged = this.roundScheduleAmount(principal + interest + fees + taxes + overdueInterest);
+    const waived = this.toNumber(item?.totalWaivedForPeriod);
+    const unchargedWaivedLpi = Math.max(this.toNumber(item?.penaltyChargesWaived) - overdueInterest, 0);
+    const waivedAgainstCharged = Math.max(waived - unchargedWaivedLpi, 0);
+    return this.roundScheduleAmount(Math.max(charged - waivedAgainstCharged, 0));
   }
 
   getDisplayTotalPaidForPeriod(item: any): number {
@@ -1385,8 +1401,14 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     return Math.min(this.toNumber(item?.totalPaidLateForPeriod), this.getDisplayTotalPaidForPeriod(item));
   }
 
+  /** Outstanding Amount = Due Payment − Amount Paid (not backend totalOutstandingForPeriod). */
   getDisplayTotalOutstandingForPeriod(item: any): number {
-    return this.toNumber(item?.totalOutstandingForPeriod);
+    const due = this.getDisplayTotalDueForPeriod(item);
+    const paid =
+      this.isForeclosureClosureActual(item) && this.showForeclosureAmountPaidOverlay(item)
+        ? this.toNumber(item?.foreclosureDisplay?.actualAmountPaid)
+        : this.getDisplayTotalPaidForPeriod(item);
+    return this.roundScheduleAmount(Math.max(due - paid, 0));
   }
 
   getDisplayTotalPenaltyChargesCharged(): number {
@@ -1800,7 +1822,15 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       return null;
     }
 
-    // Regular case: show positive outstanding only
+    // Regular case: sum of Due − Paid on each period so the footer matches the identity.
+    const periods = this.getRepaymentSchedulePeriods();
+    if (periods.length) {
+      const total = periods.reduce(
+        (sum: number, period: any) => sum + this.getDisplayTotalOutstandingForPeriod(period),
+        0
+      );
+      return total > 0.005 ? this.roundScheduleAmount(total) : null;
+    }
     return outstanding > 0 ? outstanding : null;
   }
 

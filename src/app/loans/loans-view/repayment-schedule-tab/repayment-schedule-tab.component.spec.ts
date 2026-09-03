@@ -34,7 +34,7 @@ describe('RepaymentScheduleTabComponent', () => {
     });
 
     it('returns true when outstanding positive and not complete', () => {
-      const period: any = { complete: false, totalOutstandingForPeriod: 50 };
+      const period: any = { complete: false, principalDue: 50, totalPaidForPeriod: 0 };
       expect(component.shouldShowOutstanding(period)).toBe(true);
     });
   });
@@ -65,7 +65,8 @@ describe('RepaymentScheduleTabComponent', () => {
     it('marks past-due rows red when outstanding remains', () => {
       const period: any = {
         complete: false,
-        totalOutstandingForPeriod: 5177.97,
+        principalDue: 5177.97,
+        totalPaidForPeriod: 0,
         fromDate: [
           2026,
           6,
@@ -103,6 +104,7 @@ describe('RepaymentScheduleTabComponent', () => {
         penaltyChargesDue: 648.09,
         penaltyChargesOutstanding: 72.01,
         totalDueForPeriod: 88267.95,
+        totalPaidForPeriod: 576.08,
         totalOutstandingForPeriod: 87691.87
       };
       component.repaymentScheduleDetails = {
@@ -152,6 +154,7 @@ describe('RepaymentScheduleTabComponent', () => {
         interestDue: 50,
         penaltyChargesDue: 0,
         penaltyChargesWaived: 25,
+        totalWaivedForPeriod: 25,
         totalDueForPeriod: 1050
       };
 
@@ -160,12 +163,48 @@ describe('RepaymentScheduleTabComponent', () => {
       expect(component.isWaivedOverdueInterestOnly(period)).toBe(true);
     });
 
+    it('after paying EMI plus LPI, Due includes LPI and Outstanding is zero', () => {
+      const period: any = {
+        principalDue: 15000,
+        interestDue: 688.22,
+        feeChargesDue: 0,
+        taxChargesDue: 0,
+        penaltyChargesDue: 99.27,
+        penaltyChargesWaived: 0,
+        totalWaivedForPeriod: 0,
+        totalPaidForPeriod: 15787.49,
+        totalOutstandingForPeriod: 99.27
+      };
+
+      expect(component.getOriginalEmiAmount(period)).toBeCloseTo(15688.22, 6);
+      expect(component.getDisplayTotalDueForPeriod(period)).toBeCloseTo(15787.49, 6);
+      expect(component.getDisplayTotalOutstandingForPeriod(period)).toBeCloseTo(0, 6);
+    });
+
+    it('subtracts waived charged amounts from Due Payment', () => {
+      const period: any = {
+        principalDue: 15000,
+        interestDue: 688.22,
+        penaltyChargesDue: 99.27,
+        penaltyChargesWaived: 99.27,
+        totalWaivedForPeriod: 99.27,
+        totalPaidForPeriod: 0
+      };
+
+      expect(component.getDisplayTotalDueForPeriod(period)).toBeCloseTo(15688.22, 6);
+      expect(component.getDisplayTotalOutstandingForPeriod(period)).toBeCloseTo(15688.22, 6);
+    });
+
     it('matches arrears when a refunded LPI is outstanding on an overdue installment', () => {
       const period: any = {
+        principalDue: 11930.56,
+        penaltyChargesDue: 8.97,
+        totalPaidForPeriod: 0,
         penaltyChargesOutstanding: 8.97,
         totalOutstandingForPeriod: 11939.53
       };
 
+      expect(component.getDisplayTotalDueForPeriod(period)).toBeCloseTo(11939.53, 6);
       expect(component.getDisplayTotalOutstandingForPeriod(period)).toBeCloseTo(11939.53, 6);
     });
   });
