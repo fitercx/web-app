@@ -27,7 +27,7 @@ import {
   BulkDisburseResultsDialogData
 } from '../view-loc-details/active-loans-tab/bulk-disburse-results-dialog/bulk-disburse-results-dialog.component';
 import { BulkDisburseLoadingDialogComponent } from '../view-loc-details/active-loans-tab/bulk-disburse-loading-dialog/bulk-disburse-loading-dialog.component';
-import { TransferFromSavingsDialogComponent } from './transfer-from-savings-dialog/transfer-from-savings-dialog.component';
+import { TransferFromSavingsDialogComponent } from 'app/shared/transfer-from-savings-dialog/transfer-from-savings-dialog.component';
 import { loanDisplayStatus } from 'app/loans/common/loan-display-status.util';
 
 /**

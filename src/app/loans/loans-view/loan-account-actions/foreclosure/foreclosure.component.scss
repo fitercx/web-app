@@ -81,21 +81,6 @@
   }
 }
 
-.future-preview-note {
-  border-left-color: #7c3aed;
-  background: rgb(124 58 237 / 8%);
-  font-weight: 500;
-
-  mat-icon {
-    color: #7c3aed;
-  }
-
-  &--compact {
-    font-size: 0.78rem;
-    padding: 0.45rem 0.65rem;
-  }
-}
-
 .full-outstanding-reference {
   border-left-color: #475569;
   background: rgb(71 85 105 / 8%);

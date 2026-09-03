@@ -37,11 +37,6 @@
             <span>{{ dateErrorMessage }}</span>
           </div>
 
-          <div class="date-impact-banner future-preview-note future-preview-note--compact" *ngIf="isFutureDateSelected">
-            <mat-icon>visibility</mat-icon>
-            <span><strong>Preview only</strong> — submit disabled until you pick today or an earlier date.</span>
-          </div>
-
           <mifosx-expandable-static-hint *ngIf="!dateErrorMessage && backdateLimitMessage" label="Backdate rules">
             <p>{{ backdateLimitMessage }}</p>
           </mifosx-expandable-static-hint>
@@ -66,9 +61,6 @@
             [badge]="settlementBadge"
             [subtitle]="settlementSubtitle"
             [footnotes]="settlementCardFootnotes"
-            [ledgerToday]="settlementLedgerToday"
-            [ledgerDelta]="settlementLedgerDelta"
-            [businessDateLabel]="businessDateLabel"
             [loading]="isTemplateLoading"
             [closesLoan]="settlementClosesLoan"
           ></mifosx-settlement-summary-card>
