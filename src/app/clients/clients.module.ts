@@ -68,7 +68,7 @@ import { BulkDisburseDialogComponent } from './clients-view/view-loc-details/act
 import { BulkDisburseResultsDialogComponent } from './clients-view/view-loc-details/active-loans-tab/bulk-disburse-results-dialog/bulk-disburse-results-dialog.component';
 import { BulkDisburseLoadingDialogComponent } from './clients-view/view-loc-details/active-loans-tab/bulk-disburse-loading-dialog/bulk-disburse-loading-dialog.component';
 import { EditBlockedAmountDialogComponent } from './clients-view/view-loc-details/edit-blocked-amount-dialog/edit-blocked-amount-dialog.component';
-import { TransferFromSavingsDialogModule } from './clients-view/general-tab/transfer-from-savings-dialog/transfer-from-savings-dialog.module';
+import { TransferFromSavingsDialogModule } from 'app/shared/transfer-from-savings-dialog/transfer-from-savings-dialog.module';
 
 /**
  * Clients Module
