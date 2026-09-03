@@ -18,7 +18,7 @@ import { Currency } from 'app/shared/models/general.model';
 import { DelinquencyPausePeriod } from '../models/loan-account.model';
 import { TranslateService } from '@ngx-translate/core';
 import { LoanTransaction } from 'app/products/loan-products/models/loan-account.model';
-import { TransferFromSavingsDialogComponent } from 'app/clients/clients-view/general-tab/transfer-from-savings-dialog/transfer-from-savings-dialog.component';
+import { TransferFromSavingsDialogComponent } from 'app/shared/transfer-from-savings-dialog/transfer-from-savings-dialog.component';
 
 @Component({
   selector: 'mifosx-loans-view',

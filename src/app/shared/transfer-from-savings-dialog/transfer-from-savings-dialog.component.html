@@ -56,23 +56,9 @@
         <mat-error *ngIf="amountErrorMessage">{{ amountErrorMessage }}</mat-error>
       </mat-form-field>
 
-      <div class="settlement-mode" *ngIf="!backdateBlockedMessage && canUseManualPreview">
-        <mat-slide-toggle
-          [checked]="isManualSettlementPreview"
-          (change)="onManualPreviewToggle($event.checked)"
-          color="primary"
-        >
-          Preview entered amount allocation
-        </mat-slide-toggle>
-        <span class="settlement-mode__hint" *ngIf="!isManualSettlementPreview">
-          Showing settlement as of {{ selectedTransactionDateLabel }} ({{ currencySymbol }}
-          {{ dueAsOfDateTotal | formatNumber }})
-        </span>
-      </div>
-
       <mifosx-settlement-summary-card
         *ngIf="!backdateBlockedMessage"
-        [class.settlement-summary--manual]="isManualSettlementPreview"
+        [class.settlement-summary--manual]="isEnteredAmountPreview"
         [currencySymbol]="currencySymbol"
         [eyebrow]="displaySettlementEyebrow"
         [dateLabel]="selectedTransactionDateLabel"
@@ -80,10 +66,24 @@
         [lines]="displaySettlementLines"
         [subtitle]="displaySettlementSubtitle"
         [footnotes]="displaySettlementFootnotes"
-        [businessDateLabel]="businessDateLabel"
         [loading]="isTemplateLoading"
         [closesLoan]="displaySettlementClosesLoan"
       ></mifosx-settlement-summary-card>
+
+      <div class="emi-hints" *ngIf="showDueEmiPills">
+        <div class="emi-hints__caption">Outstanding EMI</div>
+        <div class="emi-hints__pills">
+          <span
+            class="emi-pill"
+            *ngFor="let emi of displayEmis"
+            [ngClass]="[emi.state, emi.coverage]"
+            [attr.title]="emiCoverageLabel(emi.coverage)"
+          >
+            EMI #{{ emi.period }} · {{ emi.dueDate | dateFormat }} · {{ currencySymbol }}
+            {{ emi.amount | formatNumber }}
+          </span>
+        </div>
+      </div>
 
       <mat-form-field>
         <mat-label>{{ 'labels.inputs.Note' | translate }}</mat-label>
