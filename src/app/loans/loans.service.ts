@@ -97,7 +97,9 @@ export class LoansService {
         'transactionDate',
         this.dateUtils.formatDate(this.settingsService.businessDate, this.settingsService.dateFormat)
       );
-    return this.http.get(`/loans/${loanId}/transactions/template`, { params: httpParams });
+    // skipErrorHandler: overdue LOC loans reject today's date; the resolver/form handle that inline
+    // so the Foreclosure screen can still open for a backdated date.
+    return this.http.skipErrorHandler().get(`/loans/${loanId}/transactions/template`, { params: httpParams });
   }
 
   getLoanAccountResource(loanId: string, associations: string): Observable<any> {
@@ -417,7 +419,7 @@ export class LoansService {
       .set('dateFormat', foreclosuredata.dateFormat)
       .set('locale', foreclosuredata.locale)
       .set('transactionDate', foreclosuredata.transactionDate);
-    return this.http.get(`/loans/${loanId}/transactions/template`, { params: httpParams });
+    return this.http.skipErrorHandler().get(`/loans/${loanId}/transactions/template`, { params: httpParams });
   }
 
   /**
