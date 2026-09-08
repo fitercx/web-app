@@ -69,9 +69,9 @@
               Amount due as of {{ selectedTransactionDateLabel }}:
               <strong>{{ currencyLabel }} {{ dueAsOfDateTotal | formatNumber }}</strong>
               (installment plus any late-payment interest still due on this date).
-              <ng-container *ngIf="penaltyWaivedByBackdate > 0.01">
+              <ng-container *ngIf="penaltyWaivedByBackdate > 0.01 && selectedTransactionDateShortLabel">
                 {{ currencyLabel }} {{ penaltyWaivedByBackdate | formatNumber }} of late-payment interest accrued after
-                this date will be waived and is not charged.
+                {{ selectedTransactionDateShortLabel }} will be waived and is not charged.
               </ng-container>
             </span>
           </div>
@@ -89,20 +89,18 @@
               {{ displayedInterest | formatNumber }}
             </div>
 
+            <div fxFlex="50%" class="mat-body-strong">LPI</div>
+
+            <div fxFlex="50%" class="r-amount right-label">
+              {{ displayedPenalty | formatNumber }}
+            </div>
+
             <div fxFlex="50%" class="mat-body-strong">
               {{ 'Fees' | translate }}
             </div>
 
             <div fxFlex="50%" class="r-amount right-label">
               {{ displayedFee | formatNumber }}
-            </div>
-
-            <div fxFlex="50%" class="mat-body-strong">
-              {{ 'Penalties' | translate }}
-            </div>
-
-            <div fxFlex="50%" class="r-amount right-label">
-              {{ displayedPenalty | formatNumber }}
             </div>
 
             <div fxFlex="50%" class="mat-body-strong">
@@ -114,11 +112,6 @@
             </div>
           </div>
 
-          <div class="date-impact-banner lpi-payment-note" *ngIf="lpiPaymentMessage">
-            <mat-icon>payments</mat-icon>
-            <span>{{ lpiPaymentMessage }}</span>
-          </div>
-
           <mifosx-input-amount
             [currency]="currency"
             [isRequired]="true"
@@ -126,6 +119,9 @@
             [inputLabel]="'Transaction Amount'"
           >
           </mifosx-input-amount>
+          <p class="amount-cap-hint" *ngIf="enteredAmountExceedsCap">
+            Maximum {{ currencyLabel }} {{ repaymentCapWithoutOverpay | formatNumber }} — overpayment is not allowed
+          </p>
 
           <div class="date-impact-banner lpi-payment-note" *ngIf="settlementPreviewMessage">
             <mat-icon>payments</mat-icon>
@@ -138,20 +134,6 @@
           >
             <mat-icon>payments</mat-icon>
             <span>{{ repaymentOutcomeNotice }}</span>
-          </div>
-
-          <mifosx-settlement-overpayment-banner
-            context="make-repayment"
-            [currencyLabel]="currencyLabel"
-            [settlementCapWithoutOverpay]="repaymentCapWithoutOverpay"
-            [projectedOverpaymentAmount]="projectedOverpaymentAmount"
-            [outcomeNotice]="repaymentOutcomeNotice"
-            [showOutcomeNotice]="willBecomeOverpaid && willFullyRepayLoan(repaymentLoanForm.value.transactionAmount)"
-          ></mifosx-settlement-overpayment-banner>
-
-          <div class="date-impact-banner overpayment-warning" *ngIf="overpaymentWarning && !willBecomeOverpaid">
-            <mat-icon>warning</mat-icon>
-            <span>{{ overpaymentWarning }}</span>
           </div>
 
           <mat-form-field>
@@ -218,7 +200,7 @@
           <button
             mat-raised-button
             color="primary"
-            [disabled]="!repaymentLoanForm.valid || isFutureDateSelected"
+            [disabled]="!repaymentLoanForm.valid || isFutureDateSelected || enteredAmountExceedsCap"
             *mifosxHasPermission="'REPAYMENT_LOAN'"
           >
             {{ 'labels.buttons.Submit' | translate }}

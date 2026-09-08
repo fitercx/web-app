@@ -24,13 +24,6 @@
       {{ footnoteText(note) }}
     </li>
   </ul>
-
-  <div class="settlement-summary__ledger" *ngIf="showLedgerFootnote">
-    Account list · {{ businessDateLabel }}: {{ currencySymbol }} {{ ledgerToday | formatNumber }}
-    <ng-container *ngIf="ledgerDelta > 0.01">
-      (+{{ currencySymbol }} {{ ledgerDelta | formatNumber }} LPI excluded)
-    </ng-container>
-  </div>
 </section>
 
 <div class="settlement-summary settlement-summary--loading" *ngIf="loading">Loading settlement…</div>

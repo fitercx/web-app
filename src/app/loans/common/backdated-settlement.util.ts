@@ -41,6 +41,20 @@ export function computePenaltyWaivedByBackdate(penaltyInSummary: number, penalty
   return Math.max(roundAmount(Number(penaltyInSummary || 0) - Number(penaltyAsOfDate || 0)), 0);
 }
 
+/** Foreclosure copy when LPI accrued after the selected date is waived. Date is already formatted (e.g. 25-Aug). */
+export function formatWaivedLpiMessage(currencySymbol: string, amountLabel: string, fromDateLabel: string): string {
+  return `Waived LPI amount of ${currencySymbol} ${amountLabel} from ${fromDateLabel} till today`;
+}
+
+/** Make Repayment copy when LPI accrued after the selected date is waived. Date is already formatted (e.g. 18-Aug). */
+export function formatLpiWaivedAfterDateMessage(
+  currencySymbol: string,
+  amountLabel: string,
+  selectedDateLabel: string
+): string {
+  return `${currencySymbol} ${amountLabel} of late-payment interest accrued after ${selectedDateLabel} will be waived and is not charged.`;
+}
+
 /**
  * Interest on the loan ledger (full EMI period) minus pro-rated interest due as of the selected date.
  * Positive when paying before the installment due date — shown as unearned / waived interest.
@@ -146,6 +160,10 @@ export interface ReconciledAsOfDateAmounts extends SettlementComponents {
  * historical due (pre-payment) while Fineract's repayment template still reflects what can be paid
  * now. Prefer the repayment template in that case so default amount, settlement card, and EMI pills
  * stay aligned with loan summary outstanding.
+ *
+ * Interest on any date (including today) comes from /template/penalties (`interestOutstanding`), which
+ * is pro-rated to the selected date. The repayment template `interestPortion` is remaining contractual
+ * interest and must not be used for the Interest line.
  */
 export function reconcileAsOfDateAmounts(params: {
   penaltyTemplate: any;
@@ -158,6 +176,8 @@ export function reconcileAsOfDateAmounts(params: {
   isBusinessDate?: boolean;
   additionalPenalty?: number;
   reconcilePenalty?: (penaltyFromTemplate: number) => number;
+  /** Unpaid LPI-only schedule rows (additional / dummy grace) — include when paying today. */
+  lpiOnlyScheduleOutstanding?: number;
 }): ReconciledAsOfDateAmounts {
   const feeFallback = Number(params.feeFallback || 0);
   const taxFallback = Number(params.taxFallback || 0);
@@ -173,12 +193,18 @@ export function reconcileAsOfDateAmounts(params: {
         params.penaltyTemplate?.remainingPrincipalOutstanding ?? params.loanSummary?.principalOutstanding ?? principal
       )
     );
+    const asOfDateInterest = params.penaltyTemplate?.interestOutstanding;
     const interest = roundAmount(
-      Number(params.repaymentTemplate?.interestPortion ?? params.penaltyTemplate?.interestOutstanding ?? 0)
+      asOfDateInterest != null && asOfDateInterest !== ''
+        ? Number(asOfDateInterest)
+        : Number(params.repaymentTemplate?.interestPortion ?? 0)
     );
     const fee = roundAmount(Number(params.repaymentTemplate?.feeChargesPortion ?? feeFallback));
     const tax = roundAmount(Number(params.repaymentTemplate?.taxChargesPortion ?? taxFallback));
-    const penalty = roundAmount(Number(params.repaymentTemplate?.penaltyChargesPortion ?? 0) + additionalPenalty);
+    const penalty = includeLpiOnlyScheduleOutstanding(
+      roundAmount(Number(params.repaymentTemplate?.penaltyChargesPortion ?? 0) + additionalPenalty),
+      params.lpiOnlyScheduleOutstanding
+    );
 
     return {
       principal,
@@ -187,7 +213,7 @@ export function reconcileAsOfDateAmounts(params: {
       tax,
       penalty,
       remainingPrincipal,
-      defaultTransactionAmount: roundAmount(repaymentAmount)
+      defaultTransactionAmount: roundAmount(principal + interest + fee + tax + penalty)
     };
   }
 
@@ -293,6 +319,7 @@ export interface SchedulePeriod {
   interestOriginalDue?: number;
   penaltyChargesDue?: number;
   penaltyChargesPaid?: number;
+  penaltyChargesOutstanding?: number;
   feeChargesDue?: number;
   feeChargesPaid?: number;
 }
@@ -307,8 +334,42 @@ function isRealScheduleInstallment(period: SchedulePeriod): boolean {
   return Number(period.period || 0) > 0 && scheduledPI > 0.01;
 }
 
+/** Unpaid additional / dummy-grace rows (zero scheduled P+I) — LPI accrued after the last real EMI due date. */
+export function computeLpiOnlyPeriodOutstanding(periods: SchedulePeriod[] | undefined): number {
+  if (!Array.isArray(periods) || !periods.length) {
+    return 0;
+  }
+  return roundAmount(
+    periods
+      .filter((period) => period && !period.complete && !period.downPaymentPeriod && !isRealScheduleInstallment(period))
+      .filter((period) => {
+        if (period.isAdditional) {
+          return true;
+        }
+        const scheduledPI =
+          Number(period.principalOriginalDue ?? period.principalDue ?? 0) +
+          Number(period.interestOriginalDue ?? period.interestDue ?? 0);
+        return Number(period.period || 0) > 0 && scheduledPI <= 0.01;
+      })
+      .reduce((sum, period) => sum + periodOutstandingOnSchedule(period), 0)
+  );
+}
+
+function includeLpiOnlyScheduleOutstanding(penalty: number, lpiOnlyScheduleOutstanding?: number): number {
+  const extra = roundAmount(Number(lpiOnlyScheduleOutstanding || 0));
+  const current = roundAmount(penalty);
+  if (extra <= 0.01) {
+    return current;
+  }
+  // Template already has post-due LPI (current is extra, or installment + extra).
+  if (current + 0.01 >= extra) {
+    return current;
+  }
+  return roundAmount(current + extra);
+}
+
 function periodOutstandingOnSchedule(period: SchedulePeriod): number {
-  const fromOutstanding = Number(period.totalOutstandingForPeriod ?? 0);
+  const fromOutstanding = Number(period.totalOutstandingForPeriod ?? period.penaltyChargesOutstanding ?? 0);
   if (fromOutstanding > 0.01) {
     return roundAmount(fromOutstanding);
   }
@@ -342,13 +403,55 @@ export function computeScheduleCloseCap(periods: SchedulePeriod[] | undefined): 
     return 0;
   }
   const unpaidReal = periods.filter((period) => isRealScheduleInstallment(period) && !period.complete);
-  if (!unpaidReal.length) {
-    return 0;
-  }
-  return roundAmount(unpaidReal.reduce((sum, period) => sum + periodOutstandingOnSchedule(period), 0));
+  const realTotal = unpaidReal.reduce((sum, period) => sum + periodOutstandingOnSchedule(period), 0);
+  const total = roundAmount(realTotal + computeLpiOnlyPeriodOutstanding(periods));
+  return total > 0.01 ? total : 0;
 }
 
-/** Lowest positive close cap across UI figures — used to detect Overpaid before submit. */
+/** Fineract LocForeclosureValidator — foreclosure date must be strictly before this unpaid due date. */
+export const LOC_FORECLOSURE_DUE_OR_OVERDUE_ERROR_CODE = 'error.msg.loan.foreclosure.not.allowed.on.or.after.due.date';
+
+/**
+ * Last calendar date LocForeclosureValidator will accept: day before the earliest unpaid real EMI,
+ * clamped to the 30-day backdate window. Null when that date is outside min/max (cannot backdate).
+ */
+export function lastAllowedLocForeclosureDate(
+  periods: SchedulePeriod[] | undefined,
+  toComparableDate: (value: any) => Date | null,
+  minDate: Date | null,
+  maxDate: Date | null
+): Date | null {
+  if (!Array.isArray(periods) || !periods.length) {
+    return null;
+  }
+  let earliestUnpaid: Date | null = null;
+  for (const period of periods) {
+    if (!isRealScheduleInstallment(period) || period.complete || periodOutstandingOnSchedule(period) <= 0.01) {
+      continue;
+    }
+    const due = toComparableDate(period.dueDate);
+    if (!due) {
+      continue;
+    }
+    if (!earliestUnpaid || due.getTime() < earliestUnpaid.getTime()) {
+      earliestUnpaid = due;
+    }
+  }
+  if (!earliestUnpaid) {
+    return null;
+  }
+  const lastAllowed = new Date(earliestUnpaid.getFullYear(), earliestUnpaid.getMonth(), earliestUnpaid.getDate() - 1);
+  if (minDate && lastAllowed.getTime() < minDate.getTime()) {
+    return null;
+  }
+  if (maxDate && lastAllowed.getTime() > maxDate.getTime()) {
+    return null;
+  }
+  return lastAllowed;
+}
+
+/** Lowest positive close cap across UI figures — used to detect Overpaid before submit.
+ *  {@code datedRepaymentTemplateAmount} is a full-close quote (foreclosure), never current-EMI due. */
 export function computeAuthoritativeSettlementCap(caps: {
   outstandingAfterWaiver: number;
   fullLoanOutstanding: number;
@@ -473,4 +576,42 @@ export function computeSavingsBalanceAsOf(
     return 0;
   }
   return roundAmount(eligible[eligible.length - 1].runningBalance);
+}
+
+export type EmiAmountCoverage = 'covered' | 'partial' | 'uncovered';
+
+/**
+ * Walks remaining EMIs in period order and marks which ones the entered amount covers.
+ * Closing the loan marks every remaining EMI covered — remaining principal + as-of interest
+ * is not the same as the sum of future scheduled EMI amounts.
+ *
+ * Chip amounts are scheduled P+I (plus fee/tax), not LPI. Penalty is allocated first in the
+ * repayment waterfall, so {@code penaltyAllocated} is consumed before walking EMI amounts —
+ * otherwise overdue LPI looks like a partial payment on the next EMI.
+ */
+export function applyEmiAmountCoverage<T extends { amount: number }>(
+  emis: T[],
+  amount: number,
+  closesLoan: boolean,
+  penaltyAllocated = 0
+): Array<T & { coverage: EmiAmountCoverage }> {
+  if (!Array.isArray(emis) || !emis.length) {
+    return [];
+  }
+  if (closesLoan) {
+    return emis.map((emi) => ({ ...emi, coverage: 'covered' as const }));
+  }
+  let remaining = Math.max(roundAmount((Number(amount) || 0) - (Number(penaltyAllocated) || 0)), 0);
+  return emis.map((emi) => {
+    const emiAmount = Number(emi.amount) || 0;
+    if (remaining >= emiAmount - 0.01) {
+      remaining = Math.max(roundAmount(remaining - emiAmount), 0);
+      return { ...emi, coverage: 'covered' as const };
+    }
+    if (remaining > 0.01) {
+      remaining = 0;
+      return { ...emi, coverage: 'partial' as const };
+    }
+    return { ...emi, coverage: 'uncovered' as const };
+  });
 }

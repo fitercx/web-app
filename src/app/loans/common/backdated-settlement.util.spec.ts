@@ -2,14 +2,19 @@ import {
   allocateSettlement,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
+  formatWaivedLpiMessage,
+  formatLpiWaivedAfterDateMessage,
   computeProjectedOverpayment,
   computeSavingsBalanceAsOf,
   computeScheduleCloseCap,
+  computeLpiOnlyPeriodOutstanding,
   computeSettlementRequired,
   computeUnearnedInterest,
   isDummyGraceInstallmentDueOnDate,
+  lastAllowedLocForeclosureDate,
   reconcileAsOfDateAmounts,
-  reconcilePenaltyWithLedger
+  reconcilePenaltyWithLedger,
+  applyEmiAmountCoverage
 } from './backdated-settlement.util';
 
 describe('backdated-settlement.util', () => {
@@ -50,6 +55,18 @@ describe('backdated-settlement.util', () => {
       })
     ).toBe(81984.11);
     expect(computePenaltyWaivedByBackdate(197.89, 0)).toBe(197.89);
+  });
+
+  it('formats waived LPI copy with dynamic amount and from-date', () => {
+    expect(formatWaivedLpiMessage('AED', '213.970', '25-Aug')).toBe(
+      'Waived LPI amount of AED 213.970 from 25-Aug till today'
+    );
+  });
+
+  it('formats Make Repayment waived LPI copy with the selected date', () => {
+    expect(formatLpiWaivedAfterDateMessage('AED', '22.82', '18-Aug')).toBe(
+      'AED 22.82 of late-payment interest accrued after 18-Aug will be waived and is not charged.'
+    );
   });
 
   it('close amount is remaining principal plus as-of-date interest, not today summary minus waived LPI', () => {
@@ -240,6 +257,31 @@ describe('backdated-settlement.util', () => {
     expect(reconciled.interest).toBe(2580.82);
   });
 
+  it('uses as-of-date interest from penalties template, not full remaining repayment interest', () => {
+    const reconciled = reconcileAsOfDateAmounts({
+      isBackdated: false,
+      isBusinessDate: true,
+      penaltyTemplate: {
+        principalOutstanding: 73000,
+        remainingPrincipalOutstanding: 73000,
+        interestOutstanding: 1941.1,
+        penaltyAmountDue: 0
+      },
+      repaymentTemplate: {
+        amount: 76312,
+        principalPortion: 73000,
+        interestPortion: 3312,
+        penaltyChargesPortion: 0,
+        feeChargesPortion: 0,
+        taxChargesPortion: 0
+      }
+    });
+
+    expect(reconciled.interest).toBe(1941.1);
+    expect(reconciled.principal).toBe(73000);
+    expect(reconciled.defaultTransactionAmount).toBe(74941.1);
+  });
+
   it('does not inflate LPI via ledger reconcile when penalties template matches repayment template on business date', () => {
     expect(
       reconcilePenaltyWithLedger({
@@ -308,6 +350,50 @@ describe('backdated-settlement.util', () => {
     expect(computeProjectedOverpayment(104438.36, cap)).toBe(591.78);
   });
 
+  it('paying today includes post-due additional LPI omitted by the repayment template', () => {
+    const periods = [
+      {
+        period: 1,
+        complete: false,
+        principalOriginalDue: 77000,
+        interestOriginalDue: 3417.53,
+        totalOutstandingForPeriod: 80480.82
+      },
+      {
+        period: 2,
+        complete: false,
+        isAdditional: true,
+        principalOriginalDue: 0,
+        interestOriginalDue: 0,
+        totalOutstandingForPeriod: 506.32
+      }
+    ];
+    expect(computeLpiOnlyPeriodOutstanding(periods)).toBe(506.32);
+    expect(computeScheduleCloseCap(periods)).toBe(80987.14);
+
+    const reconciled = reconcileAsOfDateAmounts({
+      isBackdated: false,
+      isBusinessDate: true,
+      penaltyTemplate: {
+        principalOutstanding: 77000,
+        remainingPrincipalOutstanding: 77000,
+        interestOutstanding: 3417.53,
+        penaltyAmountDue: 63.29
+      },
+      repaymentTemplate: {
+        amount: 80480.82,
+        principalPortion: 77000,
+        interestPortion: 3417.53,
+        penaltyChargesPortion: 63.29,
+        feeChargesPortion: 0,
+        taxChargesPortion: 0
+      },
+      lpiOnlyScheduleOutstanding: 506.32
+    });
+    expect(reconciled.penalty).toBe(569.61);
+    expect(reconciled.defaultTransactionAmount).toBe(80987.14);
+  });
+
   it('authoritative cap ignores zero schedule and uses UI figures', () => {
     expect(
       computeAuthoritativeSettlementCap({
@@ -316,6 +402,88 @@ describe('backdated-settlement.util', () => {
         scheduleCloseCap: 0
       })
     ).toBe(81984.11);
+  });
+
+  it('closing the loan marks every remaining EMI as covered', () => {
+    const chips = applyEmiAmountCoverage(
+      [
+        { period: 2, amount: 27363.33 },
+        { period: 3, amount: 27363.33 }
+      ],
+      76201.6,
+      true
+    );
+    expect(chips.map((chip) => chip.coverage)).toEqual([
+      'covered',
+      'covered'
+    ]);
+  });
+
+  it('partial amount covers the first EMI and leaves later EMIs uncovered', () => {
+    const chips = applyEmiAmountCoverage(
+      [
+        { period: 2, amount: 27363.33 },
+        { period: 3, amount: 27363.33 }
+      ],
+      27363.33,
+      false
+    );
+    expect(chips.map((chip) => chip.coverage)).toEqual([
+      'covered',
+      'uncovered'
+    ]);
+  });
+
+  it('amount between two EMIs marks the second as partial', () => {
+    const chips = applyEmiAmountCoverage(
+      [
+        { period: 2, amount: 100 },
+        { period: 3, amount: 100 }
+      ],
+      150,
+      false
+    );
+    expect(chips.map((chip) => chip.coverage)).toEqual([
+      'covered',
+      'partial'
+    ]);
+  });
+
+  it('does not treat overdue LPI as a partial payment on the next EMI', () => {
+    const chips = applyEmiAmountCoverage(
+      [
+        { period: 1, amount: 15688.22 },
+        { period: 2, amount: 15688.22 }
+      ],
+      15787.49,
+      false,
+      99.27
+    );
+    expect(chips.map((chip) => chip.coverage)).toEqual([
+      'covered',
+      'uncovered'
+    ]);
+  });
+
+  it('overpay cap is as-of-date full outstanding, not a single EMI template amount', () => {
+    const cap = computeAuthoritativeSettlementCap({
+      outstandingAfterWaiver: 60500.99,
+      fullLoanOutstanding: 60650,
+      scheduleCloseCap: 62000
+    });
+    expect(cap).toBe(60500.99);
+    expect(computeProjectedOverpayment(6050.88, cap)).toBe(0);
+    expect(computeProjectedOverpayment(60501, cap)).toBe(0.01);
+  });
+
+  it('backdated close cap is LPI through the selected date, not outstanding as of today', () => {
+    const cap = computeAuthoritativeSettlementCap({
+      outstandingAfterWaiver: 15100.5,
+      fullLoanOutstanding: 15250.75,
+      scheduleCloseCap: 16000
+    });
+    expect(cap).toBe(15100.5);
+    expect(computeProjectedOverpayment(15250.75, cap)).toBe(150.25);
   });
 
   it('partial EMI payment is below schedule close cap so no projected overpayment', () => {
@@ -330,5 +498,52 @@ describe('backdated-settlement.util', () => {
       scheduleCloseCap: computeScheduleCloseCap(periods)
     });
     expect(computeProjectedOverpayment(27363.33, cap)).toBe(0);
+  });
+
+  it('last allowed LOC foreclosure date is the day before the earliest unpaid EMI', () => {
+    const suggested = lastAllowedLocForeclosureDate(
+      [
+        {
+          period: 1,
+          complete: false,
+          dueDate: [
+            2026,
+            8,
+            29
+          ],
+          principalDue: 1110000,
+          interestDue: 65687.67,
+          totalOutstandingForPeriod: 1176599.98
+        }
+      ],
+      toComparableDate,
+      new Date(2026, 7, 3),
+      new Date(2026, 8, 2)
+    );
+    expect(suggested).toEqual(new Date(2026, 7, 28));
+  });
+
+  it('returns null when the last allowed LOC foreclosure date is before the 30-day window', () => {
+    expect(
+      lastAllowedLocForeclosureDate(
+        [
+          {
+            period: 1,
+            complete: false,
+            dueDate: [
+              2026,
+              6,
+              1
+            ],
+            principalDue: 100,
+            interestDue: 10,
+            totalOutstandingForPeriod: 110
+          }
+        ],
+        toComparableDate,
+        new Date(2026, 7, 3),
+        new Date(2026, 8, 2)
+      )
+    ).toBeNull();
   });
 });
