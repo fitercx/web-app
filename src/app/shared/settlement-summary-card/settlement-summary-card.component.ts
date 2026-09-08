@@ -26,9 +26,6 @@ export class SettlementSummaryCardComponent {
   /** Replaces default "Closes the loan" when set. */
   @Input() subtitle: string | null = null;
   @Input() footnotes: Array<string | SettlementSummaryFootnote> = [];
-  @Input() ledgerToday = 0;
-  @Input() ledgerDelta = 0;
-  @Input() businessDateLabel = '';
   @Input() closesLoan = true;
   @Input() loading = false;
 
@@ -38,9 +35,5 @@ export class SettlementSummaryCardComponent {
 
   footnoteTone(note: string | SettlementSummaryFootnote): 'default' | 'negative' {
     return typeof note === 'string' ? 'default' : note.tone || 'default';
-  }
-
-  get showLedgerFootnote(): boolean {
-    return this.ledgerDelta > 0.01 && this.ledgerToday > 0.01 && !!this.businessDateLabel;
   }
 }

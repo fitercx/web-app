@@ -113,9 +113,23 @@
 
 .emi-hints {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.4rem;
   margin: 0 0 1rem;
+
+  &__caption {
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+
+  &__pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
 }
 
 .emi-pill {
@@ -135,18 +149,23 @@
   &.due {
     background: #d97706;
   }
-}
 
-.settlement-mode {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  margin-bottom: 0.75rem;
-  font-size: 0.82rem;
+  &.covered {
+    background: #059669;
+  }
 
-  &__hint {
-    color: #64748b;
-    padding-left: 0.15rem;
+  &.overdue.covered {
+    background: #dc2626;
+    box-shadow: 0 0 0 2px #059669;
+  }
+
+  &.due.covered {
+    background: #d97706;
+    box-shadow: 0 0 0 2px #059669;
+  }
+
+  &.partial {
+    background: #2563eb;
   }
 }
 

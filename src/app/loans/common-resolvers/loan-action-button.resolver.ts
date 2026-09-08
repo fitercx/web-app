@@ -9,6 +9,21 @@ import { catchError, map } from 'rxjs/operators';
 /** Custom Services */
 import { LoansService } from '../loans.service';
 
+/** Payload when GET foreclosure template fails (typically overdue LOC on business date). */
+export function foreclosureTemplateFailurePayload(err: any): {
+  foreclosureTemplateError: string;
+  foreclosureTemplateErrorCode?: string;
+} {
+  return {
+    foreclosureTemplateError:
+      err?.error?.errors?.[0]?.defaultUserMessage ||
+      err?.error?.defaultUserMessage ||
+      'This foreclosure date is not allowed for this loan. Please choose a different date.',
+    foreclosureTemplateErrorCode:
+      err?.error?.errors?.[0]?.userMessageGlobalisationCode || err?.error?.userMessageGlobalisationCode
+  };
+}
+
 /**
  * Loans notes data resolver.
  */
@@ -75,8 +90,12 @@ export class LoanActionButtonResolver implements Resolve<Object> {
     } else if (loanActionButton === 'Add Loan Charge') {
       return this.loansService.getLoanChargeTemplateResource(loanId);
     } else if (loanActionButton === 'Foreclosure') {
+      // Today's foreclosure template is rejected for overdue LOC loans. Catch that so navigation
+      // still reaches the form; the operator can then pick a date before the unpaid due date.
       return forkJoin([
-        this.loansService.getLoanForeclosureActionTemplate(loanId),
+        this.loansService
+          .getLoanForeclosureActionTemplate(loanId)
+          .pipe(catchError((err) => of(foreclosureTemplateFailurePayload(err)))),
         this.loansService.getLoanData(loanId).pipe(catchError(() => of(null)))]).pipe(
         map(
           ([
@@ -84,7 +103,8 @@ export class LoanActionButtonResolver implements Resolve<Object> {
             loanData
           ]) => ({
             ...template,
-            expectedMaturityDate: loanData?.timeline?.expectedMaturityDate ?? null
+            expectedMaturityDate: loanData?.timeline?.expectedMaturityDate ?? template?.expectedMaturityDate ?? null,
+            currency: template?.currency || loanData?.currency
           })
         )
       );

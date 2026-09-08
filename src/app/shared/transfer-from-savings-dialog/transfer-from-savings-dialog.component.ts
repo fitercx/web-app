@@ -9,11 +9,16 @@ import { Dates } from 'app/core/utils/dates';
 import { LoansService } from 'app/loans/loans.service';
 import {
   allocateSettlement,
+  computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
   computeSavingsBalanceAsOf,
+  computeScheduleCloseCap,
+  computeLpiOnlyPeriodOutstanding,
   computeSettlementRequired,
   computeUnearnedInterest,
-  reconcileAsOfDateAmounts
+  formatLpiWaivedAfterDateMessage,
+  reconcileAsOfDateAmounts,
+  applyEmiAmountCoverage
 } from 'app/loans/common/backdated-settlement.util';
 import { SettingsService } from 'app/settings/settings.service';
 import { AlertService } from 'app/core/alert/alert.service';
@@ -94,21 +99,11 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   readonly staticFutureDatePolicy =
     'A future date can be selected to preview how much late-payment interest (LPI) would accrue, but a transfer cannot be recorded with a future date — the backend does not support it.';
   /**
-   * Warning shown when the entered amount would leave the loan in an overpaid state (amount >
-   * total outstanding). This is a WARNING, not an error — the operator can still submit if they
-   * explicitly want to overpay, but must see clearly what will happen (loan closes and excess is
-   * auto-refunded to the linked savings account).
-   */
-  overpaymentWarning: string | null = null;
-  /**
-   * Visible notice when the entered amount fully settles (or overpays) the loan — the last payment
-   * that drives loan closure. Always includes the refundable excess amount when amount > outstanding.
+   * Visible notice when the entered amount fully settles the loan as of the selected date.
    */
   closureRefundNotice: string | null = null;
   /** From /template/penalties — true when value date equals a real EMI due date. */
   private onInstallmentDueDate = false;
-  /** Settlement card: date-based due amounts vs waterfall preview for the entered amount. */
-  settlementPreviewMode: 'date' | 'manual' = 'date';
 
   constructor(
     private formBuilder: UntypedFormBuilder,
@@ -142,19 +137,6 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   private onTransactionAmountEdited(): void {
     this.submitErrorMessage = null;
     this.validateTransactionAmount();
-    if (this.canUseManualPreview) {
-      this.settlementPreviewMode = 'manual';
-    } else {
-      this.settlementPreviewMode = 'date';
-    }
-  }
-
-  onManualPreviewToggle(useManual: boolean): void {
-    this.settlementPreviewMode = useManual ? 'manual' : 'date';
-    if (!useManual) {
-      this.patchDefaultTransactionAmount();
-      this.validateTransactionAmount(true);
-    }
   }
 
   private createForm(): void {
@@ -205,10 +187,10 @@ export class TransferFromSavingsDialogComponent implements OnInit {
           );
           this.baselineInterestOutstanding = Number(templates.penaltyTemplate?.interestOutstanding || 0);
           this.baselinePenaltyOutstanding = Number(templates.penaltyTemplate?.penaltyAmountDue || 0);
-          this.applyPenaltyTemplateForDate(templates.penaltyTemplate, 0, templates.repaymentTemplate, false);
-          this.applyEarliestAllowedDate(templates.penaltyTemplate?.earliestAllowedTransactionDate);
           this.data.loan.repaymentSchedule =
             templates.loanDetails?.repaymentSchedule || this.data.loan.repaymentSchedule;
+          this.applyPenaltyTemplateForDate(templates.penaltyTemplate, 0, templates.repaymentTemplate, false);
+          this.applyEarliestAllowedDate(templates.penaltyTemplate?.earliestAllowedTransactionDate);
           this.dueEmis = this.getDueEmisForDate(this.transferForm.value.transactionDate);
           this.patchDefaultTransactionAmount();
           this.validateTransactionAmount(true);
@@ -384,7 +366,10 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       taxFallback: Number(this.repaymentTemplateData?.taxChargesPortion || 0),
       isBackdated,
       isBusinessDate: this.isSelectedDateBusinessDate(),
-      additionalPenalty
+      additionalPenalty,
+      lpiOnlyScheduleOutstanding: this.isSelectedDateBusinessDate()
+        ? computeLpiOnlyPeriodOutstanding(this.data.loan?.repaymentSchedule?.periods)
+        : 0
     });
 
     this.principalOutstanding = reconciled.principal;
@@ -421,24 +406,22 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     return !!(selected && business && selected.getTime() === business.getTime());
   }
 
-  /** True when entered amount covers outstanding as of the selected date (after LPI waiver). */
+  /** True when entered amount covers outstanding the backend can absorb without Overpaid. */
   willCloseLoan(amount: number): boolean {
-    return this.outstandingAfterWaiver > 0.01 && this.roundAmount(amount) + 0.01 >= this.outstandingAfterWaiver;
-  }
-
-  private buildExcessRefundSentence(excess: number): string {
-    return `Excess ${this.currencySymbol} ${this.formatAmount(excess)} refunded to linked savings on closure.`;
+    const cap = this.repaymentCapWithoutOverpay;
+    return cap > 0.01 && this.roundAmount(amount) + 0.01 >= cap;
   }
 
   private buildClosureRefundNotice(amount: number): string | null {
     if (!this.willCloseLoan(amount)) {
       return null;
     }
-    const excess = this.roundAmount(amount - this.outstandingAfterWaiver);
+    const cap = this.repaymentCapWithoutOverpay;
+    const excess = this.roundAmount(amount - cap);
     if (excess > 0.01) {
       return `Closes loan · refund ${this.currencySymbol} ${this.formatAmount(excess)} to linked savings`;
     }
-    return `Closes loan at ${this.currencySymbol} ${this.formatAmount(this.outstandingAfterWaiver)}`;
+    return `Closes loan at ${this.currencySymbol} ${this.formatAmount(cap)}`;
   }
 
   private simulateSettlementAllocation(
@@ -535,8 +518,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   }
 
   private patchDefaultTransactionAmount(): void {
-    this.settlementPreviewMode = 'date';
-    const suggested = this.dueAsOfDateTotal;
+    const suggested = this.capEnteredAmount(this.dueAsOfDateTotal);
     if (suggested > 0) {
       this.transferForm.patchValue({ transactionAmount: suggested }, { emitEvent: false });
       return;
@@ -549,11 +531,15 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         this.taxOutstanding
     );
     if (componentTotal > 0) {
-      this.transferForm.patchValue({ transactionAmount: componentTotal }, { emitEvent: false });
+      this.transferForm.patchValue({ transactionAmount: this.capEnteredAmount(componentTotal) }, { emitEvent: false });
       return;
     }
-    const emiTotal = this.roundAmount(this.dueEmis.reduce((sum: number, emi: any) => sum + Number(emi.amount || 0), 0));
-    this.transferForm.patchValue({ transactionAmount: emiTotal || '' }, { emitEvent: false });
+    const emiTotal = this.roundAmount(
+      this.dueEmis
+        .filter((emi: any) => emi.state !== 'upcoming')
+        .reduce((sum: number, emi: any) => sum + Number(emi.amount || 0), 0)
+    );
+    this.transferForm.patchValue({ transactionAmount: this.capEnteredAmount(emiTotal) || '' }, { emitEvent: false });
   }
 
   private getDueEmisForDate(transactionDateValue: Date): any[] {
@@ -569,10 +555,6 @@ export class TransferFromSavingsDialogComponent implements OnInit {
 
     return periods
       .filter((period: any) => this.isRealOutstandingInstallment(period))
-      .filter((period: any) => {
-        const dueDate = this.toComparableDate(period.dueDate);
-        return dueDate && dueDate.getTime() <= selected.getTime();
-      })
       .sort((a: any, b: any) => Number(a.period) - Number(b.period))
       .map((period: any) => {
         const dueDate = this.toComparableDate(period.dueDate);
@@ -582,11 +564,17 @@ export class TransferFromSavingsDialogComponent implements OnInit {
             this.getPeriodComponentOutstanding(period, 'fee') +
             this.getPeriodComponentOutstanding(period, 'tax')
         );
+        let state: 'overdue' | 'due' | 'upcoming' = 'upcoming';
+        if (dueDate && dueDate.getTime() < selected.getTime()) {
+          state = 'overdue';
+        } else if (dueDate && dueDate.getTime() === selected.getTime()) {
+          state = 'due';
+        }
         return {
           period: period.period,
           dueDate: period.dueDate,
           amount,
-          state: dueDate && dueDate.getTime() < selected.getTime() ? 'overdue' : 'due'
+          state
         };
       })
       .filter((emi: any) => emi.amount > 0);
@@ -626,11 +614,6 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         this.feeOutstanding +
         this.taxOutstanding
     );
-  }
-
-  /** Business-date label — the "as of today" reference for the full posted loan balance. */
-  get businessDateLabel(): string {
-    return this.formatDate(this.settingsService.businessDate);
   }
 
   /**
@@ -690,10 +673,29 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     });
   }
 
+  /** Maximum repayment that will not move the loan to Overpaid (full loan as of the selected date). */
+  get repaymentCapWithoutOverpay(): number {
+    return computeAuthoritativeSettlementCap({
+      outstandingAfterWaiver: this.outstandingAfterWaiver,
+      fullLoanOutstanding: this.fullLoanOutstanding,
+      scheduleCloseCap: computeScheduleCloseCap(this.data.loan?.repaymentSchedule?.periods)
+    });
+  }
+
+  /** UI-only cap for the entered amount — outstanding close cap (overpayment is not allowed here). */
+  private capEnteredAmount(amount: number): number {
+    const cap = this.repaymentCapWithoutOverpay;
+    if (cap > 0.01 && amount > cap + 0.01) {
+      return cap;
+    }
+    return this.roundAmount(amount);
+  }
+
   get settlementLines(): SettlementSummaryLine[] {
     return [
       { label: 'Principal', amount: this.principalOutstanding },
       { label: 'Interest', amount: this.interestOutstanding },
+      { label: 'LPI', amount: this.penaltyOutstanding },
       { label: 'Fees', amount: this.feeOutstanding },
       { label: 'Tax', amount: this.taxOutstanding }
     ].filter((line) => line.amount > 0.01);
@@ -711,13 +713,16 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       );
     }
     if (this.penaltyWaivedByBackdate > 0.01) {
-      notes.push(
-        `${this.currencySymbol} ${this.formatAmount(this.penaltyWaivedByBackdate)} of late-payment interest accrued after this date will be waived and is not charged.`
-      );
-    } else if (this.penaltyOutstanding > 0.01) {
-      notes.push(
-        `Late payment interest of ${this.currencySymbol} ${this.formatAmount(this.penaltyOutstanding)} is included in the amount due.`
-      );
+      const selectedDateLabel = this.selectedTransactionDateShortLabel;
+      if (selectedDateLabel) {
+        notes.push(
+          formatLpiWaivedAfterDateMessage(
+            this.currencySymbol,
+            this.formatAmount(this.penaltyWaivedByBackdate),
+            selectedDateLabel
+          )
+        );
+      }
     }
 
     return notes;
@@ -727,41 +732,71 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     return Number(this.transferForm?.get('transactionAmount')?.value || 0);
   }
 
-  get canUseManualPreview(): boolean {
+  /** Show waterfall of the typed amount when it differs from due-as-of-date (no extra toggle). */
+  get isEnteredAmountPreview(): boolean {
     return (
       this.enteredTransactionAmount > 0.01 && Math.abs(this.enteredTransactionAmount - this.dueAsOfDateTotal) > 0.01
     );
   }
 
-  get isManualSettlementPreview(): boolean {
-    return this.settlementPreviewMode === 'manual' && this.canUseManualPreview;
-  }
-
   get displaySettlementEyebrow(): string | null {
-    return this.isManualSettlementPreview ? 'Payment allocation (entered amount)' : null;
+    return this.isEnteredAmountPreview ? 'Payment allocation (entered amount)' : null;
   }
 
   get displaySettlementTotal(): number {
-    return this.isManualSettlementPreview ? this.enteredTransactionAmount : this.dueAsOfDateTotal;
+    return this.isEnteredAmountPreview ? this.enteredTransactionAmount : this.dueAsOfDateTotal;
   }
 
   get displaySettlementLines(): SettlementSummaryLine[] {
-    return this.isManualSettlementPreview ? this.paymentAllocationLines : this.settlementLines;
+    return this.isEnteredAmountPreview ? this.paymentAllocationLines : this.settlementLines;
   }
 
   get displaySettlementSubtitle(): string | null {
-    if (this.isManualSettlementPreview) {
-      return this.paymentAllocationSubtitle;
+    if (!this.isEnteredAmountPreview || this.enteredAmountExceedsCap) {
+      return null;
     }
-    return null;
+    if (this.willCloseLoan(this.enteredTransactionAmount)) {
+      return this.buildClosureRefundNotice(this.enteredTransactionAmount);
+    }
+    return 'Partial payment — loan stays active';
   }
 
   get displaySettlementFootnotes(): Array<string | SettlementSummaryFootnote> {
-    return this.isManualSettlementPreview ? this.paymentAllocationFootnotes : this.summaryFootnotes;
+    if (!this.isEnteredAmountPreview) {
+      return this.summaryFootnotes;
+    }
+    const notes: Array<string | SettlementSummaryFootnote> = [...this.summaryFootnotes];
+    if (this.enteredAmountExceedsCap) {
+      return notes;
+    }
+    const remaining = this.roundAmount(this.repaymentCapWithoutOverpay - this.enteredTransactionAmount);
+    if (!this.willCloseLoan(this.enteredTransactionAmount) && remaining > 0.01) {
+      notes.push(`Remaining ~${this.currencySymbol} ${this.formatAmount(remaining)} after submit`);
+    }
+    return notes;
+  }
+
+  get enteredAmountExceedsCap(): boolean {
+    const cap = this.repaymentCapWithoutOverpay;
+    return cap > 0.01 && this.enteredTransactionAmount > cap + 0.01;
   }
 
   get displaySettlementClosesLoan(): boolean {
-    return this.isManualSettlementPreview ? this.paymentClosesLoan : this.settlementClosesLoan;
+    if (this.enteredAmountExceedsCap) {
+      return false;
+    }
+    return this.isEnteredAmountPreview ? this.paymentClosesLoan : this.settlementClosesLoan;
+  }
+
+  get paymentAllocationLines(): SettlementSummaryLine[] {
+    const allocation = this.currentSettlementAllocation;
+    return [
+      { label: 'Principal', amount: allocation.principal },
+      { label: 'Interest', amount: allocation.interest },
+      { label: 'LPI', amount: allocation.penalty },
+      { label: 'Fees', amount: allocation.fee },
+      { label: 'Tax', amount: allocation.tax }
+    ].filter((line) => line.amount > 0.01);
   }
 
   get displayLedgerToday(): number {
@@ -772,51 +807,33 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     return 0;
   }
 
-  get paymentAllocationLines(): SettlementSummaryLine[] {
-    const allocation = this.currentSettlementAllocation;
-    return [
-      { label: 'LPI', amount: allocation.penalty },
-      { label: 'Fees', amount: allocation.fee },
-      { label: 'Tax', amount: allocation.tax },
-      { label: 'Interest', amount: allocation.interest },
-      { label: 'Principal', amount: allocation.principal }
-    ].filter((line) => line.amount > 0.01);
-  }
-
-  get paymentAllocationSubtitle(): string | null {
-    const amount = this.enteredTransactionAmount;
-    if (this.willCloseLoan(amount)) {
-      return this.buildClosureRefundNotice(amount);
-    }
-    return 'Partial payment — loan stays active';
-  }
-
-  get paymentAllocationFootnotes(): string[] {
-    const notes: string[] = [];
-    const amount = this.enteredTransactionAmount;
-    const allocation = this.currentSettlementAllocation;
-
-    if (!this.willCloseLoan(amount) && this.outstandingAfterWaiver > 0.01) {
-      const remaining = this.roundAmount(this.outstandingAfterWaiver - amount);
-      if (remaining > 0.01) {
-        notes.push(`Remaining ~${this.currencySymbol} ${this.formatAmount(remaining)} after submit`);
-      }
-    }
-    if (allocation.unallocated > 0.01) {
-      notes.push(this.buildExcessRefundSentence(allocation.unallocated));
-    } else if (this.overpaymentWarning) {
-      notes.push(this.overpaymentWarning);
-    }
-    return notes;
-  }
-
   get paymentClosesLoan(): boolean {
     return this.willCloseLoan(this.enteredTransactionAmount);
   }
 
-  /** EMI chips removed from Make Repayment — installment due is the settlement total. */
+  /** Remaining outstanding EMIs covered (or partially covered) by the entered amount. */
+  get displayEmis(): any[] {
+    return applyEmiAmountCoverage(
+      this.dueEmis,
+      this.enteredTransactionAmount,
+      this.paymentClosesLoan,
+      this.currentSettlementAllocation.penalty
+    ).filter((emi) => emi.coverage !== 'uncovered');
+  }
+
+  /** EMI chips for remaining installments (amounts exclude LPI). */
   get showDueEmiPills(): boolean {
-    return false;
+    return this.displayEmis.length > 0;
+  }
+
+  emiCoverageLabel(coverage: string): string {
+    if (coverage === 'covered') {
+      return 'Covered by this amount';
+    }
+    if (coverage === 'partial') {
+      return 'Partially covered by this amount';
+    }
+    return 'Not covered by this amount';
   }
 
   private get currentSettlementAllocation(): {
@@ -842,6 +859,12 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   get selectedTransactionDateLabel(): string {
     const value = this.transferForm?.value?.transactionDate;
     return value ? this.formatDate(value) : '';
+  }
+
+  /** Selected transaction date as dd-MMM (e.g. 18-Aug) for waived-LPI copy. */
+  get selectedTransactionDateShortLabel(): string {
+    const value = this.transferForm?.value?.transactionDate;
+    return value ? this.dateUtils.formatDate(value, 'dd-MMM') : '';
   }
 
   /**
@@ -896,6 +919,9 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         this.availableBalanceAsOfDate
       )})`;
     }
+    if (control?.hasError('totalOutstandingExceeded')) {
+      return `Maximum ${this.currencySymbol} ${this.formatAmount(this.repaymentCapWithoutOverpay)} — overpayment is not allowed`;
+    }
     return '';
   }
 
@@ -917,19 +943,15 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     const amount = Number(control.value || 0);
     if (!amount || amount <= 0) {
       currentErrors.positiveAmount = true;
-      this.overpaymentWarning = null;
       this.closureRefundNotice = null;
     } else if (amount > this.availableBalanceAsOfDate) {
       currentErrors.availableBalanceExceeded = true;
-      this.overpaymentWarning = null;
       this.closureRefundNotice = null;
-    } else if (this.outstandingAfterWaiver > 0 && amount > this.outstandingAfterWaiver) {
-      const excess = this.roundAmount(amount - this.outstandingAfterWaiver);
-      this.overpaymentWarning = `Overpayment by ${this.currencySymbol} ${this.formatAmount(excess)}`;
-      this.closureRefundNotice = this.buildClosureRefundNotice(amount);
-      // Intentionally NOT adding totalOutstandingExceeded to errors — overpayment is allowed but warned.
+    } else if (this.repaymentCapWithoutOverpay > 0.01 && amount > this.repaymentCapWithoutOverpay + 0.01) {
+      currentErrors.totalOutstandingExceeded = true;
+      this.closureRefundNotice = null;
+      showFieldErrors = true;
     } else {
-      this.overpaymentWarning = null;
       this.closureRefundNotice = this.buildClosureRefundNotice(amount);
     }
 
@@ -967,7 +989,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       toAccountType: 1,
       toAccountId: this.data.loan.id,
       transferDate: this.formatDate(this.transferForm.value.transactionDate),
-      transferAmount: String(Number(this.transferForm.value.transactionAmount)),
+      transferAmount: String(this.capEnteredAmount(Number(this.transferForm.value.transactionAmount))),
       transferDescription: String(this.transferForm.value.note || '').trim(),
       dateFormat,
       locale: this.settingsService.language.code
