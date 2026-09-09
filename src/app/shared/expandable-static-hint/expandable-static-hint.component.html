@@ -1,0 +1,10 @@
+<div class="expandable-static-hint" [class.expandable-static-hint--expanded]="expanded">
+  <button type="button" class="expandable-static-hint__toggle" (click)="toggle()" [attr.aria-expanded]="expanded">
+    <mat-icon class="expandable-static-hint__info">info</mat-icon>
+    <span class="expandable-static-hint__label">{{ label }}</span>
+    <mat-icon class="expandable-static-hint__chevron">{{ expanded ? 'expand_less' : 'expand_more' }}</mat-icon>
+  </button>
+  <div class="expandable-static-hint__body" *ngIf="expanded">
+    <ng-content></ng-content>
+  </div>
+</div>

@@ -42,6 +42,16 @@ export class LoansService {
     return this.http.get(`/loans/${loanId}/transactions/template`, { params: httpParams });
   }
 
+  /** Repayment template for a specific transaction date (authoritative pay-now amount on the loan). */
+  getLoanRepaymentTemplate(loanId: string, transactionDate: string): Observable<any> {
+    const httpParams = new HttpParams()
+      .set('command', 'repayment')
+      .set('transactionDate', transactionDate)
+      .set('locale', this.settingsService.language.code)
+      .set('dateFormat', this.settingsService.dateFormat);
+    return this.http.get(`/loans/${loanId}/transactions/template`, { params: httpParams });
+  }
+
   getLoanPenaltiesTemplate(loanId: string, transactionDate?: string): Observable<any> {
     let httpParams = new HttpParams()
       .set('locale', this.settingsService.language.code)
@@ -87,12 +97,18 @@ export class LoansService {
         'transactionDate',
         this.dateUtils.formatDate(this.settingsService.businessDate, this.settingsService.dateFormat)
       );
-    return this.http.get(`/loans/${loanId}/transactions/template`, { params: httpParams });
+    // skipErrorHandler: overdue LOC loans reject today's date; the resolver/form handle that inline
+    // so the Foreclosure screen can still open for a backdated date.
+    return this.http.skipErrorHandler().get(`/loans/${loanId}/transactions/template`, { params: httpParams });
   }
 
   getLoanAccountResource(loanId: string, associations: string): Observable<any> {
     const httpParams = new HttpParams().set('associations', associations);
     return this.http.get(`/loans/${loanId}`, { params: httpParams });
+  }
+
+  getLoanData(loanId: string): Observable<any> {
+    return this.http.get(`/loans/${loanId}`);
   }
 
   /**
@@ -403,7 +419,7 @@ export class LoansService {
       .set('dateFormat', foreclosuredata.dateFormat)
       .set('locale', foreclosuredata.locale)
       .set('transactionDate', foreclosuredata.transactionDate);
-    return this.http.get(`/loans/${loanId}/transactions/template`, { params: httpParams });
+    return this.http.skipErrorHandler().get(`/loans/${loanId}/transactions/template`, { params: httpParams });
   }
 
   /**

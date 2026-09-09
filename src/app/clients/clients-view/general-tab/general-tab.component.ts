@@ -27,7 +27,8 @@ import {
   BulkDisburseResultsDialogData
 } from '../view-loc-details/active-loans-tab/bulk-disburse-results-dialog/bulk-disburse-results-dialog.component';
 import { BulkDisburseLoadingDialogComponent } from '../view-loc-details/active-loans-tab/bulk-disburse-loading-dialog/bulk-disburse-loading-dialog.component';
-import { TransferFromSavingsDialogComponent } from './transfer-from-savings-dialog/transfer-from-savings-dialog.component';
+import { TransferFromSavingsDialogComponent } from 'app/shared/transfer-from-savings-dialog/transfer-from-savings-dialog.component';
+import { loanDisplayStatus } from 'app/loans/common/loan-display-status.util';
 
 /**
  * General Tab component.
@@ -346,6 +347,10 @@ export class GeneralTabComponent {
 
   isBlank(value: any): boolean {
     return value === null || value === undefined;
+  }
+
+  loanDisplayStatus(loan: any): string {
+    return loanDisplayStatus(loan);
   }
 
   openTransferFromSavingsDialog(loan: any, event: MouseEvent): void {
@@ -778,7 +783,6 @@ export class GeneralTabComponent {
         }
         const maximumAmount = loc.maximumAmount || 0;
         const blockedAmount = loc.blockedAmount || 0;
-        const isPayable = (loc.productType || '').toLowerCase() === 'payable' || loc.productType === 'PAYABLE';
         // For legacy fallback when loans not provided, derive from loanAccounts
         const associatedLoans =
           Array.isArray(loansFromPayload) && loansFromPayload.length
@@ -802,18 +806,13 @@ export class GeneralTabComponent {
               }))
             : this.getLoansForLOC(loc.id);
 
-        let consumedAmount = loc.consumedAmount || 0;
-        let availableBalance = loc.availableBalance;
-        if (isPayable && associatedLoans.length) {
-          consumedAmount = associatedLoans.reduce((sum: number, loan: any) => {
-            const principalOutstanding = Number(
-              loan.principalOutstanding ?? loan.additionalProperties?.principalOutstanding ?? 0
-            );
-            return sum + (principalOutstanding > 0 ? principalOutstanding : 0);
-          }, 0);
-          availableBalance = Math.max(maximumAmount - blockedAmount - consumedAmount, 0);
-        }
-        const utilization = maximumAmount > 0 ? Math.round((consumedAmount / maximumAmount) * 100) : 0;
+        // Limit, utilisation and available balance are authoritative from the backend LOC summary and are NOT
+        // recomputed on the client. The previous payable re-derivation summed a per-loan `principalOutstanding`
+        // field that the API does not send, so it always evaluated to 0 — forcing utilisation to 0% and the
+        // available balance to the full credit limit even while drawdowns were outstanding.
+        const consumedAmount = loc.consumedAmount ?? 0;
+        const availableBalance = loc.availableBalance ?? 0;
+        const utilization = loc.utilizationPercentage ?? 0;
 
         // Normalize status: backend supplies loc.status {id, code, value} where code expected as status.active|inactive|suspended|closed
         const rawStatus = loc.status || loc.activationStatus || {};

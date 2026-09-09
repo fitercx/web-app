@@ -3,10 +3,26 @@ import { Injectable } from '@angular/core';
 import { Resolve, ActivatedRouteSnapshot } from '@angular/router';
 
 /** rxjs Imports */
-import { forkJoin, Observable } from 'rxjs';
+import { forkJoin, Observable, of } from 'rxjs';
+import { catchError, map } from 'rxjs/operators';
 
 /** Custom Services */
 import { LoansService } from '../loans.service';
+
+/** Payload when GET foreclosure template fails (typically overdue LOC on business date). */
+export function foreclosureTemplateFailurePayload(err: any): {
+  foreclosureTemplateError: string;
+  foreclosureTemplateErrorCode?: string;
+} {
+  return {
+    foreclosureTemplateError:
+      err?.error?.errors?.[0]?.defaultUserMessage ||
+      err?.error?.defaultUserMessage ||
+      'This foreclosure date is not allowed for this loan. Please choose a different date.',
+    foreclosureTemplateErrorCode:
+      err?.error?.errors?.[0]?.userMessageGlobalisationCode || err?.error?.userMessageGlobalisationCode
+  };
+}
 
 /**
  * Loans notes data resolver.
@@ -74,7 +90,24 @@ export class LoanActionButtonResolver implements Resolve<Object> {
     } else if (loanActionButton === 'Add Loan Charge') {
       return this.loansService.getLoanChargeTemplateResource(loanId);
     } else if (loanActionButton === 'Foreclosure') {
-      return this.loansService.getLoanForeclosureActionTemplate(loanId);
+      // Today's foreclosure template is rejected for overdue LOC loans. Catch that so navigation
+      // still reaches the form; the operator can then pick a date before the unpaid due date.
+      return forkJoin([
+        this.loansService
+          .getLoanForeclosureActionTemplate(loanId)
+          .pipe(catchError((err) => of(foreclosureTemplateFailurePayload(err)))),
+        this.loansService.getLoanData(loanId).pipe(catchError(() => of(null)))]).pipe(
+        map(
+          ([
+            template,
+            loanData
+          ]) => ({
+            ...template,
+            expectedMaturityDate: loanData?.timeline?.expectedMaturityDate ?? template?.expectedMaturityDate ?? null,
+            currency: template?.currency || loanData?.currency
+          })
+        )
+      );
     } else if (loanActionButton === 'Charge-Off') {
       return this.loansService.getLoanActionTemplate(loanId, 'charge-off');
     } else {

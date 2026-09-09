@@ -1,6 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { MatTableDataSource } from '@angular/material/table';
+import { reversedPaidLpiForLoan } from 'app/loans/common/reversed-paid-lpi-display.util';
 import { getForeclosureUnearnedInterestDetails } from '../foreclosure-unearned-interest.utils';
 
 @Component({
@@ -28,13 +29,14 @@ export class GeneralTabComponent implements OnInit {
   ];
   loanSummaryTableData: {
     property: string;
-    original: string;
-    adjustment: string;
-    paid: string;
-    waived: string;
-    writtenOff: string;
-    outstanding: string;
-    overdue: string;
+    original: string | number;
+    adjustment: string | number;
+    paid: string | number;
+    waived: string | number;
+    writtenOff: string | number;
+    outstanding: string | number;
+    overdue: string | number;
+    reversedPaidLpi?: number;
   }[];
   loanDetailsTableData: {
     key: string;
@@ -132,6 +134,13 @@ export class GeneralTabComponent implements OnInit {
   }
 
   setloanSummaryTableData() {
+    const reversedPaidLpi = reversedPaidLpiForLoan(this.loanDetails);
+    const penaltyOriginal = this.loanDetails?.multiDisburseLoan
+      ? this.getDisbursedTranchePenalties()
+      : this.loanDetails.summary.penaltyChargesCharged;
+    const totalOriginal = this.loanDetails?.multiDisburseLoan
+      ? this.getTotalOriginalForMultiTranche()
+      : this.loanDetails.summary.totalExpectedRepayment;
     // Use summary for Fees row so fee/tax split from backend is shown (e.g. fee 800 + tax 44)
     // and Total Paid equals sum of components (Principal + Interest + Fees + Taxes + Penalties)
     const feesData = {
@@ -202,11 +211,7 @@ export class GeneralTabComponent implements OnInit {
       },
       {
         property: 'Penalties',
-        original: String(
-          this.loanDetails?.multiDisburseLoan
-            ? this.getDisbursedTranchePenalties()
-            : this.loanDetails.summary.penaltyChargesCharged
-        ),
+        original: String(penaltyOriginal),
         adjustment: '0',
         paid: this.loanDetails.summary.penaltyChargesPaid,
         waived: this.loanDetails.summary.penaltyChargesWaived,
@@ -216,11 +221,7 @@ export class GeneralTabComponent implements OnInit {
       },
       {
         property: 'Total',
-        original: String(
-          this.loanDetails?.multiDisburseLoan
-            ? this.getTotalOriginalForMultiTranche()
-            : this.loanDetails.summary.totalExpectedRepayment
-        ),
+        original: String(totalOriginal),
         adjustment: this.loanDetails.summary.principalAdjustments || 0,
         paid: this.loanDetails.summary.totalRepayment,
         waived: this.loanDetails.summary.totalWaived,
@@ -230,7 +231,8 @@ export class GeneralTabComponent implements OnInit {
             ? this.getTotalOutstandingForMultiTranche()
             : this.getAdjustedTotalOutstanding()
         ),
-        overdue: this.loanDetails.summary.totalOverdue
+        overdue: this.loanDetails.summary.totalOverdue,
+        reversedPaidLpi
       }
     ];
     const foreclosureDetails = getForeclosureUnearnedInterestDetails(this.loanDetails);

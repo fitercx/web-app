@@ -1,0 +1,17 @@
+<ng-container *ngIf="visible">
+  <div class="settlement-overpayment-banner">
+    <mat-icon>warning</mat-icon>
+    <span>
+      <strong>Overpaid — {{ contextTitle }}</strong> — the {{ amountDescriptor }} exceeds what this
+      {{ transactionDescriptor }} can apply ({{ currencyLabel }} {{ settlementCapWithoutOverpay | formatNumber }}) by
+      {{ currencyLabel }} {{ projectedOverpaymentAmount | formatNumber }}. The loan will move to
+      <strong>Overpaid</strong> status.
+      {{ submitNote }}
+    </span>
+  </div>
+
+  <div class="settlement-overpayment-outcome" *ngIf="showOutcomeNotice && outcomeNotice">
+    <mat-icon>info</mat-icon>
+    <span>{{ outcomeNotice }}</span>
+  </div>
+</ng-container>

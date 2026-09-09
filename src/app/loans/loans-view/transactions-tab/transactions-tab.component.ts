@@ -15,6 +15,7 @@ import { LoanTransaction } from 'app/products/loan-products/models/loan-account.
 import { LoanTransactionType } from 'app/loans/models/loan-transaction-type.model';
 import { ForeclosureUnearnedInterestDetails } from 'app/loans/models/foreclosure-unearned-interest.model';
 import { getForeclosureUnearnedInterestDetails } from '../foreclosure-unearned-interest.utils';
+import { sortTransactionsByLatest } from 'app/core/utils/transaction-chronology';
 
 @Component({
   selector: 'mifosx-transactions-tab',
@@ -119,7 +120,7 @@ export class TransactionsTabComponent implements OnInit {
     this.transactionsData.forEach((element: any) => {
       element.date = this.dateUtils.parseDate(element.date);
     });
-    this.dataSource = new MatTableDataSource(this.transactionsData);
+    this.dataSource = new MatTableDataSource(sortTransactionsByLatest(this.transactionsData));
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
   }
@@ -172,7 +173,7 @@ export class TransactionsTabComponent implements OnInit {
         return !(hideReversed && isReversed) && !(hideAccrual && t.type.accrual);
       });
     }
-    this.dataSource = new MatTableDataSource(transactions);
+    this.dataSource = new MatTableDataSource(sortTransactionsByLatest(transactions));
     this.dataSource.paginator = this.paginator;
     this.dataSource.sort = this.sort;
   }
@@ -216,6 +217,7 @@ export class TransactionsTabComponent implements OnInit {
         2,
         4,
         9,
+        18,
         20,
         21,
         22,
@@ -232,7 +234,7 @@ export class TransactionsTabComponent implements OnInit {
   }
 
   allowUndoTransaction(transaction: LoanTransaction) {
-    if (transaction.manuallyReversed) {
+    if (transaction.manuallyReversed || this.isPaidLpiRefund(transaction)) {
       return false;
     }
     return !(
@@ -240,6 +242,21 @@ export class TransactionsTabComponent implements OnInit {
       transaction.type.chargeoff ||
       this.isReAgoeOrReAmortize(transaction.type) ||
       transaction.type.interestRefund
+    );
+  }
+
+  transactionTypeLabel(transaction: LoanTransaction): string {
+    return this.isPaidLpiRefund(transaction) ? 'Refunded LPI' : transaction.type.value;
+  }
+
+  private isPaidLpiRefund(transaction: LoanTransaction): boolean {
+    const isActiveLoanRefund =
+      transaction?.type?.id === 18 || transaction?.type?.code === 'loanTransactionType.refundForActiveLoan';
+    return (
+      isActiveLoanRefund &&
+      Number(transaction?.penaltyChargesPortion || 0) > 0 &&
+      Number(transaction?.principalPortion || 0) === 0 &&
+      Number(transaction?.interestPortion || 0) === 0
     );
   }
 

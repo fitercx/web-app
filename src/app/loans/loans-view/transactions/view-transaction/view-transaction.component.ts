@@ -116,6 +116,10 @@ export class ViewTransactionComponent implements OnInit {
       ) {
         this.allowUndo = false;
       }
+      if (this.isPaidLpiRefund()) {
+        this.allowEdition = false;
+        this.allowUndo = false;
+      }
     });
     this.clientId = this.route.snapshot.params['clientId'];
     this.loanId = this.route.snapshot.params['loanId'];
@@ -165,6 +169,22 @@ export class ViewTransactionComponent implements OnInit {
       return false;
     }
     return true;
+  }
+
+  transactionTypeLabel(): string {
+    return this.isPaidLpiRefund() ? 'Refunded LPI' : this.transactionData.type.value;
+  }
+
+  private isPaidLpiRefund(): boolean {
+    const isActiveLoanRefund =
+      this.transactionData?.type?.id === 18 ||
+      this.transactionData?.type?.code === 'loanTransactionType.refundForActiveLoan';
+    return (
+      isActiveLoanRefund &&
+      Number(this.transactionData?.penaltyChargesPortion || 0) > 0 &&
+      Number(this.transactionData?.principalPortion || 0) === 0 &&
+      Number(this.transactionData?.interestPortion || 0) === 0
+    );
   }
 
   /**

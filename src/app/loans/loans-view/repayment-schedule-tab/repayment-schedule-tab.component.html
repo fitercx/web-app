@@ -10,10 +10,17 @@
     [details]="foreclosureUnearnedInterestDetails"
     [currencyCode]="currencyCode"
   ></mifosx-foreclosure-unearned-interest-banner>
+  <p class="foreclosure-schedule-legend" *ngIf="foreclosureScheduleOverlayActive">
+    Original scheduled EMIs are preserved below. Paid installments show as
+    <span class="foreclosure-legend-paid">PAID</span>
+    with the date and amounts settled at foreclosure. Removed future installments are
+    <span class="foreclosure-legend-muted">greyed out</span>. Where the closure payment differed from the original EMI,
+    the settled amount is shown with the scheduled figure in lighter text underneath.
+  </p>
 </div>
 
 <div class="container">
-  <table mat-table [dataSource]="repaymentScheduleDetails.periods" *ngIf="!forEditing" id="repaymentSchedule">
+  <table mat-table [dataSource]="scheduleTablePeriods" *ngIf="!forEditing" id="repaymentSchedule">
     <ng-container matColumnDef="number">
       <th mat-header-cell class="center" *matHeaderCellDef>#</th>
       <td mat-cell class="right" *matCellDef="let item">{{ item.period }}</td>
@@ -22,7 +29,9 @@
 
     <ng-container matColumnDef="days">
       <th mat-header-cell class="center" *matHeaderCellDef>{{ 'labels.inputs.Days' | translate }}</th>
-      <td mat-cell class="center" *matCellDef="let item" [ngClass]="installmentStyle(item)">{{ item.daysInPeriod }}</td>
+      <td mat-cell class="center" *matCellDef="let item" [ngClass]="installmentStyle(item)">
+        <ng-container *ngIf="!isForeclosureRemovedRow(item)">{{ item.daysInPeriod }}</ng-container>
+      </td>
       <td mat-footer-cell class="center" *matFooterCellDef>
         <b *ngIf="getDisplayedTotalOutstanding() !== null"> Total</b>
       </td>
@@ -31,7 +40,13 @@
     <ng-container matColumnDef="date">
       <th mat-header-cell class="center" *matHeaderCellDef>{{ 'labels.inputs.Due Date' | translate }}</th>
       <td mat-cell class="m-r-5" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        {{ item.dueDate | dateFormat }}
+        <ng-container
+          *ngIf="isForeclosureClosureActual(item) && showForeclosureDueDateOverlay(item); else scheduledDueDate"
+        >
+          {{ item.foreclosureDisplay.actualDueDate | dateFormat }}
+          <span class="foreclosure-scheduled-muted">scheduled {{ item.dueDate | dateFormat }}</span>
+        </ng-container>
+        <ng-template #scheduledDueDate>{{ item.dueDate | dateFormat }}</ng-template>
       </td>
       <td mat-footer-cell *matFooterCellDef></td>
     </ng-container>
@@ -39,8 +54,12 @@
     <ng-container matColumnDef="paiddate">
       <th mat-header-cell class="center" *matHeaderCellDef>{{ 'labels.inputs.Paid Date' | translate }}</th>
       <td mat-cell class="center" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        <ng-container *ngIf="!(item.interestOriginalDue === 0 && item.principalDue === 0)">
-          {{ item.obligationsMetOnDate | dateFormat }}
+        <ng-container
+          *ngIf="!(item.interestOriginalDue === 0 && item.principalDue === 0 && !foreclosureScheduleOverlayActive)"
+        >
+          <ng-container *ngIf="!isForeclosureRemovedRow(item)">
+            {{ item.obligationsMetOnDate | dateFormat }}
+          </ng-container>
         </ng-container>
       </td>
       <td mat-footer-cell *matFooterCellDef></td>
@@ -78,7 +97,9 @@
         }}
       </th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        {{ item.principalLoanBalanceOutstanding | formatNumber }}
+        <ng-container *ngIf="!isForeclosureRemovedRow(item)">
+          {{ item.principalLoanBalanceOutstanding | formatNumber }}
+        </ng-container>
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
         <ng-container *ngIf="getDisplayedTotalOutstanding() !== null; else emptyOutstandingFooter">
@@ -95,11 +116,22 @@
     <ng-container matColumnDef="principalDue">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Principal Due' | translate }}</th>
       <td mat-cell class="check r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        {{ item.principalDue | formatNumber }}
+        <ng-container
+          *ngIf="isForeclosureClosureActual(item) && showForeclosurePrincipalOverlay(item); else scheduledPrincipal"
+        >
+          {{ item.foreclosureDisplay.actualPrincipalDue | formatNumber }}
+          <span class="foreclosure-scheduled-muted">scheduled {{ item.principalDue | formatNumber }}</span>
+        </ng-container>
+        <ng-template #scheduledPrincipal>{{ item.principalDue | formatNumber }}</ng-template>
       </td>
       <td mat-footer-cell class="check r-amount" *matFooterCellDef>
         <b>
-          {{ repaymentScheduleDetails.totalPrincipalExpected | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}</b
+          {{
+            (foreclosureScheduleOverlayActive
+              ? getDisplayTotalOriginalPrincipal()
+              : repaymentScheduleDetails.totalPrincipalExpected
+            ) | currency: currencyCode : 'symbol-narrow' : '1.2-2'
+          }}</b
         >
       </td>
     </ng-container>
@@ -113,11 +145,25 @@
         }}
       </th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        {{ getDisplayInterestForPeriod(item) | formatNumber }}
+        <ng-container
+          *ngIf="isForeclosureClosureActual(item) && showForeclosureInterestOverlay(item); else scheduledInterest"
+        >
+          {{ item.foreclosureDisplay.actualInterestDue | formatNumber }}
+          <span class="foreclosure-scheduled-muted"
+            >scheduled {{ getDisplayInterestForPeriod(item) | formatNumber }}</span
+          >
+        </ng-container>
+        <ng-template #scheduledInterest>{{ getDisplayInterestForPeriod(item) | formatNumber }}</ng-template>
+        <div class="foreclosure-waived-amount" *ngIf="isForeclosureRemovedRow(item)">
+          waived {{ item.foreclosureDisplay.waivedInterest | formatNumber }}
+        </div>
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
         <b>
-          {{ getDisplayTotalInterest() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+          {{
+            (foreclosureScheduleOverlayActive ? getDisplayTotalOriginalInterest() : getDisplayTotalInterest())
+              | currency: currencyCode : 'symbol-narrow' : '1.2-2'
+          }}
         </b>
       </td>
     </ng-container>
@@ -153,12 +199,18 @@
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
         <ng-container *ngIf="isLineOfCreditReceivable() || isLoanFactorRateEnabled(); else normalEmi">
           {{
-            item.principalDue + item.interestOriginalDue + getDisplayFeeForPeriod(item) + getDisplayTaxForPeriod(item)
-              | formatNumber
+            item.principalDue +
+              getDisplayInterestForPeriod(item) +
+              getDisplayFeeForPeriod(item) +
+              getDisplayTaxForPeriod(item) | formatNumber
           }}
         </ng-container>
         <ng-template #normalEmi>
-          {{ item.principalDue + item.interestOriginalDue | formatNumber }}
+          <ng-container *ngIf="isForeclosureClosureActual(item) && showForeclosureEmiOverlay(item); else scheduledEmi">
+            {{ getActualEmiAmount(item) | formatNumber }}
+            <span class="foreclosure-scheduled-muted">scheduled {{ getOriginalEmiAmount(item) | formatNumber }}</span>
+          </ng-container>
+          <ng-template #scheduledEmi>{{ getOriginalEmiAmount(item) | formatNumber }}</ng-template>
         </ng-template>
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
@@ -173,8 +225,10 @@
           </ng-container>
           <ng-template #normalEmiTotal>
             {{
-              repaymentScheduleDetails.totalPrincipalExpected + repaymentScheduleDetails.totalInterestCharged
-                | currency: currencyCode : 'symbol-narrow' : '1.2-2'
+              (foreclosureScheduleOverlayActive
+                ? getDisplayTotalOriginalEmi()
+                : repaymentScheduleDetails.totalPrincipalExpected + repaymentScheduleDetails.totalInterestCharged
+              ) | currency: currencyCode : 'symbol-narrow' : '1.2-2'
             }}
           </ng-template>
         </b>
@@ -216,33 +270,39 @@
     <ng-container matColumnDef="penalties">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Overdue Interest' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        <ng-container *ngIf="item.reversedPenaltyChargesDue && item.reversedPenaltyChargesDue > 0; else normalPenalty">
-          <span class="reversed-amount">
-            <fa-icon icon="undo" class="m-r-5" [matTooltip]="'tooltips.Reversed Paid Charge' | translate"></fa-icon>
-            {{ item.reversedPenaltyChargesDue | formatNumber }}
-          </span>
+        <ng-container *ngIf="getDisplayOverdueInterestForPeriod(item) > 0">
+          <div [class.waived-lpi-amount]="isWaivedOverdueInterestOnly(item)">
+            {{ getDisplayOverdueInterestForPeriod(item) | formatNumber }}
+            <ng-container *ngIf="isWaivedOverdueInterestOnly(item) && !isWaived"> waived</ng-container>
+          </div>
         </ng-container>
-        <ng-template #normalPenalty>
-          <ng-container *ngIf="item.penaltyChargesDue > 0">
-            {{ item.penaltyChargesDue | formatNumber }}
-          </ng-container>
-        </ng-template>
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
         <b>
-          {{ repaymentScheduleDetails.totalPenaltyChargesCharged | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+          {{ getDisplayTotalPenaltyChargesCharged() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
         </b>
+        <div class="reversed-lpi-detail" *ngIf="hasReversedPaidLpiForLoan()">
+          <fa-icon
+            icon="undo"
+            class="m-r-5"
+            matTooltip="Credited to linked savings and restored as outstanding LPI; contractual EMI is unchanged."
+          ></fa-icon>
+          LPI refund restored outstanding
+          {{ getReversedPaidLpiAdjustmentTotal() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+        </div>
       </td>
     </ng-container>
 
     <ng-container matColumnDef="due">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Due Payment' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        {{ item.totalDueForPeriod | formatNumber }}
+        <ng-container *ngIf="!isForeclosureRemovedRow(item)">
+          <div>{{ getDisplayTotalDueForPeriod(item) | formatNumber }}</div>
+        </ng-container>
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
         <b>
-          {{ repaymentScheduleDetails.totalRepaymentExpected | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+          {{ getDisplayTotalRepaymentExpected() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
         </b>
       </td>
     </ng-container>
@@ -250,30 +310,44 @@
     <ng-container matColumnDef="paid">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Amount Paid' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        {{ item.totalPaidForPeriod | formatNumber }}
+        <ng-container *ngIf="!isForeclosureRemovedRow(item)">
+          <ng-container
+            *ngIf="isForeclosureClosureActual(item) && showForeclosureAmountPaidOverlay(item); else normalPaidAmount"
+          >
+            {{ item.foreclosureDisplay.actualAmountPaid | formatNumber }}
+            <span class="foreclosure-scheduled-muted">scheduled {{ getOriginalEmiAmount(item) | formatNumber }}</span>
+          </ng-container>
+          <ng-template #normalPaidAmount>
+            <div>{{ getDisplayTotalPaidForPeriod(item) | formatNumber }}</div>
+          </ng-template>
+        </ng-container>
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
-        <b> {{ repaymentScheduleDetails.totalRepayment | currency: currencyCode : 'symbol-narrow' : '1.2-2' }} </b>
+        <b> {{ getDisplayTotalRepayment() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }} </b>
       </td>
     </ng-container>
 
     <ng-container matColumnDef="inadvance">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Advance Paid' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        {{ item.totalPaidInAdvanceForPeriod | formatNumber }}
+        <ng-container *ngIf="!isForeclosureRemovedRow(item)">
+          <div>{{ getDisplayTotalPaidInAdvanceForPeriod(item) | formatNumber }}</div>
+        </ng-container>
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
-        <b> {{ repaymentScheduleDetails.totalPaidInAdvance | currency: currencyCode : 'symbol-narrow' : '1.2-2' }} </b>
+        <b> {{ getDisplayTotalPaidInAdvance() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }} </b>
       </td>
     </ng-container>
 
     <ng-container matColumnDef="late">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Late Paid' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        {{ item.totalPaidLateForPeriod | formatNumber }}
+        <ng-container *ngIf="!isForeclosureRemovedRow(item)">
+          <div>{{ getDisplayTotalPaidLateForPeriod(item) | formatNumber }}</div>
+        </ng-container>
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
-        <b> {{ repaymentScheduleDetails.totalPaidLate | currency: currencyCode : 'symbol-narrow' : '1.2-2' }} </b>
+        <b> {{ getDisplayTotalPaidLate() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }} </b>
       </td>
     </ng-container>
 
@@ -281,7 +355,27 @@
       <ng-container matColumnDef="waived">
         <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Waived Amount' | translate }}</th>
         <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-          {{ item.totalWaivedForPeriod | formatNumber }}
+          <ng-container *ngIf="item.period > 0">
+            <div *ngIf="item.penaltyChargesWaived > 0" class="waived-lpi-amount">
+              LPI: {{ item.penaltyChargesWaived | formatNumber }}
+            </div>
+            <div *ngIf="item.interestWaived > 0" class="waived-interest-amount">
+              Interest: {{ item.interestWaived | formatNumber }}
+            </div>
+            <div *ngIf="item.feeChargesWaived > 0" class="waived-fee-amount">
+              Fees: {{ item.feeChargesWaived | formatNumber }}
+            </div>
+            <div
+              *ngIf="
+                item.totalWaivedForPeriod > 0 &&
+                !item.penaltyChargesWaived &&
+                !item.interestWaived &&
+                !item.feeChargesWaived
+              "
+            >
+              {{ item.totalWaivedForPeriod | formatNumber }}
+            </div>
+          </ng-container>
         </td>
         <td mat-footer-cell class="r-amount" *matFooterCellDef>
           <b> {{ repaymentScheduleDetails.totalWaived | currency: currencyCode : 'symbol-narrow' : '1.2-2' }} </b>
@@ -301,11 +395,15 @@
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Outstanding Amount' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item">
         <ng-container *ngIf="!isLoanOverpaid() && shouldShowOutstanding(item); else emptyOutstanding">
-          {{ item.totalOutstandingForPeriod | formatNumber }}
+          {{ getDisplayTotalOutstandingForPeriod(item) | formatNumber }}
         </ng-container>
         <ng-template #emptyOutstanding>&nbsp;</ng-template>
       </td>
-      <td mat-footer-cell class="r-amount" *matFooterCellDef>&nbsp;</td>
+      <td mat-footer-cell class="r-amount" *matFooterCellDef>
+        <b *ngIf="getDisplayedTotalOutstanding() !== null">
+          {{ getDisplayedTotalOutstanding() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+        </b>
+      </td>
     </ng-container>
 
     <ng-container matColumnDef="header">

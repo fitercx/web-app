@@ -1,8 +1,8 @@
 /** Recurring Deposits Account Buttons Configuration */
 export class LoansAccountButtonConfiguration {
-  /** Loan actions that post cash/manual payments and do not debit the linked savings account. */
+  /** Loan actions that post cash/manual payments and do not debit the linked savings account.
+   *  Make Repayment is excluded: it opens Transfer from Savings (same as the client General tab). */
   private static readonly CASH_ONLY_ACTIONS = new Set([
-    'Make Repayment',
     'Prepay Loan',
     'Close',
     'Close (as Rescheduled)',

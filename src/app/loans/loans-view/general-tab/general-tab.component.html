@@ -35,14 +35,14 @@
       <ng-container matColumnDef="Original">
         <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Original' | translate }}</th>
         <td mat-cell class="r-amount" *matCellDef="let ele">
-          {{ ele.original | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+          <div>{{ ele.original | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}</div>
         </td>
       </ng-container>
 
       <ng-container matColumnDef="Paid">
         <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Paid' | translate }}</th>
         <td mat-cell class="r-amount amount-minus" *matCellDef="let ele">
-          {{ ele.paid | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+          <div>{{ ele.paid | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}</div>
         </td>
       </ng-container>
 
@@ -77,7 +77,11 @@
       <ng-container matColumnDef="Over Due">
         <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Over Due' | translate }}</th>
         <td mat-cell class="r-amount" *matCellDef="let ele">
-          {{ ele.overdue | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+          <div>{{ ele.overdue | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}</div>
+          <div *ngIf="ele.property === 'Total' && ele.reversedPaidLpi > 0" class="reversed-lpi-detail">
+            LPI refund restored outstanding
+            {{ ele.reversedPaidLpi | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
+          </div>
         </td>
       </ng-container>
 

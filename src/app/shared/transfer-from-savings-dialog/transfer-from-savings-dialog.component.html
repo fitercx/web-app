@@ -1,0 +1,132 @@
+<h2 mat-dialog-title>Transfer from Savings Account</h2>
+
+<mat-dialog-content class="transfer-dialog">
+  <dl class="linked-savings linked-savings--compact" *ngIf="linkedSavingsAccountAccountNo">
+    <div class="linked-savings__row">
+      <dt>Linked savings</dt>
+      <dd>{{ linkedSavingsAccountAccountNo }} · {{ linkedSavingsAccountProductName }}</dd>
+    </div>
+    <div class="linked-savings__row">
+      <dt>Available as of {{ selectedTransactionDateLabel }}</dt>
+      <dd>{{ currencySymbol }} {{ availableBalanceAsOfDate | formatNumber }}</dd>
+    </div>
+  </dl>
+
+  <form [formGroup]="transferForm" (ngSubmit)="submit()">
+    <div fxLayout="column">
+      <mat-form-field (click)="transactionDatePicker.open()">
+        <mat-label>{{ 'labels.inputs.Transaction Date' | translate }}</mat-label>
+        <input
+          matInput
+          [min]="minDate"
+          [max]="maxDate"
+          [matDatepicker]="transactionDatePicker"
+          required
+          formControlName="transactionDate"
+        />
+        <mat-datepicker-toggle matSuffix [for]="transactionDatePicker"></mat-datepicker-toggle>
+        <mat-datepicker #transactionDatePicker></mat-datepicker>
+        <mat-error *ngIf="transferForm.controls.transactionDate.hasError('required')">
+          {{ 'labels.inputs.Transaction Date' | translate }} {{ 'labels.commons.is' | translate }}
+          <strong>{{ 'labels.commons.required' | translate }}</strong>
+        </mat-error>
+      </mat-form-field>
+
+      <div class="date-impact-banner date-impact-banner--blocked" *ngIf="backdateBlockedMessage">
+        <mat-icon>block</mat-icon>
+        <span>{{ backdateBlockedMessage }}</span>
+      </div>
+
+      <div class="date-impact-banner future-preview-note future-preview-note--compact" *ngIf="isFutureDateSelected">
+        <mat-icon>visibility</mat-icon>
+        <span><strong>Preview only</strong> — submit disabled until you pick today or an earlier date.</span>
+      </div>
+
+      <mifosx-expandable-static-hint
+        *ngIf="!backdateBlockedMessage && backdateLimitMessage"
+        label="Backdate &amp; future-date rules"
+      >
+        <p>{{ backdateLimitMessage }}</p>
+        <p>{{ staticFutureDatePolicy }}</p>
+      </mifosx-expandable-static-hint>
+
+      <mat-form-field>
+        <mat-label>{{ 'labels.inputs.Transaction Amount' | translate }}</mat-label>
+        <input matInput type="number" required formControlName="transactionAmount" />
+        <mat-error *ngIf="amountErrorMessage">{{ amountErrorMessage }}</mat-error>
+      </mat-form-field>
+
+      <mifosx-settlement-summary-card
+        *ngIf="!backdateBlockedMessage"
+        [class.settlement-summary--manual]="isEnteredAmountPreview"
+        [currencySymbol]="currencySymbol"
+        [eyebrow]="displaySettlementEyebrow"
+        [dateLabel]="selectedTransactionDateLabel"
+        [totalAmount]="displaySettlementTotal"
+        [lines]="displaySettlementLines"
+        [subtitle]="displaySettlementSubtitle"
+        [footnotes]="displaySettlementFootnotes"
+        [loading]="isTemplateLoading"
+        [closesLoan]="displaySettlementClosesLoan"
+      ></mifosx-settlement-summary-card>
+
+      <div class="emi-hints" *ngIf="showDueEmiPills">
+        <div class="emi-hints__caption">Outstanding EMI</div>
+        <div class="emi-hints__pills">
+          <span
+            class="emi-pill"
+            *ngFor="let emi of displayEmis"
+            [ngClass]="[emi.state, emi.coverage]"
+            [attr.title]="emiCoverageLabel(emi.coverage)"
+          >
+            EMI #{{ emi.period }} · {{ emi.dueDate | dateFormat }} · {{ currencySymbol }}
+            {{ emi.amount | formatNumber }}
+          </span>
+        </div>
+      </div>
+
+      <mat-form-field>
+        <mat-label>{{ 'labels.inputs.Note' | translate }}</mat-label>
+        <textarea matInput required formControlName="note" cdkTextareaAutosize cdkAutosizeMinRows="2"></textarea>
+        <mat-error *ngIf="transferForm.controls.note.hasError('required')">
+          {{ 'labels.inputs.Note' | translate }} {{ 'labels.commons.is' | translate }}
+          <strong>{{ 'labels.commons.required' | translate }}</strong>
+        </mat-error>
+      </mat-form-field>
+    </div>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions fxLayout="column" fxLayoutAlign="center" fxLayoutGap="5px">
+  <div class="date-impact-banner date-impact-banner--blocked submit-blocked" *ngIf="submitErrorMessage">
+    <mat-icon>error</mat-icon>
+    <span>{{ submitErrorMessage }}</span>
+  </div>
+  <div class="date-impact-banner date-impact-banner--blocked submit-blocked" *ngIf="submitBlockedReason">
+    <mat-icon>info</mat-icon>
+    <span>{{ submitBlockedReason }}</span>
+  </div>
+  <div fxLayout="row" fxLayout.xs="column" fxLayoutAlign="center" fxLayoutGap="5px">
+    <button type="button" mat-raised-button mat-dialog-close [disabled]="isLoading">
+      {{ 'labels.buttons.Cancel' | translate }}
+    </button>
+    <button
+      type="button"
+      mat-raised-button
+      color="primary"
+      [disabled]="
+        transferForm.invalid ||
+        isLoading ||
+        isTemplateLoading ||
+        !transferTemplate ||
+        !linkedSavingsAccountId ||
+        backdateBlockedMessage ||
+        isFutureDateSelected
+      "
+      *mifosxHasPermission="'CREATE_ACCOUNTTRANSFER'"
+      (click)="submit()"
+    >
+      {{ isLoading ? 'Submitting…' : ('labels.buttons.Submit' | translate) }}
+    </button>
+  </div>
+</mat-dialog-actions>

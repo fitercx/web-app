@@ -1,5 +1,22 @@
 <div class="container mat-elevation-z8">
   <mat-card>
+    <div class="linked-savings" *ngIf="linkedSavingsAccountAccountNo">
+      <div>
+        <div>
+          {{ 'labels.inputs.Linked Savings Account (Auto Debit Source)' | translate }} :
+          <span class="linked-savings__account-no">
+            {{ linkedSavingsAccountAccountNo }} - {{ linkedSavingsAccountProductName }}
+          </span>
+        </div>
+        <div>
+          Available balance as of {{ selectedTransactionDateLabel }} is
+          <span class="linked-savings__account-no">
+            {{ currencyLabel }} {{ availableBalanceAsOfDate | formatNumber }}
+          </span>
+        </div>
+      </div>
+    </div>
+
     <form [formGroup]="repaymentLoanForm" (ngSubmit)="submit()">
       <mat-card-content>
         <div fxLayout="column">
@@ -26,6 +43,16 @@
             <span>{{ backdateLimitMessage }}</span>
           </div>
 
+          <div class="date-impact-banner future-preview-note" *ngIf="isFutureDateSelected">
+            <mat-icon>visibility</mat-icon>
+            <span>
+              <strong>Preview only</strong> — you selected a future date ({{ selectedTransactionDateLabel }}). The
+              amounts below show what the customer would owe if they pay on that date, including late-payment interest
+              (LPI) accruing until then. No future-dated payment can be done — the backend does not support recording a
+              repayment after today. Change the date to today (or earlier) to submit.
+            </span>
+          </div>
+
           <div class="date-impact-banner" *ngIf="dateImpactMessages.length">
             <mat-icon>info</mat-icon>
             <ul>
@@ -33,21 +60,39 @@
             </ul>
           </div>
 
+          <div
+            class="date-impact-banner full-outstanding-banner"
+            *ngIf="dueAsOfDateTotal > 0 || outstandingAfterWaiver > 0"
+          >
+            <mat-icon>account_balance</mat-icon>
+            <span>
+              Amount due as of {{ selectedTransactionDateLabel }}:
+              <strong>{{ currencyLabel }} {{ dueAsOfDateTotal | formatNumber }}</strong>
+              (installment plus any late-payment interest still due on this date).
+              <ng-container *ngIf="penaltyWaivedByBackdate > 0.01 && selectedTransactionDateShortLabel">
+                {{ currencyLabel }} {{ penaltyWaivedByBackdate | formatNumber }} of late-payment interest accrued after
+                {{ selectedTransactionDateShortLabel }} will be waived and is not charged.
+              </ng-container>
+            </span>
+          </div>
+
           <div fxLayout="row wrap" class="content">
-            <div fxFlex="50%" class="mat-body-strong">
-              {{ 'Principal' | translate }}
-            </div>
+            <div fxFlex="50%" class="mat-body-strong">Principal</div>
 
             <div fxFlex="50%" class="r-amount right-label">
-              {{ dataObject.penaltyTemplate.principalOutstanding | formatNumber }}
+              {{ displayedPrincipal | formatNumber }}
             </div>
 
-            <div fxFlex="50%" class="mat-body-strong">
-              {{ 'Interest' | translate }}
-            </div>
+            <div fxFlex="50%" class="mat-body-strong">Interest</div>
 
             <div fxFlex="50%" class="r-amount right-label">
-              {{ dataObject.penaltyTemplate.interestOutstanding | formatNumber }}
+              {{ displayedInterest | formatNumber }}
+            </div>
+
+            <div fxFlex="50%" class="mat-body-strong">LPI</div>
+
+            <div fxFlex="50%" class="r-amount right-label">
+              {{ displayedPenalty | formatNumber }}
             </div>
 
             <div fxFlex="50%" class="mat-body-strong">
@@ -55,15 +100,7 @@
             </div>
 
             <div fxFlex="50%" class="r-amount right-label">
-              {{ dataObject.repaymentTemplate.feeChargesPortion | formatNumber }}
-            </div>
-
-            <div fxFlex="50%" class="mat-body-strong">
-              {{ 'Penalties' | translate }}
-            </div>
-
-            <div fxFlex="50%" class="r-amount right-label">
-              {{ dataObject.penaltyTemplate.penaltyAmountDue | formatNumber }}
+              {{ displayedFee | formatNumber }}
             </div>
 
             <div fxFlex="50%" class="mat-body-strong">
@@ -71,13 +108,8 @@
             </div>
 
             <div fxFlex="50%" class="r-amount right-label">
-              {{ dataObject.repaymentTemplate.taxChargesPortion | formatNumber }}
+              {{ displayedTax | formatNumber }}
             </div>
-          </div>
-
-          <div class="date-impact-banner lpi-payment-note" *ngIf="lpiPaymentMessage">
-            <mat-icon>payments</mat-icon>
-            <span>{{ lpiPaymentMessage }}</span>
           </div>
 
           <mifosx-input-amount
@@ -87,6 +119,22 @@
             [inputLabel]="'Transaction Amount'"
           >
           </mifosx-input-amount>
+          <p class="amount-cap-hint" *ngIf="enteredAmountExceedsCap">
+            Maximum {{ currencyLabel }} {{ repaymentCapWithoutOverpay | formatNumber }} — overpayment is not allowed
+          </p>
+
+          <div class="date-impact-banner lpi-payment-note" *ngIf="settlementPreviewMessage">
+            <mat-icon>payments</mat-icon>
+            <span>{{ settlementPreviewMessage }}</span>
+          </div>
+
+          <div
+            class="date-impact-banner repayment-outcome-notice"
+            *ngIf="repaymentOutcomeNotice && !willBecomeOverpaid"
+          >
+            <mat-icon>payments</mat-icon>
+            <span>{{ repaymentOutcomeNotice }}</span>
+          </div>
 
           <mat-form-field>
             <mat-label>{{ 'labels.inputs.External Id' | translate }}</mat-label>
@@ -152,7 +200,7 @@
           <button
             mat-raised-button
             color="primary"
-            [disabled]="!repaymentLoanForm.valid"
+            [disabled]="!repaymentLoanForm.valid || isFutureDateSelected || enteredAmountExceedsCap"
             *mifosxHasPermission="'REPAYMENT_LOAN'"
           >
             {{ 'labels.buttons.Submit' | translate }}

@@ -104,6 +104,37 @@ table {
     min-width: 104px;
   }
 
+  .waived-lpi-amount {
+    color: #2e7d32;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .reversed-amount {
+    color: #c62828;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .reversed-lpi-detail {
+    color: #c62828;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+
+  .before-reversal-amount {
+    color: #757575;
+    font-size: 11px;
+    line-height: 1.3;
+  }
+
+  .waived-interest-amount,
+  .waived-fee-amount {
+    color: #558b2f;
+    font-size: 12px;
+  }
+
   .mat-column-status {
     min-width: 160px;
   }
@@ -172,6 +203,62 @@ table {
   line-height: 1.5;
 }
 
+.foreclosure-removed {
+  background-color: rgb(158 158 158 / 8%);
+  color: #9e9e9e;
+}
+
+.foreclosure-closure {
+  color: $status-paid;
+}
+
+.foreclosure-scheduled-muted {
+  color: #9e9e9e;
+  font-size: 12px;
+  font-weight: 400;
+  display: block;
+  margin-top: 2px;
+  line-height: 1.3;
+}
+
+.foreclosure-actual-amount {
+  color: #757575;
+  font-size: 12px;
+  font-weight: 400;
+  margin-top: 2px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.foreclosure-waived-amount {
+  color: #9e9e9e;
+  font-size: 12px;
+  font-weight: 400;
+  margin-top: 2px;
+  display: block;
+  font-style: italic;
+}
+
+.foreclosure-schedule-legend {
+  margin: 0 0 12px;
+  padding: 0 2%;
+  font-size: 13px;
+  color: #616161;
+  line-height: 1.45;
+}
+
+.foreclosure-legend-paid {
+  color: $status-paid;
+  font-weight: 500;
+}
+
+.foreclosure-legend-muted {
+  color: #9e9e9e;
+  font-weight: 500;
+}
+
+// stylelint-disable-next-line no-descending-specificity -- intentional global .reversed-amount base style; the
+// higher-specificity #repaymentSchedule .reversed-amount above is a scoped colour override, not a specificity conflict.
 .reversed-amount {
   color: #f44336;
   font-weight: 500;

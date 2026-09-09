@@ -39,6 +39,8 @@ export class ChargesTabComponent implements OnInit {
   status: any;
   /** True when the loan is closed — charge history is view-only, no actions. */
   isReadOnlyView = false;
+  /** Temporary UI gate. The backend LPI reversal workflow remains available for controlled testing. */
+  readonly lpiReversalAvailable = false;
   /** Columns to be displayed in charges table. */
   displayedColumns: string[] = [];
   private readonly editableColumns: string[] = [
@@ -51,6 +53,7 @@ export class ChargesTabComponent implements OnInit {
     'paid',
     'waived',
     'outstanding',
+    'status',
     'actions'
   ];
   private readonly readOnlyColumns: string[] = [
@@ -104,16 +107,20 @@ export class ChargesTabComponent implements OnInit {
     this.isReadOnlyView = !!this.loanDetails?.status?.closed;
     this.displayedColumns = this.isReadOnlyView ? [...this.readOnlyColumns] : [...this.editableColumns];
 
-    const charges = this.loanDetails.charges;
-    if (charges?.length) {
-      this.initializeCharges(charges);
-    } else if (this.isReadOnlyView) {
-      this.loansService.getLoanAccountCharges(this.loanDetails.id).subscribe((data: any) => {
-        this.initializeCharges(Array.isArray(data) ? data : []);
-      });
-    } else {
-      this.initializeCharges([]);
-    }
+    this.loadCharges();
+  }
+
+  /** Loads all charges (including paid/waived history) from the dedicated charges API. */
+  private loadCharges(): void {
+    this.loansService.getLoanAccountCharges(this.loanDetails.id).subscribe({
+      next: (data: any) => {
+        const charges = Array.isArray(data) ? data : this.loanDetails.charges || [];
+        this.initializeCharges(charges);
+      },
+      error: () => {
+        this.initializeCharges(this.loanDetails.charges || []);
+      }
+    });
   }
 
   private initializeCharges(charges: any[]) {
@@ -124,18 +131,20 @@ export class ChargesTabComponent implements OnInit {
         element.dueDate = this.loanDetails.timeline.actualDisbursementDate;
       }
       element.dueDate = this.dateUtils.parseDate(element.dueDate);
-      const isReversed =
+      const isLegacyReversal =
         !element.paid &&
         !element.waived &&
         element.amountPaid > 0 &&
         element.amountOutstanding === 0 &&
         element.amountWrittenOff === 0;
-      element.isReversed = isReversed;
+      const isRefundedCharge = this.hasPaidChargeRefund(element.id);
+      element.isReversed = isLegacyReversal || isRefundedCharge;
       const nothingOutstanding = Number(element.amountOutstanding || 0) === 0;
+      element.hasOutstandingRefund = isRefundedCharge && !nothingOutstanding;
       let actionFlag = true;
       if (
         !this.isReadOnlyView &&
-        !isReversed &&
+        !element.isReversed &&
         !element.paid &&
         !element.waived &&
         !nothingOutstanding &&
@@ -156,13 +165,18 @@ export class ChargesTabComponent implements OnInit {
 
   /** Human-readable charge settlement status for read-only closed-loan view. */
   chargeStatusLabel(charge: any): string {
+    if (charge.paid) {
+      return charge.isReversed && charge.penalty && charge.name === 'Daily Late Repayment Fee'
+        ? 'Paid (LPI reversed earlier)'
+        : 'Paid';
+    }
     if (charge.isReversed) {
-      return 'Reversed';
+      return Number(charge.amountOutstanding || 0) > 0 ? 'Outstanding (Reversed)' : 'Refunded';
     }
     if (charge.waived || Number(charge.amountWaived || 0) >= Number(charge.amount || 0)) {
       return 'Waived';
     }
-    if (charge.paid || (Number(charge.amountOutstanding || 0) === 0 && Number(charge.amountPaid || 0) > 0)) {
+    if (Number(charge.amountOutstanding || 0) === 0 && Number(charge.amountPaid || 0) > 0) {
       return 'Paid';
     }
     if (Number(charge.amountWaived || 0) > 0 && Number(charge.amountOutstanding || 0) > 0) {
@@ -174,8 +188,33 @@ export class ChargesTabComponent implements OnInit {
     return 'Outstanding';
   }
 
+  private hasPaidChargeRefund(chargeId: number): boolean {
+    const transactions = Array.isArray(this.loanDetails?.transactions) ? this.loanDetails.transactions : [];
+    return transactions.some((transaction: any) => {
+      const isActiveLoanRefund =
+        !transaction?.reversed &&
+        (transaction?.type?.id === 18 || transaction?.type?.code === 'loanTransactionType.refundForActiveLoan');
+      const refundedChargePortion =
+        Number(transaction?.penaltyChargesPortion || 0) + Number(transaction?.feeChargesPortion || 0);
+      if (!isActiveLoanRefund || refundedChargePortion <= 0) {
+        return false;
+      }
+      const paidByList = Array.isArray(transaction?.loanChargePaidByList) ? transaction.loanChargePaidByList : [];
+      return paidByList.some((paidBy: any) => Number(paidBy?.chargeId) === Number(chargeId));
+    });
+  }
+
   chargeStatusClass(charge: any): string {
-    return `charge-status--${this.chargeStatusLabel(charge).toLowerCase().replace(/\s+/g, '-')}`;
+    const status = this.chargeStatusLabel(charge)
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
+    return `charge-status--${status}`;
+  }
+
+  /** The refund restores the same charge's positive outstanding balance. */
+  displayOutstandingAmount(charge: any): number {
+    return Number(charge?.amountOutstanding || 0);
   }
 
   /**
@@ -291,6 +330,10 @@ export class ChargesTabComponent implements OnInit {
    * @param {any} charge Charge object
    */
   undoPaidCharge(charge: any) {
+    if (!this.lpiReversalAvailable) {
+      return;
+    }
+
     const undoChargeDialogRef = this.dialog.open(ConfirmationDialogComponent, {
       data: {
         heading: this.translateService.instant('labels.heading.Undo Paid Charge'),
@@ -309,7 +352,7 @@ export class ChargesTabComponent implements OnInit {
         const locale = this.settingsService.language.code;
         const dateFormat = this.settingsService.dateFormat;
         const dataObject = {
-          note: `Reversed paid charge: ${charge.name}`,
+          note: `Refunded paid charge: ${charge.name}`,
           dateFormat,
           locale
         };
@@ -320,6 +363,9 @@ export class ChargesTabComponent implements OnInit {
             next: (response: any) => {
               // Debug: Log the response to see its structure
               console.log('Reverse charge response:', response);
+
+              const savingsDepositTransactionId =
+                response?.changes?.savingsDepositTransactionId || response?.savingsDepositTransactionId;
 
               // Get savings account number from response or loan details
               let savingsAccountNo = '';
@@ -336,11 +382,14 @@ export class ChargesTabComponent implements OnInit {
               console.log('Savings account number found:', savingsAccountNo);
 
               // Show success message
-              let message = 'Charge reversed to the associated savings accounts';
-              if (savingsAccountNo) {
-                message += `: ${savingsAccountNo}`;
+              let message = '';
+              if (savingsDepositTransactionId) {
+                message = 'Charge reversed and refund posted to the associated savings account';
+                if (savingsAccountNo) {
+                  message += `: ${savingsAccountNo}`;
+                }
               } else {
-                message += '.';
+                message = 'Charge reversed and re-applied to the loan balance. No savings refund was created.';
               }
 
               this.snackBar.open(message, 'Close', {
