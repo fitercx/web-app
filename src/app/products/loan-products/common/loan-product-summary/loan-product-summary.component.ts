@@ -87,6 +87,17 @@ export class LoanProductSummaryComponent implements OnInit, OnChanges {
     return !!this.loanProduct?.factorRateProductEnabled;
   }
 
+  /**
+   * Create/edit previews carry the flag at the top level of the payload, while a saved product returns it under
+   * additionalProperties (it lives in the custom DPD config table, not on m_product_loan).
+   */
+  isDpdPrincipalOnlyRepaymentEnabled(): boolean {
+    return !!(
+      this.loanProduct?.enableDpdPrincipalOnlyRepayment ??
+      this.loanProduct?.additionalProperties?.enableDpdPrincipalOnlyRepayment
+    );
+  }
+
   setCurrentValues(): void {
     this.isAdvancedPaymentAllocation = LoanProducts.isAdvancedPaymentAllocationStrategy(
       this.loanProduct.transactionProcessingStrategyCode
