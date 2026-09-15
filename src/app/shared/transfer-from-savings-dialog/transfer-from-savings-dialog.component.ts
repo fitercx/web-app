@@ -9,6 +9,7 @@ import { Dates } from 'app/core/utils/dates';
 import { LoansService } from 'app/loans/loans.service';
 import {
   allocateSettlement,
+  buildBackdateLimitMessage,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
   computeSavingsBalanceAsOf,
@@ -36,9 +37,11 @@ import {
 export class TransferFromSavingsDialogComponent implements OnInit {
   transferForm: UntypedFormGroup;
   /**
-   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS before the business date, or the
-   * loan's disbursement date if that is later (see BackdatedRepaymentValidator#computeEarliestAllowedTransactionDate
-   * on the server). Replaced with the real value once the initial template loads (see loadInitialTemplate).
+   * Minimum Date allowed — backend-computed per loan and per environment by
+   * BackdatedRepaymentValidator#computeEarliestAllowedTransactionDate on the server, driven by the
+   * `backdated-transaction-max-days` global configuration: that many days before the business date (or the loan's
+   * disbursement date if later), or the start of the loan's first instalment period when the config is disabled.
+   * Replaced with the real value once the initial template loads (see loadInitialTemplate).
    * Maximum allows FUTURE dates so ops can preview LPI that would accrue until a future pay date.
    * A transfer cannot actually be recorded with a future date — the backend rejects it — so Submit is
    * disabled while a future date is selected (see isFutureDateSelected).
@@ -288,7 +291,6 @@ export class TransferFromSavingsDialogComponent implements OnInit {
    * ever picking a date the server would reject, rather than finding out only after submitting.
    */
   private applyEarliestAllowedDate(earliestAllowedTransactionDate: any): void {
-    this.backdateLimitMessage = 'You cannot backdate a payment by more than 30 days in the past.';
     if (!earliestAllowedTransactionDate) {
       return;
     }
@@ -297,6 +299,9 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       return;
     }
     this.minDate = parsed;
+    this.backdateLimitMessage = buildBackdateLimitMessage(
+      this.dateUtils.formatDate(parsed, this.settingsService.dateFormat)
+    );
   }
 
   /** Linked savings from GET /loans/{id}?associations=linkedAccount — not foreclosure template (blocked when overdue). */
