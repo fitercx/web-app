@@ -18,7 +18,9 @@ import { getForeclosureUnearnedInterestDetails } from '../foreclosure-unearned-i
 import { sortTransactionsByLatest } from 'app/core/utils/transaction-chronology';
 import {
   displayPenaltyPortion as mapPenaltyPortion,
-  displayTaxPortion as mapTaxPortion
+  displayTaxPortion as mapTaxPortion,
+  isWaiveChargeTransaction,
+  isWaivedLpiRow
 } from './loan-transaction-display.util';
 
 @Component({
@@ -248,15 +250,25 @@ export class TransactionsTabComponent implements OnInit {
   }
 
   transactionTypeLabel(transaction: LoanTransaction): string {
-    return this.isPaidLpiRefund(transaction) ? 'Refunded LPI' : transaction.type.value;
+    if (this.isPaidLpiRefund(transaction)) {
+      return 'Refunded LPI';
+    }
+    if (isWaivedLpiRow(transaction, this.loanDetailsData?.charges)) {
+      return 'Waived LPI';
+    }
+    return transaction.type.value;
   }
 
   displayPenaltyPortion(transaction: LoanTransaction): number {
-    return mapPenaltyPortion(transaction);
+    return mapPenaltyPortion(transaction, this.loanDetailsData?.charges);
   }
 
   displayTaxPortion(transaction: LoanTransaction): number {
-    return mapTaxPortion(transaction);
+    return mapTaxPortion(transaction, this.loanDetailsData?.charges);
+  }
+
+  isWaivedLpiDisplay(transaction: LoanTransaction): boolean {
+    return isWaivedLpiRow(transaction, this.loanDetailsData?.charges);
   }
 
   private isPaidLpiRefund(transaction: LoanTransaction): boolean {
@@ -286,6 +298,9 @@ export class TransactionsTabComponent implements OnInit {
     }
     if (this.isDownPayment(transaction.type)) {
       return 'down-payment';
+    }
+    if (isWaiveChargeTransaction(transaction)) {
+      return 'waive';
     }
     if (this.isReAge(transaction.type)) {
       return 'reage';
