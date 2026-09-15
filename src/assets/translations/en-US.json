@@ -1739,6 +1739,7 @@
       "Enable installment level Delinquency": "Enable installment level Delinquency",
       "Enable Auto Repayment for Down Payment": "Enable Auto Repayment for Down Payment",
       "Enable Dormancy Tracking": "Enable Dormancy Tracking",
+      "Enable DPD Strategy Switch": "Enable DPD Strategy Switch",
       "Enable Down Payment": "Enable Down Payment",
       "Enable Multiple Disbursals": "Enable Multiple Disbursals",
       "Enabled": "Enabled",
@@ -2876,6 +2877,7 @@
       "the Transaction Type": "the Transaction Type"
     },
     "text": {
+      "Auto-switched (DPD)": "Auto-switched (DPD)",
       "Processing Disbursements": "Processing Disbursements",
       "Please wait while we process your request": "Please wait while we process your request",
       "loans selected": "loans selected",
@@ -3874,6 +3876,7 @@
     "The period at which interest rate is posted or credited": "The period at which interest rate is posted or credited to a fixed deposit account based on this fixed deposit product.",
     "The percentage of disbursements amount for Down Payment": "The percentage of disbursements amount for Down Payment",
     "The repayment strategy": "The repayment strategy determines the sequence in which each of the components is paid.",
+    "When enabled loans on this product switch to principal first once they pass the DPD threshold": "When enabled, a loan on this product is automatically switched to the Principal, Interest, Penalties, Fees Order repayment strategy once its days past due exceed the threshold set in System > Global Configurations (dpd-strategy-switch-threshold, default 60 days), so collections pay down principal first. The loan is switched back to the strategy selected above as soon as it is no longer past the threshold. Already posted transactions are never changed.",
     "The setting for number of days": "The setting for number of days in year to use to calculate interest.",
     "This sections defines an interest penalty": "This sections defines an interest penalty for pre-mature closure.",
     "These fields are used to define the minimum, default, maximum shares per customer": "These fields are used to define the minimum, default, maximum shares per customer",

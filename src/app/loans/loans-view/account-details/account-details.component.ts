@@ -18,4 +18,26 @@ export class AccountDetailsComponent {
       this.loanDetails = data.loanDetailsData;
     });
   }
+
+  /** True while the loan is running on the strategy the DPD auto-switch put it on, rather than its product strategy. */
+  get isDpdStrategySwitchActive(): boolean {
+    return !!this.loanDetails?.additionalProperties?.dpdStrategySwitchActive;
+  }
+
+  get dpdStrategySwitchTooltip(): string {
+    const properties = this.loanDetails?.additionalProperties;
+    if (!properties) {
+      return '';
+    }
+    const parts = [
+      `This loan was switched automatically because it is ${properties.dpdStrategySwitchMaxDpd} days past due` +
+        ` (threshold ${properties.dpdStrategySwitchThreshold} days).`
+    ];
+    if (properties.dpdStrategySwitchOriginalStrategyName) {
+      parts.push(
+        `It will switch back to "${properties.dpdStrategySwitchOriginalStrategyName}" once it is no longer past the threshold.`
+      );
+    }
+    return parts.join(' ');
+  }
 }

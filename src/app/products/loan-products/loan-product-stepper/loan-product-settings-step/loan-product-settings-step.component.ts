@@ -101,6 +101,9 @@ export class LoanProductSettingsStepComponent implements OnInit {
       factorRateProductEnabled: this.loanProductsTemplate?.factorRateProductEnabled,
       factorRate: this.loanProductsTemplate?.factorRate,
       penaltyGracePeriod: this.loanProductsTemplate?.penaltyGracePeriod,
+      // Returned under additionalProperties because it is a CredibleX column on the product, not part of the
+      // core LoanProductData contract.
+      enableDpdStrategySwitch: this.loanProductsTemplate?.additionalProperties?.enableDpdStrategySwitch ?? false,
       interestCalculationPeriodType: this.loanProductsTemplate.interestCalculationPeriodType.id,
       allowPartialPeriodInterestCalculation: this.loanProductsTemplate.allowPartialPeriodInterestCalculation,
       transactionProcessingStrategyCode: transactionProcessingStrategyCode,
@@ -278,6 +281,7 @@ export class LoanProductSettingsStepComponent implements OnInit {
         ]
       ],
       penaltyGracePeriod: [''],
+      enableDpdStrategySwitch: [false],
       amortizationType: [
         '',
         Validators.required

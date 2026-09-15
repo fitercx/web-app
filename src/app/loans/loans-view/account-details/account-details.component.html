@@ -16,7 +16,16 @@
 
     <div fxFlexFill>
       <span fxFlex="50%">{{ 'labels.inputs.Repayment Strategy' | translate }}</span>
-      <span fxFlex="50%">{{ loanDetails.transactionProcessingStrategyName | translateKey: 'catalogs' }}</span>
+      <span fxFlex="50%">
+        {{ loanDetails.transactionProcessingStrategyName | translateKey: 'catalogs' }}
+        <span
+          *ngIf="isDpdStrategySwitchActive"
+          class="dpd-strategy-switch-badge"
+          [matTooltip]="dpdStrategySwitchTooltip"
+        >
+          {{ 'labels.text.Auto-switched (DPD)' | translate }}
+        </span>
+      </span>
     </div>
 
     <div fxFlexFill>
