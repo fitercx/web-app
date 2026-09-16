@@ -54,6 +54,7 @@ import { InputPasswordComponent } from './input-password/input-password.componen
 import { LoanDownloadsMenuComponent } from './loan-downloads-menu/loan-downloads-menu.component';
 import { ExpandableStaticHintComponent } from './expandable-static-hint/expandable-static-hint.component';
 import { SettlementSummaryCardComponent } from './settlement-summary-card/settlement-summary-card.component';
+import { ReverseStandingInstructionDialogComponent } from './reverse-standing-instruction-dialog/reverse-standing-instruction-dialog.component';
 
 /**
  * Shared Module
@@ -114,7 +115,8 @@ import { SettlementSummaryCardComponent } from './settlement-summary-card/settle
     InputPasswordComponent,
     LoanDownloadsMenuComponent,
     ExpandableStaticHintComponent,
-    SettlementSummaryCardComponent
+    SettlementSummaryCardComponent,
+    ReverseStandingInstructionDialogComponent
   ],
   exports: [
     FileUploadComponent,
