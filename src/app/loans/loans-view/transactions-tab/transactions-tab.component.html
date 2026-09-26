@@ -148,7 +148,8 @@
         (click)="showTransactions(transaction)"
         [ngClass]="loanTransactionColor(transaction)"
       >
-        {{ displayPenaltyPortion(transaction) | formatNumber }}
+        {{ displayPenaltyPortion(transaction) | formatNumber
+        }}<span *ngIf="isWaivedLpiDisplay(transaction)" class="waived-tag"> waived</span>
       </td>
     </ng-container>
 
