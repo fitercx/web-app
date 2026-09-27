@@ -19,7 +19,8 @@ import {
   computeUnearnedInterest,
   formatLpiWaivedAfterDateMessage,
   reconcileAsOfDateAmounts,
-  applyEmiAmountCoverage
+  applyEmiAmountCoverage,
+  waterfallOrderForStrategy
 } from 'app/loans/common/backdated-settlement.util';
 import { SettingsService } from 'app/settings/settings.service';
 import { AlertService } from 'app/core/alert/alert.service';
@@ -442,7 +443,8 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         interest: this.interestOutstanding,
         principal: this.remainingPrincipalOutstanding
       },
-      this.getOutstandingInstallmentBuckets(transactionDateValue)
+      this.getOutstandingInstallmentBuckets(transactionDateValue),
+      waterfallOrderForStrategy(this.data.loan?.transactionProcessingStrategyCode)
     );
   }
 

@@ -540,4 +540,14 @@ export class LoanProductSummaryComponent implements OnInit, OnChanges {
   mapHumanReadableValueStringEnumOptionDataList(incomingParameter: StringEnumOptionData[]): string[] {
     return incomingParameter.map((v) => v.value);
   }
+
+  /**
+   * Create/edit previews carry the flag at the top level of the payload, while a saved product returns it under
+   * additionalProperties.
+   */
+  isDpdStrategySwitchEnabled(): boolean {
+    return !!(
+      this.loanProduct?.enableDpdStrategySwitch ?? this.loanProduct?.additionalProperties?.enableDpdStrategySwitch
+    );
+  }
 }

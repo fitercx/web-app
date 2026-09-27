@@ -151,6 +151,7 @@ export interface LoanProduct {
   factorRateProductEnabled?: boolean;
   factorRate?: number;
   penaltyGracePeriod?: number;
+  enableDpdStrategySwitch?: boolean;
   overAppliedCalculationType: any;
   minInterestRatePerPeriod: number;
   maxInterestRatePerPeriod: number;
@@ -172,6 +173,7 @@ export interface LoanProduct {
 export interface LoanProductAdditionalProperties {
   isLocEnabled?: boolean;
   lineOfCreditOptions?: any[];
+  enableDpdStrategySwitch?: boolean;
 }
 
 export interface AllowAttributeOverrides {

@@ -28,6 +28,7 @@ export interface InstallmentBucket extends SettlementComponents {
   period?: number;
 }
 
+/** Matches the stock "Penalties, Fees, Interest, Principal order" strategy. */
 const WATERFALL_ORDER: Array<keyof SettlementComponents> = [
   'penalty',
   'fee',
@@ -35,6 +36,26 @@ const WATERFALL_ORDER: Array<keyof SettlementComponents> = [
   'interest',
   'principal'
 ];
+
+/** Matches "Principal, Interest, Penalties, Fees Order", which the DPD auto-switch puts high-DPD loans on. */
+const PRINCIPAL_FIRST_WATERFALL_ORDER: Array<keyof SettlementComponents> = [
+  'principal',
+  'interest',
+  'penalty',
+  'fee',
+  'tax'
+];
+
+export const PRINCIPAL_FIRST_STRATEGY_CODE = 'principal-interest-penalties-fees-order-strategy';
+
+/**
+ * The preview has to follow whichever strategy the loan is actually on. A loan that the DPD auto-switch has moved
+ * to principal-first would otherwise be quoted penalties-and-interest-first here while the backend allocates the
+ * payment to principal, so the figures on screen would not match the posted transaction.
+ */
+export function waterfallOrderForStrategy(strategyCode?: string | null): Array<keyof SettlementComponents> {
+  return strategyCode === PRINCIPAL_FIRST_STRATEGY_CODE ? PRINCIPAL_FIRST_WATERFALL_ORDER : WATERFALL_ORDER;
+}
 
 /**
  * On-screen explanation of the transaction-date calendar's lower bound.
@@ -502,7 +523,8 @@ export function computeProjectedOverpayment(amount: number, settlementCap: numbe
 export function allocateSettlement(
   amount: number,
   asOfDateComponents: SettlementComponents,
-  buckets: InstallmentBucket[] = []
+  buckets: InstallmentBucket[] = [],
+  order: Array<keyof SettlementComponents> = WATERFALL_ORDER
 ): SettlementAllocation {
   const allocation: SettlementAllocation = {
     penalty: 0,
@@ -539,12 +561,12 @@ export function allocateSettlement(
     if (remaining <= 0) {
       break;
     }
-    for (const key of WATERFALL_ORDER) {
+    for (const key of order) {
       apply(key, Math.min(roundAmount(bucket[key] || 0), budgets[key]));
     }
   }
 
-  for (const key of WATERFALL_ORDER) {
+  for (const key of order) {
     apply(key, budgets[key]);
   }
 

@@ -26,7 +26,8 @@ import {
   computeUnearnedInterest,
   computeLpiOnlyPeriodOutstanding,
   reconcileAsOfDateAmounts,
-  SchedulePeriod
+  SchedulePeriod,
+  waterfallOrderForStrategy
 } from 'app/loans/common/backdated-settlement.util';
 
 /**
@@ -72,6 +73,8 @@ export class MakeRepaymentComponent implements OnInit {
   availableBalanceAsOfDate = 0;
   private savingsTransactions: any[] = [];
   private loanSummary: any;
+  /** Drives the preview waterfall, which differs once the DPD auto-switch moves a loan to principal-first. */
+  private transactionProcessingStrategyCode: string | null = null;
   private repaymentSchedulePeriods: SchedulePeriod[] = [];
   fullLoanOutstanding = 0;
 
@@ -419,6 +422,7 @@ export class MakeRepaymentComponent implements OnInit {
 
   private applyLoanSummary(loanDetails: any): void {
     this.loanSummary = loanDetails?.summary || null;
+    this.transactionProcessingStrategyCode = loanDetails?.transactionProcessingStrategyCode || null;
     this.fullLoanOutstanding = this.roundAmount(Number(this.loanSummary?.totalOutstanding || 0));
     this.repaymentSchedulePeriods = Array.isArray(loanDetails?.repaymentSchedule?.periods)
       ? loanDetails.repaymentSchedule.periods
@@ -690,13 +694,18 @@ export class MakeRepaymentComponent implements OnInit {
    */
   private get currentSettlementAllocation() {
     const amount = Number(this.repaymentLoanForm?.get('transactionAmount')?.value || 0);
-    return allocateSettlement(amount, {
-      penalty: this.penaltyAsOfDate,
-      fee: this.feeAsOfDate,
-      tax: this.taxAsOfDate,
-      interest: this.interestAsOfDate,
-      principal: this.remainingPrincipalAsOfDate
-    });
+    return allocateSettlement(
+      amount,
+      {
+        penalty: this.penaltyAsOfDate,
+        fee: this.feeAsOfDate,
+        tax: this.taxAsOfDate,
+        interest: this.interestAsOfDate,
+        principal: this.remainingPrincipalAsOfDate
+      },
+      [],
+      waterfallOrderForStrategy(this.transactionProcessingStrategyCode)
+    );
   }
 
   get currencyLabel(): string {
@@ -715,13 +724,18 @@ export class MakeRepaymentComponent implements OnInit {
       return;
     }
 
-    const allocation = allocateSettlement(amount, {
-      penalty: this.penaltyAsOfDate,
-      fee: this.feeAsOfDate,
-      tax: this.taxAsOfDate,
-      interest: this.interestAsOfDate,
-      principal: this.remainingPrincipalAsOfDate
-    });
+    const allocation = allocateSettlement(
+      amount,
+      {
+        penalty: this.penaltyAsOfDate,
+        fee: this.feeAsOfDate,
+        tax: this.taxAsOfDate,
+        interest: this.interestAsOfDate,
+        principal: this.remainingPrincipalAsOfDate
+      },
+      [],
+      waterfallOrderForStrategy(this.transactionProcessingStrategyCode)
+    );
 
     const parts: string[] = [];
     if (allocation.penalty > 0.01) {

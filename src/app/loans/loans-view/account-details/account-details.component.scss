@@ -5,3 +5,16 @@ table {
 span {
   margin: 0.5em 0;
 }
+
+.dpd-strategy-switch-badge {
+  display: inline-block;
+  margin-left: 0.5em;
+  padding: 0.1em 0.5em;
+  border-radius: 0.75em;
+  background-color: #fff3e0;
+  color: #e65100;
+  font-size: 0.75em;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: default;
+}

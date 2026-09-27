@@ -15,7 +15,9 @@ import {
   lastAllowedLocForeclosureDate,
   reconcileAsOfDateAmounts,
   reconcilePenaltyWithLedger,
-  applyEmiAmountCoverage
+  applyEmiAmountCoverage,
+  waterfallOrderForStrategy,
+  PRINCIPAL_FIRST_STRATEGY_CODE
 } from './backdated-settlement.util';
 
 describe('backdated-settlement.util', () => {
@@ -43,6 +45,26 @@ describe('backdated-settlement.util', () => {
     expect(allocation.interest).toBe(3484.11);
     expect(allocation.principal).toBe(78500);
     expect(allocation.unallocated).toBe(0);
+  });
+
+  it('quotes a DPD auto-switched loan principal-first so the preview matches what the backend will post', () => {
+    const budgets = { penalty: 12.82, fee: 0, tax: 0, interest: 2643.33, principal: 14098.79 };
+
+    const stock = allocateSettlement(500, budgets, []);
+    expect(stock.penalty).toBe(12.82);
+    expect(stock.interest).toBe(487.18);
+    expect(stock.principal).toBe(0);
+
+    const switched = allocateSettlement(500, budgets, [], waterfallOrderForStrategy(PRINCIPAL_FIRST_STRATEGY_CODE));
+    expect(switched.principal).toBe(500);
+    expect(switched.interest).toBe(0);
+    expect(switched.penalty).toBe(0);
+  });
+
+  it('falls back to the stock waterfall for any other strategy', () => {
+    expect(waterfallOrderForStrategy('mifos-standard-strategy')[0]).toBe('penalty');
+    expect(waterfallOrderForStrategy(undefined)[0]).toBe('penalty');
+    expect(waterfallOrderForStrategy(PRINCIPAL_FIRST_STRATEGY_CODE)[0]).toBe('principal');
   });
 
   it('treats paying principal+interest on the due date as a full settlement after LPI waiver', () => {
