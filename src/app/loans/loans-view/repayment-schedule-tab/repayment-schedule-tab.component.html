@@ -270,24 +270,30 @@
     <ng-container matColumnDef="penalties">
       <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Overdue Interest' | translate }}</th>
       <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
-        <ng-container *ngIf="getDisplayOverdueInterestForPeriod(item) > 0">
-          <div [class.waived-lpi-amount]="isWaivedOverdueInterestOnly(item)">
-            {{ getDisplayOverdueInterestForPeriod(item) | formatNumber }}
-            <ng-container *ngIf="isWaivedOverdueInterestOnly(item) && !isWaived"> waived</ng-container>
-          </div>
-        </ng-container>
+        <div *ngIf="getDisplayOverdueInterestForPeriod(item) > 0">
+          {{ getDisplayOverdueInterestForPeriod(item) | formatNumber }}
+        </div>
+        <div class="waived-lpi-amount" *ngIf="periodWaivedLpi(item) > 0 && !isWaived">
+          Waived LPI: {{ periodWaivedLpi(item) | formatNumber }}
+        </div>
+        <div
+          class="reversed-lpi-detail"
+          *ngIf="periodReversedLpi(item) > 0"
+          matTooltip="Refunded to linked savings. Not waived LPI, and not part of the overdue amount above."
+        >
+          Reversed LPI: {{ periodReversedLpi(item) | formatNumber }}
+        </div>
       </td>
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
         <b>
           {{ getDisplayTotalPenaltyChargesCharged() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
         </b>
-        <div class="reversed-lpi-detail" *ngIf="hasReversedPaidLpiForLoan()">
-          <fa-icon
-            icon="undo"
-            class="m-r-5"
-            matTooltip="Credited to linked savings and restored as outstanding LPI; contractual EMI is unchanged."
-          ></fa-icon>
-          LPI refund restored outstanding
+        <div
+          class="reversed-lpi-detail"
+          *ngIf="hasReversedPaidLpiForLoan()"
+          matTooltip="Refunded to linked savings. Not waived LPI, and not included in the overdue total above."
+        >
+          Reversed LPI
           {{ getReversedPaidLpiAdjustmentTotal() | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
         </div>
       </td>
@@ -357,7 +363,7 @@
         <td mat-cell class="r-amount" *matCellDef="let item" [ngClass]="installmentStyle(item)">
           <ng-container *ngIf="item.period > 0">
             <div *ngIf="item.penaltyChargesWaived > 0" class="waived-lpi-amount">
-              LPI: {{ item.penaltyChargesWaived | formatNumber }}
+              Waived LPI: {{ item.penaltyChargesWaived | formatNumber }}
             </div>
             <div *ngIf="item.interestWaived > 0" class="waived-interest-amount">
               Interest: {{ item.interestWaived | formatNumber }}
