@@ -15,7 +15,13 @@
 
           <mat-form-field>
             <mat-label>{{ 'labels.inputs.Number Value' | translate }}</mat-label>
-            <input matInput type="number" formControlName="value" />
+            <input matInput type="number" formControlName="value" [min]="isBackdateWindow ? 0 : null" />
+            <mat-hint *ngIf="isBackdateWindow">
+              0 means no backdating. Turn this configuration off to allow backdating to the start of the loan.
+            </mat-hint>
+            <mat-error *ngIf="configurationForm.controls.value.hasError('min')">
+              Value must be 0 or greater.
+            </mat-error>
           </mat-form-field>
 
           <mat-form-field>
