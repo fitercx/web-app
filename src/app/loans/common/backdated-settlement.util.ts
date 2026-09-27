@@ -57,6 +57,19 @@ export function waterfallOrderForStrategy(strategyCode?: string | null): Array<k
   return strategyCode === PRINCIPAL_FIRST_STRATEGY_CODE ? PRINCIPAL_FIRST_WATERFALL_ORDER : WATERFALL_ORDER;
 }
 
+/**
+ * On-screen explanation of the transaction-date calendar's lower bound.
+ *
+ * How far back a value date may go is backend policy, computed per loan by
+ * BackdatedRepaymentValidator#computeEarliestAllowedTransactionDate and returned as
+ * `earliestAllowedTransactionDate`. It is administrator-configurable per tenant (global configuration
+ * `backdated-transaction-max-days`), so the message states the actual earliest allowed date rather than quoting a
+ * day count that goes stale the moment the configuration changes.
+ */
+export function buildBackdateLimitMessage(formattedEarliestAllowedDate: string): string {
+  return `You cannot backdate this payment before ${formattedEarliestAllowedDate} — the earliest date allowed for this loan.`;
+}
+
 /** LPI that is on the loan today but will be waived by settling on the selected date. */
 export function computePenaltyWaivedByBackdate(penaltyInSummary: number, penaltyAsOfDate: number): number {
   return Math.max(roundAmount(Number(penaltyInSummary || 0) - Number(penaltyAsOfDate || 0)), 0);
@@ -433,8 +446,9 @@ export function computeScheduleCloseCap(periods: SchedulePeriod[] | undefined): 
 export const LOC_FORECLOSURE_DUE_OR_OVERDUE_ERROR_CODE = 'error.msg.loan.foreclosure.not.allowed.on.or.after.due.date';
 
 /**
- * Last calendar date LocForeclosureValidator will accept: day before the earliest unpaid real EMI,
- * clamped to the 30-day backdate window. Null when that date is outside min/max (cannot backdate).
+ * Last calendar date LocForeclosureValidator will accept: day before the earliest unpaid real EMI, clamped to the
+ * backend's configured backdate window (`minDate` — see buildBackdateLimitMessage).
+ * Null when that date is outside min/max (cannot backdate).
  */
 export function lastAllowedLocForeclosureDate(
   periods: SchedulePeriod[] | undefined,

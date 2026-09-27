@@ -1,5 +1,6 @@
 import {
   allocateSettlement,
+  buildBackdateLimitMessage,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
   formatWaivedLpiMessage,
@@ -567,5 +568,17 @@ describe('backdated-settlement.util', () => {
         new Date(2026, 8, 2)
       )
     ).toBeNull();
+  });
+
+  it('states the backend earliest allowed date instead of a fixed number of days', () => {
+    expect(buildBackdateLimitMessage('05 August 2026')).toBe(
+      'You cannot backdate this payment before 05 August 2026 — the earliest date allowed for this loan.'
+    );
+  });
+
+  it('tracks the widened non-production window without mentioning 30 days', () => {
+    const message = buildBackdateLimitMessage('01 January 2026');
+    expect(message).toContain('01 January 2026');
+    expect(message).not.toContain('30 days');
   });
 });

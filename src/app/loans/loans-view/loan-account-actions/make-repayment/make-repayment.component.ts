@@ -16,6 +16,7 @@ import { AlertService } from 'app/core/alert/alert.service';
 import { SavingsService } from 'app/savings/savings.service';
 import {
   allocateSettlement,
+  buildBackdateLimitMessage,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
   computeProjectedOverpayment,
@@ -46,9 +47,11 @@ export class MakeRepaymentComponent implements OnInit {
   /** Show payment details */
   showPaymentDetails = false;
   /**
-   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS (30) before the business date, or the
-   * loan's disbursement date if that is later (see BackdatedRepaymentValidator#computeEarliestAllowedTransactionDate
-   * on the server). Applied from the resolver-loaded penalty template's `earliestAllowedTransactionDate` in ngOnInit.
+   * Minimum Date allowed — backend-computed per loan and per environment by
+   * BackdatedRepaymentValidator#computeEarliestAllowedTransactionDate on the server, driven by the
+   * `backdated-transaction-max-days` global configuration: that many days before the business date (or the loan's
+   * disbursement date if later), or the start of the loan's first instalment period when the config is disabled.
+   * Applied from the resolver-loaded penalty template's `earliestAllowedTransactionDate` in ngOnInit.
    * Maximum allows FUTURE dates so the ops team can preview the amount a customer would owe on a future pay date
    * (LPI keeps accruing until then). A repayment can never actually be recorded with a future date — the backend
    * rejects it — so the Submit button is disabled while a future date is selected (see isFutureDateSelected).
@@ -328,7 +331,6 @@ export class MakeRepaymentComponent implements OnInit {
    * ever picking a date the server would reject, rather than finding out only after submitting.
    */
   private applyEarliestAllowedDate(earliestAllowedTransactionDate: any): void {
-    this.backdateLimitMessage = 'You cannot backdate a payment by more than 30 days in the past.';
     if (!earliestAllowedTransactionDate) {
       return;
     }
@@ -337,6 +339,9 @@ export class MakeRepaymentComponent implements OnInit {
       return;
     }
     this.minDate = parsed;
+    this.backdateLimitMessage = buildBackdateLimitMessage(
+      this.dateUtils.formatDate(parsed, this.settingsService.dateFormat)
+    );
   }
 
   /**
