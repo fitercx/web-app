@@ -1,5 +1,6 @@
 import {
   allocateSettlement,
+  includeLpiWaiveFootnote,
   buildBackdateLimitMessage,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
@@ -31,6 +32,73 @@ describe('backdated-settlement.util', () => {
     }
     return null;
   };
+
+  it('collects schedule LPI and unmapped LPI before interest and principal', () => {
+    const allocation = allocateSettlement(
+      15000,
+      { penalty: 821.9, fee: 0, tax: 0, interest: 3287.67, principal: 100000 },
+      [{ penalty: 82.19, fee: 0, tax: 0, interest: 3287.67, principal: 100000, period: 1 }]
+    );
+
+    expect(allocation.penalty).toBe(821.9);
+    expect(allocation.interest).toBe(3287.67);
+    expect(allocation.principal).toBe(10890.43);
+    expect(allocation.unallocated).toBe(0);
+  });
+
+  it('applies a small partial entirely to LPI when LPI is due first', () => {
+    const allocation = allocateSettlement(100, { penalty: 328.76, fee: 0, tax: 0, interest: 200, principal: 85000 }, [
+      { penalty: 0, fee: 0, tax: 0, interest: 200, principal: 85000, period: 1 }]);
+
+    expect(allocation.penalty).toBe(100);
+    expect(allocation.interest).toBe(0);
+    expect(allocation.principal).toBe(0);
+  });
+
+  it('LMS-146 / LMS-147: Fero partial of 81,000.820 on 11 Sep keeps both overdue days in the allocation', () => {
+    const allocation = allocateSettlement(
+      81000.82,
+      { penalty: 356.8, fee: 0, tax: 0, interest: 0, principal: 217054.01 },
+      [{ penalty: 178.4, fee: 0, tax: 0, interest: 0, principal: 217054.01, period: 1 }]
+    );
+
+    expect(allocation.penalty).toBe(356.8);
+    expect(allocation.principal).toBe(80644.02);
+    expect(includeLpiWaiveFootnote(true, false)).toBe(false);
+    expect(formatLpiWaivedAfterDateMessage('AED', '2140.80', '11-Sep')).toBe(
+      'AED 2140.80 of late-payment interest accrued after 11-Sep will be waived and is not charged.'
+    );
+  });
+
+  it('LMS-150: partial 10,000 on 5 Aug still shows the 328.76 LPI row', () => {
+    const allocation = allocateSettlement(
+      10000,
+      { penalty: 328.76, fee: 0, tax: 0, interest: 0, principal: 85082.19 },
+      [{ penalty: 82.19, fee: 0, tax: 0, interest: 0, principal: 85082.19, period: 1 }]
+    );
+
+    expect(allocation.penalty).toBe(328.76);
+    expect(allocation.principal).toBe(9671.24);
+    expect(includeLpiWaiveFootnote(true, false)).toBe(false);
+  });
+
+  it('shows the LPI waive note for a full quote and a closing payment, not a partial', () => {
+    expect(includeLpiWaiveFootnote(false, false)).toBe(true);
+    expect(includeLpiWaiveFootnote(true, true)).toBe(true);
+    expect(includeLpiWaiveFootnote(true, false)).toBe(false);
+  });
+
+  it('allocates as-of-date LPI before principal when the installment bucket omits it', () => {
+    const allocation = allocateSettlement(
+      10000,
+      { penalty: 328.76, fee: 0, tax: 0, interest: 0, principal: 85082.19 },
+      [{ penalty: 0, fee: 0, tax: 0, interest: 0, principal: 85082.19, period: 1 }]
+    );
+
+    expect(allocation.penalty).toBe(328.76);
+    expect(allocation.principal).toBe(9671.24);
+    expect(allocation.unallocated).toBe(0);
+  });
 
   it('does not allocate waived LPI when penalty as of the selected date is 0', () => {
     const allocation = allocateSettlement(

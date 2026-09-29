@@ -59,6 +59,17 @@ export function formatWaivedLpiMessage(currencySymbol: string, amountLabel: stri
   return `Waived LPI amount of ${currencySymbol} ${amountLabel} from ${fromDateLabel} till today`;
 }
 
+/**
+ * Later LPI is waived only for the full as-of-date quote, or when the entered amount actually closes the loan.
+ * A partial preview must not tell the operator that LPI after the value date will be waived.
+ */
+export function includeLpiWaiveFootnote(isPartialAmountPreview: boolean, paymentClosesLoan: boolean): boolean {
+  if (!isPartialAmountPreview) {
+    return true;
+  }
+  return paymentClosesLoan;
+}
+
 /** Make Repayment copy when LPI accrued after the selected date is waived. Date is already formatted (e.g. 18-Aug). */
 export function formatLpiWaivedAfterDateMessage(
   currencySymbol: string,
@@ -534,6 +545,11 @@ export function allocateSettlement(
     remaining = roundAmount(remaining - applied);
     budgets[key] = roundAmount(budgets[key] - applied);
   };
+
+  // LPI due as of the value date often sits on charge rows, not on the installment bucket. Apply that
+  // unmapped penalty before the bucket's principal, otherwise a partial amount shows principal only.
+  const mappedPenalty = roundAmount(buckets.reduce((sum, bucket) => sum + roundAmount(bucket.penalty || 0), 0));
+  apply('penalty', Math.max(roundAmount(budgets.penalty - mappedPenalty), 0));
 
   for (const bucket of buckets) {
     if (remaining <= 0) {

@@ -18,6 +18,7 @@ import {
   computeSettlementRequired,
   computeUnearnedInterest,
   formatLpiWaivedAfterDateMessage,
+  includeLpiWaiveFootnote,
   reconcileAsOfDateAmounts,
   applyEmiAmountCoverage
 } from 'app/loans/common/backdated-settlement.util';
@@ -717,7 +718,10 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         `+${this.currencySymbol} ${this.formatAmount(this.additionalFutureLpiAmount)} projected LPI (preview)`
       );
     }
-    if (this.penaltyWaivedByBackdate > 0.01) {
+    if (
+      includeLpiWaiveFootnote(this.isEnteredAmountPreview, this.willCloseLoan(this.enteredTransactionAmount)) &&
+      this.penaltyWaivedByBackdate > 0.01
+    ) {
       const selectedDateLabel = this.selectedTransactionDateShortLabel;
       if (selectedDateLabel) {
         notes.push(
