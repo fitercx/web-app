@@ -506,6 +506,32 @@ export function computeProjectedOverpayment(amount: number, settlementCap: numbe
 }
 
 /**
+ * Daily LPI dated before the selected value date can sit on the next installment, whose due date is
+ * still after that value date, so the due-EMI buckets do not include it. The penalty quote already
+ * counts those days. Add the shortfall onto the latest installment due on or before the value date
+ * so a partial payment takes that LPI before that installment's interest.
+ */
+export function includePenaltyDueOnLastDueBucket(
+  buckets: InstallmentBucket[],
+  penaltyDue: number
+): InstallmentBucket[] {
+  if (!buckets.length) {
+    return buckets;
+  }
+  const alreadyOnDueEmis = roundAmount(buckets.reduce((sum, bucket) => sum + (bucket.penalty || 0), 0));
+  const shortfall = roundAmount(penaltyDue - alreadyOnDueEmis);
+  if (shortfall <= 0.01) {
+    return buckets;
+  }
+  return buckets.map((bucket, index) => {
+    if (index !== buckets.length - 1) {
+      return bucket;
+    }
+    return { ...bucket, penalty: roundAmount((bucket.penalty || 0) + shortfall) };
+  });
+}
+
+/**
  * Waterfall allocation capped to as-of-date component totals.
  * Principal budget is remaining principal (all EMIs), matching mifos-standard in-advance
  * application. Penalty/interest budgets come from /template/penalties so waived LPI is not previewed.

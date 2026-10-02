@@ -1,6 +1,7 @@
 import {
   allocateSettlement,
   includeLpiWaiveFootnote,
+  includePenaltyDueOnLastDueBucket,
   buildBackdateLimitMessage,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
@@ -20,6 +21,25 @@ import {
 } from './backdated-settlement.util';
 
 describe('backdated-settlement.util', () => {
+  it('takes LPI accrued before the selected date before the due EMI interest', () => {
+    const dueEmi = [{ period: 1, penalty: 5.75, fee: 0, tax: 0, interest: 1350, principal: 6901.2 }];
+    const on2Sep = allocateSettlement(
+      200,
+      { penalty: 11.5, fee: 0, tax: 0, interest: 1350, principal: 90000 },
+      includePenaltyDueOnLastDueBucket(dueEmi, 11.5)
+    );
+    expect(on2Sep.penalty).toBe(11.5);
+    expect(on2Sep.interest).toBe(188.5);
+
+    const on3Sep = allocateSettlement(
+      200,
+      { penalty: 17.25, fee: 0, tax: 0, interest: 1350, principal: 90000 },
+      includePenaltyDueOnLastDueBucket(dueEmi, 17.25)
+    );
+    expect(on3Sep.penalty).toBe(17.25);
+    expect(on3Sep.interest).toBe(182.75);
+  });
+
   const toComparableDate = (value: any): Date | null => {
     if (!value) {
       return null;
