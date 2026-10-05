@@ -84,7 +84,7 @@ describe('backdated-settlement.util', () => {
 
     expect(allocation.penalty).toBe(356.8);
     expect(allocation.principal).toBe(80644.02);
-    expect(includeLpiWaiveFootnote(true, false)).toBe(false);
+    expect(includeLpiWaiveFootnote(false)).toBe(false);
     expect(formatLpiWaivedAfterDateMessage('AED', '2140.80', '11-Sep')).toBe(
       'AED 2140.80 of late-payment interest accrued after 11-Sep will be waived and is not charged.'
     );
@@ -99,13 +99,22 @@ describe('backdated-settlement.util', () => {
 
     expect(allocation.penalty).toBe(328.76);
     expect(allocation.principal).toBe(9671.24);
-    expect(includeLpiWaiveFootnote(true, false)).toBe(false);
+    expect(includeLpiWaiveFootnote(false)).toBe(false);
   });
 
-  it('shows the LPI waive note for a full quote and a closing payment, not a partial', () => {
-    expect(includeLpiWaiveFootnote(false, false)).toBe(true);
-    expect(includeLpiWaiveFootnote(true, true)).toBe(true);
-    expect(includeLpiWaiveFootnote(true, false)).toBe(false);
+  it('shows the LPI waive note only when the amount on screen closes the loan', () => {
+    expect(includeLpiWaiveFootnote(false)).toBe(false);
+    expect(includeLpiWaiveFootnote(true)).toBe(true);
+  });
+
+  it('takes LPI on a later overdue EMI before the earlier EMI principal', () => {
+    const allocation = allocateSettlement(400, { penalty: 500, fee: 0, tax: 0, interest: 0, principal: 1000 }, [
+      { penalty: 200, fee: 0, tax: 0, interest: 0, principal: 500, period: 1 },
+      { penalty: 200, fee: 0, tax: 0, interest: 0, principal: 500, period: 2 }
+    ]);
+
+    expect(allocation.penalty).toBe(400);
+    expect(allocation.principal).toBe(0);
   });
 
   it('allocates as-of-date LPI before principal when the installment bucket omits it', () => {

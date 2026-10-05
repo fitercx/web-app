@@ -767,7 +767,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       );
     }
     if (
-      includeLpiWaiveFootnote(this.isEnteredAmountPreview, this.willCloseLoan(this.enteredTransactionAmount)) &&
+      includeLpiWaiveFootnote(this.willCloseLoan(this.displaySettlementTotal)) &&
       this.penaltyWaivedByBackdate > 0.01
     ) {
       const selectedDateLabel = this.selectedTransactionDateShortLabel;

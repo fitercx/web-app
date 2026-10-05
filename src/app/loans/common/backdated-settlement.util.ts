@@ -60,13 +60,10 @@ export function formatWaivedLpiMessage(currencySymbol: string, amountLabel: stri
 }
 
 /**
- * Later LPI is waived only for the full as-of-date quote, or when the entered amount actually closes the loan.
- * A partial preview must not tell the operator that LPI after the value date will be waived.
+ * Later LPI is waived only when the amount on screen actually closes the loan.
+ * The default as-of total and a partial entered amount must not say later LPI will be waived.
  */
-export function includeLpiWaiveFootnote(isPartialAmountPreview: boolean, paymentClosesLoan: boolean): boolean {
-  if (!isPartialAmountPreview) {
-    return true;
-  }
+export function includeLpiWaiveFootnote(paymentClosesLoan: boolean): boolean {
   return paymentClosesLoan;
 }
 
@@ -572,16 +569,17 @@ export function allocateSettlement(
     budgets[key] = roundAmount(budgets[key] - applied);
   };
 
-  // LPI due as of the value date often sits on charge rows, not on the installment bucket. Apply that
-  // unmapped penalty before the bucket's principal, otherwise a partial amount shows principal only.
-  const mappedPenalty = roundAmount(buckets.reduce((sum, bucket) => sum + roundAmount(bucket.penalty || 0), 0));
-  apply('penalty', Math.max(roundAmount(budgets.penalty - mappedPenalty), 0));
-
-  for (const bucket of buckets) {
-    if (remaining <= 0) {
-      break;
+  // Penalty first across every overdue EMI, then fee, tax, interest, and principal. A per-bucket
+  // waterfall lets the first EMI's principal consume the payment before the next EMI's LPI.
+  for (const key of WATERFALL_ORDER) {
+    if (key === 'penalty') {
+      const mappedPenalty = roundAmount(buckets.reduce((sum, bucket) => sum + roundAmount(bucket.penalty || 0), 0));
+      apply('penalty', Math.max(roundAmount(budgets.penalty - mappedPenalty), 0));
     }
-    for (const key of WATERFALL_ORDER) {
+    for (const bucket of buckets) {
+      if (remaining <= 0) {
+        break;
+      }
       apply(key, Math.min(roundAmount(bucket[key] || 0), budgets[key]));
     }
   }
