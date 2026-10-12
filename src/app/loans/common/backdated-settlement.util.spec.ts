@@ -15,6 +15,7 @@ import {
   computeUnearnedInterest,
   isDummyGraceInstallmentDueOnDate,
   lastAllowedLocForeclosureDate,
+  applyPreDateLpiFloor,
   reconcileAsOfDateAmounts,
   reconcilePenaltyWithLedger,
   applyEmiAmountCoverage
@@ -100,6 +101,112 @@ describe('backdated-settlement.util', () => {
     expect(allocation.penalty).toBe(328.76);
     expect(allocation.principal).toBe(9671.24);
     expect(includeLpiWaiveFootnote(false)).toBe(false);
+  });
+
+  it('LMS-150: Make Repayment prefill on 10 Aug includes all 10 pre-date LPI days, not the one day on the EMI', () => {
+    const reconciled = applyPreDateLpiFloor(
+      reconcileAsOfDateAmounts({
+        isBackdated: true,
+        penaltyTemplate: {
+          principalOutstanding: 100000,
+          remainingPrincipalOutstanding: 100000,
+          interestOutstanding: 3287.67,
+          penaltyAmountDue: 821.9
+        },
+        repaymentTemplate: {
+          amount: 103369.86,
+          principalPortion: 100000,
+          interestPortion: 3287.67,
+          penaltyChargesPortion: 82.19,
+          feeChargesPortion: 0,
+          taxChargesPortion: 0
+        }
+      }),
+      821.9,
+      false
+    );
+
+    expect(reconciled.penalty).toBe(821.9);
+    expect(reconciled.defaultTransactionAmount).toBe(104109.57);
+
+    const partial = allocateSettlement(15000, {
+      penalty: reconciled.penalty,
+      fee: reconciled.fee,
+      tax: reconciled.tax,
+      interest: reconciled.interest,
+      principal: reconciled.remainingPrincipal
+    });
+    expect(partial.penalty).toBe(821.9);
+    expect(partial.interest).toBe(3287.67);
+    expect(partial.principal).toBe(10890.43);
+    const closesLoan = (amount: number) => amount + 0.01 >= reconciled.defaultTransactionAmount;
+    expect(includeLpiWaiveFootnote(closesLoan(15000))).toBe(false);
+    expect(includeLpiWaiveFootnote(closesLoan(reconciled.defaultTransactionAmount))).toBe(true);
+  });
+
+  it('LMS-146: Make Repayment prefill on 11 Sep includes 9 Sep and 10 Sep', () => {
+    const reconciled = applyPreDateLpiFloor(
+      reconcileAsOfDateAmounts({
+        isBackdated: true,
+        penaltyTemplate: {
+          principalOutstanding: 217054.01,
+          remainingPrincipalOutstanding: 217054.01,
+          interestOutstanding: 0,
+          penaltyAmountDue: 356.8
+        },
+        repaymentTemplate: {
+          amount: 217232.41,
+          principalPortion: 217054.01,
+          interestPortion: 0,
+          penaltyChargesPortion: 178.4,
+          feeChargesPortion: 0,
+          taxChargesPortion: 0
+        }
+      }),
+      356.8,
+      false
+    );
+
+    expect(reconciled.penalty).toBe(356.8);
+    expect(reconciled.defaultTransactionAmount).toBe(217410.81);
+    const partial = allocateSettlement(81000.82, {
+      penalty: reconciled.penalty,
+      fee: 0,
+      tax: 0,
+      interest: reconciled.interest,
+      principal: reconciled.remainingPrincipal
+    });
+    expect(partial.penalty).toBe(356.8);
+    expect(partial.principal).toBe(80644.02);
+    expect(includeLpiWaiveFootnote(false)).toBe(false);
+  });
+
+  it('LMS-132: a due-date partial prefill does not add same-day LPI and does not claim a waive', () => {
+    const reconciled = applyPreDateLpiFloor(
+      reconcileAsOfDateAmounts({
+        isBackdated: true,
+        penaltyTemplate: {
+          principalOutstanding: 546036.05,
+          remainingPrincipalOutstanding: 546036.05,
+          interestOutstanding: 170602.8,
+          penaltyAmountDue: 0
+        },
+        repaymentTemplate: {
+          amount: 717087.64,
+          principalPortion: 546036.05,
+          interestPortion: 170602.8,
+          penaltyChargesPortion: 448.79,
+          feeChargesPortion: 0,
+          taxChargesPortion: 0
+        }
+      }),
+      0,
+      true
+    );
+
+    expect(reconciled.penalty).toBe(0);
+    expect(reconciled.defaultTransactionAmount).toBe(716638.85);
+    expect(includeLpiWaiveFootnote(293987.85 + 0.01 >= reconciled.defaultTransactionAmount)).toBe(false);
   });
 
   it('shows the LPI waive note only when the amount on screen closes the loan', () => {

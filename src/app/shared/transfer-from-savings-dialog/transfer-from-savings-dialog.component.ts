@@ -9,6 +9,7 @@ import { Dates } from 'app/core/utils/dates';
 import { LoansService } from 'app/loans/loans.service';
 import {
   allocateSettlement,
+  applyPreDateLpiFloor,
   includePenaltyDueOnLastDueBucket,
   buildBackdateLimitMessage,
   computeAuthoritativeSettlementCap,
@@ -379,16 +380,17 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         : 0
     });
 
-    this.principalOutstanding = reconciled.principal;
-    this.remainingPrincipalOutstanding = reconciled.remainingPrincipal;
-    this.interestOutstanding = reconciled.interest;
-    this.feeOutstanding = reconciled.fee;
-    this.taxOutstanding = reconciled.tax;
-    this.penaltyOutstanding = reconciled.penalty;
-    const penaltyDue = this.roundAmount(Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalPenalty);
-    if (!this.onInstallmentDueDate && penaltyDue > this.penaltyOutstanding + 0.01) {
-      this.penaltyOutstanding = penaltyDue;
-    }
+    const withPreDateLpi = applyPreDateLpiFloor(
+      reconciled,
+      Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalPenalty,
+      this.onInstallmentDueDate
+    );
+    this.principalOutstanding = withPreDateLpi.principal;
+    this.remainingPrincipalOutstanding = withPreDateLpi.remainingPrincipal;
+    this.interestOutstanding = withPreDateLpi.interest;
+    this.feeOutstanding = withPreDateLpi.fee;
+    this.taxOutstanding = withPreDateLpi.tax;
+    this.penaltyOutstanding = withPreDateLpi.penalty;
     this.suggestedTransactionAmount = this.roundAmount(
       this.principalOutstanding +
         this.interestOutstanding +

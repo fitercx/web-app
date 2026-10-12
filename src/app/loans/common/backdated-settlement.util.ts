@@ -275,6 +275,33 @@ export function reconcileAsOfDateAmounts(params: {
   };
 }
 
+/**
+ * Prefill for Make Repayment and Transfer from Savings.
+ * <p>
+ * The penalties template lists every unpaid LPI day strictly before the selected date. The repayment template often
+ * still has only the one day already sitting on the installment, and a backdated reconcile can copy that smaller
+ * figure. The amount the operator sees must keep the higher pre-date total. On an installment due date that same-day
+ * LPI is not part of the amount due, so the template figure is left as it is.
+ */
+export function applyPreDateLpiFloor(
+  reconciled: ReconciledAsOfDateAmounts,
+  penaltyTemplateDue: number,
+  onInstallmentDueDate: boolean
+): ReconciledAsOfDateAmounts {
+  const penaltyDue = roundAmount(Number(penaltyTemplateDue || 0));
+  if (onInstallmentDueDate || penaltyDue <= reconciled.penalty + 0.01) {
+    return reconciled;
+  }
+  const penalty = penaltyDue;
+  return {
+    ...reconciled,
+    penalty,
+    defaultTransactionAmount: roundAmount(
+      reconciled.principal + reconciled.interest + reconciled.fee + reconciled.tax + penalty
+    )
+  };
+}
+
 export function reconcilePenaltyWithLedger(params: {
   penaltyFromTemplate: number;
   penaltyInSummary: number;
