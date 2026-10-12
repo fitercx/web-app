@@ -30,8 +30,8 @@ describe('ChargesTabComponent', () => {
       name: 'Daily Late Repayment Fee'
     };
 
-    expect(component.chargeStatusLabel(charge)).toBe('Paid (LPI reversed earlier)');
-    expect(component.chargeStatusClass(charge)).toBe('charge-status--paid-lpi-reversed-earlier');
+    expect(component.chargeStatusLabel(charge)).toBe('Paid (reversed earlier)');
+    expect(component.chargeStatusClass(charge)).toBe('charge-status--paid-reversed-earlier');
   });
 
   it('keeps the normal paid label when the LPI has no reversal history', () => {

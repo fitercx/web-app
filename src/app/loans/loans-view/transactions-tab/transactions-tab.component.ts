@@ -248,7 +248,8 @@ export class TransactionsTabComponent implements OnInit {
   }
 
   transactionTypeLabel(transaction: LoanTransaction): string {
-    return this.isPaidLpiRefund(transaction) ? 'Refunded LPI' : transaction.type.value;
+    const base = this.isPaidLpiRefund(transaction) ? 'Refunded LPI' : transaction.type.value;
+    return this.isTransactionReversed(transaction) ? `${base} (Reversed)` : base;
   }
 
   displayPenaltyPortion(transaction: LoanTransaction): number {

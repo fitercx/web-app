@@ -166,12 +166,10 @@ export class ChargesTabComponent implements OnInit {
   /** Human-readable charge settlement status for read-only closed-loan view. */
   chargeStatusLabel(charge: any): string {
     if (charge.paid) {
-      return charge.isReversed && charge.penalty && charge.name === 'Daily Late Repayment Fee'
-        ? 'Paid (LPI reversed earlier)'
-        : 'Paid';
+      return charge.isReversed && charge.penalty ? 'Paid (reversed earlier)' : 'Paid';
     }
     if (charge.isReversed) {
-      return Number(charge.amountOutstanding || 0) > 0 ? 'Outstanding (Reversed)' : 'Refunded';
+      return Number(charge.amountOutstanding || 0) > 0 ? 'Reversed, still outstanding' : 'Reversed';
     }
     if (charge.waived || Number(charge.amountWaived || 0) >= Number(charge.amount || 0)) {
       return 'Waived';
