@@ -9,6 +9,8 @@ import { Dates } from 'app/core/utils/dates';
 import { LoansService } from 'app/loans/loans.service';
 import {
   allocateSettlement,
+  applyPreDateLpiFloor,
+  includePenaltyDueOnLastDueBucket,
   buildBackdateLimitMessage,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
@@ -18,6 +20,7 @@ import {
   computeSettlementRequired,
   computeUnearnedInterest,
   formatLpiWaivedAfterDateMessage,
+  includeLpiWaiveFootnote,
   reconcileAsOfDateAmounts,
   applyEmiAmountCoverage
 } from 'app/loans/common/backdated-settlement.util';
@@ -377,16 +380,17 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         : 0
     });
 
-    this.principalOutstanding = reconciled.principal;
-    this.remainingPrincipalOutstanding = reconciled.remainingPrincipal;
-    this.interestOutstanding = reconciled.interest;
-    this.feeOutstanding = reconciled.fee;
-    this.taxOutstanding = reconciled.tax;
-    this.penaltyOutstanding = reconciled.penalty;
-    const penaltyDue = this.roundAmount(Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalPenalty);
-    if (!this.onInstallmentDueDate && penaltyDue > this.penaltyOutstanding + 0.01) {
-      this.penaltyOutstanding = penaltyDue;
-    }
+    const withPreDateLpi = applyPreDateLpiFloor(
+      reconciled,
+      Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalPenalty,
+      this.onInstallmentDueDate
+    );
+    this.principalOutstanding = withPreDateLpi.principal;
+    this.remainingPrincipalOutstanding = withPreDateLpi.remainingPrincipal;
+    this.interestOutstanding = withPreDateLpi.interest;
+    this.feeOutstanding = withPreDateLpi.fee;
+    this.taxOutstanding = withPreDateLpi.tax;
+    this.penaltyOutstanding = withPreDateLpi.penalty;
     this.suggestedTransactionAmount = this.roundAmount(
       this.principalOutstanding +
         this.interestOutstanding +
@@ -442,7 +446,10 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         interest: this.interestOutstanding,
         principal: this.remainingPrincipalOutstanding
       },
-      this.getOutstandingInstallmentBuckets(transactionDateValue)
+      includePenaltyDueOnLastDueBucket(
+        this.getOutstandingInstallmentBuckets(transactionDateValue),
+        this.penaltyOutstanding
+      )
     );
   }
 
@@ -459,7 +466,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       return [];
     }
 
-    return periods
+    const dueBuckets = periods
       .filter((period: any) => this.isRealOutstandingInstallment(period))
       .filter((period: any) => {
         const dueDate = this.toComparableDate(period.dueDate);
@@ -475,6 +482,50 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       }))
       .filter((bucket) => bucket.penalty + bucket.fee + bucket.tax + bucket.interest + bucket.principal > 0.01)
       .sort((a, b) => a.period - b.period);
+
+    // LPI after the last EMI due date is stored on a later row whose own due date is after the
+    // value date, so the filter above drops it. On a single EMI, or when this payment is against
+    // the last EMI, that amount is still payable and must show in the preview before interest.
+    const laterContractualEmi = periods.some((period: any) => {
+      if (!this.isRealOutstandingInstallment(period)) {
+        return false;
+      }
+      const dueDate = this.toComparableDate(period.dueDate);
+      if (!dueDate || dueDate.getTime() <= selected.getTime()) {
+        return false;
+      }
+      return (
+        this.getPeriodComponentOutstanding(period, 'principal') > 0.01 ||
+        this.getPeriodComponentOutstanding(period, 'interest') > 0.01
+      );
+    });
+    if (!laterContractualEmi && dueBuckets.length) {
+      const alreadyIncluded = new Set(dueBuckets.map((bucket) => bucket.period));
+      const spillPenalty = periods
+        .filter((period: any) => !alreadyIncluded.has(Number(period.period)))
+        .filter((period: any) => this.isPenaltyOnlySpill(period))
+        .reduce((sum: number, period: any) => sum + this.getPeriodComponentOutstanding(period, 'penalty'), 0);
+      if (spillPenalty > 0.01) {
+        const last = dueBuckets[dueBuckets.length - 1];
+        last.penalty = this.roundAmount(last.penalty + spillPenalty);
+      }
+    }
+    return dueBuckets;
+  }
+
+  /** Schedule row that only holds LPI posted after an EMI due date. */
+  private isPenaltyOnlySpill(period: any): boolean {
+    if (!period || period.complete || period.downPaymentPeriod) {
+      return false;
+    }
+    if (this.getPeriodComponentOutstanding(period, 'penalty') <= 0.01) {
+      return false;
+    }
+    return (
+      this.getPeriodComponentOutstanding(period, 'principal') <= 0.01 &&
+      this.getPeriodComponentOutstanding(period, 'interest') <= 0.01 &&
+      this.getPeriodComponentOutstanding(period, 'fee') <= 0.01
+    );
   }
 
   private getPeriodComponentOutstanding(
@@ -717,7 +768,10 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         `+${this.currencySymbol} ${this.formatAmount(this.additionalFutureLpiAmount)} projected LPI (preview)`
       );
     }
-    if (this.penaltyWaivedByBackdate > 0.01) {
+    if (
+      includeLpiWaiveFootnote(this.willCloseLoan(this.displaySettlementTotal)) &&
+      this.penaltyWaivedByBackdate > 0.01
+    ) {
       const selectedDateLabel = this.selectedTransactionDateShortLabel;
       if (selectedDateLabel) {
         notes.push(

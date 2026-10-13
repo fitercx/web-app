@@ -16,6 +16,7 @@ import { AlertService } from 'app/core/alert/alert.service';
 import { SavingsService } from 'app/savings/savings.service';
 import {
   allocateSettlement,
+  applyPreDateLpiFloor,
   buildBackdateLimitMessage,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
@@ -294,19 +295,20 @@ export class MakeRepaymentComponent implements OnInit {
             !isBackdated && !isFutureDate ? computeLpiOnlyPeriodOutstanding(this.repaymentSchedulePeriods) : 0
         });
 
-        const penaltyDue = this.roundAmount(Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalLPIAmount);
-        if (!this.onInstallmentDueDate && penaltyDue > reconciled.penalty + 0.01) {
-          reconciled.penalty = penaltyDue;
-        }
+        const withPreDateLpi = applyPreDateLpiFloor(
+          reconciled,
+          Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalLPIAmount,
+          this.onInstallmentDueDate
+        );
 
-        this.dataObject.penaltyTemplate.principalOutstanding = reconciled.principal;
-        this.dataObject.penaltyTemplate.remainingPrincipalOutstanding = reconciled.remainingPrincipal;
-        this.dataObject.penaltyTemplate.interestOutstanding = reconciled.interest;
-        this.dataObject.penaltyTemplate.penaltyAmountDue = reconciled.penalty;
+        this.dataObject.penaltyTemplate.principalOutstanding = withPreDateLpi.principal;
+        this.dataObject.penaltyTemplate.remainingPrincipalOutstanding = withPreDateLpi.remainingPrincipal;
+        this.dataObject.penaltyTemplate.interestOutstanding = withPreDateLpi.interest;
+        this.dataObject.penaltyTemplate.penaltyAmountDue = withPreDateLpi.penalty;
 
         this.dateImpactMessages = this.buildDateImpactMessages(
-          reconciled.interest,
-          reconciled.penalty,
+          withPreDateLpi.interest,
+          withPreDateLpi.penalty,
           transactionDate
         );
 
@@ -366,13 +368,8 @@ export class MakeRepaymentComponent implements OnInit {
     const penaltyDelta = round(this.baselinePenaltyAmountDue - totalPenaltyAmount);
     if (this.onInstallmentDueDate && totalPenaltyAmount <= 0.01) {
       messages.push(
-        `This date is an installment due date — no late-payment interest (LPI) applies. ` +
-          `Any LPI posted overnight after this due date will be automatically waived when you submit this repayment.`
-      );
-    } else if (penaltyDelta > 0.01) {
-      messages.push(
-        `${currencyLabel} ${penaltyDelta.toFixed(2)} of late-payment interest accrued after ${formattedDate} ` +
-          `will be waived and is not charged.`
+        `This date is an installment due date. Late-payment interest for this installment is dated after the due date, ` +
+          `so it is not included in the amount due. It is waived only when this repayment closes the loan.`
       );
     } else if (penaltyDelta < -0.01) {
       const selected = this.toComparableDate(this.dateUtils.parseDate(transactionDate) || transactionDate);

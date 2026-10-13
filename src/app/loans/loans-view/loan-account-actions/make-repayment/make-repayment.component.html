@@ -69,7 +69,13 @@
               Amount due as of {{ selectedTransactionDateLabel }}:
               <strong>{{ currencyLabel }} {{ dueAsOfDateTotal | formatNumber }}</strong>
               (installment plus any late-payment interest still due on this date).
-              <ng-container *ngIf="penaltyWaivedByBackdate > 0.01 && selectedTransactionDateShortLabel">
+              <ng-container
+                *ngIf="
+                  penaltyWaivedByBackdate > 0.01 &&
+                  selectedTransactionDateShortLabel &&
+                  willFullyRepayLoan(repaymentLoanForm.value.transactionAmount)
+                "
+              >
                 {{ currencyLabel }} {{ penaltyWaivedByBackdate | formatNumber }} of late-payment interest accrued after
                 {{ selectedTransactionDateShortLabel }} will be waived and is not charged.
               </ng-container>

@@ -59,6 +59,14 @@ export function formatWaivedLpiMessage(currencySymbol: string, amountLabel: stri
   return `Waived LPI amount of ${currencySymbol} ${amountLabel} from ${fromDateLabel} till today`;
 }
 
+/**
+ * Later LPI is waived only when the amount on screen actually closes the loan.
+ * The default as-of total and a partial entered amount must not say later LPI will be waived.
+ */
+export function includeLpiWaiveFootnote(paymentClosesLoan: boolean): boolean {
+  return paymentClosesLoan;
+}
+
 /** Make Repayment copy when LPI accrued after the selected date is waived. Date is already formatted (e.g. 18-Aug). */
 export function formatLpiWaivedAfterDateMessage(
   currencySymbol: string,
@@ -264,6 +272,33 @@ export function reconcileAsOfDateAmounts(params: {
     penalty,
     remainingPrincipal,
     defaultTransactionAmount
+  };
+}
+
+/**
+ * Prefill for Make Repayment and Transfer from Savings.
+ * <p>
+ * The penalties template lists every unpaid LPI day strictly before the selected date. The repayment template often
+ * still has only the one day already sitting on the installment, and a backdated reconcile can copy that smaller
+ * figure. The amount the operator sees must keep the higher pre-date total. On an installment due date that same-day
+ * LPI is not part of the amount due, so the template figure is left as it is.
+ */
+export function applyPreDateLpiFloor(
+  reconciled: ReconciledAsOfDateAmounts,
+  penaltyTemplateDue: number,
+  onInstallmentDueDate: boolean
+): ReconciledAsOfDateAmounts {
+  const penaltyDue = roundAmount(Number(penaltyTemplateDue || 0));
+  if (onInstallmentDueDate || penaltyDue <= reconciled.penalty + 0.01) {
+    return reconciled;
+  }
+  const penalty = penaltyDue;
+  return {
+    ...reconciled,
+    penalty,
+    defaultTransactionAmount: roundAmount(
+      reconciled.principal + reconciled.interest + reconciled.fee + reconciled.tax + penalty
+    )
   };
 }
 
@@ -495,6 +530,32 @@ export function computeProjectedOverpayment(amount: number, settlementCap: numbe
 }
 
 /**
+ * Daily LPI dated before the selected value date can sit on the next installment, whose due date is
+ * still after that value date, so the due-EMI buckets do not include it. The penalty quote already
+ * counts those days. Add the shortfall onto the latest installment due on or before the value date
+ * so a partial payment takes that LPI before that installment's interest.
+ */
+export function includePenaltyDueOnLastDueBucket(
+  buckets: InstallmentBucket[],
+  penaltyDue: number
+): InstallmentBucket[] {
+  if (!buckets.length) {
+    return buckets;
+  }
+  const alreadyOnDueEmis = roundAmount(buckets.reduce((sum, bucket) => sum + (bucket.penalty || 0), 0));
+  const shortfall = roundAmount(penaltyDue - alreadyOnDueEmis);
+  if (shortfall <= 0.01) {
+    return buckets;
+  }
+  return buckets.map((bucket, index) => {
+    if (index !== buckets.length - 1) {
+      return bucket;
+    }
+    return { ...bucket, penalty: roundAmount((bucket.penalty || 0) + shortfall) };
+  });
+}
+
+/**
  * Waterfall allocation capped to as-of-date component totals.
  * Principal budget is remaining principal (all EMIs), matching mifos-standard in-advance
  * application. Penalty/interest budgets come from /template/penalties so waived LPI is not previewed.
@@ -535,11 +596,17 @@ export function allocateSettlement(
     budgets[key] = roundAmount(budgets[key] - applied);
   };
 
-  for (const bucket of buckets) {
-    if (remaining <= 0) {
-      break;
+  // Penalty first across every overdue EMI, then fee, tax, interest, and principal. A per-bucket
+  // waterfall lets the first EMI's principal consume the payment before the next EMI's LPI.
+  for (const key of WATERFALL_ORDER) {
+    if (key === 'penalty') {
+      const mappedPenalty = roundAmount(buckets.reduce((sum, bucket) => sum + roundAmount(bucket.penalty || 0), 0));
+      apply('penalty', Math.max(roundAmount(budgets.penalty - mappedPenalty), 0));
     }
-    for (const key of WATERFALL_ORDER) {
+    for (const bucket of buckets) {
+      if (remaining <= 0) {
+        break;
+      }
       apply(key, Math.min(roundAmount(bucket[key] || 0), budgets[key]));
     }
   }

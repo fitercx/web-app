@@ -1,5 +1,7 @@
 import {
   allocateSettlement,
+  includeLpiWaiveFootnote,
+  includePenaltyDueOnLastDueBucket,
   buildBackdateLimitMessage,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
@@ -13,12 +15,32 @@ import {
   computeUnearnedInterest,
   isDummyGraceInstallmentDueOnDate,
   lastAllowedLocForeclosureDate,
+  applyPreDateLpiFloor,
   reconcileAsOfDateAmounts,
   reconcilePenaltyWithLedger,
   applyEmiAmountCoverage
 } from './backdated-settlement.util';
 
 describe('backdated-settlement.util', () => {
+  it('takes LPI accrued before the selected date before the due EMI interest', () => {
+    const dueEmi = [{ period: 1, penalty: 5.75, fee: 0, tax: 0, interest: 1350, principal: 6901.2 }];
+    const on2Sep = allocateSettlement(
+      200,
+      { penalty: 11.5, fee: 0, tax: 0, interest: 1350, principal: 90000 },
+      includePenaltyDueOnLastDueBucket(dueEmi, 11.5)
+    );
+    expect(on2Sep.penalty).toBe(11.5);
+    expect(on2Sep.interest).toBe(188.5);
+
+    const on3Sep = allocateSettlement(
+      200,
+      { penalty: 17.25, fee: 0, tax: 0, interest: 1350, principal: 90000 },
+      includePenaltyDueOnLastDueBucket(dueEmi, 17.25)
+    );
+    expect(on3Sep.penalty).toBe(17.25);
+    expect(on3Sep.interest).toBe(182.75);
+  });
+
   const toComparableDate = (value: any): Date | null => {
     if (!value) {
       return null;
@@ -31,6 +53,188 @@ describe('backdated-settlement.util', () => {
     }
     return null;
   };
+
+  it('collects schedule LPI and unmapped LPI before interest and principal', () => {
+    const allocation = allocateSettlement(
+      15000,
+      { penalty: 821.9, fee: 0, tax: 0, interest: 3287.67, principal: 100000 },
+      [{ penalty: 82.19, fee: 0, tax: 0, interest: 3287.67, principal: 100000, period: 1 }]
+    );
+
+    expect(allocation.penalty).toBe(821.9);
+    expect(allocation.interest).toBe(3287.67);
+    expect(allocation.principal).toBe(10890.43);
+    expect(allocation.unallocated).toBe(0);
+  });
+
+  it('applies a small partial entirely to LPI when LPI is due first', () => {
+    const allocation = allocateSettlement(100, { penalty: 328.76, fee: 0, tax: 0, interest: 200, principal: 85000 }, [
+      { penalty: 0, fee: 0, tax: 0, interest: 200, principal: 85000, period: 1 }]);
+
+    expect(allocation.penalty).toBe(100);
+    expect(allocation.interest).toBe(0);
+    expect(allocation.principal).toBe(0);
+  });
+
+  it('LMS-146 / LMS-147: Fero partial of 81,000.820 on 11 Sep keeps both overdue days in the allocation', () => {
+    const allocation = allocateSettlement(
+      81000.82,
+      { penalty: 356.8, fee: 0, tax: 0, interest: 0, principal: 217054.01 },
+      [{ penalty: 178.4, fee: 0, tax: 0, interest: 0, principal: 217054.01, period: 1 }]
+    );
+
+    expect(allocation.penalty).toBe(356.8);
+    expect(allocation.principal).toBe(80644.02);
+    expect(includeLpiWaiveFootnote(false)).toBe(false);
+    expect(formatLpiWaivedAfterDateMessage('AED', '2140.80', '11-Sep')).toBe(
+      'AED 2140.80 of late-payment interest accrued after 11-Sep will be waived and is not charged.'
+    );
+  });
+
+  it('LMS-150: partial 10,000 on 5 Aug still shows the 328.76 LPI row', () => {
+    const allocation = allocateSettlement(
+      10000,
+      { penalty: 328.76, fee: 0, tax: 0, interest: 0, principal: 85082.19 },
+      [{ penalty: 82.19, fee: 0, tax: 0, interest: 0, principal: 85082.19, period: 1 }]
+    );
+
+    expect(allocation.penalty).toBe(328.76);
+    expect(allocation.principal).toBe(9671.24);
+    expect(includeLpiWaiveFootnote(false)).toBe(false);
+  });
+
+  it('LMS-150: Make Repayment prefill on 10 Aug includes all 10 pre-date LPI days, not the one day on the EMI', () => {
+    const reconciled = applyPreDateLpiFloor(
+      reconcileAsOfDateAmounts({
+        isBackdated: true,
+        penaltyTemplate: {
+          principalOutstanding: 100000,
+          remainingPrincipalOutstanding: 100000,
+          interestOutstanding: 3287.67,
+          penaltyAmountDue: 821.9
+        },
+        repaymentTemplate: {
+          amount: 103369.86,
+          principalPortion: 100000,
+          interestPortion: 3287.67,
+          penaltyChargesPortion: 82.19,
+          feeChargesPortion: 0,
+          taxChargesPortion: 0
+        }
+      }),
+      821.9,
+      false
+    );
+
+    expect(reconciled.penalty).toBe(821.9);
+    expect(reconciled.defaultTransactionAmount).toBe(104109.57);
+
+    const partial = allocateSettlement(15000, {
+      penalty: reconciled.penalty,
+      fee: reconciled.fee,
+      tax: reconciled.tax,
+      interest: reconciled.interest,
+      principal: reconciled.remainingPrincipal
+    });
+    expect(partial.penalty).toBe(821.9);
+    expect(partial.interest).toBe(3287.67);
+    expect(partial.principal).toBe(10890.43);
+    const closesLoan = (amount: number) => amount + 0.01 >= reconciled.defaultTransactionAmount;
+    expect(includeLpiWaiveFootnote(closesLoan(15000))).toBe(false);
+    expect(includeLpiWaiveFootnote(closesLoan(reconciled.defaultTransactionAmount))).toBe(true);
+  });
+
+  it('LMS-146: Make Repayment prefill on 11 Sep includes 9 Sep and 10 Sep', () => {
+    const reconciled = applyPreDateLpiFloor(
+      reconcileAsOfDateAmounts({
+        isBackdated: true,
+        penaltyTemplate: {
+          principalOutstanding: 217054.01,
+          remainingPrincipalOutstanding: 217054.01,
+          interestOutstanding: 0,
+          penaltyAmountDue: 356.8
+        },
+        repaymentTemplate: {
+          amount: 217232.41,
+          principalPortion: 217054.01,
+          interestPortion: 0,
+          penaltyChargesPortion: 178.4,
+          feeChargesPortion: 0,
+          taxChargesPortion: 0
+        }
+      }),
+      356.8,
+      false
+    );
+
+    expect(reconciled.penalty).toBe(356.8);
+    expect(reconciled.defaultTransactionAmount).toBe(217410.81);
+    const partial = allocateSettlement(81000.82, {
+      penalty: reconciled.penalty,
+      fee: 0,
+      tax: 0,
+      interest: reconciled.interest,
+      principal: reconciled.remainingPrincipal
+    });
+    expect(partial.penalty).toBe(356.8);
+    expect(partial.principal).toBe(80644.02);
+    expect(includeLpiWaiveFootnote(false)).toBe(false);
+  });
+
+  it('LMS-132: a due-date partial prefill does not add same-day LPI and does not claim a waive', () => {
+    const reconciled = applyPreDateLpiFloor(
+      reconcileAsOfDateAmounts({
+        isBackdated: true,
+        penaltyTemplate: {
+          principalOutstanding: 546036.05,
+          remainingPrincipalOutstanding: 546036.05,
+          interestOutstanding: 170602.8,
+          penaltyAmountDue: 0
+        },
+        repaymentTemplate: {
+          amount: 717087.64,
+          principalPortion: 546036.05,
+          interestPortion: 170602.8,
+          penaltyChargesPortion: 448.79,
+          feeChargesPortion: 0,
+          taxChargesPortion: 0
+        }
+      }),
+      0,
+      true
+    );
+
+    expect(reconciled.penalty).toBe(0);
+    expect(reconciled.defaultTransactionAmount).toBe(716638.85);
+    expect(includeLpiWaiveFootnote(293987.85 + 0.01 >= reconciled.defaultTransactionAmount)).toBe(false);
+  });
+
+  it('shows the LPI waive note only when the amount on screen closes the loan', () => {
+    expect(includeLpiWaiveFootnote(false)).toBe(false);
+    expect(includeLpiWaiveFootnote(true)).toBe(true);
+  });
+
+  it('takes LPI on a later overdue EMI before the earlier EMI principal', () => {
+    const allocation = allocateSettlement(400, { penalty: 500, fee: 0, tax: 0, interest: 0, principal: 1000 }, [
+      { penalty: 200, fee: 0, tax: 0, interest: 0, principal: 500, period: 1 },
+      { penalty: 200, fee: 0, tax: 0, interest: 0, principal: 500, period: 2 }
+    ]);
+
+    expect(allocation.penalty).toBe(400);
+    expect(allocation.principal).toBe(0);
+  });
+
+  it('allocates as-of-date LPI before principal when the installment bucket omits it', () => {
+    const allocation = allocateSettlement(
+      10000,
+      { penalty: 328.76, fee: 0, tax: 0, interest: 0, principal: 85082.19 },
+      [{ penalty: 0, fee: 0, tax: 0, interest: 0, principal: 85082.19, period: 1 }]
+    );
+
+    expect(allocation.penalty).toBe(328.76);
+    expect(allocation.principal).toBe(9671.24);
+    expect(allocation.unallocated).toBe(0);
+  });
 
   it('does not allocate waived LPI when penalty as of the selected date is 0', () => {
     const allocation = allocateSettlement(
