@@ -40,6 +40,17 @@
       color: $status-downpayment;
     }
 
+    .waive {
+      color: $green-sea;
+    }
+
+    .waived-tag {
+      margin-left: 4px;
+      font-size: 11px;
+      font-style: italic;
+      color: $green-sea;
+    }
+
     .chargeoff {
       color: $status-chargeoff;
     }
