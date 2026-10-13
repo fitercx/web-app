@@ -37,6 +37,7 @@ export class GeneralTabComponent implements OnInit {
     outstanding: string | number;
     overdue: string | number;
     reversedPaidLpi?: number;
+    unearnedInterest?: number;
   }[];
   loanDetailsTableData: {
     key: string;
@@ -217,7 +218,8 @@ export class GeneralTabComponent implements OnInit {
         waived: this.loanDetails.summary.penaltyChargesWaived,
         writtenOff: this.loanDetails.summary.penaltyChargesWrittenOff,
         outstanding: this.loanDetails.summary.penaltyChargesOutstanding,
-        overdue: this.loanDetails.summary.penaltyChargesOverdue
+        overdue: this.loanDetails.summary.penaltyChargesOverdue,
+        reversedPaidLpi
       },
       {
         property: 'Total',
@@ -231,8 +233,7 @@ export class GeneralTabComponent implements OnInit {
             ? this.getTotalOutstandingForMultiTranche()
             : this.getAdjustedTotalOutstanding()
         ),
-        overdue: this.loanDetails.summary.totalOverdue,
-        reversedPaidLpi
+        overdue: this.loanDetails.summary.totalOverdue
       }
     ];
     const foreclosureDetails = getForeclosureUnearnedInterestDetails(this.loanDetails);
@@ -241,14 +242,15 @@ export class GeneralTabComponent implements OnInit {
       const interestRowIndex = this.loanSummaryTableData.findIndex((row) => row.property === 'Interest');
       const insertIndex = interestRowIndex >= 0 ? interestRowIndex + 1 : this.loanSummaryTableData.length;
       this.loanSummaryTableData.splice(insertIndex, 0, {
-        property: 'Unearned Interest (Foreclosure)',
-        original: String(unearnedInterestDueToForeclosure),
+        property: 'Unearned interest (foreclosure)',
+        original: '0',
         adjustment: '0',
         paid: '0',
-        waived: String(unearnedInterestDueToForeclosure),
+        waived: '0',
         writtenOff: '0',
         outstanding: '0',
-        overdue: '0'
+        overdue: '0',
+        unearnedInterest: unearnedInterestDueToForeclosure
       });
     }
     if (this.loanDetails.factorRateEnabled) {

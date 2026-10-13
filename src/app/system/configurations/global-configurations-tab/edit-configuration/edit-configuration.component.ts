@@ -16,6 +16,9 @@ import { SystemService } from '../../../system.service';
   styleUrls: ['./edit-configuration.component.scss']
 })
 export class EditConfigurationComponent implements OnInit {
+  /** Global config whose number value is a day count. 0 is valid and means no backdating. */
+  private static readonly backdateWindowConfigName = 'backdated-transaction-max-days';
+
   /** Minimum transaction date allowed. */
   minDate = new Date(2000, 0, 1);
   /** Maximum transaction date allowed. */
@@ -57,6 +60,10 @@ export class EditConfigurationComponent implements OnInit {
   /**
    * Creates and sets the global configuration form.
    */
+  get isBackdateWindow(): boolean {
+    return this.configuration?.name === EditConfigurationComponent.backdateWindowConfigName;
+  }
+
   createConfigurationForm() {
     this.configurationForm = this.formBuilder.group({
       name: [
@@ -64,7 +71,10 @@ export class EditConfigurationComponent implements OnInit {
         Validators.required
       ],
       description: [{ value: this.configuration.description, disabled: true }],
-      value: [this.configuration.value],
+      value: [
+        this.configuration.value,
+        this.isBackdateWindow ? [Validators.min(0)] : []
+      ],
       stringValue: [this.configuration.stringValue],
       dateValue: [this.configuration.dateValue]
     });
