@@ -15,8 +15,9 @@ import { Currency } from 'app/shared/models/general.model';
 import { AlertService } from 'app/core/alert/alert.service';
 import { SavingsService } from 'app/savings/savings.service';
 import {
-  allocateSettlement,
+  allocateOldestInstallmentFirst,
   applyPreDateLpiFloor,
+  buildDueInstallmentBuckets,
   buildBackdateLimitMessage,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
@@ -26,6 +27,7 @@ import {
   computeSettlementRequired,
   computeUnearnedInterest,
   computeLpiOnlyPeriodOutstanding,
+  OverduePenaltyCharge,
   reconcileAsOfDateAmounts,
   SchedulePeriod
 } from 'app/loans/common/backdated-settlement.util';
@@ -74,6 +76,7 @@ export class MakeRepaymentComponent implements OnInit {
   private savingsTransactions: any[] = [];
   private loanSummary: any;
   private repaymentSchedulePeriods: SchedulePeriod[] = [];
+  private loanCharges: OverduePenaltyCharge[] = [];
   fullLoanOutstanding = 0;
 
   /**
@@ -391,7 +394,7 @@ export class MakeRepaymentComponent implements OnInit {
 
   private loadLinkedSavingsAndSummary(): void {
     this.loanService
-      .getLoanAccountResource(this.loanId, 'summary,linkedAccount,repaymentSchedule')
+      .getLoanAccountResource(this.loanId, 'summary,linkedAccount,repaymentSchedule,charges')
       .pipe(
         catchError(() => of(null)),
         switchMap((loanDetails: any) => {
@@ -420,6 +423,7 @@ export class MakeRepaymentComponent implements OnInit {
     this.repaymentSchedulePeriods = Array.isArray(loanDetails?.repaymentSchedule?.periods)
       ? loanDetails.repaymentSchedule.periods
       : [];
+    this.loanCharges = Array.isArray(loanDetails?.charges) ? loanDetails.charges : [];
     this.mergePostDueLpiFromSchedule();
     this.recapTransactionAmountIfOverpayRisk();
   }
@@ -681,18 +685,33 @@ export class MakeRepaymentComponent implements OnInit {
   }
 
   /**
-   * Flat as-of-date allocation (no installment buckets). This screen does not load the repayment
-   * schedule; transfer-from-savings uses buckets because it already has periods for the due-EMI list.
-   * Component totals still use the same as-of-date budgets. Backend allocation on submit is authoritative.
+   * One overdue EMI keeps the flat LPI-first preview. Several overdue EMIs are allocated oldest
+   * first: that EMI's own LPI, interest, and principal are deducted before the next EMI's LPI.
    */
   private get currentSettlementAllocation() {
     const amount = Number(this.repaymentLoanForm?.get('transactionAmount')?.value || 0);
-    return allocateSettlement(amount, {
-      penalty: this.penaltyAsOfDate,
-      fee: this.feeAsOfDate,
-      tax: this.taxAsOfDate,
-      interest: this.interestAsOfDate,
-      principal: this.remainingPrincipalAsOfDate
+    return this.allocateEnteredAmount(amount);
+  }
+
+  private allocateEnteredAmount(amount: number) {
+    return allocateOldestInstallmentFirst(
+      amount,
+      {
+        penalty: this.penaltyAsOfDate,
+        fee: this.feeAsOfDate,
+        tax: this.taxAsOfDate,
+        interest: this.interestAsOfDate,
+        principal: this.remainingPrincipalAsOfDate
+      },
+      this.overdueInstallmentBuckets()
+    );
+  }
+
+  private overdueInstallmentBuckets() {
+    return buildDueInstallmentBuckets({
+      periods: this.repaymentSchedulePeriods,
+      charges: this.loanCharges,
+      transactionDate: this.toComparableDate(this.repaymentLoanForm?.get('transactionDate')?.value)
     });
   }
 
@@ -712,13 +731,8 @@ export class MakeRepaymentComponent implements OnInit {
       return;
     }
 
-    const allocation = allocateSettlement(amount, {
-      penalty: this.penaltyAsOfDate,
-      fee: this.feeAsOfDate,
-      tax: this.taxAsOfDate,
-      interest: this.interestAsOfDate,
-      principal: this.remainingPrincipalAsOfDate
-    });
+    const allocation = this.allocateEnteredAmount(amount);
+    const oldestFirst = this.overdueInstallmentBuckets().length > 1;
 
     const parts: string[] = [];
     if (allocation.penalty > 0.01) {
@@ -740,7 +754,8 @@ export class MakeRepaymentComponent implements OnInit {
     const lines = [
       `Of the entered amount (${this.currencyLabel} ${amount.toFixed(2)}), ` +
         (parts.length
-          ? `${parts.join(', ')} will be applied with this repayment (as at ${dateLabel}).`
+          ? `${parts.join(', ')} will be applied with this repayment (as at ${dateLabel})` +
+            (oldestFirst ? `, clearing the oldest overdue installment before the next.` : '.')
           : `no outstanding balance remains to allocate (as at ${dateLabel}).`)
     ];
 
