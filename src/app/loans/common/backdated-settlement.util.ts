@@ -36,6 +36,136 @@ const WATERFALL_ORDER: Array<keyof SettlementComponents> = [
   'principal'
 ];
 
+const PRINCIPAL_INTEREST_PENALTY_FEE: Array<keyof SettlementComponents> = [
+  'principal',
+  'interest',
+  'penalty',
+  'fee',
+  'tax'
+];
+
+const INTEREST_PRINCIPAL_PENALTY_FEE: Array<keyof SettlementComponents> = [
+  'interest',
+  'principal',
+  'penalty',
+  'fee',
+  'tax'
+];
+
+const PENALTY_INTEREST_PRINCIPAL_FEE: Array<keyof SettlementComponents> = [
+  'penalty',
+  'interest',
+  'principal',
+  'fee',
+  'tax'
+];
+
+const PRINCIPAL_INTEREST_FEE_PENALTY: Array<keyof SettlementComponents> = [
+  'principal',
+  'interest',
+  'fee',
+  'tax',
+  'penalty'
+];
+
+/**
+ * Due/on-time payment order for each loan transaction-processing strategy.
+ * Tax sits with fees; the processors do not allocate tax as its own step.
+ * Callers that omit a strategy keep {@link WATERFALL_ORDER}.
+ */
+const STRATEGY_COMPONENT_ORDERS: Record<string, Array<keyof SettlementComponents>> = {
+  'principal-interest-penalties-fees-order-strategy': PRINCIPAL_INTEREST_PENALTY_FEE,
+  'principal, interest, penalties, fees order': PRINCIPAL_INTEREST_PENALTY_FEE,
+  'heavensfamily-strategy': PRINCIPAL_INTEREST_FEE_PENALTY,
+  'interest-principal-penalties-fees-order-strategy': INTEREST_PRINCIPAL_PENALTY_FEE,
+  'interest, principal, penalties, fees order': INTEREST_PRINCIPAL_PENALTY_FEE,
+  'early-repayment-strategy': INTEREST_PRINCIPAL_PENALTY_FEE,
+  'due-penalty-interest-principal-fee-in-advance-penalty-interest-principal-fee-strategy':
+    PENALTY_INTEREST_PRINCIPAL_FEE,
+  'mifos-standard-strategy': WATERFALL_ORDER,
+  'pro-rata-mifos-standard-strategy': WATERFALL_ORDER,
+  'creocore-strategy': WATERFALL_ORDER,
+  'rbi-india-strategy': WATERFALL_ORDER,
+  'acme-standard-strategy': WATERFALL_ORDER,
+  'due-penalty-fee-interest-principal-in-advance-principal-penalty-fee-interest-strategy': WATERFALL_ORDER
+};
+
+const ADVANCED_RULE_COMPONENT: Record<string, keyof SettlementComponents> = {
+  PAST_DUE_PENALTY: 'penalty',
+  DUE_PENALTY: 'penalty',
+  IN_ADVANCE_PENALTY: 'penalty',
+  PAST_DUE_FEE: 'fee',
+  DUE_FEE: 'fee',
+  IN_ADVANCE_FEE: 'fee',
+  PAST_DUE_INTEREST: 'interest',
+  DUE_INTEREST: 'interest',
+  IN_ADVANCE_INTEREST: 'interest',
+  PAST_DUE_PRINCIPAL: 'principal',
+  DUE_PRINCIPAL: 'principal',
+  IN_ADVANCE_PRINCIPAL: 'principal'
+};
+
+export interface RepaymentPaymentAllocation {
+  transactionType?: string;
+  paymentAllocationOrder?: Array<{ paymentAllocationRule?: string; order?: number }>;
+}
+
+/**
+ * Component order a repayment uses on each due installment.
+ * `advanced-payment-allocation-strategy` follows the loan's DEFAULT allocation rules.
+ */
+export function repaymentComponentOrder(
+  strategyCode: string | null | undefined,
+  paymentAllocations?: RepaymentPaymentAllocation[] | null
+): Array<keyof SettlementComponents> {
+  const key = (strategyCode || '').trim().toLowerCase();
+  if (key === 'advanced-payment-allocation-strategy') {
+    const advanced = orderFromAdvancedAllocation(paymentAllocations);
+    if (advanced) {
+      return advanced;
+    }
+  }
+  return STRATEGY_COMPONENT_ORDERS[key] || WATERFALL_ORDER;
+}
+
+function orderFromAdvancedAllocation(
+  paymentAllocations?: RepaymentPaymentAllocation[] | null
+): Array<keyof SettlementComponents> | null {
+  const rows = paymentAllocations || [];
+  const selected = rows.find((row) => (row.transactionType || '').toUpperCase() === 'DEFAULT') || rows[0];
+  const rules = selected?.paymentAllocationOrder;
+  if (!rules?.length) {
+    return null;
+  }
+  const sorted = [...rules].sort((left, right) => Number(left.order || 0) - Number(right.order || 0));
+  const seen = new Set<keyof SettlementComponents>();
+  const order: Array<keyof SettlementComponents> = [];
+  for (const rule of sorted) {
+    const component = ADVANCED_RULE_COMPONENT[(rule.paymentAllocationRule || '').toUpperCase()];
+    if (!component || seen.has(component)) {
+      continue;
+    }
+    seen.add(component);
+    order.push(component);
+    if (component === 'fee') {
+      order.push('tax');
+      seen.add('tax');
+    }
+  }
+  for (const component of [
+    'penalty',
+    'fee',
+    'tax',
+    'interest',
+    'principal'
+  ] as const) {
+    if (!seen.has(component)) {
+      order.push(component);
+    }
+  }
+  return order;
+}
+
 /**
  * On-screen explanation of the transaction-date calendar's lower bound.
  *
@@ -697,8 +827,8 @@ function penaltyOwnedByPeriod(
  * Due installments (due on or before `transactionDate`) with each EMI's own unpaid LPI.
  * <p>
  * Daily LPI stays linked to the EMI whose principal it was calculated on, even when the schedule
- * column shows later days on the next period. A partial repayment collects the oldest EMI's LPI,
- * interest, and principal before the next EMI's LPI, so the buckets have to carry that split.
+ * column shows later days on the next period. A partial repayment clears the oldest EMI, in the
+ * loan's repayment-strategy order, before the next EMI, so the buckets have to carry that split.
  */
 export function buildDueInstallmentBuckets(params: {
   periods: SchedulePeriod[] | undefined;
@@ -748,16 +878,19 @@ export function buildDueInstallmentBuckets(params: {
 
 /**
  * Waterfall allocation capped to as-of-date component totals.
- * Principal budget is remaining principal (all EMIs), matching mifos-standard in-advance
- * application. Penalty/interest budgets come from /template/penalties so waived LPI is not previewed.
+ * Principal budget is remaining principal (all EMIs). Penalty/interest budgets come from
+ * /template/penalties so waived LPI is not previewed.
  * <p>
- * One overdue installment keeps LPI ahead of that installment's interest. When several installments
- * are overdue, Make Repayment uses {@link allocateOldestInstallmentFirst} instead.
+ * `componentOrder` is the loan repayment strategy ({@link repaymentComponentOrder}). When omitted,
+ * the order is penalty, fee, tax, interest, principal. When several installments are overdue,
+ * Make Repayment uses {@link allocateOldestInstallmentFirst} so each installment is cleared in
+ * that order before the next installment starts.
  */
 export function allocateSettlement(
   amount: number,
   asOfDateComponents: SettlementComponents,
-  buckets: InstallmentBucket[] = []
+  buckets: InstallmentBucket[] = [],
+  componentOrder: Array<keyof SettlementComponents> = WATERFALL_ORDER
 ): SettlementAllocation {
   const allocation: SettlementAllocation = {
     penalty: 0,
@@ -790,8 +923,9 @@ export function allocateSettlement(
     budgets[key] = roundAmount(budgets[key] - applied);
   };
 
-  // One overdue EMI: LPI the schedule parked on a later row is taken before that EMI's interest.
-  for (const key of WATERFALL_ORDER) {
+  const order = componentOrder.length ? componentOrder : WATERFALL_ORDER;
+  // Unmapped LPI (schedule parked it on a later row) is taken when the strategy reaches penalty.
+  for (const key of order) {
     if (key === 'penalty') {
       const mappedPenalty = roundAmount(buckets.reduce((sum, bucket) => sum + roundAmount(bucket.penalty || 0), 0));
       apply('penalty', Math.max(roundAmount(budgets.penalty - mappedPenalty), 0));
@@ -804,7 +938,7 @@ export function allocateSettlement(
     }
   }
 
-  for (const key of WATERFALL_ORDER) {
+  for (const key of order) {
     apply(key, budgets[key]);
   }
 
@@ -814,17 +948,17 @@ export function allocateSettlement(
 
 /**
  * Deduction preview when more than one installment is overdue.
- * The oldest installment is cleared first — its own LPI, then fees, tax, interest, and principal —
- * before the next installment's LPI. That is the split a repayment posts. A single installment
- * delegates to {@link allocateSettlement}.
+ * The oldest installment is cleared first, in `componentOrder`, before the next installment.
+ * A single installment delegates to {@link allocateSettlement}.
  */
 export function allocateOldestInstallmentFirst(
   amount: number,
   asOfDateComponents: SettlementComponents,
-  buckets: InstallmentBucket[] = []
+  buckets: InstallmentBucket[] = [],
+  componentOrder: Array<keyof SettlementComponents> = WATERFALL_ORDER
 ): SettlementAllocation {
   if (buckets.length <= 1) {
-    return allocateSettlement(amount, asOfDateComponents, buckets);
+    return allocateSettlement(amount, asOfDateComponents, buckets, componentOrder);
   }
 
   const budgets: SettlementComponents = {
@@ -857,7 +991,7 @@ export function allocateOldestInstallmentFirst(
     unallocated: 0
   };
   let remaining = roundAmount(amount);
-  const keys = WATERFALL_ORDER;
+  const keys = componentOrder.length ? componentOrder : WATERFALL_ORDER;
   for (const bucket of prepared) {
     if (remaining <= 0.01) {
       break;
@@ -871,7 +1005,8 @@ export function allocateOldestInstallmentFirst(
         interest: Math.min(budgets.interest, bucket.interest),
         principal: Math.min(budgets.principal, bucket.principal)
       },
-      [bucket]
+      [bucket],
+      keys
     );
     for (const key of keys) {
       allocation[key] = roundAmount(allocation[key] + slice[key]);
@@ -880,7 +1015,7 @@ export function allocateOldestInstallmentFirst(
     }
   }
   if (remaining > 0.01) {
-    const rest = allocateSettlement(remaining, budgets);
+    const rest = allocateSettlement(remaining, budgets, [], keys);
     for (const key of keys) {
       allocation[key] = roundAmount(allocation[key] + rest[key]);
       remaining = roundAmount(remaining - rest[key]);

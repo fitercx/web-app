@@ -12,6 +12,8 @@ import {
   applyPreDateLpiFloor,
   buildDueInstallmentBuckets,
   buildBackdateLimitMessage,
+  repaymentComponentOrder,
+  RepaymentPaymentAllocation,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
   computeSavingsBalanceAsOf,
@@ -94,6 +96,9 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   private repaymentTemplateData: any;
   /** Full loan summary loaded from the loan API (not the client accounts list row). */
   private loanSummary: any;
+  /** Loan transaction-processing strategy. The entered-amount split follows this order. */
+  private transactionProcessingStrategyCode: string | null = null;
+  private paymentAllocations: RepaymentPaymentAllocation[] | null = null;
   /** Overdue/LPI charges, used to put each day's fee on the installment it belongs to. */
   private loanCharges: any[] = [];
   /** Shown when pending LPI is due on the selected date and will be paid with this settlement. */
@@ -347,6 +352,13 @@ export class TransferFromSavingsDialogComponent implements OnInit {
 
   /** Captures full-loan outstanding from the loan API — never from the client accounts list row. */
   private applyLoanSummary(loanDetails: any): void {
+    this.transactionProcessingStrategyCode =
+      loanDetails?.transactionProcessingStrategyCode || this.data.loan?.transactionProcessingStrategyCode || null;
+    this.paymentAllocations = Array.isArray(loanDetails?.paymentAllocation)
+      ? loanDetails.paymentAllocation
+      : Array.isArray(this.data.loan?.paymentAllocation)
+        ? this.data.loan.paymentAllocation
+        : null;
     this.loanSummary = loanDetails?.summary || null;
     const fromSummary = Number(this.loanSummary?.totalOutstanding || 0);
     const fromListBalance = Number(this.data.loan?.loanBalance || 0);
@@ -437,9 +449,8 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   }
 
   /**
-   * A partial that cannot clear every overdue installment is applied to the oldest one:
-   * that installment's own LPI, then its interest, then its principal. Later installments'
-   * LPI and interest stay out of the preview until this amount reaches them.
+   * A partial that cannot clear every overdue installment is applied to the oldest one,
+   * in the loan's repayment-strategy order, before the next installment.
    */
   private simulateSettlementAllocation(
     amount: number,
@@ -458,7 +469,15 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         periods: this.data.loan?.repaymentSchedule?.periods,
         charges: this.loanCharges,
         transactionDate: this.toComparableDate(transactionDateValue)
-      })
+      }),
+      this.componentOrder
+    );
+  }
+
+  private get componentOrder() {
+    return repaymentComponentOrder(
+      this.transactionProcessingStrategyCode || this.data.loan?.transactionProcessingStrategyCode,
+      this.paymentAllocations || this.data.loan?.paymentAllocation
     );
   }
 
@@ -783,13 +802,22 @@ export class TransferFromSavingsDialogComponent implements OnInit {
 
   get paymentAllocationLines(): SettlementSummaryLine[] {
     const allocation = this.currentSettlementAllocation;
-    return [
-      { label: 'Principal', amount: allocation.principal },
-      { label: 'Interest', amount: allocation.interest },
-      { label: 'LPI', amount: allocation.penalty },
-      { label: 'Fees', amount: allocation.fee },
-      { label: 'Tax', amount: allocation.tax }
-    ].filter((line) => line.amount > 0.01);
+    const labels: Record<string, string> = {
+      principal: 'Principal',
+      interest: 'Interest',
+      penalty: 'LPI',
+      fee: 'Fees',
+      tax: 'Tax'
+    };
+    return ([
+        'principal',
+        'interest',
+        'penalty',
+        'fee',
+        'tax'
+      ] as const)
+      .map((key) => ({ label: labels[key], amount: allocation[key] }))
+      .filter((line) => line.amount > 0.01);
   }
 
   get displayLedgerToday(): number {

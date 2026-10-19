@@ -1,6 +1,7 @@
 import {
   allocateOldestInstallmentFirst,
   allocateSettlement,
+  repaymentComponentOrder,
   buildDueInstallmentBuckets,
   installmentNumberForPenaltyCharge,
   includeLpiWaiveFootnote,
@@ -385,6 +386,58 @@ describe('backdated-settlement.util', () => {
     expect(clearsBoth.penalty).toBe(1111.7);
     expect(clearsBoth.interest).toBe(4874.34);
     expect(clearsBoth.principal).toBe(31609.9);
+  });
+
+  it('principal-interest-penalties-fees pays the oldest installment principal before interest and LPI', () => {
+    const order = repaymentComponentOrder('principal-interest-penalties-fees-order-strategy');
+    const components = { penalty: 230.76, fee: 0, tax: 0, interest: 269.24, principal: 109683.49 };
+    const buckets = [
+      { period: 1, penalty: 230.76, fee: 0, tax: 0, interest: 269.24, principal: 18000 }];
+
+    const partial = allocateOldestInstallmentFirst(500, components, buckets, order);
+    expect(partial.principal).toBe(500);
+    expect(partial.interest).toBe(0);
+    expect(partial.penalty).toBe(0);
+
+    const clearsInstallment = allocateOldestInstallmentFirst(18500, components, buckets, order);
+    expect(clearsInstallment.principal).toBe(18000);
+    expect(clearsInstallment.interest).toBe(269.24);
+    expect(clearsInstallment.penalty).toBe(230.76);
+    expect(clearsInstallment.unallocated).toBe(0);
+  });
+
+  it('interest-principal-penalties-fees pays interest before principal', () => {
+    const order = repaymentComponentOrder('Interest, Principal, Penalties, Fees Order');
+    const allocation = allocateOldestInstallmentFirst(
+      500,
+      { penalty: 230.76, fee: 0, tax: 0, interest: 269.24, principal: 18000 },
+      [{ period: 1, penalty: 230.76, fee: 0, tax: 0, interest: 269.24, principal: 18000 }],
+      order
+    );
+    expect(allocation.interest).toBe(269.24);
+    expect(allocation.principal).toBe(230.76);
+    expect(allocation.penalty).toBe(0);
+  });
+
+  it('advanced payment allocation follows the loan DEFAULT rule order', () => {
+    const order = repaymentComponentOrder('advanced-payment-allocation-strategy', [
+      {
+        transactionType: 'DEFAULT',
+        paymentAllocationOrder: [
+          { paymentAllocationRule: 'DUE_PRINCIPAL', order: 1 },
+          { paymentAllocationRule: 'DUE_INTEREST', order: 2 },
+          { paymentAllocationRule: 'DUE_PENALTY', order: 3 },
+          { paymentAllocationRule: 'DUE_FEE', order: 4 }
+        ]
+      }
+    ]);
+    expect(order).toEqual([
+      'principal',
+      'interest',
+      'penalty',
+      'fee',
+      'tax'
+    ]);
   });
 
   it('LMS-150: Make Repayment prefill on 10 Aug includes all 10 pre-date LPI days, not the one day on the EMI', () => {

@@ -19,6 +19,8 @@ import {
   applyPreDateLpiFloor,
   buildDueInstallmentBuckets,
   buildBackdateLimitMessage,
+  repaymentComponentOrder,
+  RepaymentPaymentAllocation,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
   computeProjectedOverpayment,
@@ -104,6 +106,9 @@ export class MakeRepaymentComponent implements OnInit {
   overpaymentWarning: string | null = null;
   /** Outcome of this repayment transaction (Active / Closed / Overpaid) — not Early Closure / Foreclosure. */
   repaymentOutcomeNotice: string | null = null;
+  /** Loan transaction-processing strategy. The entered-amount split follows this order. */
+  transactionProcessingStrategyCode: string | null = null;
+  private paymentAllocations: RepaymentPaymentAllocation[] | null = null;
 
   /**
    * @param {FormBuilder} formBuilder Form Builder.
@@ -418,6 +423,8 @@ export class MakeRepaymentComponent implements OnInit {
   }
 
   private applyLoanSummary(loanDetails: any): void {
+    this.transactionProcessingStrategyCode = loanDetails?.transactionProcessingStrategyCode || null;
+    this.paymentAllocations = Array.isArray(loanDetails?.paymentAllocation) ? loanDetails.paymentAllocation : null;
     this.loanSummary = loanDetails?.summary || null;
     this.fullLoanOutstanding = this.roundAmount(Number(this.loanSummary?.totalOutstanding || 0));
     this.repaymentSchedulePeriods = Array.isArray(loanDetails?.repaymentSchedule?.periods)
@@ -664,29 +671,9 @@ export class MakeRepaymentComponent implements OnInit {
     return cap > 0.01 && this.roundAmount(amount) + 0.01 >= cap;
   }
 
-  get displayedPrincipal(): number {
-    return this.currentSettlementAllocation.principal;
-  }
-
-  get displayedInterest(): number {
-    return this.currentSettlementAllocation.interest;
-  }
-
-  get displayedFee(): number {
-    return this.currentSettlementAllocation.fee;
-  }
-
-  get displayedPenalty(): number {
-    return this.currentSettlementAllocation.penalty;
-  }
-
-  get displayedTax(): number {
-    return this.currentSettlementAllocation.tax;
-  }
-
   /**
-   * One overdue EMI keeps the flat LPI-first preview. Several overdue EMIs are allocated oldest
-   * first: that EMI's own LPI, interest, and principal are deducted before the next EMI's LPI.
+   * Entered amount is applied to the oldest overdue installment first, in the loan's repayment
+   * strategy order, before the next installment.
    */
   private get currentSettlementAllocation() {
     const amount = Number(this.repaymentLoanForm?.get('transactionAmount')?.value || 0);
@@ -703,8 +690,35 @@ export class MakeRepaymentComponent implements OnInit {
         interest: this.interestAsOfDate,
         principal: this.remainingPrincipalAsOfDate
       },
-      this.overdueInstallmentBuckets()
+      this.overdueInstallmentBuckets(),
+      this.componentOrder
     );
+  }
+
+  private get componentOrder() {
+    return repaymentComponentOrder(this.transactionProcessingStrategyCode, this.paymentAllocations);
+  }
+
+  get allocationDisplayLines(): Array<{ label: string; amount: number; translate: boolean }> {
+    const allocation = this.currentSettlementAllocation;
+    const labels: Record<string, { label: string; translate: boolean }> = {
+      principal: { label: 'Principal', translate: false },
+      interest: { label: 'Interest', translate: false },
+      penalty: { label: 'LPI', translate: false },
+      fee: { label: 'Fees', translate: true },
+      tax: { label: 'Taxes', translate: true }
+    };
+    return ([
+        'principal',
+        'interest',
+        'penalty',
+        'fee',
+        'tax'
+      ] as const).map((key) => ({
+      label: labels[key].label,
+      translate: labels[key].translate,
+      amount: allocation[key]
+    }));
   }
 
   private overdueInstallmentBuckets() {
@@ -734,21 +748,25 @@ export class MakeRepaymentComponent implements OnInit {
     const allocation = this.allocateEnteredAmount(amount);
     const oldestFirst = this.overdueInstallmentBuckets().length > 1;
 
+    const portionPhrase: Record<string, string> = {
+      penalty: 'to late payment interest (LPI)',
+      fee: 'to fees',
+      tax: 'to tax',
+      interest: 'to interest',
+      principal: 'to principal'
+    };
     const parts: string[] = [];
-    if (allocation.penalty > 0.01) {
-      parts.push(`${this.currencyLabel} ${allocation.penalty.toFixed(2)} to late payment interest (LPI)`);
-    }
-    if (allocation.fee > 0.01) {
-      parts.push(`${this.currencyLabel} ${allocation.fee.toFixed(2)} to fees`);
-    }
-    if (allocation.tax > 0.01) {
-      parts.push(`${this.currencyLabel} ${allocation.tax.toFixed(2)} to tax`);
-    }
-    if (allocation.interest > 0.01) {
-      parts.push(`${this.currencyLabel} ${allocation.interest.toFixed(2)} to interest`);
-    }
-    if (allocation.principal > 0.01) {
-      parts.push(`${this.currencyLabel} ${allocation.principal.toFixed(2)} to principal`);
+    for (const key of [
+      'principal',
+      'interest',
+      'penalty',
+      'fee',
+      'tax'
+    ] as const) {
+      const portion = allocation[key];
+      if (portion > 0.01) {
+        parts.push(`${this.currencyLabel} ${portion.toFixed(2)} ${portionPhrase[key]}`);
+      }
     }
 
     const lines = [
