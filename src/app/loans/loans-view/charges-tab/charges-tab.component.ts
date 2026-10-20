@@ -21,6 +21,7 @@ import { FormfieldBase } from 'app/shared/form-dialog/formfield/model/formfield-
 import { InputBase } from 'app/shared/form-dialog/formfield/model/input-base';
 import { DatepickerBase } from 'app/shared/form-dialog/formfield/model/datepicker-base';
 import { Dates } from 'app/core/utils/dates';
+import { installmentNumberForPenaltyCharge } from 'app/loans/common/backdated-settlement.util';
 import { SystemService } from 'app/system/system.service';
 import { GlobalConfiguration } from 'app/system/configurations/global-configurations-tab/configuration.model';
 import { TranslateService } from '@ngx-translate/core';
@@ -46,6 +47,7 @@ export class ChargesTabComponent implements OnInit {
   private readonly editableColumns: string[] = [
     'name',
     'feepenalty',
+    'installment',
     'paymentdueat',
     'dueDate',
     'calculationtype',
@@ -59,6 +61,7 @@ export class ChargesTabComponent implements OnInit {
   private readonly readOnlyColumns: string[] = [
     'name',
     'feepenalty',
+    'installment',
     'paymentdueat',
     'dueDate',
     'calculationtype',
@@ -154,6 +157,10 @@ export class ChargesTabComponent implements OnInit {
         actionFlag = false;
       }
       element.actionFlag = actionFlag;
+      element.installmentNumber = installmentNumberForPenaltyCharge(
+        element,
+        this.loanDetails?.repaymentSchedule?.periods
+      );
     });
     this.chargesData = this.chargesData.sort(function (a: any, b: any) {
       return b.dueDate - a.dueDate;

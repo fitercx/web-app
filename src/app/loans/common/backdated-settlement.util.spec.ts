@@ -1,5 +1,11 @@
 import {
+  allocateOldestInstallmentFirst,
   allocateSettlement,
+  repaymentComponentOrder,
+  buildDueInstallmentBuckets,
+  installmentNumberForPenaltyCharge,
+  includeLpiWaiveFootnote,
+  includePenaltyDueOnLastDueBucket,
   buildBackdateLimitMessage,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
@@ -13,12 +19,32 @@ import {
   computeUnearnedInterest,
   isDummyGraceInstallmentDueOnDate,
   lastAllowedLocForeclosureDate,
+  applyPreDateLpiFloor,
   reconcileAsOfDateAmounts,
   reconcilePenaltyWithLedger,
   applyEmiAmountCoverage
 } from './backdated-settlement.util';
 
 describe('backdated-settlement.util', () => {
+  it('takes LPI accrued before the selected date before the due EMI interest', () => {
+    const dueEmi = [{ period: 1, penalty: 5.75, fee: 0, tax: 0, interest: 1350, principal: 6901.2 }];
+    const on2Sep = allocateSettlement(
+      200,
+      { penalty: 11.5, fee: 0, tax: 0, interest: 1350, principal: 90000 },
+      includePenaltyDueOnLastDueBucket(dueEmi, 11.5)
+    );
+    expect(on2Sep.penalty).toBe(11.5);
+    expect(on2Sep.interest).toBe(188.5);
+
+    const on3Sep = allocateSettlement(
+      200,
+      { penalty: 17.25, fee: 0, tax: 0, interest: 1350, principal: 90000 },
+      includePenaltyDueOnLastDueBucket(dueEmi, 17.25)
+    );
+    expect(on3Sep.penalty).toBe(17.25);
+    expect(on3Sep.interest).toBe(182.75);
+  });
+
   const toComparableDate = (value: any): Date | null => {
     if (!value) {
       return null;
@@ -31,6 +57,521 @@ describe('backdated-settlement.util', () => {
     }
     return null;
   };
+
+  it('collects schedule LPI and unmapped LPI before interest and principal', () => {
+    const allocation = allocateSettlement(
+      15000,
+      { penalty: 821.9, fee: 0, tax: 0, interest: 3287.67, principal: 100000 },
+      [{ penalty: 82.19, fee: 0, tax: 0, interest: 3287.67, principal: 100000, period: 1 }]
+    );
+
+    expect(allocation.penalty).toBe(821.9);
+    expect(allocation.interest).toBe(3287.67);
+    expect(allocation.principal).toBe(10890.43);
+    expect(allocation.unallocated).toBe(0);
+  });
+
+  it('applies a small partial entirely to LPI when LPI is due first', () => {
+    const allocation = allocateSettlement(100, { penalty: 328.76, fee: 0, tax: 0, interest: 200, principal: 85000 }, [
+      { penalty: 0, fee: 0, tax: 0, interest: 200, principal: 85000, period: 1 }]);
+
+    expect(allocation.penalty).toBe(100);
+    expect(allocation.interest).toBe(0);
+    expect(allocation.principal).toBe(0);
+  });
+
+  it('LMS-146 / LMS-147: Fero partial of 81,000.820 on 11 Sep keeps both overdue days in the allocation', () => {
+    const allocation = allocateSettlement(
+      81000.82,
+      { penalty: 356.8, fee: 0, tax: 0, interest: 0, principal: 217054.01 },
+      [{ penalty: 178.4, fee: 0, tax: 0, interest: 0, principal: 217054.01, period: 1 }]
+    );
+
+    expect(allocation.penalty).toBe(356.8);
+    expect(allocation.principal).toBe(80644.02);
+    expect(includeLpiWaiveFootnote(false)).toBe(false);
+    expect(formatLpiWaivedAfterDateMessage('AED', '2140.80', '11-Sep')).toBe(
+      'AED 2140.80 of late-payment interest accrued after 11-Sep will be waived and is not charged.'
+    );
+  });
+
+  it('LMS-150: partial 10,000 on 5 Aug still shows the 328.76 LPI row', () => {
+    const allocation = allocateSettlement(
+      10000,
+      { penalty: 328.76, fee: 0, tax: 0, interest: 0, principal: 85082.19 },
+      [{ penalty: 82.19, fee: 0, tax: 0, interest: 0, principal: 85082.19, period: 1 }]
+    );
+
+    expect(allocation.penalty).toBe(328.76);
+    expect(allocation.principal).toBe(9671.24);
+    expect(includeLpiWaiveFootnote(false)).toBe(false);
+  });
+
+  it('loan 000014627: a 10,000 partial uses EMI 1 LPI and interest, not every overdue installment', () => {
+    const on18Oct = new Date(2026, 9, 18);
+    const periods = [
+      {
+        period: 1,
+        dueDate: [
+          2026,
+          8,
+          20
+        ],
+        principalDue: 15598.79,
+        principalOutstanding: 15598.79,
+        interestDue: 2643.33,
+        interestOutstanding: 2643.33,
+        penaltyChargesOutstanding: 12.82
+      },
+      {
+        period: 2,
+        dueDate: [
+          2026,
+          9,
+          21
+        ],
+        principalDue: 16011.11,
+        principalOutstanding: 16011.11,
+        interestDue: 2231.01,
+        interestOutstanding: 2231.01,
+        penaltyChargesOutstanding: 423.4
+      },
+      {
+        period: 3,
+        dueDate: [
+          2026,
+          10,
+          20
+        ],
+        principalDue: 16434.34,
+        principalOutstanding: 16434.34,
+        interestDue: 1807.78,
+        interestOutstanding: 1807.78,
+        penaltyChargesOutstanding: 675.48
+      }
+    ];
+    const charges = [
+      {
+        penalty: true,
+        amountOutstanding: 756.38,
+        amountPercentageAppliedTo: 15598.79,
+        dueDate: [
+          2026,
+          10,
+          17
+        ]
+      },
+      {
+        penalty: true,
+        amountOutstanding: 355.32,
+        amountPercentageAppliedTo: 16011.11,
+        dueDate: [
+          2026,
+          10,
+          17
+        ]
+      }
+    ];
+    const buckets = buildDueInstallmentBuckets({ periods, charges, transactionDate: on18Oct });
+    const allocation = allocateOldestInstallmentFirst(
+      10000,
+      { penalty: 1111.7, fee: 0, tax: 0, interest: 4874.34, principal: 100000 },
+      buckets
+    );
+
+    expect(allocation.penalty).toBe(756.38);
+    expect(allocation.interest).toBe(2643.33);
+    expect(allocation.principal).toBe(6600.29);
+    expect(allocation.penalty).not.toBe(1111.7);
+    expect(allocation.interest).not.toBe(4874.34);
+  });
+
+  it('loan 000014629: LPI on the reduced principal of EMI 1 is taken before more principal', () => {
+    const on6Oct = new Date(2026, 9, 6);
+    const periods = [
+      {
+        period: 1,
+        dueDate: [
+          2026,
+          8,
+          20
+        ],
+        principalDue: 15598.79,
+        principalOutstanding: 8780.56,
+        interestDue: 2643.33,
+        interestOutstanding: 0
+      },
+      {
+        period: 2,
+        dueDate: [
+          2026,
+          9,
+          21
+        ],
+        principalDue: 16011.11,
+        principalOutstanding: 16011.11,
+        interestDue: 2231.01,
+        interestOutstanding: 2231.01
+      }
+    ];
+    const charges = [
+      {
+        penalty: true,
+        amountOutstanding: 36.1,
+        amountPercentageAppliedTo: 8780.56,
+        dueDate: [
+          2026,
+          10,
+          5
+        ]
+      },
+      {
+        penalty: true,
+        amountOutstanding: 355.32,
+        amountPercentageAppliedTo: 16011.11,
+        dueDate: [
+          2026,
+          10,
+          5
+        ]
+      }
+    ];
+    const buckets = buildDueInstallmentBuckets({ periods, charges, transactionDate: on6Oct });
+    const allocation = allocateOldestInstallmentFirst(
+      1000,
+      { penalty: 391.42, fee: 0, tax: 0, interest: 2231.01, principal: 93181.77 },
+      buckets
+    );
+
+    expect(buckets[0].penalty).toBe(36.1);
+    expect(allocation.penalty).toBe(36.1);
+    expect(allocation.interest).toBe(0);
+    expect(allocation.principal).toBe(963.9);
+    expect(installmentNumberForPenaltyCharge(charges[0], periods)).toBe(1);
+    expect(installmentNumberForPenaltyCharge(charges[1], periods)).toBe(2);
+    expect(
+      installmentNumberForPenaltyCharge({ penalty: false, amountPercentageAppliedTo: 8780.56 }, periods)
+    ).toBeNull();
+  });
+
+  it('loan 000014629: a finished installment still owns LPI calculated on its reduced principal', () => {
+    const periods = [
+      {
+        period: 1,
+        dueDate: [
+          2026,
+          8,
+          20
+        ],
+        principalDue: 15598.79,
+        principalOutstanding: 0,
+        principalPaid: 15598.79,
+        interestDue: 2643.33
+      },
+      {
+        period: 2,
+        dueDate: [
+          2026,
+          9,
+          21
+        ],
+        principalDue: 16011.11,
+        principalOutstanding: 16011.11,
+        interestDue: 2231.01
+      }
+    ];
+    expect(installmentNumberForPenaltyCharge({ penalty: true, amountPercentageAppliedTo: 15598.79 }, periods)).toBe(1);
+    expect(installmentNumberForPenaltyCharge({ penalty: true, amountPercentageAppliedTo: 8780.56 }, periods)).toBe(1);
+    expect(installmentNumberForPenaltyCharge({ penalty: true, amountPercentageAppliedTo: 7816.66 }, periods)).toBe(1);
+    expect(installmentNumberForPenaltyCharge({ penalty: true, amountPercentageAppliedTo: 6842.34 }, periods)).toBe(1);
+    expect(installmentNumberForPenaltyCharge({ penalty: true, amountPercentageAppliedTo: 16011.11 }, periods)).toBe(2);
+  });
+
+  it('several overdue EMIs: a partial clears the oldest EMI before the next EMI LPI', () => {
+    const on18Oct = new Date(2026, 9, 18);
+    const periods = [
+      {
+        period: 1,
+        dueDate: [
+          2026,
+          8,
+          20
+        ],
+        principalDue: 15598.79,
+        interestDue: 2643.33,
+        penaltyChargesDue: 12.82,
+        penaltyChargesPaid: 0
+      },
+      {
+        period: 2,
+        dueDate: [
+          2026,
+          9,
+          21
+        ],
+        principalDue: 16011.11,
+        interestDue: 2231.01,
+        penaltyChargesDue: 765.56,
+        penaltyChargesPaid: 0
+      },
+      {
+        period: 3,
+        dueDate: [
+          2026,
+          10,
+          20
+        ],
+        principalDue: 16434.34,
+        interestDue: 1807.78,
+        penaltyChargesDue: 333.32,
+        penaltyChargesPaid: 0
+      }
+    ];
+    const charges = [
+      {
+        penalty: true,
+        amountOutstanding: 756.38,
+        amountPercentageAppliedTo: 15598.79,
+        dueDate: [
+          2026,
+          10,
+          17
+        ]
+      },
+      {
+        penalty: true,
+        amountOutstanding: 355.32,
+        amountPercentageAppliedTo: 16011.11,
+        dueDate: [
+          2026,
+          10,
+          17
+        ]
+      },
+      {
+        penalty: true,
+        amountOutstanding: 13.16,
+        amountPercentageAppliedTo: 16011.11,
+        dueDate: [
+          2026,
+          10,
+          18
+        ]
+      }
+    ];
+    const buckets = buildDueInstallmentBuckets({ periods, charges, transactionDate: on18Oct });
+
+    expect(buckets.map((bucket) => bucket.period)).toEqual([
+      1,
+      2
+    ]);
+    expect(buckets[0].penalty).toBe(756.38);
+    expect(buckets[1].penalty).toBe(355.32);
+
+    const partial = allocateOldestInstallmentFirst(
+      10000,
+      { penalty: 1111.7, fee: 0, tax: 0, interest: 4874.34, principal: 100000 },
+      buckets
+    );
+    expect(partial.penalty).toBe(756.38);
+    expect(partial.interest).toBe(2643.33);
+    expect(partial.principal).toBe(6600.29);
+    expect(partial.unallocated).toBe(0);
+
+    const clearsBoth = allocateOldestInstallmentFirst(
+      37595.94,
+      { penalty: 1111.7, fee: 0, tax: 0, interest: 4874.34, principal: 100000 },
+      buckets
+    );
+    expect(clearsBoth.penalty).toBe(1111.7);
+    expect(clearsBoth.interest).toBe(4874.34);
+    expect(clearsBoth.principal).toBe(31609.9);
+  });
+
+  it('principal-interest-penalties-fees pays the oldest installment principal before interest and LPI', () => {
+    const order = repaymentComponentOrder('principal-interest-penalties-fees-order-strategy');
+    const components = { penalty: 230.76, fee: 0, tax: 0, interest: 269.24, principal: 109683.49 };
+    const buckets = [
+      { period: 1, penalty: 230.76, fee: 0, tax: 0, interest: 269.24, principal: 18000 }];
+
+    const partial = allocateOldestInstallmentFirst(500, components, buckets, order);
+    expect(partial.principal).toBe(500);
+    expect(partial.interest).toBe(0);
+    expect(partial.penalty).toBe(0);
+
+    const clearsInstallment = allocateOldestInstallmentFirst(18500, components, buckets, order);
+    expect(clearsInstallment.principal).toBe(18000);
+    expect(clearsInstallment.interest).toBe(269.24);
+    expect(clearsInstallment.penalty).toBe(230.76);
+    expect(clearsInstallment.unallocated).toBe(0);
+  });
+
+  it('interest-principal-penalties-fees pays interest before principal', () => {
+    const order = repaymentComponentOrder('Interest, Principal, Penalties, Fees Order');
+    const allocation = allocateOldestInstallmentFirst(
+      500,
+      { penalty: 230.76, fee: 0, tax: 0, interest: 269.24, principal: 18000 },
+      [{ period: 1, penalty: 230.76, fee: 0, tax: 0, interest: 269.24, principal: 18000 }],
+      order
+    );
+    expect(allocation.interest).toBe(269.24);
+    expect(allocation.principal).toBe(230.76);
+    expect(allocation.penalty).toBe(0);
+  });
+
+  it('advanced payment allocation follows the loan DEFAULT rule order', () => {
+    const order = repaymentComponentOrder('advanced-payment-allocation-strategy', [
+      {
+        transactionType: 'DEFAULT',
+        paymentAllocationOrder: [
+          { paymentAllocationRule: 'DUE_PRINCIPAL', order: 1 },
+          { paymentAllocationRule: 'DUE_INTEREST', order: 2 },
+          { paymentAllocationRule: 'DUE_PENALTY', order: 3 },
+          { paymentAllocationRule: 'DUE_FEE', order: 4 }
+        ]
+      }
+    ]);
+    expect(order).toEqual([
+      'principal',
+      'interest',
+      'penalty',
+      'fee',
+      'tax'
+    ]);
+  });
+
+  it('LMS-150: Make Repayment prefill on 10 Aug includes all 10 pre-date LPI days, not the one day on the EMI', () => {
+    const reconciled = applyPreDateLpiFloor(
+      reconcileAsOfDateAmounts({
+        isBackdated: true,
+        penaltyTemplate: {
+          principalOutstanding: 100000,
+          remainingPrincipalOutstanding: 100000,
+          interestOutstanding: 3287.67,
+          penaltyAmountDue: 821.9
+        },
+        repaymentTemplate: {
+          amount: 103369.86,
+          principalPortion: 100000,
+          interestPortion: 3287.67,
+          penaltyChargesPortion: 82.19,
+          feeChargesPortion: 0,
+          taxChargesPortion: 0
+        }
+      }),
+      821.9,
+      false
+    );
+
+    expect(reconciled.penalty).toBe(821.9);
+    expect(reconciled.defaultTransactionAmount).toBe(104109.57);
+
+    const partial = allocateSettlement(15000, {
+      penalty: reconciled.penalty,
+      fee: reconciled.fee,
+      tax: reconciled.tax,
+      interest: reconciled.interest,
+      principal: reconciled.remainingPrincipal
+    });
+    expect(partial.penalty).toBe(821.9);
+    expect(partial.interest).toBe(3287.67);
+    expect(partial.principal).toBe(10890.43);
+    const closesLoan = (amount: number) => amount + 0.01 >= reconciled.defaultTransactionAmount;
+    expect(includeLpiWaiveFootnote(closesLoan(15000))).toBe(false);
+    expect(includeLpiWaiveFootnote(closesLoan(reconciled.defaultTransactionAmount))).toBe(true);
+  });
+
+  it('LMS-146: Make Repayment prefill on 11 Sep includes 9 Sep and 10 Sep', () => {
+    const reconciled = applyPreDateLpiFloor(
+      reconcileAsOfDateAmounts({
+        isBackdated: true,
+        penaltyTemplate: {
+          principalOutstanding: 217054.01,
+          remainingPrincipalOutstanding: 217054.01,
+          interestOutstanding: 0,
+          penaltyAmountDue: 356.8
+        },
+        repaymentTemplate: {
+          amount: 217232.41,
+          principalPortion: 217054.01,
+          interestPortion: 0,
+          penaltyChargesPortion: 178.4,
+          feeChargesPortion: 0,
+          taxChargesPortion: 0
+        }
+      }),
+      356.8,
+      false
+    );
+
+    expect(reconciled.penalty).toBe(356.8);
+    expect(reconciled.defaultTransactionAmount).toBe(217410.81);
+    const partial = allocateSettlement(81000.82, {
+      penalty: reconciled.penalty,
+      fee: 0,
+      tax: 0,
+      interest: reconciled.interest,
+      principal: reconciled.remainingPrincipal
+    });
+    expect(partial.penalty).toBe(356.8);
+    expect(partial.principal).toBe(80644.02);
+    expect(includeLpiWaiveFootnote(false)).toBe(false);
+  });
+
+  it('LMS-132: a due-date partial prefill does not add same-day LPI and does not claim a waive', () => {
+    const reconciled = applyPreDateLpiFloor(
+      reconcileAsOfDateAmounts({
+        isBackdated: true,
+        penaltyTemplate: {
+          principalOutstanding: 546036.05,
+          remainingPrincipalOutstanding: 546036.05,
+          interestOutstanding: 170602.8,
+          penaltyAmountDue: 0
+        },
+        repaymentTemplate: {
+          amount: 717087.64,
+          principalPortion: 546036.05,
+          interestPortion: 170602.8,
+          penaltyChargesPortion: 448.79,
+          feeChargesPortion: 0,
+          taxChargesPortion: 0
+        }
+      }),
+      0,
+      true
+    );
+
+    expect(reconciled.penalty).toBe(0);
+    expect(reconciled.defaultTransactionAmount).toBe(716638.85);
+    expect(includeLpiWaiveFootnote(293987.85 + 0.01 >= reconciled.defaultTransactionAmount)).toBe(false);
+  });
+
+  it('shows the LPI waive note only when the amount on screen closes the loan', () => {
+    expect(includeLpiWaiveFootnote(false)).toBe(false);
+    expect(includeLpiWaiveFootnote(true)).toBe(true);
+  });
+
+  it('takes LPI on a later overdue EMI before the earlier EMI principal', () => {
+    const allocation = allocateSettlement(400, { penalty: 500, fee: 0, tax: 0, interest: 0, principal: 1000 }, [
+      { penalty: 200, fee: 0, tax: 0, interest: 0, principal: 500, period: 1 },
+      { penalty: 200, fee: 0, tax: 0, interest: 0, principal: 500, period: 2 }
+    ]);
+
+    expect(allocation.penalty).toBe(400);
+    expect(allocation.principal).toBe(0);
+  });
+
+  it('allocates as-of-date LPI before principal when the installment bucket omits it', () => {
+    const allocation = allocateSettlement(
+      10000,
+      { penalty: 328.76, fee: 0, tax: 0, interest: 0, principal: 85082.19 },
+      [{ penalty: 0, fee: 0, tax: 0, interest: 0, principal: 85082.19, period: 1 }]
+    );
+
+    expect(allocation.penalty).toBe(328.76);
+    expect(allocation.principal).toBe(9671.24);
+    expect(allocation.unallocated).toBe(0);
+  });
 
   it('does not allocate waived LPI when penalty as of the selected date is 0', () => {
     const allocation = allocateSettlement(

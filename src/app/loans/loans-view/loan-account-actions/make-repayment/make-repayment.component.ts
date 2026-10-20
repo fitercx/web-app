@@ -15,8 +15,12 @@ import { Currency } from 'app/shared/models/general.model';
 import { AlertService } from 'app/core/alert/alert.service';
 import { SavingsService } from 'app/savings/savings.service';
 import {
-  allocateSettlement,
+  allocateOldestInstallmentFirst,
+  applyPreDateLpiFloor,
+  buildDueInstallmentBuckets,
   buildBackdateLimitMessage,
+  repaymentComponentOrder,
+  RepaymentPaymentAllocation,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
   computeProjectedOverpayment,
@@ -25,6 +29,7 @@ import {
   computeSettlementRequired,
   computeUnearnedInterest,
   computeLpiOnlyPeriodOutstanding,
+  OverduePenaltyCharge,
   reconcileAsOfDateAmounts,
   SchedulePeriod
 } from 'app/loans/common/backdated-settlement.util';
@@ -73,6 +78,7 @@ export class MakeRepaymentComponent implements OnInit {
   private savingsTransactions: any[] = [];
   private loanSummary: any;
   private repaymentSchedulePeriods: SchedulePeriod[] = [];
+  private loanCharges: OverduePenaltyCharge[] = [];
   fullLoanOutstanding = 0;
 
   /**
@@ -100,6 +106,9 @@ export class MakeRepaymentComponent implements OnInit {
   overpaymentWarning: string | null = null;
   /** Outcome of this repayment transaction (Active / Closed / Overpaid) — not Early Closure / Foreclosure. */
   repaymentOutcomeNotice: string | null = null;
+  /** Loan transaction-processing strategy. The entered-amount split follows this order. */
+  transactionProcessingStrategyCode: string | null = null;
+  private paymentAllocations: RepaymentPaymentAllocation[] | null = null;
 
   /**
    * @param {FormBuilder} formBuilder Form Builder.
@@ -294,19 +303,20 @@ export class MakeRepaymentComponent implements OnInit {
             !isBackdated && !isFutureDate ? computeLpiOnlyPeriodOutstanding(this.repaymentSchedulePeriods) : 0
         });
 
-        const penaltyDue = this.roundAmount(Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalLPIAmount);
-        if (!this.onInstallmentDueDate && penaltyDue > reconciled.penalty + 0.01) {
-          reconciled.penalty = penaltyDue;
-        }
+        const withPreDateLpi = applyPreDateLpiFloor(
+          reconciled,
+          Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalLPIAmount,
+          this.onInstallmentDueDate
+        );
 
-        this.dataObject.penaltyTemplate.principalOutstanding = reconciled.principal;
-        this.dataObject.penaltyTemplate.remainingPrincipalOutstanding = reconciled.remainingPrincipal;
-        this.dataObject.penaltyTemplate.interestOutstanding = reconciled.interest;
-        this.dataObject.penaltyTemplate.penaltyAmountDue = reconciled.penalty;
+        this.dataObject.penaltyTemplate.principalOutstanding = withPreDateLpi.principal;
+        this.dataObject.penaltyTemplate.remainingPrincipalOutstanding = withPreDateLpi.remainingPrincipal;
+        this.dataObject.penaltyTemplate.interestOutstanding = withPreDateLpi.interest;
+        this.dataObject.penaltyTemplate.penaltyAmountDue = withPreDateLpi.penalty;
 
         this.dateImpactMessages = this.buildDateImpactMessages(
-          reconciled.interest,
-          reconciled.penalty,
+          withPreDateLpi.interest,
+          withPreDateLpi.penalty,
           transactionDate
         );
 
@@ -366,13 +376,8 @@ export class MakeRepaymentComponent implements OnInit {
     const penaltyDelta = round(this.baselinePenaltyAmountDue - totalPenaltyAmount);
     if (this.onInstallmentDueDate && totalPenaltyAmount <= 0.01) {
       messages.push(
-        `This date is an installment due date — no late-payment interest (LPI) applies. ` +
-          `Any LPI posted overnight after this due date will be automatically waived when you submit this repayment.`
-      );
-    } else if (penaltyDelta > 0.01) {
-      messages.push(
-        `${currencyLabel} ${penaltyDelta.toFixed(2)} of late-payment interest accrued after ${formattedDate} ` +
-          `will be waived and is not charged.`
+        `This date is an installment due date. Late-payment interest for this installment is dated after the due date, ` +
+          `so it is not included in the amount due. It is waived only when this repayment closes the loan.`
       );
     } else if (penaltyDelta < -0.01) {
       const selected = this.toComparableDate(this.dateUtils.parseDate(transactionDate) || transactionDate);
@@ -394,7 +399,7 @@ export class MakeRepaymentComponent implements OnInit {
 
   private loadLinkedSavingsAndSummary(): void {
     this.loanService
-      .getLoanAccountResource(this.loanId, 'summary,linkedAccount,repaymentSchedule')
+      .getLoanAccountResource(this.loanId, 'summary,linkedAccount,repaymentSchedule,charges')
       .pipe(
         catchError(() => of(null)),
         switchMap((loanDetails: any) => {
@@ -418,11 +423,14 @@ export class MakeRepaymentComponent implements OnInit {
   }
 
   private applyLoanSummary(loanDetails: any): void {
+    this.transactionProcessingStrategyCode = loanDetails?.transactionProcessingStrategyCode || null;
+    this.paymentAllocations = Array.isArray(loanDetails?.paymentAllocation) ? loanDetails.paymentAllocation : null;
     this.loanSummary = loanDetails?.summary || null;
     this.fullLoanOutstanding = this.roundAmount(Number(this.loanSummary?.totalOutstanding || 0));
     this.repaymentSchedulePeriods = Array.isArray(loanDetails?.repaymentSchedule?.periods)
       ? loanDetails.repaymentSchedule.periods
       : [];
+    this.loanCharges = Array.isArray(loanDetails?.charges) ? loanDetails.charges : [];
     this.mergePostDueLpiFromSchedule();
     this.recapTransactionAmountIfOverpayRisk();
   }
@@ -663,39 +671,61 @@ export class MakeRepaymentComponent implements OnInit {
     return cap > 0.01 && this.roundAmount(amount) + 0.01 >= cap;
   }
 
-  get displayedPrincipal(): number {
-    return this.currentSettlementAllocation.principal;
-  }
-
-  get displayedInterest(): number {
-    return this.currentSettlementAllocation.interest;
-  }
-
-  get displayedFee(): number {
-    return this.currentSettlementAllocation.fee;
-  }
-
-  get displayedPenalty(): number {
-    return this.currentSettlementAllocation.penalty;
-  }
-
-  get displayedTax(): number {
-    return this.currentSettlementAllocation.tax;
-  }
-
   /**
-   * Flat as-of-date allocation (no installment buckets). This screen does not load the repayment
-   * schedule; transfer-from-savings uses buckets because it already has periods for the due-EMI list.
-   * Component totals still use the same as-of-date budgets. Backend allocation on submit is authoritative.
+   * Entered amount is applied to the oldest overdue installment first, in the loan's repayment
+   * strategy order, before the next installment.
    */
   private get currentSettlementAllocation() {
     const amount = Number(this.repaymentLoanForm?.get('transactionAmount')?.value || 0);
-    return allocateSettlement(amount, {
-      penalty: this.penaltyAsOfDate,
-      fee: this.feeAsOfDate,
-      tax: this.taxAsOfDate,
-      interest: this.interestAsOfDate,
-      principal: this.remainingPrincipalAsOfDate
+    return this.allocateEnteredAmount(amount);
+  }
+
+  private allocateEnteredAmount(amount: number) {
+    return allocateOldestInstallmentFirst(
+      amount,
+      {
+        penalty: this.penaltyAsOfDate,
+        fee: this.feeAsOfDate,
+        tax: this.taxAsOfDate,
+        interest: this.interestAsOfDate,
+        principal: this.remainingPrincipalAsOfDate
+      },
+      this.overdueInstallmentBuckets(),
+      this.componentOrder
+    );
+  }
+
+  private get componentOrder() {
+    return repaymentComponentOrder(this.transactionProcessingStrategyCode, this.paymentAllocations);
+  }
+
+  get allocationDisplayLines(): Array<{ label: string; amount: number; translate: boolean }> {
+    const allocation = this.currentSettlementAllocation;
+    const labels: Record<string, { label: string; translate: boolean }> = {
+      principal: { label: 'Principal', translate: false },
+      interest: { label: 'Interest', translate: false },
+      penalty: { label: 'LPI', translate: false },
+      fee: { label: 'Fees', translate: true },
+      tax: { label: 'Taxes', translate: true }
+    };
+    return ([
+        'principal',
+        'interest',
+        'penalty',
+        'fee',
+        'tax'
+      ] as const).map((key) => ({
+      label: labels[key].label,
+      translate: labels[key].translate,
+      amount: allocation[key]
+    }));
+  }
+
+  private overdueInstallmentBuckets() {
+    return buildDueInstallmentBuckets({
+      periods: this.repaymentSchedulePeriods,
+      charges: this.loanCharges,
+      transactionDate: this.toComparableDate(this.repaymentLoanForm?.get('transactionDate')?.value)
     });
   }
 
@@ -715,35 +745,35 @@ export class MakeRepaymentComponent implements OnInit {
       return;
     }
 
-    const allocation = allocateSettlement(amount, {
-      penalty: this.penaltyAsOfDate,
-      fee: this.feeAsOfDate,
-      tax: this.taxAsOfDate,
-      interest: this.interestAsOfDate,
-      principal: this.remainingPrincipalAsOfDate
-    });
+    const allocation = this.allocateEnteredAmount(amount);
+    const oldestFirst = this.overdueInstallmentBuckets().length > 1;
 
+    const portionPhrase: Record<string, string> = {
+      penalty: 'to late payment interest (LPI)',
+      fee: 'to fees',
+      tax: 'to tax',
+      interest: 'to interest',
+      principal: 'to principal'
+    };
     const parts: string[] = [];
-    if (allocation.penalty > 0.01) {
-      parts.push(`${this.currencyLabel} ${allocation.penalty.toFixed(2)} to late payment interest (LPI)`);
-    }
-    if (allocation.fee > 0.01) {
-      parts.push(`${this.currencyLabel} ${allocation.fee.toFixed(2)} to fees`);
-    }
-    if (allocation.tax > 0.01) {
-      parts.push(`${this.currencyLabel} ${allocation.tax.toFixed(2)} to tax`);
-    }
-    if (allocation.interest > 0.01) {
-      parts.push(`${this.currencyLabel} ${allocation.interest.toFixed(2)} to interest`);
-    }
-    if (allocation.principal > 0.01) {
-      parts.push(`${this.currencyLabel} ${allocation.principal.toFixed(2)} to principal`);
+    for (const key of [
+      'principal',
+      'interest',
+      'penalty',
+      'fee',
+      'tax'
+    ] as const) {
+      const portion = allocation[key];
+      if (portion > 0.01) {
+        parts.push(`${this.currencyLabel} ${portion.toFixed(2)} ${portionPhrase[key]}`);
+      }
     }
 
     const lines = [
       `Of the entered amount (${this.currencyLabel} ${amount.toFixed(2)}), ` +
         (parts.length
-          ? `${parts.join(', ')} will be applied with this repayment (as at ${dateLabel}).`
+          ? `${parts.join(', ')} will be applied with this repayment (as at ${dateLabel})` +
+            (oldestFirst ? `, clearing the oldest overdue installment before the next.` : '.')
           : `no outstanding balance remains to allocate (as at ${dateLabel}).`)
     ];
 

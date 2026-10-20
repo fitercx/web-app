@@ -69,7 +69,13 @@
               Amount due as of {{ selectedTransactionDateLabel }}:
               <strong>{{ currencyLabel }} {{ dueAsOfDateTotal | formatNumber }}</strong>
               (installment plus any late-payment interest still due on this date).
-              <ng-container *ngIf="penaltyWaivedByBackdate > 0.01 && selectedTransactionDateShortLabel">
+              <ng-container
+                *ngIf="
+                  penaltyWaivedByBackdate > 0.01 &&
+                  selectedTransactionDateShortLabel &&
+                  willFullyRepayLoan(repaymentLoanForm.value.transactionAmount)
+                "
+              >
                 {{ currencyLabel }} {{ penaltyWaivedByBackdate | formatNumber }} of late-payment interest accrued after
                 {{ selectedTransactionDateShortLabel }} will be waived and is not charged.
               </ng-container>
@@ -77,39 +83,15 @@
           </div>
 
           <div fxLayout="row wrap" class="content">
-            <div fxFlex="50%" class="mat-body-strong">Principal</div>
-
-            <div fxFlex="50%" class="r-amount right-label">
-              {{ displayedPrincipal | formatNumber }}
-            </div>
-
-            <div fxFlex="50%" class="mat-body-strong">Interest</div>
-
-            <div fxFlex="50%" class="r-amount right-label">
-              {{ displayedInterest | formatNumber }}
-            </div>
-
-            <div fxFlex="50%" class="mat-body-strong">LPI</div>
-
-            <div fxFlex="50%" class="r-amount right-label">
-              {{ displayedPenalty | formatNumber }}
-            </div>
-
-            <div fxFlex="50%" class="mat-body-strong">
-              {{ 'Fees' | translate }}
-            </div>
-
-            <div fxFlex="50%" class="r-amount right-label">
-              {{ displayedFee | formatNumber }}
-            </div>
-
-            <div fxFlex="50%" class="mat-body-strong">
-              {{ 'Taxes' | translate }}
-            </div>
-
-            <div fxFlex="50%" class="r-amount right-label">
-              {{ displayedTax | formatNumber }}
-            </div>
+            <ng-container *ngFor="let line of allocationDisplayLines">
+              <div fxFlex="50%" class="mat-body-strong">
+                <ng-container *ngIf="line.translate">{{ line.label | translate }}</ng-container>
+                <ng-container *ngIf="!line.translate">{{ line.label }}</ng-container>
+              </div>
+              <div fxFlex="50%" class="r-amount right-label">
+                {{ line.amount | formatNumber }}
+              </div>
+            </ng-container>
           </div>
 
           <mifosx-input-amount
