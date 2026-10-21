@@ -42,6 +42,22 @@ describe('TransactionsTabComponent', () => {
     expect(component.allowUndoTransaction(txn)).toBeFalsy();
   });
 
+  it('labels a penalty waive as Waived LPI', () => {
+    component.loanDetailsData = {
+      charges: [{ id: 88, penalty: true, chargeTimeType: { value: 'Overdue Fees' } }]
+    };
+    const txn = {
+      type: { id: 9, code: 'loanTransactionType.waiveCharges', waiveCharges: true, value: 'Waive loan charges' },
+      penaltyChargesPortion: 0,
+      taxChargesPortion: 4.47,
+      feeChargesPortion: 0,
+      loanChargePaidByList: [{ chargeId: 88 }]
+    } as LoanTransaction;
+
+    expect(component.transactionTypeLabel(txn)).toBe('Waived LPI');
+    expect((component as any).loanTransactionColor(txn)).toBe('waive');
+  });
+
   it('hides only backend-reversed rows when Show Reversed is off', () => {
     component.transactionsData = [
       { id: 1, reversed: false, manuallyReversed: true, type: { accrual: false } } as LoanTransaction,
