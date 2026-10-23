@@ -1,0 +1,46 @@
+<h1 mat-dialog-title>{{ 'labels.heading.Reverse Standing Instruction Payment' | translate }}</h1>
+
+<div mat-dialog-content>
+  <p>
+    {{ 'labels.text.You are about to reverse the automatic EMI payment of' | translate }}
+    <strong>{{ data.amount | formatNumber }}</strong>
+    {{ 'labels.text.executed on' | translate }}
+    <strong>{{ data.executionTime }}</strong
+    >.
+  </p>
+  <p>
+    {{
+      'labels.text.This will restore the funds to the savings account and re-open the loan installment as unpaid.'
+        | translate
+    }}
+  </p>
+  <p>
+    <strong>{{
+      'labels.text.This action cannot be undone without re-applying the payment manually.' | translate
+    }}</strong>
+  </p>
+
+  <form [formGroup]="reverseForm">
+    <mat-form-field appearance="outline" style="width: 100%; margin-top: 8px">
+      <mat-label>{{ 'labels.inputs.Reason for reversal' | translate }}</mat-label>
+      <textarea
+        matInput
+        formControlName="note"
+        rows="3"
+        placeholder="{{ 'labels.inputs.Reason for reversal placeholder' | translate }}"
+      ></textarea>
+      <mat-error *ngIf="noteControl.invalid && (noteControl.dirty || noteControl.touched)">
+        {{ 'labels.inputs.A reason is required' | translate }}
+      </mat-error>
+    </mat-form-field>
+  </form>
+
+  <p *ngIf="errorMessage" style="color: red; margin-top: 8px">{{ errorMessage }}</p>
+</div>
+
+<mat-dialog-actions align="end">
+  <button mat-raised-button (click)="cancel()">{{ 'labels.buttons.Cancel' | translate }}</button>
+  <button mat-raised-button color="warn" [disabled]="reverseForm.invalid" (click)="confirm()">
+    {{ 'labels.buttons.Confirm Reversal' | translate }}
+  </button>
+</mat-dialog-actions>

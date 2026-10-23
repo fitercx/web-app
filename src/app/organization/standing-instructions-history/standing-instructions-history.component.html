@@ -144,6 +144,34 @@
         </td>
       </ng-container>
 
+      <ng-container matColumnDef="actions">
+        <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Actions' | translate }}</th>
+        <td mat-cell *matCellDef="let instruction">
+          <ng-container *ngIf="instruction.status === 'success' || instruction.status === 'partial'">
+            <ng-container *ngIf="!instruction.isReversed; else reversedBadge">
+              <button
+                mat-raised-button
+                color="warn"
+                *mifosxHasPermission="'REVERSE_STANDING_INSTRUCTION_HISTORY'"
+                (click)="reverseExecution(instruction)"
+              >
+                {{ 'labels.buttons.Reverse' | translate }}
+              </button>
+            </ng-container>
+            <ng-template #reversedBadge>
+              <span
+                class="reversed-badge"
+                [matTooltip]="
+                  instruction.reversedAt ? ('labels.text.Reversed on' | translate) + ' ' + instruction.reversedAt : ''
+                "
+              >
+                {{ 'labels.text.Reversed' | translate }}
+              </span>
+            </ng-template>
+          </ng-container>
+        </td>
+      </ng-container>
+
       <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
       <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
     </table>
