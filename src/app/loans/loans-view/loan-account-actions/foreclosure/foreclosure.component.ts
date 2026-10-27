@@ -700,6 +700,9 @@ export class ForeclosureComponent implements OnInit {
         'loan may become Overpaid instead of Closed'
       );
     }
+    if (this.linkedSavingsAccountAccountNo) {
+      return 'This amount is deducted from the linked savings account and closes the loan';
+    }
     return null;
   }
 
@@ -839,11 +842,16 @@ export class ForeclosureComponent implements OnInit {
     if (waivedLpiNote) {
       notes.push(waivedLpiNote);
     }
+    if (this.prepaidInterestNettedIntoQuote > 0.01) {
+      notes.push(
+        `${this.currencySymbol} ${this.formatAmount(this.prepaidInterestNettedIntoQuote)} of interest already paid is included in this total. ` +
+          'It is not deducted again.'
+      );
+    }
     if (this.unearnedInterest > 0.01 && this.closureTypeInfo?.type === 'foreclosure') {
-      notes.push({
-        text: `Unearned interest: −${this.currencySymbol} ${this.formatAmount(this.unearnedInterest)}`,
-        tone: 'negative'
-      });
+      notes.push(
+        `Future interest of ${this.currencySymbol} ${this.formatAmount(this.unearnedInterest)} is not charged and is not part of the amount deducted.`
+      );
     }
     if (this.isRealEmiDueOnSelectedDate && this.penaltyAsOfDate <= 0.01 && this.settlementLedgerDelta <= 0.01) {
       notes.push('No LPI on installment due date');
@@ -899,6 +907,16 @@ export class ForeclosureComponent implements OnInit {
   }
 
   /**
+   * Interest already collected for days after the foreclosure date, and already subtracted from the quote principal.
+   * The savings debit is the settlement total; this amount is not a second deduction.
+   */
+  get prepaidInterestNettedIntoQuote(): number {
+    const quotedPrincipal = Number(this.formRawValue.outstandingPrincipalPortion || 0);
+    const principalOutstanding = Number(this.loanSummary?.principalOutstanding ?? 0);
+    return Math.max(roundAmount(principalOutstanding - quotedPrincipal), 0);
+  }
+
+  /**
    * Interest waived by early foreclosure — ledger full-period interest minus foreclosure quote interest,
    * or the account-list vs settlement gap when the template rolls discount into principal only.
    */
@@ -913,7 +931,7 @@ export class ForeclosureComponent implements OnInit {
       return fromBaseline;
     }
     if (this.closureTypeInfo?.type === 'foreclosure' && this.penaltyAsOfDate <= 0.01) {
-      return Math.max(this.fullOutstandingVsDueDelta, 0);
+      return Math.max(roundAmount(this.fullOutstandingVsDueDelta - this.prepaidInterestNettedIntoQuote), 0);
     }
     return 0;
   }

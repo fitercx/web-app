@@ -2,7 +2,10 @@ import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { MatTableDataSource } from '@angular/material/table';
 import { reversedPaidLpiForLoan } from 'app/loans/common/reversed-paid-lpi-display.util';
-import { getForeclosureUnearnedInterestDetails } from '../foreclosure-unearned-interest.utils';
+import {
+  getDisplayTotalScheduledInterest,
+  getForeclosureUnearnedInterestDetails
+} from '../foreclosure-unearned-interest.utils';
 
 @Component({
   selector: 'mifosx-general-tab',
@@ -139,9 +142,21 @@ export class GeneralTabComponent implements OnInit {
     const penaltyOriginal = this.loanDetails?.multiDisburseLoan
       ? this.getDisbursedTranchePenalties()
       : this.loanDetails.summary.penaltyChargesCharged;
-    const totalOriginal = this.loanDetails?.multiDisburseLoan
-      ? this.getTotalOriginalForMultiTranche()
-      : this.loanDetails.summary.totalExpectedRepayment;
+    const foreclosureDetails = getForeclosureUnearnedInterestDetails(this.loanDetails);
+    const chargedInterest = Number(this.loanDetails.summary.interestCharged) || 0;
+    const interestOriginal = getDisplayTotalScheduledInterest(
+      foreclosureDetails,
+      this.loanDetails?.multiDisburseLoan ? this.getDisbursedTrancheInterest() : chargedInterest
+    );
+    const interestAlreadyInTotal = this.loanDetails?.multiDisburseLoan
+      ? this.getDisbursedTrancheInterest()
+      : chargedInterest;
+    const totalOriginalBase = Number(
+      this.loanDetails?.multiDisburseLoan
+        ? this.getTotalOriginalForMultiTranche()
+        : this.loanDetails.summary.totalExpectedRepayment
+    );
+    const totalOriginal = totalOriginalBase + Math.max(interestOriginal - Number(interestAlreadyInTotal || 0), 0);
     // Use summary for Fees row so fee/tax split from backend is shown (e.g. fee 800 + tax 44)
     // and Total Paid equals sum of components (Principal + Interest + Fees + Taxes + Penalties)
     const feesData = {
@@ -174,11 +189,7 @@ export class GeneralTabComponent implements OnInit {
       },
       {
         property: 'Interest',
-        original: String(
-          this.loanDetails?.multiDisburseLoan
-            ? this.getDisbursedTrancheInterest()
-            : this.loanDetails.summary.interestCharged
-        ),
+        original: String(interestOriginal),
         adjustment: '0',
         paid: this.loanDetails.summary.interestPaid,
         waived: this.loanDetails.summary.interestWaived,
@@ -236,7 +247,6 @@ export class GeneralTabComponent implements OnInit {
         overdue: this.loanDetails.summary.totalOverdue
       }
     ];
-    const foreclosureDetails = getForeclosureUnearnedInterestDetails(this.loanDetails);
     const unearnedInterestDueToForeclosure = foreclosureDetails?.unearnedInterest ?? 0;
     if (unearnedInterestDueToForeclosure > 0) {
       const interestRowIndex = this.loanSummaryTableData.findIndex((row) => row.property === 'Interest');
