@@ -2,7 +2,6 @@ import { Component, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { UntypedFormControl } from '@angular/forms';
 import { MatPaginator } from '@angular/material/paginator';
-import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
 import { Dates } from 'app/core/utils/dates';
 import { LoansService } from 'app/loans/loans.service';
@@ -15,7 +14,12 @@ import { LoanTransaction } from 'app/products/loan-products/models/loan-account.
 import { LoanTransactionType } from 'app/loans/models/loan-transaction-type.model';
 import { ForeclosureUnearnedInterestDetails } from 'app/loans/models/foreclosure-unearned-interest.model';
 import { getForeclosureUnearnedInterestDetails } from '../foreclosure-unearned-interest.utils';
-import { sortTransactionsByLatest } from 'app/core/utils/transaction-chronology';
+import { sortTransactionsByValueDate } from 'app/core/utils/transaction-chronology';
+import {
+  exportTransactionsToExcel,
+  TransactionExportColumn,
+  transactionExportFileName
+} from 'app/core/utils/transactions-export';
 import {
   displayPenaltyPortion as mapPenaltyPortion,
   displayTaxPortion as mapTaxPortion
@@ -84,7 +88,6 @@ export class TransactionsTabComponent implements OnInit {
 
   dataSource: MatTableDataSource<any>;
   @ViewChild(MatPaginator, { static: true }) paginator: MatPaginator;
-  @ViewChild(MatSort, { static: true }) sort: MatSort;
 
   loanId: number;
   /**
@@ -122,9 +125,12 @@ export class TransactionsTabComponent implements OnInit {
     this.transactionsData.forEach((element: any) => {
       element.date = this.dateUtils.parseDate(element.date);
     });
-    this.dataSource = new MatTableDataSource(sortTransactionsByLatest(this.transactionsData));
+    this.setDataSource(this.transactionsData);
+  }
+
+  private setDataSource(transactions: LoanTransaction[]): void {
+    this.dataSource = new MatTableDataSource(sortTransactionsByValueDate(transactions));
     this.dataSource.paginator = this.paginator;
-    this.dataSource.sort = this.sort;
   }
 
   /**
@@ -175,9 +181,51 @@ export class TransactionsTabComponent implements OnInit {
         return !(hideReversed && isReversed) && !(hideAccrual && t.type.accrual);
       });
     }
-    this.dataSource = new MatTableDataSource(sortTransactionsByLatest(transactions));
-    this.dataSource.paginator = this.paginator;
-    this.dataSource.sort = this.sort;
+    this.setDataSource(transactions);
+  }
+
+  exportTransactionsToExcel(): void {
+    exportTransactionsToExcel(
+      this.displayedTransactions(),
+      this.exportColumns(),
+      'Transactions',
+      transactionExportFileName(
+        'LoanTransactions',
+        this.loanDetailsData?.accountNo || String(this.loanId),
+        this.settingsService.businessDate
+      )
+    );
+  }
+
+  /** Filtered transactions in the order the table currently shows them, across all pages. */
+  displayedTransactions(): LoanTransaction[] {
+    return this.dataSource.filteredData;
+  }
+
+  private exportColumns(): TransactionExportColumn<LoanTransaction>[] {
+    const label = (key: string) => this.translateService.instant(key);
+    return [
+      { header: label('labels.inputs.Id'), value: (t) => t.id },
+      { header: label('labels.inputs.External Id'), value: (t) => t.externalId },
+      { header: label('labels.inputs.Value Date'), value: (t) => this.formatExportDate(t.date) },
+      { header: label('labels.inputs.Transaction Date'), value: (t) => this.formatExportDate(t.submittedOnDate) },
+      { header: label('labels.inputs.Transaction Type'), value: (t) => this.transactionTypeLabel(t) },
+      { header: label('labels.inputs.Amount'), value: (t) => t.amount },
+      { header: label('labels.inputs.Principal'), value: (t) => t.principalPortion },
+      { header: label('labels.inputs.Interest'), value: (t) => t.interestPortion },
+      { header: label('labels.inputs.Fees'), value: (t) => t.feeChargesPortion },
+      { header: label('labels.inputs.Overdue Interest'), value: (t) => this.displayPenaltyPortion(t) },
+      { header: label('labels.inputs.Taxes'), value: (t) => this.displayTaxPortion(t) },
+      { header: label('labels.inputs.Loan Balance'), value: (t) => t.outstandingLoanBalance },
+      {
+        header: label('labels.inputs.Reversed'),
+        value: (t) => label(this.isTransactionReversed(t) ? 'labels.buttons.Yes' : 'labels.buttons.No')
+      }
+    ];
+  }
+
+  private formatExportDate(value: any): string {
+    return value ? this.dateUtils.formatDate(this.dateUtils.parseDate(value), this.settingsService.dateFormat) : '';
   }
 
   applyFilter(filterValue: string = '') {
