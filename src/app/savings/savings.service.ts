@@ -65,6 +65,14 @@ export class SavingsService {
   }
 
   /**
+   * @param accountId Savings Account Id of account to get associated loans for.
+   * @returns {Observable<any>} Associated loan data keyed by savings transaction id.
+   */
+  getSavingsTransactionAssociatedLoans(accountId: string): Observable<any> {
+    return this.http.get(`/crediblex/savingsaccounts/${accountId}/transactions/associated-loans`);
+  }
+
+  /**
    * @param accountId Savings Account Id.
    * @param transactionId Savings Transaction Id.
    * @returns {Observable<any>} Transaction sub-type keyed by savings transaction id.
