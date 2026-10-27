@@ -1323,6 +1323,7 @@
       "Transaction History": "Transaction History",
       "Loan Amount": "Loan Amount",
       "Outstanding Balance": "Outstanding Balance",
+      "Associated Loan": "Associated Loan",
       "Associated Loan ID": "Associated Loan ID",
       "Associated Loan Account": "Associated Loan/LOC Account",
       "DP Name": "DP Name",

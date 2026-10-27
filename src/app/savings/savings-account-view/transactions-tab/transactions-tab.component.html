@@ -94,6 +94,20 @@
         </td>
       </ng-container>
 
+      <ng-container matColumnDef="associatedLoan">
+        <th mat-header-cell *matHeaderCellDef>{{ 'labels.inputs.Associated Loan' | translate }}</th>
+        <td mat-cell *matCellDef="let transaction" [ngClass]="savingsTransactionColor(transaction)">
+          <ng-container *ngIf="associatedLoanLabel(transaction) as loanLabel; else noAssociatedLoan">
+            <a class="td-select" href="javascript:void(0)" (click)="openAssociatedLoan(transaction, $event)">
+              {{ loanLabel }}
+            </a>
+          </ng-container>
+          <ng-template #noAssociatedLoan>
+            <span>–</span>
+          </ng-template>
+        </td>
+      </ng-container>
+
       <ng-container matColumnDef="debit">
         <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Debit' | translate }}</th>
         <td

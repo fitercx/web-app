@@ -7,6 +7,7 @@ import { MatTableDataSource } from '@angular/material/table';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Dates } from 'app/core/utils/dates';
 import {
+  SavingsAccountAssociatedLoan,
   SavingsAccountTransaction,
   SavingsAccountTransactionType
 } from 'app/savings/models/savings-account-transaction.model';
@@ -15,6 +16,8 @@ import { SettingsService } from 'app/settings/settings.service';
 import { SavingsUndoTransactionDialogComponent } from '../custom-dialogs/savings-undo-transaction-dialog/savings-undo-transaction-dialog.component';
 import { MatDialog } from '@angular/material/dialog';
 import { sortTransactionsByLatest } from 'app/core/utils/transaction-chronology';
+import { forkJoin, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 
 /**
  * Transactions Tab Component.
@@ -51,6 +54,7 @@ export class TransactionsTabComponent implements OnInit {
     'submittedOnDate',
     'externalId',
     'transactionType',
+    'associatedLoan',
     'debit',
     'credit',
     'balance',
@@ -100,20 +104,31 @@ export class TransactionsTabComponent implements OnInit {
   }
 
   loadTransactionSubTypes(): void {
-    this.savingsService.getSavingsTransactionSubTypes(this.accountId).subscribe({
-      next: (transactionSubTypes: { [key: string]: any }) => {
+    forkJoin({
+      transactionSubTypes: this.savingsService
+        .getSavingsTransactionSubTypes(this.accountId)
+        .pipe(catchError(() => of({}))),
+      associatedLoans: this.savingsService
+        .getSavingsTransactionAssociatedLoans(this.accountId)
+        .pipe(catchError(() => of({})))
+    }).subscribe({
+      next: ({
+        transactionSubTypes,
+        associatedLoans
+      }: {
+        transactionSubTypes: { [key: string]: any };
+        associatedLoans: { [key: string]: SavingsAccountAssociatedLoan };
+      }) => {
         this.transactionsData = this.transactionsData.map((transaction: SavingsAccountTransaction) => ({
           ...transaction,
-          transactionSubType: transactionSubTypes[transaction.id] || transaction.transactionSubType
+          transactionSubType: transactionSubTypes[transaction.id] || transaction.transactionSubType,
+          associatedLoan: associatedLoans[transaction.id] || transaction.associatedLoan
         }));
         this.filterTransactions(
           this.hideReversedParam.value,
           this.hideAccrualsParam.value,
           this.transactionTypeFilter.value
         );
-      },
-      error: () => {
-        this.setTransactions();
       }
     });
   }
@@ -301,6 +316,33 @@ export class TransactionsTabComponent implements OnInit {
     } else {
       return '';
     }
+  }
+
+  associatedLoanLabel(transaction: SavingsAccountTransaction): string | null {
+    const associatedLoan = transaction.associatedLoan;
+    if (!associatedLoan || !associatedLoan.loanId) {
+      return null;
+    }
+    const fromInstallment = associatedLoan.fromInstallment;
+    const toInstallment = associatedLoan.toInstallment;
+    if (fromInstallment != null && toInstallment != null) {
+      if (fromInstallment === toInstallment) {
+        return `${associatedLoan.loanId}-EMI${fromInstallment}`;
+      }
+      return `${associatedLoan.loanId}-EMI${fromInstallment}-${toInstallment}`;
+    }
+    return String(associatedLoan.loanId);
+  }
+
+  openAssociatedLoan(transaction: SavingsAccountTransaction, event: MouseEvent): void {
+    event.stopPropagation();
+    const associatedLoan = transaction.associatedLoan;
+    if (!associatedLoan?.loanId || !associatedLoan?.loanClientId) {
+      return;
+    }
+    this.router.navigateByUrl(
+      `/clients/${associatedLoan.loanClientId}/loans-accounts/${associatedLoan.loanId}/general`
+    );
   }
 
   undoTransaction(transactionData: SavingsAccountTransaction): void {
