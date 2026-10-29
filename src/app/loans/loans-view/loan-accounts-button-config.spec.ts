@@ -10,6 +10,14 @@ describe('LoansAccountButtonConfiguration', () => {
     expect(makeRepayment.disabled).not.toBe(true);
   });
 
+  it('offers Change Repayment Strategy on an active loan', () => {
+    const config = new LoansAccountButtonConfiguration('Active');
+
+    expect(config.options.find((option) => option.name === 'Change Repayment Strategy')?.taskPermissionName).toBe(
+      'UPDATEREPAYMENTSTRATEGY_LOAN'
+    );
+  });
+
   it('still disables cash-only Close and Prepay Loan', () => {
     const config = new LoansAccountButtonConfiguration('Active');
     config.addButton({ name: 'Prepay Loan', icon: 'coins', taskPermissionName: 'REPAYMENT_LOAN' });

@@ -1,0 +1,52 @@
+<h2 mat-dialog-title>{{ 'labels.heading.Change Repayment Strategy' | translate }}</h2>
+
+<mat-dialog-content>
+  <p *ngIf="loading">{{ 'labels.text.Loading repayment strategies' | translate }}</p>
+
+  <form *ngIf="!loading" [formGroup]="strategyForm" fxLayout="column" fxLayoutGap="16px">
+    <div class="info-box">
+      <p>
+        {{ 'labels.text.Change repayment strategy explanation' | translate }}
+      </p>
+    </div>
+
+    <p class="current-strategy">
+      <strong>{{ 'labels.inputs.Repayment Strategy' | translate }}:</strong>
+      {{ currentStrategyName | translateKey: 'catalogs' }}
+    </p>
+
+    <div *ngIf="unsupportedReason" class="warning-box">
+      <p>{{ unsupportedReason }}</p>
+    </div>
+
+    <mat-form-field appearance="outline" *ngIf="!unsupportedReason">
+      <mat-label>{{ 'labels.heading.Change Repayment Strategy' | translate }}</mat-label>
+      <mat-select formControlName="transactionProcessingStrategyCode" required>
+        <mat-option *ngFor="let strategy of strategyOptions" [value]="strategy.code">
+          {{ strategy.name | translateKey: 'catalogs' }}
+        </mat-option>
+      </mat-select>
+      <mat-error *ngIf="strategyForm.get('transactionProcessingStrategyCode')?.hasError('required')">
+        {{ 'labels.text.Repayment strategy is required' | translate }}
+      </mat-error>
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" *ngIf="!unsupportedReason">
+      <mat-label>{{ 'labels.inputs.Note' | translate }}</mat-label>
+      <textarea matInput formControlName="note" rows="3" maxlength="500"></textarea>
+      <mat-hint>{{ 'labels.text.Change repayment strategy note hint' | translate }}</mat-hint>
+    </mat-form-field>
+  </form>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-button mat-dialog-close [disabled]="submitting">{{ 'labels.buttons.Cancel' | translate }}</button>
+  <button
+    mat-raised-button
+    color="primary"
+    [disabled]="loading || submitting || !!unsupportedReason || strategyForm.invalid || selectedStrategyUnchanged"
+    (click)="submit()"
+  >
+    {{ 'labels.buttons.Submit' | translate }}
+  </button>
+</mat-dialog-actions>

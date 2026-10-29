@@ -1,0 +1,21 @@
+.info-box,
+.warning-box {
+  padding: 12px;
+  border-radius: 4px;
+}
+
+.info-box {
+  background-color: #e3f2fd;
+  border-left: 4px solid #2196f3;
+}
+
+.warning-box {
+  background-color: #fff3e0;
+  border-left: 4px solid #fb8c00;
+}
+
+.current-strategy,
+.info-box p,
+.warning-box p {
+  margin: 0;
+}
