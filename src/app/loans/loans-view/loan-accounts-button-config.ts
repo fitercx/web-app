@@ -228,6 +228,10 @@ export class LoansAccountButtonConfiguration {
           {
             name: 'Adjust Installment Date',
             taskPermissionName: 'ADJUSTINSTALLMENTDATE_LOAN'
+          },
+          {
+            name: 'Change Repayment Strategy',
+            taskPermissionName: 'UPDATEREPAYMENTSTRATEGY_LOAN'
           }
         ];
         this.optionPaymentArray = [
