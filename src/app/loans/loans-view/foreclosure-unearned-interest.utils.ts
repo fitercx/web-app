@@ -144,10 +144,14 @@ export function getDisplayTotalScheduledInterest(
   details: ForeclosureUnearnedInterestDetails | null,
   totalInterestCharged: number
 ): number {
-  if (details?.closureType === 'EARLY_REPAYMENT' && details.originalScheduleInterest != null) {
-    return Number(details.originalScheduleInterest);
+  const charged = Number(totalInterestCharged) || 0;
+  const original = Number(details?.originalScheduleInterest);
+  // After foreclosure the live schedule no longer carries interest that was not earned. The original
+  // schedule total is the interest the loan was booked with.
+  if (Number.isFinite(original) && original > charged) {
+    return original;
   }
-  return totalInterestCharged;
+  return charged;
 }
 
 export function getForeclosureUnearnedInterestDetails(loanDetails: any): ForeclosureUnearnedInterestDetails | null {
