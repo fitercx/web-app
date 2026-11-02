@@ -20,6 +20,7 @@ import { TranslateService } from '@ngx-translate/core';
 import { LoanTransaction } from 'app/products/loan-products/models/loan-account.model';
 import { TransferFromSavingsDialogComponent } from 'app/shared/transfer-from-savings-dialog/transfer-from-savings-dialog.component';
 import { isAnyLocProductType } from 'app/core/utils/loc-product-type';
+import { ChangeRepaymentStrategyDialogComponent } from './custom-dialogs/change-repayment-strategy-dialog/change-repayment-strategy-dialog.component';
 
 @Component({
   selector: 'mifosx-loans-view',
@@ -318,6 +319,9 @@ class LoansViewComponent implements OnInit {
           queryParams: { openAdjustDialog: 'true' }
         });
         break;
+      case 'Change Repayment Strategy':
+        this.openChangeRepaymentStrategyDialog();
+        break;
       case 'Undo Re-Age':
       case 'Undo Re-Amortize':
       case 'Undo Charge-Off':
@@ -339,6 +343,21 @@ class LoansViewComponent implements OnInit {
         );
         break;
     }
+  }
+
+  private openChangeRepaymentStrategyDialog(): void {
+    const dialogRef = this.dialog.open(ChangeRepaymentStrategyDialogComponent, {
+      width: '40rem',
+      maxWidth: '95vw',
+      data: {
+        loanId: this.loanId
+      }
+    });
+    dialogRef.afterClosed().subscribe((result: { applied?: boolean }) => {
+      if (result?.applied) {
+        this.reload();
+      }
+    });
   }
 
   /** Same Transfer from Savings dialog as the client General tab Make Repayment button. */
