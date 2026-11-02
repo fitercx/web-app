@@ -6,6 +6,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { LoansService } from '../loans.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { ClientsService } from 'app/clients/clients.service';
+import { isReceivableFamily } from 'app/core/utils/loc-product-type';
 
 /** Step Components */
 import { LoansAccountDetailsStepComponent } from '../loans-account-stepper/loans-account-details-step/loans-account-details-step.component';
@@ -240,7 +241,7 @@ export class CreateLoansAccountComponent {
         // Determine which approved amount to use based on LOC type
         const amountAfterAdvance = filteredLocDetails.amountAfterAdvance;
         const approvedPayableAmount = filteredLocDetails.amountInFacilityCurrency;
-        const isReceivableType = filteredLocDetails.locType === 'RECEIVABLE';
+        const isReceivableType = isReceivableFamily(filteredLocDetails.locType);
 
         // Use the appropriate approved facility amount as principal
         // For receivable: use amount after advance (approved amount after applying advance percentage)

@@ -1155,6 +1155,10 @@
       "Principal Amount": "Valor principal"
     },
     "inputs": {
+      "Invoice Discounting (Non-Recourse)": "Invoice Discounting (Non-Recourse)",
+      "LOC Payable": "LOC Payable",
+      "LOC Receivable": "LOC Receivable",
+      "LOC Receivable NR": "LOC Receivable NR",
       "accounting": {
         "ASSET": "ATIVO",
         "LIABILITY": "RESPONSABILIDADE",

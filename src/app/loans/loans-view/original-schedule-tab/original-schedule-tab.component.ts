@@ -1,6 +1,7 @@
 import { Component } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { Currency } from 'app/shared/models/general.model';
+import { isShortDisbursedReceivable } from 'app/core/utils/loc-product-type';
 
 @Component({
   selector: 'mifosx-original-schedule-tab',
@@ -58,9 +59,8 @@ export class OriginalScheduleTabComponent {
       return false;
     }
 
-    // Check if it's of receivable type
-    const locProductType = this.loanDetailsData.additionalProperties?.locProductType;
-    return locProductType === 'RECEIVABLE';
+    // Short-disbursed receivable only; non-recourse uses the standard columns
+    return isShortDisbursedReceivable(this.loanDetailsData.additionalProperties?.locProductType);
   }
 
   /**

@@ -8,6 +8,7 @@ import { Dates } from 'app/core/utils/dates';
 import { LoansService } from 'app/loans/loans.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { Currency } from 'app/shared/models/general.model';
+import { isReceivableFamily, isShortDisbursedReceivable } from 'app/core/utils/loc-product-type';
 
 /**
  * Approve Loan component.
@@ -123,27 +124,34 @@ export class ApproveLoanComponent implements OnInit {
   }
 
   /**
-   * Checks if the loan is a Line of Credit Receivable loan
+   * Checks if the loan is a Line of Credit Receivable loan (receivable or receivable non-recourse)
    */
   isLineOfCreditReceivable(): boolean {
+    return isReceivableFamily(this.getLocProductType());
+  }
+
+  /**
+   * Checks if the loan is a short-disbursed Line of Credit Receivable loan (excludes non-recourse)
+   */
+  isShortDisbursedLineOfCreditReceivable(): boolean {
+    return isShortDisbursedReceivable(this.getLocProductType());
+  }
+
+  private getLocProductType(): string | null {
     // Use loanDetailsData if available, fallback to loanData
     const loanInfo = this.loanDetailsData || this.loanData;
 
     if (!loanInfo) {
-      return false;
+      return null;
     }
 
     // Check if loan has a line of credit ID (indicating it's a LOC loan)
     const hasLineOfCredit = !!(loanInfo.lineOfCreditId || loanInfo.additionalProperties?.lineOfCreditId);
 
     if (!hasLineOfCredit) {
-      return false;
+      return null;
     }
 
-    // Check if it's of receivable type
-    const locType = loanInfo.locType || loanInfo.additionalProperties?.locProductType;
-    const isReceivable = locType === 'RECEIVABLE';
-
-    return isReceivable;
+    return loanInfo.locType || loanInfo.additionalProperties?.locProductType;
   }
 }
