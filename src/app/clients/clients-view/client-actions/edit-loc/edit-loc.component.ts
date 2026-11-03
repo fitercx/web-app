@@ -19,6 +19,12 @@ import { delay } from 'rxjs/operators';
 import { ClientsService } from '../../../clients.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { nonNegativeWithPrecisionValidator } from 'app/clients/utils/amount-validation.util';
+import {
+  LocProductTypeInput,
+  getDefaultAdvancePercentage,
+  getDefaultInterestChargeTimeCode,
+  isPayable as isLocPayable
+} from 'app/core/utils/loc-product-type';
 
 /**
  * Edit LOC component.
@@ -45,6 +51,8 @@ export class EditLocComponent implements OnInit {
     'action'
   ];
   editingCharge: any = null;
+  /** True when the LOC already has loans, so its product type can no longer change */
+  productTypeLocked = false;
   // template-driven option lists
   locTemplate: any = null;
   productTypeOptions: any[] = [];
@@ -160,24 +168,11 @@ export class EditLocComponent implements OnInit {
   }
 
   // Update buyer/supplier labels based on product type
-  updateBuyerSupplierLabels(productType: any) {
-    // Find the product type option to get its code/value
-    let productTypeOption = this.productTypeOptions.find((pt) => pt.id == productType);
-    if (!productTypeOption) {
-      productTypeOption = this.productTypeOptions.find((pt) => pt.code === productType || pt.value === productType);
-    }
-
-    const productTypeCode = productTypeOption?.code || productTypeOption?.value || productType;
-
-    // Check for payable variations (could be 'payable', 'PAYABLE', 'Payable', etc.)
-    if (productTypeCode && productTypeCode.toString().toLowerCase().includes('payable')) {
+  updateBuyerSupplierLabels(productType: LocProductTypeInput) {
+    if (isLocPayable(productType)) {
       this.buyerSupplierLabel = 'Supplier';
       this.approvedBuyerSupplierLabel = 'Approved Supplier';
-    } else if (productTypeCode && productTypeCode.toString().toLowerCase().includes('receivable')) {
-      this.buyerSupplierLabel = 'Buyer';
-      this.approvedBuyerSupplierLabel = 'Approved Buyer';
     } else {
-      // Default fallback
       this.buyerSupplierLabel = 'Buyer';
       this.approvedBuyerSupplierLabel = 'Approved Buyer';
     }
@@ -209,6 +204,8 @@ export class EditLocComponent implements OnInit {
 
     // Prepopulate form with existing LOC data
     this.prepopulateForm();
+
+    this.lockProductTypeIfLocHasLoans();
 
     // react to reviewPeriod changes to compute nextReviewDate (example computed field)
     this.locForm
@@ -271,7 +268,14 @@ export class EditLocComponent implements OnInit {
         'productType'
       ])
       ?.valueChanges.subscribe((productType) => {
-        this.updateAdvancePercentage(productType);
+        // Prefill emits too; only reset the advance % when the user picks a different type
+        const productTypeControl = this.locForm.get([
+          'basicInfo',
+          'productType'
+        ]);
+        if (productTypeControl?.dirty) {
+          this.updateAdvancePercentage(productType);
+        }
         this.updateBuyerSupplierLabels(productType);
         this.updateInterestChargeTime(productType);
       });
@@ -444,6 +448,30 @@ export class EditLocComponent implements OnInit {
 
     // Compute interim review date after patching values
     this.computeInterimReviewDate();
+  }
+
+  /** The backend rejects product type changes once the LOC has any loan, so disable the select up front. */
+  private lockProductTypeIfLocHasLoans() {
+    if (!this.clientId || !this.locId) {
+      return;
+    }
+    this.clientsService.getLoans(this.clientId, this.locId, 0, 1).subscribe({
+      next: (data: any) => {
+        const loanCount = Number(data?.totalFilteredRecords ?? data?.pageItems?.length ?? 0);
+        if (loanCount > 0) {
+          this.productTypeLocked = true;
+          this.locForm
+            .get([
+              'basicInfo',
+              'productType'
+            ])
+            ?.disable({ emitEvent: false });
+        }
+      },
+      error: () => {
+        // Leave the select enabled; the backend still enforces the rule
+      }
+    });
   }
 
   getProductTypeLabel(productTypeId: any): string {
@@ -885,16 +913,15 @@ export class EditLocComponent implements OnInit {
   }
 
   // Update advance percentage based on product type
-  updateAdvancePercentage(productType: string) {
-    const advancePercentageControl = this.locForm.get([
-      'limitsTerms',
-      'advancePercentage'
-    ]);
-
-    if (productType === 'payable') {
-      advancePercentageControl?.setValue('100');
-    } else if (productType === 'receivable') {
-      advancePercentageControl?.setValue('90');
+  updateAdvancePercentage(productType: LocProductTypeInput) {
+    const advancePercentage = getDefaultAdvancePercentage(productType);
+    if (advancePercentage !== null) {
+      this.locForm
+        .get([
+          'limitsTerms',
+          'advancePercentage'
+        ])
+        ?.setValue(advancePercentage);
     }
   }
 
@@ -1221,7 +1248,7 @@ export class EditLocComponent implements OnInit {
   }
 
   // Auto-select interest charge time based on product type
-  updateInterestChargeTime(productType: Number) {
+  updateInterestChargeTime(productType: LocProductTypeInput) {
     // If no interest charge time options loaded yet, skip update
     if (!this.interestChargeTimeOptions || this.interestChargeTimeOptions.length === 0) {
       return;
@@ -1236,20 +1263,11 @@ export class EditLocComponent implements OnInit {
       return;
     }
 
-    if (productType && productType === 2) {
-      // For payable (productType 2): set to "post disbursement"
-      const postDisbursementOption = this.interestChargeTimeOptions.find((ict) => ict.code === 'POST_DISBURSEMENT');
-
-      if (postDisbursementOption) {
-        control?.setValue(postDisbursementOption.id);
-      }
-    } else if (productType && productType === 1) {
-      // For receivable: set to "upfront"
-      const upfrontOption = this.interestChargeTimeOptions.find((ict) => ict.code === 'UPFRONT');
-
-      if (upfrontOption) {
-        control?.setValue(upfrontOption.id);
-      }
+    // Upfront for receivable; post disbursement for payable and receivable non-recourse
+    const defaultCode = getDefaultInterestChargeTimeCode(productType);
+    const option = defaultCode && this.interestChargeTimeOptions.find((ict) => ict.code === defaultCode);
+    if (option) {
+      control.setValue(option.id);
     }
   }
 

@@ -2,6 +2,7 @@ import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { MatTableDataSource } from '@angular/material/table';
 import { reversedPaidLpiForLoan } from 'app/loans/common/reversed-paid-lpi-display.util';
+import { isAnyLocProductType, isShortDisbursedReceivable } from 'app/core/utils/loc-product-type';
 import {
   getDisplayTotalScheduledInterest,
   getForeclosureUnearnedInterestDetails
@@ -405,11 +406,10 @@ export class GeneralTabComponent implements OnInit {
     if (!hasLocId) {
       return false;
     }
-    const locType = info.locType || info.additionalProperties?.locProductType;
-    return locType === 'RECEIVABLE' || locType === 'PAYABLE';
+    return isAnyLocProductType(info.locType || info.additionalProperties?.locProductType);
   }
 
-  /** Any LOC (receivable) */
+  /** Short-disbursed receivable LOC (excludes non-recourse) */
   private isReceivableLineOfCredit(): boolean {
     const info = this.loanDetails;
     if (!info) {
@@ -419,8 +419,7 @@ export class GeneralTabComponent implements OnInit {
     if (!hasLocId) {
       return false;
     }
-    const locType = info.locType || info.additionalProperties?.locProductType;
-    return locType === 'RECEIVABLE';
+    return isShortDisbursedReceivable(info.locType || info.additionalProperties?.locProductType);
   }
 
   /**

@@ -17,6 +17,13 @@ import { MatStepper } from '@angular/material/stepper';
 import { ClientsService } from '../../../clients.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { nonNegativeWithPrecisionValidator } from 'app/clients/utils/amount-validation.util';
+import {
+  LocProductTypeInput,
+  getDefaultAdvancePercentage,
+  getDefaultInterestChargeTimeCode,
+  getLocDisplayName,
+  isPayable as isLocPayable
+} from 'app/core/utils/loc-product-type';
 
 /**
  * Create LOC component.
@@ -700,21 +707,20 @@ export class CreateLocComponent implements OnInit {
   }
 
   // Update advance percentage based on product type
-  updateAdvancePercentage(productType: string) {
-    const advancePercentageControl = this.locForm.get([
-      'limitsTerms',
-      'advancePercentage'
-    ]);
-
-    if (productType === 'payable') {
-      advancePercentageControl?.setValue('100');
-    } else if (productType === 'receivable') {
-      advancePercentageControl?.setValue('90');
+  updateAdvancePercentage(productType: LocProductTypeInput) {
+    const advancePercentage = getDefaultAdvancePercentage(productType);
+    if (advancePercentage !== null) {
+      this.locForm
+        .get([
+          'limitsTerms',
+          'advancePercentage'
+        ])
+        ?.setValue(advancePercentage);
     }
   }
 
   // Update interest charge time based on product type
-  updateInterestChargeTime(productType: Number) {
+  updateInterestChargeTime(productType: LocProductTypeInput) {
     // If no interest charge time options loaded yet, skip update
     if (!this.interestChargeTimeOptions || this.interestChargeTimeOptions.length === 0) {
       return;
@@ -729,36 +735,27 @@ export class CreateLocComponent implements OnInit {
       return;
     }
 
-    if (productType && productType === 2) {
-      // For payable (productType 2): set to "post disbursement"
-      const postDisbursementOption = this.interestChargeTimeOptions.find((ict) => ict.code === 'POST_DISBURSEMENT');
-
-      if (postDisbursementOption) {
-        control?.setValue(postDisbursementOption.id);
-      }
-    } else if (productType && productType === 1) {
-      // For receivable: set to "upfront"
-      const upfrontOption = this.interestChargeTimeOptions.find((ict) => ict.code === 'UPFRONT');
-
-      if (upfrontOption) {
-        control?.setValue(upfrontOption.id);
-      }
+    // Upfront for receivable; post disbursement for payable and receivable non-recourse
+    const defaultCode = getDefaultInterestChargeTimeCode(productType);
+    const option = defaultCode && this.interestChargeTimeOptions.find((ict) => ict.code === defaultCode);
+    if (option) {
+      control.setValue(option.id);
     }
   }
 
   // Update buyer/supplier labels based on product type
-  updateBuyerSupplierLabels(productType: Number) {
-    // Check for payable variations (could be 'payable', 'PAYABLE', 'Payable', etc.)
-    if (productType && productType === 2) {
+  updateBuyerSupplierLabels(productType: LocProductTypeInput) {
+    if (isLocPayable(productType)) {
       this.buyerSupplierLabel = 'Supplier';
       this.approvedBuyerSupplierLabel = 'Approved Supplier';
-    } else if (productType && productType === 1) {
-      this.buyerSupplierLabel = 'Buyer';
-      this.approvedBuyerSupplierLabel = 'Approved Buyer';
     } else {
       this.buyerSupplierLabel = 'Buyer';
       this.approvedBuyerSupplierLabel = 'Approved Buyer';
     }
+  }
+
+  getProductTypeDisplayName(productType: LocProductTypeInput): string {
+    return getLocDisplayName(productType);
   }
 
   // Charges step helpers

@@ -4,12 +4,13 @@ import { MatDialogRef, MAT_DIALOG_DATA } from '@angular/material/dialog';
 import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 import { OrganizationService } from 'app/organization/organization.service';
+import { isPayable as isLocPayable, isReceivableFamily } from 'app/core/utils/loc-product-type';
 
 export interface BulkDisburseDialogData {
   clientId: number;
   locId: number;
   locCurrency: string;
-  locType?: string; // 'Receivable' or 'Payable'
+  locType?: string; // LocProductType code, e.g. 'RECEIVABLE_NON_RECOURSE'
   selectedLoans: any[];
 }
 
@@ -169,13 +170,12 @@ export class BulkDisburseDialogComponent implements OnInit {
    */
   getLoanAmount(loan: any): number {
     const ap = loan.additionalProperties || {};
-    const locType = (this.data.locType || '').toUpperCase();
 
     // First try to get the approved amount based on LOC type
-    if (locType === 'RECEIVABLE' && ap.approvedReceivableAmount > 0) {
+    if (isReceivableFamily(this.data.locType) && ap.approvedReceivableAmount > 0) {
       return ap.approvedReceivableAmount;
     }
-    if (locType === 'PAYABLE' && ap.approvedPayableAmount > 0) {
+    if (isLocPayable(this.data.locType) && ap.approvedPayableAmount > 0) {
       return ap.approvedPayableAmount;
     }
 
@@ -267,7 +267,6 @@ export class BulkDisburseDialogComponent implements OnInit {
    */
   getLoanAmountInAed(loan: any): number {
     const ap = loan.additionalProperties || {};
-    const locType = (this.data.locType || '').toUpperCase();
 
     // First, check if we have pre-calculated AED amounts stored
     // amountInFacilityCurrency is the funded amount in AED
@@ -279,11 +278,11 @@ export class BulkDisburseDialogComponent implements OnInit {
     }
 
     // approvedReceivableAmount / approvedPayableAmount are already in AED
-    if (locType === 'RECEIVABLE') {
+    if (isReceivableFamily(this.data.locType)) {
       if (ap.approvedReceivableAmount > 0) return ap.approvedReceivableAmount;
       if (loan.approvedReceivableAmount > 0) return loan.approvedReceivableAmount;
     }
-    if (locType === 'PAYABLE') {
+    if (isLocPayable(this.data.locType)) {
       if (ap.approvedPayableAmount > 0) return ap.approvedPayableAmount;
       if (loan.approvedPayableAmount > 0) return loan.approvedPayableAmount;
     }

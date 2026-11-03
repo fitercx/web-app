@@ -1221,6 +1221,10 @@
       "Select end date to remove charges within a range, or leave empty to remove from start date onwards": "Select end date to remove charges within a range, or leave empty to remove from start date onwards"
     },
     "inputs": {
+      "Invoice Discounting (Non-Recourse)": "Invoice Discounting (Non-Recourse)",
+      "LOC Payable": "LOC Payable",
+      "LOC Receivable": "LOC Receivable",
+      "LOC Receivable NR": "LOC Receivable NR",
       "Disbursement Date": "Disbursement Date",
       "Payment Type": "Payment Type",
       "Withdrawal Payment Type": "Withdrawal Payment Type",
