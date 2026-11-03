@@ -2,7 +2,6 @@
 import { Component, OnInit, ViewChild } from '@angular/core';
 import { UntypedFormControl } from '@angular/forms';
 import { MatPaginator } from '@angular/material/paginator';
-import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Dates } from 'app/core/utils/dates';
@@ -14,7 +13,13 @@ import { SavingsService } from 'app/savings/savings.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { SavingsUndoTransactionDialogComponent } from '../custom-dialogs/savings-undo-transaction-dialog/savings-undo-transaction-dialog.component';
 import { MatDialog } from '@angular/material/dialog';
-import { sortTransactionsByLatest } from 'app/core/utils/transaction-chronology';
+import { TranslateService } from '@ngx-translate/core';
+import { sortTransactionsByValueDate } from 'app/core/utils/transaction-chronology';
+import {
+  exportTransactionsToExcel,
+  TransactionExportColumn,
+  transactionExportFileName
+} from 'app/core/utils/transactions-export';
 
 /**
  * Transactions Tab Component.
@@ -59,11 +64,11 @@ export class TransactionsTabComponent implements OnInit {
   /** Data source for transactions table. */
   dataSource: MatTableDataSource<any>;
   @ViewChild(MatPaginator, { static: true }) paginator: MatPaginator;
-  @ViewChild(MatSort, { static: true }) sort: MatSort;
 
   accountWithTransactions = false;
 
   accountId: string;
+  accountNo: string;
 
   /**
    * Retrieves savings account data from `resolve`.
@@ -75,11 +80,13 @@ export class TransactionsTabComponent implements OnInit {
     private savingsService: SavingsService,
     private settingsService: SettingsService,
     private dialog: MatDialog,
-    private dateUtils: Dates
+    private dateUtils: Dates,
+    private translateService: TranslateService
   ) {
     this.route.parent.parent.data.subscribe((data: { savingsAccountData: any }) => {
       this.transactionsData = data.savingsAccountData.transactions;
       this.status = data.savingsAccountData.status.value;
+      this.accountNo = data.savingsAccountData.accountNo;
     });
     this.accountId = this.route.parent.parent.snapshot.params['savingAccountId'];
   }
@@ -93,10 +100,13 @@ export class TransactionsTabComponent implements OnInit {
   }
 
   setTransactions(): void {
-    this.dataSource = new MatTableDataSource(sortTransactionsByLatest(this.transactionsData));
     this.accountWithTransactions = this.transactionsData && this.transactionsData.length > 0;
+    this.setDataSource(this.transactionsData);
+  }
+
+  private setDataSource(transactions: SavingsAccountTransaction[]): void {
+    this.dataSource = new MatTableDataSource(sortTransactionsByValueDate(transactions));
     this.dataSource.paginator = this.paginator;
-    this.dataSource.sort = this.sort;
   }
 
   loadTransactionSubTypes(): void {
@@ -215,9 +225,7 @@ export class TransactionsTabComponent implements OnInit {
         this.matchesTransactionTypeFilter(t, transactionTypeFilter)
       );
     });
-    this.dataSource = new MatTableDataSource(sortTransactionsByLatest(transactions));
-    this.dataSource.paginator = this.paginator;
-    this.dataSource.sort = this.sort;
+    this.setDataSource(transactions);
   }
 
   matchesTransactionTypeFilter(transaction: SavingsAccountTransaction, transactionTypeFilter: string): boolean {
@@ -345,6 +353,46 @@ export class TransactionsTabComponent implements OnInit {
         }
       }
     );
+  }
+
+  exportTransactionsToExcel(): void {
+    exportTransactionsToExcel(
+      this.displayedTransactions(),
+      this.exportColumns(),
+      'Transactions',
+      transactionExportFileName(
+        'SavingsTransactions',
+        this.accountNo || this.accountId,
+        this.settingsService.businessDate
+      )
+    );
+  }
+
+  /** Filtered transactions in the order the table currently shows them, across all pages. */
+  displayedTransactions(): SavingsAccountTransaction[] {
+    return this.dataSource.filteredData;
+  }
+
+  private exportColumns(): TransactionExportColumn<SavingsAccountTransaction>[] {
+    const label = (key: string) => this.translateService.instant(key);
+    return [
+      { header: label('labels.inputs.Id'), value: (t) => t.id },
+      { header: label('labels.inputs.Value Date'), value: (t) => this.formatExportDate(t.date) },
+      { header: label('labels.inputs.Transaction Date'), value: (t) => this.formatExportDate(t.submittedOnDate) },
+      { header: label('labels.inputs.External Id'), value: (t) => t.externalId },
+      { header: label('labels.inputs.Transaction Type'), value: (t) => this.transactionTypeLabel(t) },
+      { header: label('labels.inputs.Debit'), value: (t) => (this.isDebit(t.transactionType) ? t.amount : null) },
+      { header: label('labels.inputs.Credit'), value: (t) => (this.isDebit(t.transactionType) ? null : t.amount) },
+      { header: label('labels.inputs.Balance'), value: (t) => t.runningBalance },
+      {
+        header: label('labels.inputs.Reversed'),
+        value: (t) => label(t.reversed ? 'labels.buttons.Yes' : 'labels.buttons.No')
+      }
+    ];
+  }
+
+  private formatExportDate(value: any): string {
+    return value ? this.dateUtils.formatDate(this.dateUtils.parseDate(value), this.settingsService.dateFormat) : '';
   }
 
   private reload() {

@@ -8,7 +8,12 @@ import { AccountTransfersService } from 'app/account-transfers/account-transfers
 import { Dates } from 'app/core/utils/dates';
 import { LoansService } from 'app/loans/loans.service';
 import {
-  allocateSettlement,
+  allocateOldestInstallmentFirst,
+  applyPreDateLpiFloor,
+  buildDueInstallmentBuckets,
+  buildBackdateLimitMessage,
+  repaymentComponentOrder,
+  RepaymentPaymentAllocation,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
   computeSavingsBalanceAsOf,
@@ -17,6 +22,7 @@ import {
   computeSettlementRequired,
   computeUnearnedInterest,
   formatLpiWaivedAfterDateMessage,
+  includeLpiWaiveFootnote,
   reconcileAsOfDateAmounts,
   applyEmiAmountCoverage
 } from 'app/loans/common/backdated-settlement.util';
@@ -36,9 +42,11 @@ import {
 export class TransferFromSavingsDialogComponent implements OnInit {
   transferForm: UntypedFormGroup;
   /**
-   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS before the business date, or the
-   * loan's disbursement date if that is later (see BackdatedRepaymentValidator#computeEarliestAllowedTransactionDate
-   * on the server). Replaced with the real value once the initial template loads (see loadInitialTemplate).
+   * Minimum Date allowed — backend-computed per loan and per environment by
+   * BackdatedRepaymentValidator#computeEarliestAllowedTransactionDate on the server, driven by the
+   * `backdated-transaction-max-days` global configuration: that many days before the business date (or the loan's
+   * disbursement date if later), or the start of the loan's first instalment period when the config is disabled.
+   * Replaced with the real value once the initial template loads (see loadInitialTemplate).
    * Maximum allows FUTURE dates so ops can preview LPI that would accrue until a future pay date.
    * A transfer cannot actually be recorded with a future date — the backend rejects it — so Submit is
    * disabled while a future date is selected (see isFutureDateSelected).
@@ -88,6 +96,11 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   private repaymentTemplateData: any;
   /** Full loan summary loaded from the loan API (not the client accounts list row). */
   private loanSummary: any;
+  /** Loan transaction-processing strategy. The entered-amount split follows this order. */
+  private transactionProcessingStrategyCode: string | null = null;
+  private paymentAllocations: RepaymentPaymentAllocation[] | null = null;
+  /** Overdue/LPI charges, used to put each day's fee on the installment it belongs to. */
+  private loanCharges: any[] = [];
   /** Shown when pending LPI is due on the selected date and will be paid with this settlement. */
   /**
    * Set when the selected (backdated) transaction date is not allowed for this loan's product
@@ -104,10 +117,6 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   closureRefundNotice: string | null = null;
   /** From /template/penalties — true when value date equals a real EMI due date. */
   private onInstallmentDueDate = false;
-  /** Runtime DPD principal-only mode (from loan additionalProperties). */
-  isDpdPrincipalOnlyActive = false;
-  maxDpd = 0;
-  dpdThreshold = 60;
 
   constructor(
     private formBuilder: UntypedFormBuilder,
@@ -172,7 +181,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       repaymentTemplate: this.loanService.getLoanRepaymentTemplate(loanId, transactionDate),
       penaltyTemplate: this.loanService.getLoanPenaltiesTemplate(loanId, transactionDate),
       // Client general-tab loan rows have no summary — always load authoritative outstanding here.
-      loanDetails: this.loanService.getLoanAccountResource(loanId, 'summary,repaymentSchedule,linkedAccount')
+      loanDetails: this.loanService.getLoanAccountResource(loanId, 'summary,repaymentSchedule,linkedAccount,charges')
     })
       .pipe(
         switchMap((templates: any) => {
@@ -181,8 +190,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
           this.repaymentTemplateData = templates.repaymentTemplate;
           this.captureLinkedSavingsFromLoanDetails(templates.loanDetails);
           this.applyLoanSummary(templates.loanDetails);
-          this.captureDpdRepaymentStatus(templates.loanDetails);
-          this.captureDpdRepaymentStatus(this.data.loan);
+          this.loanCharges = Array.isArray(templates.loanDetails?.charges) ? templates.loanDetails.charges : [];
           // Remaining-principal baseline for full settlement (all EMIs), not current-installment only.
           this.baselinePrincipalOutstanding = Number(templates.penaltyTemplate?.principalOutstanding || 0);
           this.baselineRemainingPrincipalOutstanding = Number(
@@ -294,7 +302,6 @@ export class TransferFromSavingsDialogComponent implements OnInit {
    * ever picking a date the server would reject, rather than finding out only after submitting.
    */
   private applyEarliestAllowedDate(earliestAllowedTransactionDate: any): void {
-    this.backdateLimitMessage = 'You cannot backdate a payment by more than 30 days in the past.';
     if (!earliestAllowedTransactionDate) {
       return;
     }
@@ -303,6 +310,9 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       return;
     }
     this.minDate = parsed;
+    this.backdateLimitMessage = buildBackdateLimitMessage(
+      this.dateUtils.formatDate(parsed, this.settingsService.dateFormat)
+    );
   }
 
   /** Linked savings from GET /loans/{id}?associations=linkedAccount — not foreclosure template (blocked when overdue). */
@@ -342,6 +352,13 @@ export class TransferFromSavingsDialogComponent implements OnInit {
 
   /** Captures full-loan outstanding from the loan API — never from the client accounts list row. */
   private applyLoanSummary(loanDetails: any): void {
+    this.transactionProcessingStrategyCode =
+      loanDetails?.transactionProcessingStrategyCode || this.data.loan?.transactionProcessingStrategyCode || null;
+    this.paymentAllocations = Array.isArray(loanDetails?.paymentAllocation)
+      ? loanDetails.paymentAllocation
+      : Array.isArray(this.data.loan?.paymentAllocation)
+        ? this.data.loan.paymentAllocation
+        : null;
     this.loanSummary = loanDetails?.summary || null;
     const fromSummary = Number(this.loanSummary?.totalOutstanding || 0);
     const fromListBalance = Number(this.data.loan?.loanBalance || 0);
@@ -378,16 +395,17 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         : 0
     });
 
-    this.principalOutstanding = reconciled.principal;
-    this.remainingPrincipalOutstanding = reconciled.remainingPrincipal;
-    this.interestOutstanding = reconciled.interest;
-    this.feeOutstanding = reconciled.fee;
-    this.taxOutstanding = reconciled.tax;
-    this.penaltyOutstanding = reconciled.penalty;
-    const penaltyDue = this.roundAmount(Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalPenalty);
-    if (!this.onInstallmentDueDate && penaltyDue > this.penaltyOutstanding + 0.01) {
-      this.penaltyOutstanding = penaltyDue;
-    }
+    const withPreDateLpi = applyPreDateLpiFloor(
+      reconciled,
+      Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalPenalty,
+      this.onInstallmentDueDate
+    );
+    this.principalOutstanding = withPreDateLpi.principal;
+    this.remainingPrincipalOutstanding = withPreDateLpi.remainingPrincipal;
+    this.interestOutstanding = withPreDateLpi.interest;
+    this.feeOutstanding = withPreDateLpi.fee;
+    this.taxOutstanding = withPreDateLpi.tax;
+    this.penaltyOutstanding = withPreDateLpi.penalty;
     this.suggestedTransactionAmount = this.roundAmount(
       this.principalOutstanding +
         this.interestOutstanding +
@@ -414,27 +432,8 @@ export class TransferFromSavingsDialogComponent implements OnInit {
 
   /** True when entered amount covers outstanding the backend can absorb without Overpaid. */
   willCloseLoan(amount: number): boolean {
-    if (this.isDpdPrincipalOnlyActive) {
-      return false;
-    }
     const cap = this.repaymentCapWithoutOverpay;
     return cap > 0.01 && this.roundAmount(amount) + 0.01 >= cap;
-  }
-
-  private captureDpdRepaymentStatus(source: any): void {
-    const props = source?.additionalProperties;
-    if (!props) {
-      return;
-    }
-    if (props.dpdPrincipalOnlyActive != null) {
-      this.isDpdPrincipalOnlyActive = !!props.dpdPrincipalOnlyActive;
-    }
-    if (props.maxDpd != null) {
-      this.maxDpd = Number(props.maxDpd);
-    }
-    if (props.dpdPrincipalOnlyThreshold != null) {
-      this.dpdThreshold = Number(props.dpdPrincipalOnlyThreshold);
-    }
   }
 
   private buildClosureRefundNotice(amount: number): string | null {
@@ -449,22 +448,15 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     return `Closes loan at ${this.currencySymbol} ${this.formatAmount(cap)}`;
   }
 
+  /**
+   * A partial that cannot clear every overdue installment is applied to the oldest one,
+   * in the loan's repayment-strategy order, before the next installment.
+   */
   private simulateSettlementAllocation(
     amount: number,
     transactionDateValue: Date
   ): { penalty: number; fee: number; tax: number; interest: number; principal: number; unallocated: number } {
-    if (this.isDpdPrincipalOnlyActive) {
-      const principalApplied = Math.min(this.roundAmount(amount), this.roundAmount(this.remainingPrincipalOutstanding));
-      return {
-        penalty: 0,
-        fee: 0,
-        tax: 0,
-        interest: 0,
-        principal: principalApplied,
-        unallocated: this.roundAmount(Math.max(amount - principalApplied, 0))
-      };
-    }
-    return allocateSettlement(
+    return allocateOldestInstallmentFirst(
       amount,
       {
         penalty: this.penaltyOutstanding,
@@ -473,39 +465,20 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         interest: this.interestOutstanding,
         principal: this.remainingPrincipalOutstanding
       },
-      this.getOutstandingInstallmentBuckets(transactionDateValue)
+      buildDueInstallmentBuckets({
+        periods: this.data.loan?.repaymentSchedule?.periods,
+        charges: this.loanCharges,
+        transactionDate: this.toComparableDate(transactionDateValue)
+      }),
+      this.componentOrder
     );
   }
 
-  private getOutstandingInstallmentBuckets(
-    transactionDateValue: Date
-  ): Array<{ period: number; penalty: number; fee: number; tax: number; interest: number; principal: number }> {
-    const periods = this.data.loan?.repaymentSchedule?.periods;
-    if (!Array.isArray(periods)) {
-      return [];
-    }
-
-    const selected = this.toComparableDate(transactionDateValue);
-    if (!selected) {
-      return [];
-    }
-
-    return periods
-      .filter((period: any) => this.isRealOutstandingInstallment(period))
-      .filter((period: any) => {
-        const dueDate = this.toComparableDate(period.dueDate);
-        return dueDate && dueDate.getTime() <= selected.getTime();
-      })
-      .map((period: any) => ({
-        period: Number(period.period),
-        penalty: this.getPeriodComponentOutstanding(period, 'penalty'),
-        fee: this.getPeriodComponentOutstanding(period, 'fee'),
-        tax: this.getPeriodComponentOutstanding(period, 'tax'),
-        interest: this.getPeriodComponentOutstanding(period, 'interest'),
-        principal: this.getPeriodComponentOutstanding(period, 'principal')
-      }))
-      .filter((bucket) => bucket.penalty + bucket.fee + bucket.tax + bucket.interest + bucket.principal > 0.01)
-      .sort((a, b) => a.period - b.period);
+  private get componentOrder() {
+    return repaymentComponentOrder(
+      this.transactionProcessingStrategyCode || this.data.loan?.transactionProcessingStrategyCode,
+      this.paymentAllocations || this.data.loan?.paymentAllocation
+    );
   }
 
   private getPeriodComponentOutstanding(
@@ -554,13 +527,6 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   }
 
   private patchDefaultTransactionAmount(): void {
-    if (this.isDpdPrincipalOnlyActive) {
-      const principalOnly = this.roundAmount(this.remainingPrincipalOutstanding);
-      if (principalOnly > 0) {
-        this.transferForm.patchValue({ transactionAmount: this.capEnteredAmount(principalOnly) }, { emitEvent: false });
-        return;
-      }
-    }
     const suggested = this.capEnteredAmount(this.dueAsOfDateTotal);
     if (suggested > 0) {
       this.transferForm.patchValue({ transactionAmount: suggested }, { emitEvent: false });
@@ -707,9 +673,6 @@ export class TransferFromSavingsDialogComponent implements OnInit {
    * due that day + fees + tax + LPI still due. Does not include future EMI interest.
    */
   get outstandingAfterWaiver(): number {
-    if (this.isDpdPrincipalOnlyActive) {
-      return this.roundAmount(this.remainingPrincipalOutstanding);
-    }
     return computeSettlementRequired({
       principal: this.remainingPrincipalOutstanding,
       interest: this.interestOutstanding,
@@ -721,9 +684,6 @@ export class TransferFromSavingsDialogComponent implements OnInit {
 
   /** Maximum repayment that will not move the loan to Overpaid (full loan as of the selected date). */
   get repaymentCapWithoutOverpay(): number {
-    if (this.isDpdPrincipalOnlyActive) {
-      return this.roundAmount(this.remainingPrincipalOutstanding);
-    }
     return computeAuthoritativeSettlementCap({
       outstandingAfterWaiver: this.outstandingAfterWaiver,
       fullLoanOutstanding: this.fullLoanOutstanding,
@@ -751,26 +711,20 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   }
 
   get settlementClosesLoan(): boolean {
-    if (this.isDpdPrincipalOnlyActive) {
-      return false;
-    }
     return this.outstandingAfterWaiver <= this.dueAsOfDateTotal + 0.01;
   }
 
   get summaryFootnotes(): Array<string | SettlementSummaryFootnote> {
     const notes: Array<string | SettlementSummaryFootnote> = [];
-    if (this.isDpdPrincipalOnlyActive) {
-      notes.push(
-        `DPD principal-only mode (max DPD ${this.maxDpd}, threshold ${this.dpdThreshold}). ` +
-          `This settlement applies to principal only — interest and LPI remain outstanding.`
-      );
-    }
     if (this.isFutureDateSelected && this.additionalFutureLpiAmount > 0.01) {
       notes.push(
         `+${this.currencySymbol} ${this.formatAmount(this.additionalFutureLpiAmount)} projected LPI (preview)`
       );
     }
-    if (!this.isDpdPrincipalOnlyActive && this.penaltyWaivedByBackdate > 0.01) {
+    if (
+      includeLpiWaiveFootnote(this.willCloseLoan(this.displaySettlementTotal)) &&
+      this.penaltyWaivedByBackdate > 0.01
+    ) {
       const selectedDateLabel = this.selectedTransactionDateShortLabel;
       if (selectedDateLabel) {
         notes.push(
@@ -848,13 +802,22 @@ export class TransferFromSavingsDialogComponent implements OnInit {
 
   get paymentAllocationLines(): SettlementSummaryLine[] {
     const allocation = this.currentSettlementAllocation;
-    return [
-      { label: 'Principal', amount: allocation.principal },
-      { label: 'Interest', amount: allocation.interest },
-      { label: 'LPI', amount: allocation.penalty },
-      { label: 'Fees', amount: allocation.fee },
-      { label: 'Tax', amount: allocation.tax }
-    ].filter((line) => line.amount > 0.01);
+    const labels: Record<string, string> = {
+      principal: 'Principal',
+      interest: 'Interest',
+      penalty: 'LPI',
+      fee: 'Fees',
+      tax: 'Tax'
+    };
+    return ([
+        'principal',
+        'interest',
+        'penalty',
+        'fee',
+        'tax'
+      ] as const)
+      .map((key) => ({ label: labels[key], amount: allocation[key] }))
+      .filter((line) => line.amount > 0.01);
   }
 
   get displayLedgerToday(): number {

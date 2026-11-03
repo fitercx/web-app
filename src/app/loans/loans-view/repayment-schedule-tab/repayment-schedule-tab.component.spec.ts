@@ -159,7 +159,8 @@ describe('RepaymentScheduleTabComponent', () => {
       };
 
       expect(component.getDisplayTotalDueForPeriod(period)).toBeCloseTo(1050, 6);
-      expect(component.getDisplayOverdueInterestForPeriod(period)).toBeCloseTo(25, 6);
+      expect(component.getDisplayOverdueInterestForPeriod(period)).toBe(0);
+      expect(component.periodWaivedLpi(period)).toBe(25);
       expect(component.isWaivedOverdueInterestOnly(period)).toBe(true);
     });
 

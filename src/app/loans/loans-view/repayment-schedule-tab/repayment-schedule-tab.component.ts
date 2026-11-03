@@ -646,8 +646,8 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       })
       .filter((column) => !!column);
 
-    // The Refunded LPI (reversal) amount is shown in the UI only as a footer note on the
-    // Overdue Interest column. Surface it in the export as its own column so the reversal is captured.
+    // Reversed LPI is not a schedule column. Export it beside Overdue Interest so it is not
+    // mixed into the charged or waived amounts.
     if (this.hasReversedPaidLpiForLoan()) {
       const penaltiesIndex = columns.findIndex((column) => column?.key === 'penalties');
       const insertIndex = penaltiesIndex >= 0 ? penaltiesIndex + 1 : columns.length;
@@ -661,7 +661,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     const moneyFormat = '#,##0.000';
     return {
       key: 'reversedLpi',
-      header: 'Refunded LPI (Reversal)',
+      header: 'Reversed LPI',
       value: (item: any) => {
         const amount = reversedPaidLpiIndicatorForPeriod(this.loanDetailsData, item);
         return amount > 0 ? amount : '';
@@ -1355,13 +1355,21 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     );
   }
 
-  /** Overdue interest (LPI): show amount due, or waived LPI when due is zero (e.g. grace-period row). */
+  /**
+   * Overdue interest column is charged LPI still on the installment (`penalty_charges_amount` / due).
+   * Waived LPI is `penalty_charges_waived_derived` and belongs in the Waived column. Reversed LPI is
+   * not a schedule column; it is shown beside this cell from `reversedPenaltyChargesDue`.
+   */
   getDisplayOverdueInterestForPeriod(item: any): number {
-    const due = Number(item?.penaltyChargesDue || 0);
-    if (due > 0) {
-      return due;
-    }
+    return Number(item?.penaltyChargesDue || 0);
+  }
+
+  periodWaivedLpi(item: any): number {
     return Number(item?.penaltyChargesWaived || 0);
+  }
+
+  periodReversedLpi(item: any): number {
+    return reversedPaidLpiIndicatorForPeriod(this.loanDetailsData, item);
   }
 
   hasReversedPaidLpiForLoan(): boolean {

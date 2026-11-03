@@ -9,6 +9,7 @@ import { catchError, map, switchMap } from 'rxjs/operators';
 import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 import {
+  buildBackdateLimitMessage,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
   formatWaivedLpiMessage,
@@ -42,9 +43,11 @@ export class ForeclosureComponent implements OnInit {
   loanId: any;
   foreclosureForm: UntypedFormGroup;
   /**
-   * Minimum Date allowed — backend-computed per loan: MAX_BACKDATE_DAYS (30) before the business date, or the
-   * loan's disbursement date if that is later (see BackdatedRepaymentValidator#computeEarliestAllowedTransactionDate
-   * on the server). Replaced with the real value once the foreclosure template loads (see captureLinkedAccount), so
+   * Minimum Date allowed — backend-computed per loan and per environment by
+   * BackdatedRepaymentValidator#computeEarliestAllowedTransactionDate on the server, driven by the
+   * `backdated-transaction-max-days` global configuration: that many days before the business date (or the loan's
+   * disbursement date if later), or the start of the loan's first instalment period when the config is disabled.
+   * Replaced with the real value once the foreclosure template loads (see captureLinkedAccount), so
    * the calendar never lets an operator pick a date the server would reject. Note: this is separate from (and
    * looser than) the "cannot be earlier than the loan's last non-waiver transaction date" rule the backend also
    * enforces unconditionally on every foreclosure - that rule changes after every transaction, so it is surfaced
@@ -162,6 +165,13 @@ export class ForeclosureComponent implements OnInit {
       .pipe(catchError(() => of(null)))
       .subscribe((penaltyTemplate: any) => {
         this.penaltyTemplateData = penaltyTemplate;
+        // /template/penalties is not blocked when the foreclosure template is (LOC due/overdue), so it is the one
+        // source of the backend's backdate floor that is available on every path — and the floor is what bounds the
+        // last-allowed-date suggestion below, so it has to be applied before that runs.
+        this.applyEarliestAllowedDate(penaltyTemplate?.earliestAllowedTransactionDate);
+        if (this.tryApplyLastAllowedLocForeclosureDate()) {
+          return;
+        }
         this.patchForeclosureFormFromTemplate(transactionDate);
         this.updateClosureTypeInfo();
         this.updateForeclosureOverpaymentPreview();
@@ -186,9 +196,6 @@ export class ForeclosureComponent implements OnInit {
         this.fullLoanOutstanding = roundAmount(Number(this.loanSummary?.totalOutstanding || 0));
         this.captureLinkedSavingsFromLoanDetails(loanDetails);
         this.applyReceivableFlagFromLoanDetails(loanDetails);
-        if (this.tryApplyLastAllowedLocForeclosureDate()) {
-          return;
-        }
         this.refreshSettlementForSelectedDate();
       });
   }
@@ -245,14 +252,21 @@ export class ForeclosureComponent implements OnInit {
     this.isReceivableLineOfCredit = locType === 'RECEIVABLE';
   }
 
-  /** Calendar min when the foreclosure template did not return earliestAllowedTransactionDate. */
+  /**
+   * Placeholder calendar min for the moment between opening the screen and the first backend response carrying
+   * `earliestAllowedTransactionDate`. Deliberately the tightest (production) window, since guessing a looser one
+   * client-side would let an operator pick a date the server rejects; both minDate and the message are replaced by
+   * the real per-environment floor as soon as applyEarliestAllowedDate runs.
+   */
   private applyDefaultBackdateWindow(): void {
     const business = this.toComparableDate(this.settingsService.businessDate);
     if (!business) {
       return;
     }
     this.minDate = new Date(business.getFullYear(), business.getMonth(), business.getDate() - 30);
-    this.backdateLimitMessage = 'You cannot backdate a payment by more than 30 days in the past.';
+    this.backdateLimitMessage = buildBackdateLimitMessage(
+      this.dateUtils.formatDate(this.minDate, this.settingsService.dateFormat)
+    );
   }
 
   private applyMaturityDate(raw: any): void {
@@ -566,7 +580,9 @@ export class ForeclosureComponent implements OnInit {
       return;
     }
     this.minDate = parsed;
-    this.backdateLimitMessage = 'You cannot backdate a payment by more than 30 days in the past.';
+    this.backdateLimitMessage = buildBackdateLimitMessage(
+      this.dateUtils.formatDate(parsed, this.settingsService.dateFormat)
+    );
   }
 
   get isFutureDateSelected(): boolean {
@@ -683,6 +699,9 @@ export class ForeclosureComponent implements OnInit {
         `Quoted total exceeds schedule close cap by ~${this.currencySymbol} ${this.formatAmount(this.projectedOverpaymentAmount)} — ` +
         'loan may become Overpaid instead of Closed'
       );
+    }
+    if (this.linkedSavingsAccountAccountNo) {
+      return 'This amount is deducted from the linked savings account and closes the loan';
     }
     return null;
   }
@@ -823,11 +842,16 @@ export class ForeclosureComponent implements OnInit {
     if (waivedLpiNote) {
       notes.push(waivedLpiNote);
     }
+    if (this.prepaidInterestNettedIntoQuote > 0.01) {
+      notes.push(
+        `${this.currencySymbol} ${this.formatAmount(this.prepaidInterestNettedIntoQuote)} of interest already paid is included in this total. ` +
+          'It is not deducted again.'
+      );
+    }
     if (this.unearnedInterest > 0.01 && this.closureTypeInfo?.type === 'foreclosure') {
-      notes.push({
-        text: `Unearned interest: −${this.currencySymbol} ${this.formatAmount(this.unearnedInterest)}`,
-        tone: 'negative'
-      });
+      notes.push(
+        `Future interest of ${this.currencySymbol} ${this.formatAmount(this.unearnedInterest)} is not charged and is not part of the amount deducted.`
+      );
     }
     if (this.isRealEmiDueOnSelectedDate && this.penaltyAsOfDate <= 0.01 && this.settlementLedgerDelta <= 0.01) {
       notes.push('No LPI on installment due date');
@@ -883,6 +907,16 @@ export class ForeclosureComponent implements OnInit {
   }
 
   /**
+   * Interest already collected for days after the foreclosure date, and already subtracted from the quote principal.
+   * The savings debit is the settlement total; this amount is not a second deduction.
+   */
+  get prepaidInterestNettedIntoQuote(): number {
+    const quotedPrincipal = Number(this.formRawValue.outstandingPrincipalPortion || 0);
+    const principalOutstanding = Number(this.loanSummary?.principalOutstanding ?? 0);
+    return Math.max(roundAmount(principalOutstanding - quotedPrincipal), 0);
+  }
+
+  /**
    * Interest waived by early foreclosure — ledger full-period interest minus foreclosure quote interest,
    * or the account-list vs settlement gap when the template rolls discount into principal only.
    */
@@ -897,7 +931,7 @@ export class ForeclosureComponent implements OnInit {
       return fromBaseline;
     }
     if (this.closureTypeInfo?.type === 'foreclosure' && this.penaltyAsOfDate <= 0.01) {
-      return Math.max(this.fullOutstandingVsDueDelta, 0);
+      return Math.max(roundAmount(this.fullOutstandingVsDueDelta - this.prepaidInterestNettedIntoQuote), 0);
     }
     return 0;
   }

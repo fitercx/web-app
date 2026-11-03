@@ -31,7 +31,10 @@
         <div>
           <div class="loan-id">Loan ID {{ result.loanAccountNo || result.loanId }}</div>
           <div class="muted">{{ result.borrowerName || '-' }} · {{ result.product || '-' }}</div>
-          <div class="muted" *ngIf="searchType.value === 'invoiceNo'">Invoice Number {{ result.invoiceNo }}</div>
+          <div class="muted" *ngIf="searchedType === 'invoiceNo'">Invoice Number {{ result.invoiceNo }}</div>
+          <div class="muted" *ngIf="searchedType === 'savingsAccountNo'">
+            Savings Account No. {{ savingsAccountNo }}
+          </div>
         </div>
         <span class="status-badge">{{ result.status || '-' }}</span>
       </div>
@@ -45,6 +48,7 @@
   </div>
 
   <div class="empty-state" *ngIf="submitted && !loading && results.length === 0">
-    No record found for {{ searchedValue }}
+    <ng-container *ngIf="showNoLinkedLoans; else noRecord">No loans linked to this savings account</ng-container>
+    <ng-template #noRecord>No record found for {{ searchedValue }}</ng-template>
   </div>
 </div>
