@@ -31,6 +31,7 @@ import {
   SettlementSummaryLine
 } from 'app/shared/settlement-summary-card/settlement-summary-card.component';
 import { SavingsService } from 'app/savings/savings.service';
+import { isShortDisbursedReceivable } from 'app/core/utils/loc-product-type';
 
 @Component({
   selector: 'mifosx-foreclosure',
@@ -248,8 +249,10 @@ export class ForeclosureComponent implements OnInit {
     if (this.isReceivableLineOfCredit || !loanDetails) {
       return;
     }
-    const locType = loanDetails.locType || loanDetails.additionalProperties?.locProductType;
-    this.isReceivableLineOfCredit = locType === 'RECEIVABLE';
+    // Short-disbursed receivable only; non-recourse has no refund leg or "Disbursal" wording
+    this.isReceivableLineOfCredit = isShortDisbursedReceivable(
+      loanDetails.locType || loanDetails.additionalProperties?.locProductType
+    );
   }
 
   /**

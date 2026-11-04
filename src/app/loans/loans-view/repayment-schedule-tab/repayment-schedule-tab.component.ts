@@ -47,6 +47,11 @@ import { jsPDF, jsPDFOptions } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as JSZip from 'jszip';
 import * as XLSX from 'xlsx';
+import {
+  isAnyLocProductType,
+  isPayable as isLocPayable,
+  isShortDisbursedReceivable
+} from 'app/core/utils/loc-product-type';
 
 @Component({
   selector: 'mifosx-repayment-schedule-tab',
@@ -1484,45 +1489,38 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     return true;
   }
 
+  /** Short-disbursed receivable LOC (excludes non-recourse, which uses the standard schedule columns) */
   isLineOfCreditReceivable(): boolean {
+    return isShortDisbursedReceivable(this.getLocProductType());
+  }
+
+  /** LOC payable type */
+  isLineOfCreditPayable(): boolean {
+    return isLocPayable(this.getLocProductType());
+  }
+
+  /** Any LOC (receivable, receivable non-recourse or payable) */
+  private isAnyLineOfCredit(): boolean {
+    return isAnyLocProductType(this.getLocProductType());
+  }
+
+  private getLocProductType(): string | null {
     // Use loanData (for creation flow) or loanDetailsData (for view flow)
     const loanInfo = this.loanData || this.loanDetailsData;
 
     if (!loanInfo) {
-      return false;
+      return null;
     }
 
     // Check if loan has a line of credit ID (indicating it's a LOC loan)
     const hasLineOfCredit = !!(loanInfo.lineOfCreditId || loanInfo.additionalProperties?.lineOfCreditId);
 
     if (!hasLineOfCredit) {
-      return false;
+      return null;
     }
 
-    // Check if it's of receivable type
-    // For creation flow, check locType field
-    // For view flow, check locProductType field
-    const locType = loanInfo.locType || loanInfo.additionalProperties?.locProductType;
-    return locType === 'RECEIVABLE';
-  }
-
-  /** LOC payable type */
-  isLineOfCreditPayable(): boolean {
-    const loanInfo = this.loanData || this.loanDetailsData;
-    if (!loanInfo) {
-      return false;
-    }
-    const hasLineOfCredit = !!(loanInfo.lineOfCreditId || loanInfo.additionalProperties?.lineOfCreditId);
-    if (!hasLineOfCredit) {
-      return false;
-    }
-    const locType = loanInfo.locType || loanInfo.additionalProperties?.locProductType;
-    return locType === 'PAYABLE';
-  }
-
-  /** Any LOC (receivable or payable) */
-  private isAnyLineOfCredit(): boolean {
-    return this.isLineOfCreditReceivable() || this.isLineOfCreditPayable();
+    // Creation flow uses locType; view flow uses additionalProperties.locProductType
+    return loanInfo.locType || loanInfo.additionalProperties?.locProductType;
   }
 
   /**

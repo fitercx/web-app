@@ -104,7 +104,7 @@
       <td mat-footer-cell class="r-amount" *matFooterCellDef>
         <ng-container *ngIf="getDisplayedTotalOutstanding() !== null; else emptyOutstandingFooter">
           <b>{{
-            isLineOfCreditReceivable
+            isLineOfCreditReceivable()
               ? null
               : (getDisplayedTotalOutstanding() | currency: currencyCode : 'symbol-narrow' : '1.2-2')
           }}</b>

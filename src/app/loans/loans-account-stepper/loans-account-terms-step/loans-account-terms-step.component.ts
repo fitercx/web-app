@@ -195,7 +195,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
         loanTermFrequency: loanTermFrequency,
         loanTermFrequencyType: loanTermFrequencyType,
         numberOfRepayments: this.loansAccountTermsData.numberOfRepayments,
-        repaymentEvery: this.loansAccountTermsData.repaymentEvery,
+        repaymentEvery: this.isLocProduct() ? loanTermFrequency : this.loansAccountTermsData.repaymentEvery,
         repaymentFrequencyType: this.loansAccountTermsData.repaymentFrequencyType.id,
         amortizationType: this.loansAccountTermsData.amortizationType.id,
         isEqualAmortization: this.loansAccountTermsData.isEqualAmortization,
@@ -373,7 +373,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
         loanTermFrequency: loanTermFrequency,
         loanTermFrequencyType: loanTermFrequencyType,
         numberOfRepayments: this.loansAccountTermsData.numberOfRepayments,
-        repaymentEvery: this.loansAccountTermsData.repaymentEvery,
+        repaymentEvery: this.isLocProduct() ? loanTermFrequency : this.loansAccountTermsData.repaymentEvery,
         repaymentFrequencyType: this.loansAccountTermsData.repaymentFrequencyType.id,
         amortizationType: this.loansAccountTermsData.amortizationType.id,
         isEqualAmortization: this.loansAccountTermsData.isEqualAmortization,
@@ -995,6 +995,7 @@ export class LoansAccountTermsStepComponent implements OnInit, OnChanges, OnDest
       // Update the form with the new tenor days, but preserve user input if they've modified values
       this.patchFormPreservingUserInput({
         loanTermFrequency: tenorDays,
+        repaymentEvery: tenorDays,
         loanTermFrequencyType: daysFrequencyType?.id || this.loansAccountTermsForm.get('loanTermFrequencyType')?.value
       });
     }

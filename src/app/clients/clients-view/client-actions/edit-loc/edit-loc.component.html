@@ -52,6 +52,7 @@
                       {{ pt.value || pt.code }}
                     </mat-option>
                   </mat-select>
+                  <mat-hint *ngIf="productTypeLocked">LOC type cannot be changed once the LOC has loans</mat-hint>
                 </mat-form-field>
                 <mat-form-field fxFlex>
                   <mat-label>Currency</mat-label>

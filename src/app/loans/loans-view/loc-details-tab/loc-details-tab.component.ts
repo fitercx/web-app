@@ -1,6 +1,7 @@
 /** Angular Imports */
 import { AfterViewInit, Component } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { isPayable as isLocPayable, isReceivableFamily } from 'app/core/utils/loc-product-type';
 
 /**
  * Invoice Details Tab Component
@@ -43,14 +44,14 @@ export class LocDetailsTabComponent implements AfterViewInit {
    * Checks if the selected LOC type is receivable based on locProductType
    */
   get isReceivableType(): boolean {
-    return this.locDetails?.locProductType === 'RECEIVABLE';
+    return isReceivableFamily(this.locDetails?.locProductType);
   }
 
   /**
    * Checks if the selected LOC type is payable based on locProductType
    */
   get isPayableType(): boolean {
-    return this.locDetails?.locProductType === 'PAYABLE';
+    return isLocPayable(this.locDetails?.locProductType);
   }
 
   /**

@@ -8,6 +8,7 @@ import { TranslateService } from '@ngx-translate/core';
 /** Custom Services */
 import { LoansService } from '../../loans.service';
 import { Commons } from 'app/core/utils/commons';
+import { isPayable as isLocPayable, isReceivableFamily } from 'app/core/utils/loc-product-type';
 import { takeUntil } from 'rxjs/operators';
 import { ReplaySubject, Subject } from 'rxjs';
 
@@ -96,9 +97,9 @@ export class LoansAccountDetailsStepComponent implements OnInit, OnDestroy {
 
     if (this.loansAccountTemplate) {
       if (this.lineOfCreditId && this.lineOfCreditType) {
-        // Filter LOC-related products, constrained by LOC type (Receivable or Payable)
-        const isReceivable = String(this.lineOfCreditType).toLowerCase() === 'receivable';
-        const isPayable = String(this.lineOfCreditType).toLowerCase() === 'payable';
+        // Filter LOC-related products, constrained by LOC type (receivable family or payable)
+        const isReceivable = isReceivableFamily(String(this.lineOfCreditType));
+        const isPayable = isLocPayable(String(this.lineOfCreditType));
 
         this.productList = (this.loansAccountTemplate.productOptions || [])
           .filter((p: any) => {

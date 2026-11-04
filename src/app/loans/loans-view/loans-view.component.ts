@@ -19,6 +19,7 @@ import { DelinquencyPausePeriod } from '../models/loan-account.model';
 import { TranslateService } from '@ngx-translate/core';
 import { LoanTransaction } from 'app/products/loan-products/models/loan-account.model';
 import { TransferFromSavingsDialogComponent } from 'app/shared/transfer-from-savings-dialog/transfer-from-savings-dialog.component';
+import { isAnyLocProductType } from 'app/core/utils/loc-product-type';
 import { ChangeRepaymentStrategyDialogComponent } from './custom-dialogs/change-repayment-strategy-dialog/change-repayment-strategy-dialog.component';
 
 @Component({
@@ -529,8 +530,7 @@ class LoansViewComponent implements OnInit {
     if (!hasLocId) {
       return false;
     }
-    const locType = info.locType || info.additionalProperties?.locProductType;
-    return locType === 'RECEIVABLE' || locType === 'PAYABLE';
+    return isAnyLocProductType(info.locType || info.additionalProperties?.locProductType);
   }
 
   private getTotalOutstandingForMultiTranche(): number {

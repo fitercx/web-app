@@ -29,6 +29,13 @@ import {
 import { BulkDisburseLoadingDialogComponent } from '../view-loc-details/active-loans-tab/bulk-disburse-loading-dialog/bulk-disburse-loading-dialog.component';
 import { TransferFromSavingsDialogComponent } from 'app/shared/transfer-from-savings-dialog/transfer-from-savings-dialog.component';
 import { loanDisplayStatus } from 'app/loans/common/loan-display-status.util';
+import {
+  LocProductType,
+  isPayable as isLocPayable,
+  isReceivableFamily,
+  isReceivableNonRecourse,
+  toLocProductType
+} from 'app/core/utils/loc-product-type';
 
 /**
  * General Tab component.
@@ -859,10 +866,12 @@ export class GeneralTabComponent {
           blockedAmount,
           availableBalance,
           outstanding: consumedAmount,
-          type:
-            (loc.productType || '').toLowerCase() === 'payable' || loc.productType === 'PAYABLE'
-              ? 'Payable'
+          type: isLocPayable(loc.productType)
+            ? 'Payable'
+            : isReceivableNonRecourse(loc.productType)
+              ? 'Receivable NR'
               : 'Receivable',
+          productType: toLocProductType(loc.productType) ?? LocProductType.RECEIVABLE,
           utilization,
           // status / activationStatus backward compatibility
           status: displayValue,
@@ -957,7 +966,7 @@ export class GeneralTabComponent {
     }
     const queryParams: any = {
       lineOfCreditId: loc.id,
-      lineOfCreditType: loc.type
+      lineOfCreditType: loc.productType
     };
 
     this.router.navigate(
@@ -1108,8 +1117,7 @@ export class GeneralTabComponent {
   }
 
   getApprovedAmount(loan: any, lineOfCredit: any): number {
-    const productType = lineOfCredit?.type?.toUpperCase() ?? '';
-    return productType === 'RECEIVABLE'
+    return isReceivableFamily(lineOfCredit?.productType)
       ? loan?.additionalProperties?.approvedReceivableAmount
       : loan?.additionalProperties?.approvedPayableAmount;
   }
@@ -1325,7 +1333,7 @@ export class GeneralTabComponent {
       clientId: this.clientid,
       locId: loc.id,
       locCurrency: loc.currency?.code || 'USD',
-      locType: loc.type, // 'Receivable' or 'Payable'
+      locType: loc.productType,
       selectedLoans: selectedLoans
     };
 
