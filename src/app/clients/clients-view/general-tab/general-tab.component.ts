@@ -33,6 +33,7 @@ import {
   LocProductType,
   isPayable as isLocPayable,
   isReceivableFamily,
+  FACTORING_DISPLAY_NAME,
   isReceivableNonRecourse,
   toLocProductType
 } from 'app/core/utils/loc-product-type';
@@ -869,7 +870,7 @@ export class GeneralTabComponent {
           type: isLocPayable(loc.productType)
             ? 'Payable'
             : isReceivableNonRecourse(loc.productType)
-              ? 'Receivable NR'
+              ? FACTORING_DISPLAY_NAME
               : 'Receivable',
           productType: toLocProductType(loc.productType) ?? LocProductType.RECEIVABLE,
           utilization,

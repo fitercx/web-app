@@ -49,7 +49,7 @@
                   <mat-label>LOC Type</mat-label>
                   <mat-select formControlName="productType">
                     <mat-option *ngFor="let pt of productTypeOptions" [value]="pt.id">
-                      {{ pt.value || pt.code }}
+                      {{ getProductTypeOptionLabel(pt) }}
                     </mat-option>
                   </mat-select>
                   <mat-hint *ngIf="productTypeLocked">LOC type cannot be changed once the LOC has loans</mat-hint>

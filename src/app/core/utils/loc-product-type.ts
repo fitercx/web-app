@@ -121,7 +121,26 @@ export function getDefaultAdvancePercentage(input: LocProductTypeInput): string 
   return isReceivableFamily(type) ? '90' : '100';
 }
 
-/** Badge text shown on LOC screens, e.g. "LOC RECEIVABLE NR". */
+/** User-facing name of the non-recourse product; the backend code stays RECEIVABLE_NON_RECOURSE. */
+export const FACTORING_DISPLAY_NAME = 'Factoring';
+
+/** Backend loan product label for non-recourse loans (CredX loan search SQL). */
+const NON_RECOURSE_LOAN_PRODUCT_LABEL = 'Invoice Discounting (Non-Recourse)';
+
+/** Label for a backend LOC product type option (`{ id, code, value }`). */
+export function getLocProductTypeOptionLabel(option: { id?: number | string; code?: string; value?: string }): string {
+  if (isReceivableNonRecourse(option.code) || isReceivableNonRecourse(option.id)) {
+    return FACTORING_DISPLAY_NAME;
+  }
+  return option.value || option.code || '';
+}
+
+/** Maps backend loan product labels to their display name. */
+export function getLoanProductDisplayLabel(label: string | null | undefined): string {
+  return label === NON_RECOURSE_LOAN_PRODUCT_LABEL ? FACTORING_DISPLAY_NAME : label || '';
+}
+
+/** Badge text shown on LOC screens, e.g. "LOC FACTORING". */
 export function getLocBadgeLabel(input: LocProductTypeInput): string {
   const type = toLocProductType(input) ?? LocProductType.RECEIVABLE;
   switch (type) {
@@ -130,13 +149,13 @@ export function getLocBadgeLabel(input: LocProductTypeInput): string {
     case LocProductType.PAYABLE:
       return 'LOC PAYABLE';
     case LocProductType.RECEIVABLE_NON_RECOURSE:
-      return 'LOC RECEIVABLE NR';
+      return 'LOC FACTORING';
     default:
       return assertNever(type);
   }
 }
 
-/** Title-case display name, e.g. "LOC Receivable NR". */
+/** Title-case display name, e.g. "LOC Factoring". */
 export function getLocDisplayName(input: LocProductTypeInput): string {
   const type = toLocProductType(input) ?? LocProductType.RECEIVABLE;
   switch (type) {
@@ -145,7 +164,7 @@ export function getLocDisplayName(input: LocProductTypeInput): string {
     case LocProductType.PAYABLE:
       return 'LOC Payable';
     case LocProductType.RECEIVABLE_NON_RECOURSE:
-      return 'LOC Receivable NR';
+      return 'LOC Factoring';
     default:
       return assertNever(type);
   }

@@ -1155,10 +1155,10 @@
       "Principal Amount": "Pamatsumma"
     },
     "inputs": {
-      "Invoice Discounting (Non-Recourse)": "Invoice Discounting (Non-Recourse)",
+      "Invoice Discounting (Non-Recourse)": "Factoring",
       "LOC Payable": "LOC Payable",
       "LOC Receivable": "LOC Receivable",
-      "LOC Receivable NR": "LOC Receivable NR",
+      "LOC Factoring": "LOC Factoring",
       "accounting": {
         "ASSET": "AKTĪVS",
         "LIABILITY": "ATBILDĪBA",
