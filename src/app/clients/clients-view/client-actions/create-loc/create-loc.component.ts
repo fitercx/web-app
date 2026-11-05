@@ -22,6 +22,7 @@ import {
   getDefaultAdvancePercentage,
   getDefaultInterestChargeTimeCode,
   getLocDisplayName,
+  getLocProductTypeOptionLabel,
   isPayable as isLocPayable
 } from 'app/core/utils/loc-product-type';
 
@@ -753,6 +754,8 @@ export class CreateLocComponent implements OnInit {
       this.approvedBuyerSupplierLabel = 'Approved Buyer';
     }
   }
+
+  readonly getProductTypeOptionLabel = getLocProductTypeOptionLabel;
 
   getProductTypeDisplayName(productType: LocProductTypeInput): string {
     return getLocDisplayName(productType);
