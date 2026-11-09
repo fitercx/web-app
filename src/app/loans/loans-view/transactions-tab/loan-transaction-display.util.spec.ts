@@ -1,14 +1,39 @@
-import { displayPenaltyPortion, displayTaxPortion, isWaivedLpiBookedAsTax } from './loan-transaction-display.util';
+import {
+  displayPenaltyPortion,
+  displayTaxPortion,
+  isWaivedLpiBookedAsTax,
+  isWaivedLpiRow
+} from './loan-transaction-display.util';
 
 describe('loan-transaction-display.util', () => {
-  const waiveLpi = {
-    type: { id: 9, code: 'loanTransactionType.waiveCharges', waiveCharges: true },
-    taxChargesPortion: 4.47,
-    penaltyChargesPortion: 0,
-    feeChargesPortion: 0
+  const lpiCharge = {
+    id: 88,
+    penalty: true,
+    chargeTimeType: { value: 'Overdue Fees' }
   };
 
-  it('treats waive-charge LPI booked in tax as a penalty display amount', () => {
+  it('shows new-backend unaccrued LPI waive in Penalties, not Tax', () => {
+    const waive = {
+      type: { id: 9, waiveCharges: true },
+      taxChargesPortion: 0,
+      penaltyChargesPortion: 40,
+      feeChargesPortion: 0,
+      unrecognizedIncomePortion: 60,
+      loanChargePaidByList: [{ chargeId: 88 }]
+    };
+    expect(isWaivedLpiBookedAsTax(waive, [lpiCharge])).toBe(false);
+    expect(displayPenaltyPortion(waive, [lpiCharge])).toBe(100);
+    expect(displayTaxPortion(waive, [lpiCharge])).toBe(0);
+    expect(isWaivedLpiRow(waive, [lpiCharge])).toBe(true);
+  });
+
+  it('treats legacy waive-LPI booked in tax as a penalty display amount', () => {
+    const waiveLpi = {
+      type: { id: 9, code: 'loanTransactionType.waiveCharges', waiveCharges: true },
+      taxChargesPortion: 4.47,
+      penaltyChargesPortion: 0,
+      feeChargesPortion: 0
+    };
     expect(isWaivedLpiBookedAsTax(waiveLpi)).toBe(true);
     expect(displayPenaltyPortion(waiveLpi)).toBe(4.47);
     expect(displayTaxPortion(waiveLpi)).toBe(0);
@@ -26,15 +51,17 @@ describe('loan-transaction-display.util', () => {
     expect(displayTaxPortion(repayment)).toBe(12.5);
   });
 
-  it('does not remap a fee waive that has no tax portion', () => {
-    const feeWaive = {
+  it('does not remap a non-penalty waive even when the tax field is populated', () => {
+    const taxOrFeeWaive = {
       type: { id: 9, waiveCharges: true },
-      taxChargesPortion: 0,
+      taxChargesPortion: 6.2,
       penaltyChargesPortion: 0,
-      feeChargesPortion: 25
+      feeChargesPortion: 0,
+      loanChargePaidByList: [{ chargeId: 21 }]
     };
-    expect(isWaivedLpiBookedAsTax(feeWaive)).toBe(false);
-    expect(displayPenaltyPortion(feeWaive)).toBe(0);
-    expect(displayTaxPortion(feeWaive)).toBe(0);
+    const charges = [{ id: 21, penalty: false, chargeTimeType: { value: 'Specified due date' } }];
+    expect(isWaivedLpiBookedAsTax(taxOrFeeWaive, charges)).toBe(false);
+    expect(displayPenaltyPortion(taxOrFeeWaive, charges)).toBe(0);
+    expect(displayTaxPortion(taxOrFeeWaive, charges)).toBe(6.2);
   });
 });
