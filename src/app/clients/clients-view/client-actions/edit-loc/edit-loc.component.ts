@@ -23,6 +23,7 @@ import {
   LocProductTypeInput,
   getDefaultAdvancePercentage,
   getDefaultInterestChargeTimeCode,
+  getLocProductTypeOptionLabel,
   isPayable as isLocPayable
 } from 'app/core/utils/loc-product-type';
 
@@ -480,8 +481,10 @@ export class EditLocComponent implements OnInit {
     }
 
     const option = this.productTypeOptions.find((pt) => pt.id == productTypeId);
-    return option ? option.value || option.code : '';
+    return option ? getLocProductTypeOptionLabel(option) : '';
   }
+
+  readonly getProductTypeOptionLabel = getLocProductTypeOptionLabel;
 
   getCashMarginValueSuffix(cashMarginTypeId: any, cashMarginValue: any): string {
     if (!cashMarginValue || !this.cashMarginTypeOptions || cashMarginTypeId === undefined) {

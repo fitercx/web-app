@@ -3,8 +3,10 @@ import {
   getDefaultAdvancePercentage,
   getDefaultInterestChargeTimeCode,
   getLocBadgeLabel,
+  getLoanProductDisplayLabel,
   getLocDisplayName,
   getLocProductTypeId,
+  getLocProductTypeOptionLabel,
   isAnyLocProductType,
   isPayable,
   isReceivableFamily,
@@ -61,10 +63,29 @@ describe('loc-product-type', () => {
   });
 
   it('builds labels', () => {
-    expect(getLocBadgeLabel('RECEIVABLE_NON_RECOURSE')).toBe('LOC RECEIVABLE NR');
+    expect(getLocBadgeLabel('RECEIVABLE_NON_RECOURSE')).toBe('LOC FACTORING');
     expect(getLocBadgeLabel('PAYABLE')).toBe('LOC PAYABLE');
     expect(getLocBadgeLabel(undefined)).toBe('LOC RECEIVABLE');
-    expect(getLocDisplayName(3)).toBe('LOC Receivable NR');
+    expect(getLocDisplayName(3)).toBe('LOC Factoring');
     expect(getLocDisplayName(2)).toBe('LOC Payable');
+  });
+
+  it('shows non-recourse as Factoring in backend-provided labels', () => {
+    expect(
+      getLocProductTypeOptionLabel({
+        id: 3,
+        code: 'RECEIVABLE_NON_RECOURSE',
+        value: 'Receivable non recourse product type'
+      })
+    ).toBe('Factoring');
+    expect(getLocProductTypeOptionLabel({ id: 3 })).toBe('Factoring');
+    expect(getLocProductTypeOptionLabel({ id: 1, code: 'RECEIVABLE', value: 'Receivable product type' })).toBe(
+      'Receivable product type'
+    );
+    expect(getLocProductTypeOptionLabel({ id: 2, code: 'PAYABLE' })).toBe('PAYABLE');
+
+    expect(getLoanProductDisplayLabel('Invoice Discounting (Non-Recourse)')).toBe('Factoring');
+    expect(getLoanProductDisplayLabel('Invoice Discounting')).toBe('Invoice Discounting');
+    expect(getLoanProductDisplayLabel(null)).toBe('');
   });
 });

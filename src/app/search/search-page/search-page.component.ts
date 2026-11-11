@@ -8,6 +8,7 @@ import { finalize } from 'rxjs/operators';
 
 /** Custom Services */
 import { LoanRecordSearchResult, SavingsAccountLoanSearchResult, SearchService } from '../search.service';
+import { getLoanProductDisplayLabel } from 'app/core/utils/loc-product-type';
 
 type SearchType = 'loanId' | 'invoiceNo' | 'savingsAccountNo';
 
@@ -123,6 +124,8 @@ export class SearchPageComponent {
         }
       );
   }
+
+  readonly getProductLabel = getLoanProductDisplayLabel;
 
   loanLink(result: LoanRecordSearchResult): any[] {
     const parentSegment = result.clientId ? 'clients' : 'groups';

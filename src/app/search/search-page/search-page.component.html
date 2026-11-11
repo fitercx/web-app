@@ -30,7 +30,7 @@
       <div class="result-main">
         <div>
           <div class="loan-id">Loan ID {{ result.loanAccountNo || result.loanId }}</div>
-          <div class="muted">{{ result.borrowerName || '-' }} · {{ result.product || '-' }}</div>
+          <div class="muted">{{ result.borrowerName || '-' }} · {{ getProductLabel(result.product) || '-' }}</div>
           <div class="muted" *ngIf="searchedType === 'invoiceNo'">Invoice Number {{ result.invoiceNo }}</div>
           <div class="muted" *ngIf="searchedType === 'savingsAccountNo'">
             Savings Account No. {{ savingsAccountNo }}
