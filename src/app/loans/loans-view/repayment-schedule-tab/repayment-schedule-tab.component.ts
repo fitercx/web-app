@@ -33,7 +33,6 @@ import { FormfieldBase } from 'app/shared/form-dialog/formfield/model/formfield-
 import { InputBase } from 'app/shared/form-dialog/formfield/model/input-base';
 import { AdjustInstallmentDateDialogComponent } from '../custom-dialogs/adjust-installment-date-dialog/adjust-installment-date-dialog.component';
 import { LoansService } from 'app/loans/loans.service';
-import { ProductsService } from 'app/products/products.service';
 import { computeMonthlyAccrualRows } from 'app/loans/accrual-report.util';
 import {
   reversedPaidLpiForLoan,
@@ -149,7 +148,6 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     private dateUtils: Dates,
     private dialog: MatDialog,
     private loansService: LoansService,
-    private productsService: ProductsService,
     private router: Router
   ) {
     this.route.parent.data.subscribe((data: { loanDetailsData: any }) => {
@@ -1022,17 +1020,10 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   /**
-   * Exports the accrual report using "Generate Loan Monthly Accrual Summations" data from the backend.
-   * Falls back to client-side calculation if the API is unavailable.
+   * Exports the accrual report: principal from the repayment schedule, interest accrued from the loan's posted
+   * accrual transactions.
    */
   exportAccrualReport() {
-    this.exportAccrualReportFromSchedule();
-  }
-
-  /**
-   * Fallback: generates accrual data from repayment schedule and exports to Excel.
-   */
-  private exportAccrualReportFromSchedule() {
     if (
       !this.repaymentScheduleDetails ||
       !this.repaymentScheduleDetails.periods ||
@@ -1059,45 +1050,30 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     const lastPeriod = periods[periods.length - 1];
     const maturityDate = this.dateUtils.parseDate(lastPeriod.dueDate);
 
-    this.resolveProductAnnualRate(loanInfo).then((annualRatePercent) => {
-      const accrualData = computeMonthlyAccrualRows({
-        periods,
-        startDate,
-        maturityDate,
-        businessDate: this.settingsService.businessDate,
-        annualRatePercent,
-        parseDate: (value: any) => this.dateUtils.parseDate(value),
-        formatMonthEnd: (date: Date) => this.dateUtils.formatDate(date, Dates.DEFAULT_DATEFORMAT)
-      });
-      this.exportAccrualToExcel(accrualData, startDate);
-    });
-  }
-
-  /**
-   * Resolves the loan PRODUCT's annual nominal (reducing-balance) interest rate used to accrue interest.
-   * Falls back to the loan-level rate if the product id or product rate is unavailable.
-   */
-  private resolveProductAnnualRate(loanInfo: any): Promise<number> {
-    const fallbackRate = this.toNumber(loanInfo?.annualInterestRate);
-    const loanProductId = loanInfo?.loanProductId;
-    if (loanProductId == null) {
-      console.warn('Accrual report: loanProductId unavailable, using loan-level annualInterestRate');
-      return Promise.resolve(fallbackRate);
+    const loanId = this.loanDetailsData?.id ?? loanInfo?.id;
+    if (loanId == null) {
+      console.error('Accrual report: loan id unavailable');
+      return;
     }
-    return new Promise((resolve) => {
-      this.productsService
-        .getLoanProduct(String(loanProductId))
-        .pipe(take(1))
-        .subscribe({
-          next: (product: any) => {
-            resolve(product?.annualInterestRate != null ? this.toNumber(product.annualInterestRate) : fallbackRate);
-          },
-          error: () => {
-            console.warn('Accrual report: failed to fetch loan product rate, using loan-level annualInterestRate');
-            resolve(fallbackRate);
-          }
-        });
-    });
+
+    this.loansService
+      .getLoanTransactions(String(loanId), false)
+      .pipe(take(1))
+      .subscribe({
+        next: (response: any) => {
+          const accrualData = computeMonthlyAccrualRows({
+            periods,
+            transactions: response?.transactions || [],
+            startDate,
+            maturityDate,
+            businessDate: this.settingsService.businessDate,
+            parseDate: (value: any) => this.dateUtils.parseDate(value),
+            formatMonthEnd: (date: Date) => this.dateUtils.formatDate(date, Dates.DEFAULT_DATEFORMAT)
+          });
+          this.exportAccrualToExcel(accrualData, startDate);
+        },
+        error: (error: any) => console.error('Accrual report: failed to load loan transactions', error)
+      });
   }
 
   /**
@@ -1129,8 +1105,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       { wch: 15 }, // End of Month
       { wch: 18 }, // Opening Principal
       { wch: 18 }, // Closing Principal
-      { wch: 18 }, // Interest Accrued
-      { wch: 22 } // Actual Interest Accrued
+      { wch: 18 } // Interest Accrued
 
     ];
     ws['!cols'] = colWidths;
@@ -1150,10 +1125,6 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
   private addAccrualTotalsRow(accrualData: any[]): any[] {
     const interestAccruedTotal = accrualData.reduce((sum, row) => sum + this.toNumber(row['Interest Accrued']), 0);
-    const actualInterestAccruedTotal = accrualData.reduce(
-      (sum, row) => sum + this.toNumber(row['Actual Interest Accrued']),
-      0
-    );
 
     return [
       ...accrualData,
@@ -1162,8 +1133,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
         'End of Month': '',
         'Opening Principal': '',
         'Closing Principal': '',
-        'Interest Accrued': this.formatCurrency(interestAccruedTotal),
-        'Actual Interest Accrued': this.formatCurrency(actualInterestAccruedTotal)
+        'Interest Accrued': this.formatCurrency(interestAccruedTotal)
       }
     ];
   }
