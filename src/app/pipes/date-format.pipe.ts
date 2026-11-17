@@ -21,7 +21,9 @@ export class DateFormatPipe implements PipeTransform {
     if (Array.isArray(value)) {
       dateVal = moment(value.join('-'), 'YYYY-MM-DD');
     } else if (typeof value === 'number') {
-      dateVal = moment(value * 1000);
+      // Unix seconds stay below 1e12. Fineract audit dates are already epoch milliseconds.
+      const epochMilliseconds = value < 1e12 ? value * 1000 : value;
+      dateVal = moment(epochMilliseconds);
     } else {
       dateVal = moment(value);
     }
