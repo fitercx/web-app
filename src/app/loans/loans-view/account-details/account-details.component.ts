@@ -18,4 +18,19 @@ export class AccountDetailsComponent {
       this.loanDetails = data.loanDetailsData;
     });
   }
+
+  /** Runtime DPD principal-only mode uses effective strategy from API; stored product strategy stays unchanged. */
+  get isDpdPrincipalOnlyActive(): boolean {
+    return !!this.loanDetails?.additionalProperties?.dpdPrincipalOnlyActive;
+  }
+
+  get displayRepaymentStrategyName(): string {
+    if (this.isDpdPrincipalOnlyActive) {
+      return (
+        this.loanDetails?.additionalProperties?.effectiveRepaymentStrategyName ||
+        this.loanDetails?.transactionProcessingStrategyName
+      );
+    }
+    return this.loanDetails?.transactionProcessingStrategyName;
+  }
 }

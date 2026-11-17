@@ -19,6 +19,10 @@
       <p>{{ unsupportedReason }}</p>
     </div>
 
+    <div *ngIf="!unsupportedReason && crossEmiBlocked" class="warning-box">
+      <p>{{ crossEmiRequiresOverdueMessage }}</p>
+    </div>
+
     <mat-form-field appearance="outline" *ngIf="!unsupportedReason">
       <mat-label>{{ 'labels.heading.Change Repayment Strategy' | translate }}</mat-label>
       <mat-select formControlName="transactionProcessingStrategyCode" required>
@@ -44,7 +48,14 @@
   <button
     mat-raised-button
     color="primary"
-    [disabled]="loading || submitting || !!unsupportedReason || strategyForm.invalid || selectedStrategyUnchanged"
+    [disabled]="
+      loading ||
+      submitting ||
+      !!unsupportedReason ||
+      strategyForm.invalid ||
+      selectedStrategyUnchanged ||
+      crossEmiBlocked
+    "
     (click)="submit()"
   >
     {{ 'labels.buttons.Submit' | translate }}

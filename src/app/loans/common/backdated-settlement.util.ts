@@ -74,6 +74,8 @@ const PRINCIPAL_INTEREST_FEE_PENALTY: Array<keyof SettlementComponents> = [
  * Callers that omit a strategy keep {@link WATERFALL_ORDER}.
  */
 const STRATEGY_COMPONENT_ORDERS: Record<string, Array<keyof SettlementComponents>> = {
+  'cross-emi-principal-interest-fees-strategy': PRINCIPAL_INTEREST_FEE_PENALTY,
+  'principal, interest, fees across all emis': PRINCIPAL_INTEREST_FEE_PENALTY,
   'principal-interest-penalties-fees-order-strategy': PRINCIPAL_INTEREST_PENALTY_FEE,
   'principal, interest, penalties, fees order': PRINCIPAL_INTEREST_PENALTY_FEE,
   'heavensfamily-strategy': PRINCIPAL_INTEREST_FEE_PENALTY,
@@ -126,6 +128,170 @@ export function repaymentComponentOrder(
     }
   }
   return STRATEGY_COMPONENT_ORDERS[key] || WATERFALL_ORDER;
+}
+
+export const CROSS_EMI_OVERDUE_CLEARED_MESSAGE =
+  'Overdue installments are cleared. Change the repayment strategy before another repayment can be recorded.';
+export const CROSS_EMI_AMOUNT_EXCEEDS_OVERDUE_MESSAGE = 'The amount is greater than the overdue amount.';
+export const CROSS_EMI_REQUIRES_OVERDUE_MESSAGE =
+  'This repayment strategy can be used only while the loan has overdue installments.';
+
+/** Overdue installments only: all overdue principal, then interest, then fees, then LPI. */
+export function isCrossEmiPrincipalInterestFeesStrategy(strategyCode: string | null | undefined): boolean {
+  const key = (strategyCode || '').trim().toLowerCase();
+  return key === 'cross-emi-principal-interest-fees-strategy' || key === 'principal, interest, fees across all emis';
+}
+
+/**
+ * Make Repayment and the linked-savings transfer preview.
+ * The cross-EMI strategy spends only the overdue installment buckets passed in: principal, then interest,
+ * then fees, then LPI. Cash above that overdue total is left unallocated so the screen can reject it.
+ * Every other strategy clears the oldest installment before the next one.
+ */
+export function allocateRepaymentPreview(
+  strategyCode: string | null | undefined,
+  amount: number,
+  asOfDateComponents: SettlementComponents,
+  buckets: InstallmentBucket[] = [],
+  paymentAllocations?: RepaymentPaymentAllocation[] | null
+): SettlementAllocation {
+  const order = repaymentComponentOrder(strategyCode, paymentAllocations);
+  if (isCrossEmiPrincipalInterestFeesStrategy(strategyCode)) {
+    return allocateCrossEmiOverdue(amount, buckets);
+  }
+  return allocateOldestInstallmentFirst(amount, asOfDateComponents, buckets, order);
+}
+
+export function crossEmiOverdueTotal(buckets: InstallmentBucket[]): number {
+  return roundAmount(
+    (buckets || []).reduce(
+      (sum, bucket) =>
+        sum +
+        (Number(bucket.principal) || 0) +
+        (Number(bucket.interest) || 0) +
+        (Number(bucket.fee) || 0) +
+        (Number(bucket.tax) || 0) +
+        (Number(bucket.penalty) || 0),
+      0
+    )
+  );
+}
+
+function allocateCrossEmiOverdue(amount: number, buckets: InstallmentBucket[]): SettlementAllocation {
+  const asOfDateComponents: SettlementComponents = {
+    principal: 0,
+    interest: 0,
+    fee: 0,
+    tax: 0,
+    penalty: 0
+  };
+  for (const bucket of buckets || []) {
+    asOfDateComponents.principal = roundAmount(asOfDateComponents.principal + (Number(bucket.principal) || 0));
+    asOfDateComponents.interest = roundAmount(asOfDateComponents.interest + (Number(bucket.interest) || 0));
+    asOfDateComponents.fee = roundAmount(asOfDateComponents.fee + (Number(bucket.fee) || 0));
+    asOfDateComponents.tax = roundAmount(asOfDateComponents.tax + (Number(bucket.tax) || 0));
+    asOfDateComponents.penalty = roundAmount(asOfDateComponents.penalty + (Number(bucket.penalty) || 0));
+  }
+  return allocateComponentBudgets(amount, asOfDateComponents, PRINCIPAL_INTEREST_FEE_PENALTY);
+}
+
+function allocateComponentBudgets(
+  amount: number,
+  asOfDateComponents: SettlementComponents,
+  componentOrder: Array<keyof SettlementComponents>
+): SettlementAllocation {
+  const allocation: SettlementAllocation = {
+    penalty: 0,
+    fee: 0,
+    tax: 0,
+    interest: 0,
+    principal: 0,
+    unallocated: 0
+  };
+  let remaining = roundAmount(amount);
+  if (remaining <= 0) {
+    return allocation;
+  }
+  const order = componentOrder.length ? componentOrder : PRINCIPAL_INTEREST_FEE_PENALTY;
+  for (const key of order) {
+    if (remaining <= 0) {
+      break;
+    }
+    const budget = roundAmount(asOfDateComponents[key] || 0);
+    if (budget <= 0) {
+      continue;
+    }
+    const applied = Math.min(remaining, budget);
+    allocation[key] = roundAmount(applied);
+    remaining = roundAmount(remaining - applied);
+  }
+  allocation.unallocated = remaining;
+  return allocation;
+}
+
+export interface CrossEmiInstallmentOutstanding {
+  principal: number;
+  interest: number;
+  fee: number;
+  tax: number;
+  penalty: number;
+}
+
+/**
+ * Same passes as the backend processor, across the overdue installments passed in: principal, then
+ * interest, then fees, then penalties. Each installment records how much of {@code amount} lands on it.
+ */
+export function applyCrossEmiInstallmentCoverage<T extends CrossEmiInstallmentOutstanding>(
+  installments: T[],
+  amount: number
+): Array<T & { coverage: EmiAmountCoverage; applied: number }> {
+  const rows = Array.isArray(installments) ? installments : [];
+  const applied = rows.map(() => ({ principal: 0, interest: 0, fee: 0, tax: 0, penalty: 0 }));
+  let remaining = roundAmount(amount);
+  const keys: Array<keyof CrossEmiInstallmentOutstanding> = [
+    'principal',
+    'interest',
+    'fee',
+    'tax',
+    'penalty'
+  ];
+  for (const key of keys) {
+    for (let index = 0; index < rows.length; index++) {
+      if (remaining <= 0) {
+        break;
+      }
+      const budget = roundAmount(Math.max(Number(rows[index][key]) || 0, 0));
+      if (budget <= 0) {
+        continue;
+      }
+      const pay = Math.min(remaining, budget);
+      applied[index][key] = roundAmount(pay);
+      remaining = roundAmount(remaining - pay);
+    }
+  }
+  return rows.map((installment, index) => {
+    const paid = roundAmount(
+      applied[index].principal +
+        applied[index].interest +
+        applied[index].fee +
+        applied[index].tax +
+        applied[index].penalty
+    );
+    const outstanding = roundAmount(
+      (Number(installment.principal) || 0) +
+        (Number(installment.interest) || 0) +
+        (Number(installment.fee) || 0) +
+        (Number(installment.tax) || 0) +
+        (Number(installment.penalty) || 0)
+    );
+    let coverage: EmiAmountCoverage = 'uncovered';
+    if (paid > 0.01 && paid + 0.01 >= outstanding) {
+      coverage = 'covered';
+    } else if (paid > 0.01) {
+      coverage = 'partial';
+    }
+    return { ...installment, coverage, applied: paid };
+  });
 }
 
 function orderFromAdvancedAllocation(
@@ -834,6 +1000,8 @@ export function buildDueInstallmentBuckets(params: {
   periods: SchedulePeriod[] | undefined;
   charges?: OverduePenaltyCharge[] | null;
   transactionDate: Date | null;
+  /** Due date strictly before the transaction date. An installment due on that date is excluded. */
+  overdueOnly?: boolean;
 }): InstallmentBucket[] {
   const transactionDate = params.transactionDate;
   if (!transactionDate || !Array.isArray(params.periods) || !params.periods.length) {
@@ -847,7 +1015,10 @@ export function buildDueInstallmentBuckets(params: {
     .filter((period) => isRealScheduleInstallment(period) && !period.complete)
     .filter((period) => {
       const due = startOfDay(period.dueDate);
-      return !!due && due.getTime() <= selected.getTime();
+      if (!due) {
+        return false;
+      }
+      return params.overdueOnly ? due.getTime() < selected.getTime() : due.getTime() <= selected.getTime();
     })
     .sort((left, right) => Number(left.period || 0) - Number(right.period || 0));
   if (!duePeriods.length) {
