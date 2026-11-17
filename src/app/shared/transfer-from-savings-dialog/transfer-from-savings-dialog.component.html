@@ -71,7 +71,7 @@
       ></mifosx-settlement-summary-card>
 
       <div class="emi-hints" *ngIf="showDueEmiPills">
-        <div class="emi-hints__caption">Outstanding EMI</div>
+        <div class="emi-hints__caption">{{ emiHintsCaption }}</div>
         <div class="emi-hints__pills">
           <span
             class="emi-pill"
@@ -121,7 +121,9 @@
         !transferTemplate ||
         !linkedSavingsAccountId ||
         backdateBlockedMessage ||
-        isFutureDateSelected
+        isFutureDateSelected ||
+        crossEmiRepaymentBlocked ||
+        crossEmiAmountExceedsOverdue
       "
       *mifosxHasPermission="'CREATE_ACCOUNTTRANSFER'"
       (click)="submit()"

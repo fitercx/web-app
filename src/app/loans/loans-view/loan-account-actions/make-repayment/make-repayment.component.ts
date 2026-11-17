@@ -15,11 +15,14 @@ import { Currency } from 'app/shared/models/general.model';
 import { AlertService } from 'app/core/alert/alert.service';
 import { SavingsService } from 'app/savings/savings.service';
 import {
-  allocateOldestInstallmentFirst,
+  allocateRepaymentPreview,
+  CROSS_EMI_AMOUNT_EXCEEDS_OVERDUE_MESSAGE,
+  CROSS_EMI_OVERDUE_CLEARED_MESSAGE,
+  crossEmiOverdueTotal as sumCrossEmiOverdue,
+  isCrossEmiPrincipalInterestFeesStrategy,
   applyPreDateLpiFloor,
   buildDueInstallmentBuckets,
   buildBackdateLimitMessage,
-  repaymentComponentOrder,
   RepaymentPaymentAllocation,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
@@ -219,7 +222,14 @@ export class MakeRepaymentComponent implements OnInit {
 
   /** Submits the repayment form */
   submit() {
-    if (this.isFutureDateSelected || this.enteredAmountExceedsCap) {
+    if (this.isFutureDateSelected || this.enteredAmountExceedsCap || this.crossEmiRepaymentBlocked) {
+      return;
+    }
+    if (this.crossEmiAmountExceedsOverdue) {
+      this.alertService.alert({
+        type: 'Repayment',
+        message: `${CROSS_EMI_AMOUNT_EXCEEDS_OVERDUE_MESSAGE} Overdue amount is ${this.currencyLabel} ${this.crossEmiOverdueTotal.toFixed(2)}.`
+      });
       return;
     }
     const repaymentLoanFormData = this.repaymentLoanForm.value;
@@ -320,7 +330,7 @@ export class MakeRepaymentComponent implements OnInit {
           transactionDate
         );
 
-        const rawSuggested = this.dueAsOfDateTotal;
+        const rawSuggested = this.isCrossEmiStrategy ? this.crossEmiOverdueTotal : this.dueAsOfDateTotal;
         const totalAmount = this.capRepaymentAmount(rawSuggested);
         this.repaymentLoanForm.patchValue(
           {
@@ -433,6 +443,10 @@ export class MakeRepaymentComponent implements OnInit {
     this.loanCharges = Array.isArray(loanDetails?.charges) ? loanDetails.charges : [];
     this.mergePostDueLpiFromSchedule();
     this.recapTransactionAmountIfOverpayRisk();
+    if (this.isCrossEmiStrategy && this.repaymentLoanForm) {
+      const overdue = this.crossEmiOverdueTotal;
+      this.repaymentLoanForm.patchValue({ transactionAmount: overdue > 0.01 ? overdue : '' }, { emitEvent: false });
+    }
   }
 
   /** Paying today: add LPI from additional/dummy schedule rows that the repayment template omitted. */
@@ -671,9 +685,34 @@ export class MakeRepaymentComponent implements OnInit {
     return cap > 0.01 && this.roundAmount(amount) + 0.01 >= cap;
   }
 
+  get isCrossEmiStrategy(): boolean {
+    return isCrossEmiPrincipalInterestFeesStrategy(this.transactionProcessingStrategyCode);
+  }
+
+  get crossEmiOverdueTotal(): number {
+    return this.isCrossEmiStrategy ? sumCrossEmiOverdue(this.overdueInstallmentBuckets()) : 0;
+  }
+
+  get crossEmiRepaymentBlocked(): boolean {
+    return this.isCrossEmiStrategy && this.crossEmiOverdueTotal <= 0.01;
+  }
+
+  get crossEmiAmountExceedsOverdue(): boolean {
+    const amount = Number(this.repaymentLoanForm?.get('transactionAmount')?.value || 0);
+    return this.isCrossEmiStrategy && !this.crossEmiRepaymentBlocked && amount > this.crossEmiOverdueTotal + 0.01;
+  }
+
+  get crossEmiOverdueClearedMessage(): string {
+    return CROSS_EMI_OVERDUE_CLEARED_MESSAGE;
+  }
+
+  get crossEmiAmountExceedsMessage(): string {
+    return CROSS_EMI_AMOUNT_EXCEEDS_OVERDUE_MESSAGE;
+  }
+
   /**
-   * Entered amount is applied to the oldest overdue installment first, in the loan's repayment
-   * strategy order, before the next installment.
+   * Entered amount is split the way the loan's stored repayment strategy will post it.
+   * Cross-EMI pays overdue principal, then overdue interest, then overdue fees, then overdue LPI.
    */
   private get currentSettlementAllocation() {
     const amount = Number(this.repaymentLoanForm?.get('transactionAmount')?.value || 0);
@@ -681,7 +720,8 @@ export class MakeRepaymentComponent implements OnInit {
   }
 
   private allocateEnteredAmount(amount: number) {
-    return allocateOldestInstallmentFirst(
+    return allocateRepaymentPreview(
+      this.transactionProcessingStrategyCode,
       amount,
       {
         penalty: this.penaltyAsOfDate,
@@ -691,12 +731,8 @@ export class MakeRepaymentComponent implements OnInit {
         principal: this.remainingPrincipalAsOfDate
       },
       this.overdueInstallmentBuckets(),
-      this.componentOrder
+      this.paymentAllocations
     );
-  }
-
-  private get componentOrder() {
-    return repaymentComponentOrder(this.transactionProcessingStrategyCode, this.paymentAllocations);
   }
 
   get allocationDisplayLines(): Array<{ label: string; amount: number; translate: boolean }> {
@@ -714,18 +750,21 @@ export class MakeRepaymentComponent implements OnInit {
         'penalty',
         'fee',
         'tax'
-      ] as const).map((key) => ({
-      label: labels[key].label,
-      translate: labels[key].translate,
-      amount: allocation[key]
-    }));
+      ] as const)
+      .map((key) => ({
+        label: labels[key].label,
+        translate: labels[key].translate,
+        amount: allocation[key]
+      }))
+      .filter((line) => line.amount > 0.01);
   }
 
   private overdueInstallmentBuckets() {
     return buildDueInstallmentBuckets({
       periods: this.repaymentSchedulePeriods,
       charges: this.loanCharges,
-      transactionDate: this.toComparableDate(this.repaymentLoanForm?.get('transactionDate')?.value)
+      transactionDate: this.toComparableDate(this.repaymentLoanForm?.get('transactionDate')?.value),
+      overdueOnly: this.isCrossEmiStrategy
     });
   }
 
