@@ -7,6 +7,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { ClientsService } from '../../clients.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { AlertService } from 'app/core/alert/alert.service';
+import { AuthenticationService } from 'app/core/authentication/authentication.service';
 
 /** Custom Components */
 import { FormDialogComponent } from 'app/shared/form-dialog/form-dialog.component';
@@ -15,6 +16,11 @@ import {
   EditBlockedAmountDialogComponent,
   EditBlockedAmountDialogResult
 } from './edit-blocked-amount-dialog/edit-blocked-amount-dialog.component';
+import {
+  ChangeExpiryDateDialogComponent,
+  ChangeExpiryDateDialogResult
+} from './change-expiry-date-dialog/change-expiry-date-dialog.component';
+import { RejectCommentDialogComponent } from 'app/shared/reject-comment-dialog/reject-comment-dialog.component';
 
 /** Custom Models */
 import { ApprovedBuyer, ManageApprovedBuyersDialogData } from '../../models/credit-line.model';
@@ -55,6 +61,8 @@ export class ViewLocDetailsComponent implements OnInit {
   circumference = 2 * Math.PI * 15.9155; // ~100
   strokeDashoffset = this.circumference;
   blockedAmountActionAllowed = true;
+  pendingExpiry: any = null;
+  currentUserId: number | null = null;
 
   /**
    * Extract approved buyers from various possible data structures
@@ -137,10 +145,12 @@ export class ViewLocDetailsComponent implements OnInit {
     private dialog: MatDialog,
     private clientsService: ClientsService,
     private settingsService: SettingsService,
-    private alertService: AlertService
+    private alertService: AlertService,
+    private authenticationService: AuthenticationService
   ) {
     this.clientId = this.route.parent?.snapshot.paramMap.get('clientId') || '';
     this.locId = this.route.snapshot.paramMap.get('locId') || '';
+    this.currentUserId = this.authenticationService.getCredentials()?.userId ?? null;
   }
 
   ngOnInit() {
@@ -169,6 +179,7 @@ export class ViewLocDetailsComponent implements OnInit {
     } else {
       console.warn('No LOC data available from resolver or service');
     }
+    this.loadPendingExpiryChange();
   }
 
   /**
@@ -338,8 +349,131 @@ export class ViewLocDetailsComponent implements OnInit {
       case 'Edit Blocked Amount':
         this.openEditBlockedAmountDialog();
         break;
+      case 'Change Expiry Date':
+        this.openChangeExpiryDateDialog();
+        break;
       default:
     }
+  }
+
+  canChangeExpiryDate(): boolean {
+    const code = this.locDetails?.status?.code;
+    return code === 'status.active' || code === 'status.inactive';
+  }
+
+  isExpiryChangeMaker(): boolean {
+    return (
+      this.pendingExpiry?.makerUserId != null && Number(this.pendingExpiry.makerUserId) === Number(this.currentUserId)
+    );
+  }
+
+  openChangeExpiryDateDialog(): void {
+    if (this.pendingExpiry?.commandId) {
+      this.alertService.alert({
+        type: 'Line of Credit',
+        message: 'An expiry change is already pending approval for this facility.'
+      });
+      return;
+    }
+    const dialogRef = this.dialog.open(ChangeExpiryDateDialogComponent, {
+      width: '560px',
+      data: {
+        currentEndDate: this.locDetails?.endDate || null,
+        startDate: this.locDetails?.startDate || null,
+        nextReviewDate: this.locDetails?.nextReviewDate || null
+      }
+    });
+    dialogRef.afterClosed().subscribe((result?: ChangeExpiryDateDialogResult) => {
+      if (!result) {
+        return;
+      }
+      this.clientsService.submitLocExpiryChange(this.clientId, this.locId, result).subscribe(
+        (response: any) => {
+          const awaitingApproval = response?.rollbackTransaction === true;
+          const inactiveMessage = response?.changes?.message;
+          this.alertService.alert({
+            type: 'Line of Credit',
+            message: awaitingApproval
+              ? 'Expiry change submitted for checker approval.'
+              : inactiveMessage || 'Expiry date updated.'
+          });
+          this.refreshLocData();
+        },
+        (error) => {
+          this.alertService.alert({ type: 'Line of Credit', message: this.extractApiErrorMessage(error) });
+        }
+      );
+    });
+  }
+
+  approveExpiryChange(): void {
+    if (!this.pendingExpiry?.commandId) {
+      return;
+    }
+    this.clientsService.approveLocExpiryChange(this.pendingExpiry.commandId).subscribe(
+      (response: any) => {
+        this.alertService.alert({
+          type: 'Line of Credit',
+          message: response?.changes?.message || 'Expiry date updated.'
+        });
+        this.refreshLocData();
+      },
+      (error) => {
+        this.alertService.alert({ type: 'Line of Credit', message: this.extractApiErrorMessage(error) });
+      }
+    );
+  }
+
+  rejectExpiryChange(): void {
+    if (!this.pendingExpiry?.commandId) {
+      return;
+    }
+    const dialogRef = this.dialog.open(RejectCommentDialogComponent, { width: '480px' });
+    dialogRef.afterClosed().subscribe((comment?: string) => {
+      if (!comment) {
+        return;
+      }
+      this.clientsService
+        .rejectLocExpiryChange(this.clientId, this.locId, this.pendingExpiry.commandId, comment)
+        .subscribe(
+          () => {
+            this.alertService.alert({ type: 'Line of Credit', message: 'Expiry change rejected.' });
+            this.refreshLocData();
+          },
+          (error) => {
+            this.alertService.alert({ type: 'Line of Credit', message: this.extractApiErrorMessage(error) });
+          }
+        );
+    });
+  }
+
+  withdrawExpiryChange(): void {
+    if (!this.pendingExpiry?.commandId) {
+      return;
+    }
+    this.clientsService.withdrawLocExpiryChange(this.clientId, this.locId, this.pendingExpiry.commandId).subscribe(
+      () => {
+        this.alertService.alert({ type: 'Line of Credit', message: 'Expiry change withdrawn.' });
+        this.refreshLocData();
+      },
+      (error) => {
+        this.alertService.alert({ type: 'Line of Credit', message: this.extractApiErrorMessage(error) });
+      }
+    );
+  }
+
+  private loadPendingExpiryChange(): void {
+    if (!this.clientId || !this.locId) {
+      return;
+    }
+    this.clientsService.getPendingLocExpiryChange(this.clientId, this.locId).subscribe(
+      (pending: any) => {
+        this.pendingExpiry = pending?.commandId ? pending : null;
+      },
+      () => {
+        this.pendingExpiry = null;
+      }
+    );
   }
 
   openEditBlockedAmountDialog(): void {
@@ -444,6 +578,7 @@ export class ViewLocDetailsComponent implements OnInit {
       this.clientsService.getClientCreditLine(this.clientId, this.locId).subscribe(
         (data: any) => {
           this.processLocData(data);
+          this.loadPendingExpiryChange();
         },
         (err) => {
           console.error('Failed to refresh LOC details:', err);

@@ -1,0 +1,63 @@
+<h2 mat-dialog-title>Change Expiry Date</h2>
+<form [formGroup]="form" (ngSubmit)="submit()">
+  <mat-dialog-content>
+    <p class="current-date">Current End Date: {{ data.currentEndDate | date: 'dd MMM yyyy' }}</p>
+
+    <mat-form-field appearance="outline">
+      <mat-label>New End Date</mat-label>
+      <input
+        matInput
+        class="date-input"
+        [matDatepicker]="endPicker"
+        formControlName="newEndDate"
+        [min]="minNewEndDate"
+        (click)="endPicker.open()"
+        readonly
+        required
+      />
+      <mat-datepicker-toggle matSuffix [for]="endPicker"></mat-datepicker-toggle>
+      <mat-datepicker #endPicker></mat-datepicker>
+      <mat-error *ngIf="form.get('newEndDate')?.hasError('required')">New End Date is required.</mat-error>
+      <mat-error *ngIf="form.get('newEndDate')?.hasError('afterToday')">New End Date must be after today.</mat-error>
+      <mat-error *ngIf="form.get('newEndDate')?.hasError('afterStart')"
+        >New End Date must be after the Start Date.</mat-error
+      >
+      <mat-error *ngIf="form.get('newEndDate')?.hasError('unchanged')"
+        >New End Date must be different from the current End Date.</mat-error
+      >
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Change type</mat-label>
+      <input matInput [value]="changeType" readonly />
+    </mat-form-field>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Next Review Date</mat-label>
+      <input
+        matInput
+        class="date-input"
+        [matDatepicker]="reviewPicker"
+        formControlName="nextReviewDate"
+        (click)="reviewPicker.open()"
+        readonly
+      />
+      <mat-datepicker-toggle matSuffix [for]="reviewPicker"></mat-datepicker-toggle>
+      <mat-datepicker #reviewPicker></mat-datepicker>
+    </mat-form-field>
+    <p class="review-warning" *ngIf="reviewWarning">{{ reviewWarning }}</p>
+
+    <mat-form-field appearance="outline">
+      <mat-label>Comment</mat-label>
+      <textarea matInput rows="3" formControlName="comment" required></textarea>
+      <mat-error *ngIf="form.get('comment')?.hasError('required')">Comment is required.</mat-error>
+      <mat-error *ngIf="form.get('comment')?.hasError('maxlength')"
+        >Comment cannot be longer than 1000 characters.</mat-error
+      >
+    </mat-form-field>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
+    <button mat-button type="button" (click)="cancel()">Cancel</button>
+    <button mat-raised-button color="primary" type="submit" [disabled]="submitting">Submit</button>
+  </mat-dialog-actions>
+</form>
