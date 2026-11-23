@@ -18,6 +18,12 @@ export interface LoanRecordSearchResult {
   invoiceNo?: string;
 }
 
+export interface SavingsAccountLoanSearchResult {
+  savingsAccountFound: boolean;
+  savingsAccountNo?: string;
+  loans: LoanRecordSearchResult[];
+}
+
 /**
  * Search service.
  */
@@ -43,5 +49,12 @@ export class SearchService {
   searchLoanRecords(type: 'loanId' | 'invoiceNo', value: string): Observable<LoanRecordSearchResult[]> {
     const httpParams = new HttpParams().set('type', type).set('value', value);
     return this.http.get<LoanRecordSearchResult[]>('/loans/crediblex/search', { params: httpParams });
+  }
+
+  searchLoansBySavingsAccountNo(accountNo: string): Observable<SavingsAccountLoanSearchResult> {
+    const httpParams = new HttpParams().set('accountNo', accountNo);
+    return this.http.get<SavingsAccountLoanSearchResult>('/loans/crediblex/search/savings-account', {
+      params: httpParams
+    });
   }
 }

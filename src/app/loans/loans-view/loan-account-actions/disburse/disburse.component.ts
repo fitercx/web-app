@@ -8,6 +8,7 @@ import { LoansService } from 'app/loans/loans.service';
 import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
 import { Currency } from 'app/shared/models/general.model';
+import { isReceivableFamily } from 'app/core/utils/loc-product-type';
 
 /**
  * Disburse Loan Option
@@ -158,7 +159,7 @@ export class DisburseComponent implements OnInit {
   }
 
   /**
-   * Checks if the loan is a Line of Credit Receivable loan
+   * Checks if the loan is a Line of Credit Receivable loan (receivable or receivable non-recourse)
    */
   isLineOfCreditReceivable(): boolean {
     // Use loanDetailsData which has the full loan information
@@ -175,10 +176,6 @@ export class DisburseComponent implements OnInit {
       return false;
     }
 
-    // Check if it's of receivable type
-    const locType = loanInfo.locType || loanInfo.additionalProperties?.locProductType;
-    const isReceivable = locType === 'RECEIVABLE';
-
-    return isReceivable;
+    return isReceivableFamily(loanInfo.locType || loanInfo.additionalProperties?.locProductType);
   }
 }

@@ -18,6 +18,7 @@ import {
 
 /** Custom Models */
 import { ApprovedBuyer, ManageApprovedBuyersDialogData } from '../../models/credit-line.model';
+import { LocProductType, getLocBadgeLabel, toLocProductType } from 'app/core/utils/loc-product-type';
 
 /** Form Field Models */
 import { DatepickerBase } from 'app/shared/form-dialog/formfield/model/datepicker-base';
@@ -184,7 +185,8 @@ export class ViewLocDetailsComponent implements OnInit {
       id: data.id,
       externalId: data.externalId,
       name: data.name,
-      type: data.productType === 'PAYABLE' ? 'LOC PAYABLE' : 'LOC RECEIVABLE',
+      type: getLocBadgeLabel(data.productType),
+      productType: toLocProductType(data.productType) ?? LocProductType.RECEIVABLE,
       status: rawStatusObj || rawStatus, // retain original object for pipe consumption (expects code)
       activationDate: this.parseDate(timelineData.activatedOnDate),
       nextReviewDate: this.parseDate(data.interimReviewDate),
@@ -304,7 +306,7 @@ export class ViewLocDetailsComponent implements OnInit {
         // Navigate to loan creation page with LOC ID as query parameter
         const queryParams: any = {
           lineOfCreditId: this.locId,
-          lineOfCreditType: this.locDetails.type === 'LOC PAYABLE' ? 'Payable' : 'Receivable'
+          lineOfCreditType: this.locDetails.productType
         };
         this.router.navigate(
           [
@@ -395,7 +397,7 @@ export class ViewLocDetailsComponent implements OnInit {
       clientId: this.clientId,
       lineOfCreditId: this.locId,
       currentVendors: [], // Will be loaded from API in the dialog
-      locType: this.locDetails?.type === 'LOC PAYABLE' ? 'PAYABLE' : 'RECEIVABLE',
+      locType: this.locDetails?.productType ?? LocProductType.RECEIVABLE,
       isActive: this.isActive()
     };
 

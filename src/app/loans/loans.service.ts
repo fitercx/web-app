@@ -631,6 +631,20 @@ export class LoansService {
   }
 
   /**
+   * Current repayment strategy and the strategies a manual change may select.
+   */
+  repaymentStrategyTemplate(accountId: string): Observable<any> {
+    return this.http.get(`/loan-repayment-strategy/${accountId}/template`);
+  }
+
+  /**
+   * Submits a manual repayment strategy change. Maker-checker holds it for approval when that task is enabled.
+   */
+  updateRepaymentStrategy(accountId: string, data: any): Observable<any> {
+    return this.http.post(`/loan-repayment-strategy/${accountId}`, data);
+  }
+
+  /**
    * Bulk-waives outstanding overdue charges (LPI). Selection payload supports dueDate/toDueDate,
    * removeCompleteEmiOverdue + selectedEmiNumbers, or no filters (waive all). Charges are waived through the
    * standard waiver flow so accounting entries and the audit trail are preserved; charges are never

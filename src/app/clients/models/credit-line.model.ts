@@ -1,3 +1,5 @@
+import { LocProductType } from 'app/core/utils/loc-product-type';
+
 /**
  * TypeScript interfaces for Credit Line (LOC) related data structures
  */
@@ -185,7 +187,7 @@ export interface ManageApprovedBuyersDialogData {
   clientId: string;
   lineOfCreditId: string;
   currentVendors: Vendor[]; // Updated to use Vendor instead of ApprovedBuyer
-  locType: 'RECEIVABLE' | 'PAYABLE';
+  locType: LocProductType;
   isActive: boolean;
 }
 
@@ -197,6 +199,6 @@ export interface LegacyManageApprovedBuyersDialogData {
   clientId: string;
   lineOfCreditId: string;
   currentBuyers: ApprovedBuyer[];
-  locType: 'RECEIVABLE' | 'PAYABLE';
+  locType: LocProductType;
   isActive: boolean;
 }

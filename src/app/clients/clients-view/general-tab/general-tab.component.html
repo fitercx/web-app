@@ -158,7 +158,7 @@
     <ng-container matColumnDef="Type">
       <th mat-header-cell class="center" *matHeaderCellDef>{{ 'labels.inputs.Type' | translate }}</th>
       <td mat-cell *matCellDef="let element" class="loc-type-cell">
-        <span class="loc-type-badge" [ngClass]="element.type === 'Receivable' ? 'receivable' : 'payable'">
+        <span class="loc-type-badge" [ngClass]="element.type === 'Payable' ? 'payable' : 'receivable'">
           {{ element.type }}
         </span>
       </td>

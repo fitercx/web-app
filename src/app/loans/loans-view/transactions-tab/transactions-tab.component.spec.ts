@@ -1,6 +1,13 @@
-import { async, ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, waitForAsync } from '@angular/core/testing';
 import { UntypedFormControl } from '@angular/forms';
+import { MatDialog } from '@angular/material/dialog';
+import { ActivatedRoute, Router } from '@angular/router';
+import { TranslateService } from '@ngx-translate/core';
+import { of } from 'rxjs';
 
+import { Dates } from 'app/core/utils/dates';
+import { LoansService } from 'app/loans/loans.service';
+import { SettingsService } from 'app/settings/settings.service';
 import { TransactionsTabComponent } from './transactions-tab.component';
 import { LoanTransaction } from 'app/products/loan-products/models/loan-account.model';
 
@@ -8,10 +15,44 @@ describe('TransactionsTabComponent', () => {
   let component: TransactionsTabComponent;
   let fixture: ComponentFixture<TransactionsTabComponent>;
 
-  beforeEach(async(() => {
+  const transaction = (id: number, date: number[], submittedOnDate: number[], amount: number, reversed = false) =>
+    ({
+      id,
+      date,
+      submittedOnDate,
+      amount,
+      reversed,
+      manuallyReversed: false,
+      type: { id: 2, value: 'Repayment', accrual: false }
+    }) as LoanTransaction;
+
+  const route = {
+    parent: {
+      parent: {
+        data: of({ loanDetailsData: { transactions: [], status: { value: 'Active' }, accountNo: '000000101' } }),
+        snapshot: { params: { loanId: '101', clientId: '7' } }
+      }
+    }
+  };
+
+  beforeEach(waitForAsync(() => {
     TestBed.configureTestingModule({
-      declarations: [TransactionsTabComponent]
-    }).compileComponents();
+      declarations: [TransactionsTabComponent],
+      providers: [
+        { provide: ActivatedRoute, useValue: route },
+        { provide: Router, useValue: { navigate: jasmine.createSpy('navigate') } },
+        { provide: LoansService, useValue: {} },
+        {
+          provide: SettingsService,
+          useValue: { dateFormat: 'dd MMMM yyyy', businessDate: new Date(2026, 9, 27), language: { code: 'en' } }
+        },
+        { provide: MatDialog, useValue: {} },
+        { provide: Dates, useValue: {} },
+        { provide: TranslateService, useValue: { instant: (key: string) => key } }
+      ]
+    })
+      .overrideTemplate(TransactionsTabComponent, '')
+      .compileComponents();
   }));
 
   beforeEach(() => {
@@ -51,5 +92,90 @@ describe('TransactionsTabComponent', () => {
     component.showReversedParam = new UntypedFormControl(false);
     component.filterTransactions(true, true);
     expect(component.dataSource.data.map((t) => t.id)).toEqual([1]);
+  });
+
+  describe('value-date ordering', () => {
+    beforeEach(() => {
+      component.transactionsData = [
+        transaction(
+          1,
+          [
+            2026,
+            9,
+            1
+          ],
+          [
+            2026,
+            9,
+            1
+          ],
+          10000
+        ),
+        transaction(
+          2,
+          [
+            2026,
+            9,
+            15
+          ],
+          [
+            2026,
+            9,
+            15
+          ],
+          500
+        ),
+        transaction(
+          3,
+          [
+            2026,
+            9,
+            10
+          ],
+          [
+            2026,
+            9,
+            26
+          ],
+          300
+        ),
+        transaction(
+          4,
+          [
+            2026,
+            9,
+            15
+          ],
+          [
+            2026,
+            9,
+            15
+          ],
+          700,
+          true
+        )
+      ];
+    });
+
+    it('shows reversed and backdated rows by their value date, newest first', () => {
+      component.filterTransactions(false, true);
+
+      expect(component.displayedTransactions().map((t) => t.id)).toEqual([
+        4,
+        2,
+        3,
+        1
+      ]);
+    });
+
+    it('exports the filtered transactions in the displayed order', () => {
+      component.filterTransactions(true, true);
+
+      expect(component.displayedTransactions().map((t) => t.id)).toEqual([
+        2,
+        3,
+        1
+      ]);
+    });
   });
 });

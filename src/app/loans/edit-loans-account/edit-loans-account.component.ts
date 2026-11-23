@@ -9,6 +9,7 @@ import { LoansAccountLocDetailsStepComponent } from '../loans-account-stepper/lo
 /** Custom Services */
 import { SettingsService } from 'app/settings/settings.service';
 import { Dates } from 'app/core/utils/dates';
+import { isReceivableFamily } from 'app/core/utils/loc-product-type';
 
 /**
  * Edit Loans
@@ -155,7 +156,7 @@ export class EditLoansAccountComponent {
       if (locId) {
         const amountAfterAdvance = filteredLocDetails.amountAfterAdvance;
         const approvedPayableAmount = filteredLocDetails.amountInFacilityCurrency;
-        const isReceivableType = filteredLocDetails.locType === 'RECEIVABLE';
+        const isReceivableType = isReceivableFamily(filteredLocDetails.locType);
 
         // Use the appropriate approved facility amount as principal
         // For receivable: use amount after advance (approved amount after applying advance percentage)

@@ -11,7 +11,6 @@ import * as XLSX from 'xlsx';
 /** Custom Services. */
 import { ClientsService, BulkLoanDisbursementResponse } from 'app/clients/clients.service';
 import { LoansService } from 'app/loans/loans.service';
-import { ProductsService } from 'app/products/products.service';
 import { computeMonthlyAccrualRows } from 'app/loans/accrual-report.util';
 import { Dates } from 'app/core/utils/dates';
 import { SettingsService } from 'app/settings/settings.service';
@@ -29,6 +28,14 @@ import {
 import { BulkDisburseLoadingDialogComponent } from '../view-loc-details/active-loans-tab/bulk-disburse-loading-dialog/bulk-disburse-loading-dialog.component';
 import { TransferFromSavingsDialogComponent } from 'app/shared/transfer-from-savings-dialog/transfer-from-savings-dialog.component';
 import { loanDisplayStatus } from 'app/loans/common/loan-display-status.util';
+import {
+  LocProductType,
+  isPayable as isLocPayable,
+  isReceivableFamily,
+  FACTORING_DISPLAY_NAME,
+  isReceivableNonRecourse,
+  toLocProductType
+} from 'app/core/utils/loc-product-type';
 
 /**
  * General Tab component.
@@ -248,7 +255,6 @@ export class GeneralTabComponent {
     private router: Router,
     private dialog: MatDialog,
     private loansService: LoansService,
-    private productsService: ProductsService,
     private settingsService: SettingsService,
     private dateUtils: Dates,
     private cdr: ChangeDetectorRef
@@ -538,13 +544,16 @@ export class GeneralTabComponent {
       : this.dateUtils.parseDate(periods[0].fromDate || periods[0].dueDate);
     const maturityDate = this.dateUtils.parseDate(periods[periods.length - 1].dueDate);
 
-    const annualRatePercent = await this.resolveProductAnnualRate(loan);
+    const transactionsResponse: any = await this.loansService
+      .getLoanTransactions(String(loan.id), false)
+      .pipe(take(1))
+      .toPromise();
     const rows = computeMonthlyAccrualRows({
       periods,
+      transactions: transactionsResponse?.transactions || [],
       startDate,
       maturityDate,
       businessDate: this.settingsService.businessDate,
-      annualRatePercent,
       parseDate: (value: any) => this.dateUtils.parseDate(value),
       formatMonthEnd: (date: Date) => this.dateUtils.formatDate(date, Dates.DEFAULT_DATEFORMAT)
     });
@@ -558,39 +567,11 @@ export class GeneralTabComponent {
       { wch: 15 },
       { wch: 18 },
       { wch: 18 },
-      { wch: 18 },
-      { wch: 22 }];
+      { wch: 18 }];
     const workbook: XLSX.WorkBook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Accrual Report');
     const businessDate = this.dateUtils.formatDate(this.settingsService.businessDate, Dates.DEFAULT_DATEFORMAT);
     XLSX.writeFile(workbook, `Accrual-Report-${loan.id || 'loan'}-${businessDate}.xlsx`, { cellDates: true });
-  }
-
-  /**
-   * Resolves the loan PRODUCT's annual nominal (reducing-balance) interest rate used to accrue interest.
-   * Falls back to the loan-level rate if the product id or product rate is unavailable.
-   */
-  private resolveProductAnnualRate(loan: any): Promise<number> {
-    const fallbackRate = this.asNumber(loan?.annualInterestRate);
-    const loanProductId = loan?.loanProductId;
-    if (loanProductId == null) {
-      console.warn('Accrual report: loanProductId unavailable, using loan-level annualInterestRate');
-      return Promise.resolve(fallbackRate);
-    }
-    return new Promise((resolve) => {
-      this.productsService
-        .getLoanProduct(String(loanProductId))
-        .pipe(take(1))
-        .subscribe({
-          next: (product: any) => {
-            resolve(product?.annualInterestRate != null ? this.asNumber(product.annualInterestRate) : fallbackRate);
-          },
-          error: () => {
-            console.warn('Accrual report: failed to fetch loan product rate, using loan-level annualInterestRate');
-            resolve(fallbackRate);
-          }
-        });
-    });
   }
 
   private exportLoanKeyFactStatement(loan: any): Promise<void> {
@@ -648,12 +629,7 @@ export class GeneralTabComponent {
         'End of Month': '',
         'Opening Principal': '',
         'Closing Principal': '',
-        'Interest Accrued': accrualData
-          .reduce((sum, row) => sum + this.asNumber(row['Interest Accrued']), 0)
-          .toFixed(2),
-        'Actual Interest Accrued': accrualData
-          .reduce((sum, row) => sum + this.asNumber(row['Actual Interest Accrued']), 0)
-          .toFixed(2)
+        'Interest Accrued': accrualData.reduce((sum, row) => sum + this.asNumber(row['Interest Accrued']), 0).toFixed(2)
       }
     ];
   }
@@ -859,10 +835,12 @@ export class GeneralTabComponent {
           blockedAmount,
           availableBalance,
           outstanding: consumedAmount,
-          type:
-            (loc.productType || '').toLowerCase() === 'payable' || loc.productType === 'PAYABLE'
-              ? 'Payable'
+          type: isLocPayable(loc.productType)
+            ? 'Payable'
+            : isReceivableNonRecourse(loc.productType)
+              ? FACTORING_DISPLAY_NAME
               : 'Receivable',
+          productType: toLocProductType(loc.productType) ?? LocProductType.RECEIVABLE,
           utilization,
           // status / activationStatus backward compatibility
           status: displayValue,
@@ -957,7 +935,7 @@ export class GeneralTabComponent {
     }
     const queryParams: any = {
       lineOfCreditId: loc.id,
-      lineOfCreditType: loc.type
+      lineOfCreditType: loc.productType
     };
 
     this.router.navigate(
@@ -1108,8 +1086,7 @@ export class GeneralTabComponent {
   }
 
   getApprovedAmount(loan: any, lineOfCredit: any): number {
-    const productType = lineOfCredit?.type?.toUpperCase() ?? '';
-    return productType === 'RECEIVABLE'
+    return isReceivableFamily(lineOfCredit?.productType)
       ? loan?.additionalProperties?.approvedReceivableAmount
       : loan?.additionalProperties?.approvedPayableAmount;
   }
@@ -1325,7 +1302,7 @@ export class GeneralTabComponent {
       clientId: this.clientid,
       locId: loc.id,
       locCurrency: loc.currency?.code || 'USD',
-      locType: loc.type, // 'Receivable' or 'Payable'
+      locType: loc.productType,
       selectedLoans: selectedLoans
     };
 

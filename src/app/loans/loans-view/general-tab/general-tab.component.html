@@ -29,7 +29,13 @@
     <table mat-table [dataSource]="dataSource">
       <ng-container matColumnDef="Empty">
         <th mat-header-cell *matHeaderCellDef></th>
-        <td mat-cell *matCellDef="let ele">{{ ele.property }}</td>
+        <td mat-cell *matCellDef="let ele">
+          {{ ele.property }}
+          <div *ngIf="ele.unearnedInterest > 0" class="reversed-lpi-detail">
+            Unearned interest
+            {{ ele.unearnedInterest | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}. Not waived LPI.
+          </div>
+        </td>
       </ng-container>
 
       <ng-container matColumnDef="Original">
@@ -78,8 +84,12 @@
         <th mat-header-cell class="r-amount" *matHeaderCellDef>{{ 'labels.inputs.Over Due' | translate }}</th>
         <td mat-cell class="r-amount" *matCellDef="let ele">
           <div>{{ ele.overdue | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}</div>
-          <div *ngIf="ele.property === 'Total' && ele.reversedPaidLpi > 0" class="reversed-lpi-detail">
-            LPI refund restored outstanding
+          <div
+            *ngIf="ele.property === 'Penalties' && ele.reversedPaidLpi > 0"
+            class="reversed-lpi-detail"
+            matTooltip="Refunded to linked savings. Not included in Waived or in the overdue amount."
+          >
+            Reversed LPI
             {{ ele.reversedPaidLpi | currency: currencyCode : 'symbol-narrow' : '1.2-2' }}
           </div>
         </td>

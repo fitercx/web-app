@@ -80,6 +80,7 @@ import { ExternalAssetTransferComponent } from './loans-view/external-asset-owne
 import { TranslateModule } from '@ngx-translate/core';
 import { LoanDelinquencyActionDialogComponent } from './custom-dialog/loan-delinquency-action-dialog/loan-delinquency-action-dialog.component';
 import { AdjustInstallmentDateDialogComponent } from './loans-view/custom-dialogs/adjust-installment-date-dialog/adjust-installment-date-dialog.component';
+import { ChangeRepaymentStrategyDialogComponent } from './loans-view/custom-dialogs/change-repayment-strategy-dialog/change-repayment-strategy-dialog.component';
 import { BulkWaiveChargesDialogComponent } from './loans-view/custom-dialogs/bulk-waive-charges-dialog/bulk-waive-charges-dialog.component';
 import { LoanReagingComponent } from './loans-view/loan-account-actions/loan-reaging/loan-reaging.component';
 import { LoanReamortizeComponent } from './loans-view/loan-account-actions/loan-reamortize/loan-reamortize.component';
@@ -179,6 +180,7 @@ import { TransferFromSavingsDialogModule } from 'app/shared/transfer-from-saving
     AddInterestPauseComponent,
     LoansActiveClientMembersComponent,
     AdjustInstallmentDateDialogComponent,
+    ChangeRepaymentStrategyDialogComponent,
     BulkWaiveChargesDialogComponent,
     LoanUndoTransactionDialogComponent,
     SettlementOverpaymentBannerComponent

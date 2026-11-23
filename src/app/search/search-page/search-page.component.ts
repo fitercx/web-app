@@ -7,9 +7,16 @@ import { ActivatedRoute } from '@angular/router';
 import { finalize } from 'rxjs/operators';
 
 /** Custom Services */
-import { LoanRecordSearchResult, SearchService } from '../search.service';
+import { LoanRecordSearchResult, SavingsAccountLoanSearchResult, SearchService } from '../search.service';
+import { getLoanProductDisplayLabel } from 'app/core/utils/loc-product-type';
 
-type SearchType = 'loanId' | 'invoiceNo';
+type SearchType = 'loanId' | 'invoiceNo' | 'savingsAccountNo';
+
+const SEARCH_TYPES: SearchType[] = [
+  'loanId',
+  'invoiceNo',
+  'savingsAccountNo'
+];
 
 /**
  * Search Page Component
@@ -22,12 +29,16 @@ type SearchType = 'loanId' | 'invoiceNo';
 export class SearchPageComponent {
   searchType = new UntypedFormControl('loanId');
   searchValue = new UntypedFormControl('');
-  searchTypeOptions = [
+  searchTypeOptions: { value: SearchType; label: string }[] = [
     { value: 'loanId', label: 'Loan ID' },
-    { value: 'invoiceNo', label: 'Invoice Number' }
+    { value: 'invoiceNo', label: 'Invoice Number' },
+    { value: 'savingsAccountNo', label: 'Savings Account No.' }
   ];
   results: LoanRecordSearchResult[] = [];
   searchedValue = '';
+  searchedType: SearchType = 'loanId';
+  savingsAccountFound = false;
+  savingsAccountNo = '';
   submitted = false;
   loading = false;
 
@@ -42,7 +53,7 @@ export class SearchPageComponent {
     this.route.queryParamMap.subscribe((params) => {
       const type = params.get('type') as SearchType;
       const value = params.get('value');
-      if ((type === 'loanId' || type === 'invoiceNo') && value) {
+      if (SEARCH_TYPES.includes(type) && value) {
         this.searchType.patchValue(type, { emitEvent: false });
         this.searchValue.patchValue(value, { emitEvent: false });
         this.search();
@@ -51,7 +62,23 @@ export class SearchPageComponent {
   }
 
   get inputLabel(): string {
-    return this.searchType.value === 'invoiceNo' ? 'Enter Invoice Number' : 'Enter Loan ID';
+    const type: SearchType = this.searchType.value;
+    switch (type) {
+      case 'loanId':
+        return 'Enter Loan ID';
+      case 'invoiceNo':
+        return 'Enter Invoice Number';
+      case 'savingsAccountNo':
+        return 'Enter Savings Account No.';
+      default: {
+        const exhaustive: never = type;
+        return exhaustive;
+      }
+    }
+  }
+
+  get showNoLinkedLoans(): boolean {
+    return this.searchedType === 'savingsAccountNo' && this.savingsAccountFound;
   }
 
   search(): void {
@@ -59,17 +86,38 @@ export class SearchPageComponent {
     if (!value || this.loading) {
       return;
     }
+    const type: SearchType = this.searchType.value;
     this.submitted = true;
     this.searchedValue = value;
+    this.searchedType = type;
+    this.savingsAccountFound = false;
+    this.savingsAccountNo = '';
     this.results = [];
     this.loading = true;
 
+    if (type === 'savingsAccountNo') {
+      this.searchService
+        .searchLoansBySavingsAccountNo(value)
+        .pipe(finalize(() => (this.loading = false)))
+        .subscribe(
+          (response: SavingsAccountLoanSearchResult) => {
+            this.savingsAccountFound = response.savingsAccountFound;
+            this.savingsAccountNo = response.savingsAccountNo || value;
+            this.results = response.loans || [];
+          },
+          () => {
+            this.results = [];
+          }
+        );
+      return;
+    }
+
     this.searchService
-      .searchLoanRecords(this.searchType.value, value)
+      .searchLoanRecords(type, value)
       .pipe(finalize(() => (this.loading = false)))
       .subscribe(
         (results: LoanRecordSearchResult[]) => {
-          this.results = this.searchType.value === 'loanId' ? results.slice(0, 1) : results;
+          this.results = type === 'loanId' ? results.slice(0, 1) : results;
         },
         () => {
           this.results = [];
@@ -77,10 +125,12 @@ export class SearchPageComponent {
       );
   }
 
+  readonly getProductLabel = getLoanProductDisplayLabel;
+
   loanLink(result: LoanRecordSearchResult): any[] {
     const parentSegment = result.clientId ? 'clients' : 'groups';
     const parentId = result.clientId || result.groupId;
-    const tab = this.searchType.value === 'invoiceNo' ? 'loc-details' : 'general';
+    const tab = this.searchedType === 'invoiceNo' ? 'loc-details' : 'general';
     return [
       '/',
       parentSegment,
@@ -92,6 +142,6 @@ export class SearchPageComponent {
   }
 
   queryParams(result: LoanRecordSearchResult): any {
-    return this.searchType.value === 'invoiceNo' ? { invoiceNo: result.invoiceNo } : {};
+    return this.searchedType === 'invoiceNo' ? { invoiceNo: result.invoiceNo } : {};
   }
 }

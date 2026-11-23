@@ -7,6 +7,7 @@ import { SettingsService } from 'app/settings/settings.service';
 import { Currency } from 'app/shared/models/general.model';
 import { ClientsService } from 'app/clients/clients.service';
 import { OrganizationService } from 'app/organization/organization.service';
+import { isReceivableFamily } from 'app/core/utils/loc-product-type';
 
 @Component({
   selector: 'mifosx-disburse-to-savings-account',
@@ -236,7 +237,7 @@ export class DisburseToSavingsAccountComponent implements OnInit {
   }
 
   /**
-   * Checks if the loan is a Line of Credit Receivable loan
+   * Checks if the loan is a Line of Credit Receivable loan (receivable or receivable non-recourse)
    */
   isLineOfCreditReceivable(): boolean {
     const loanInfo = this.loanDetailsData || this.dataObject;
@@ -247,8 +248,7 @@ export class DisburseToSavingsAccountComponent implements OnInit {
     if (!hasLineOfCredit) {
       return false;
     }
-    const locType = loanInfo.locType || loanInfo.additionalProperties?.locProductType;
-    return locType === 'RECEIVABLE';
+    return isReceivableFamily(loanInfo.locType || loanInfo.additionalProperties?.locProductType);
   }
 
   /**

@@ -24,7 +24,7 @@
                   <mat-label>LOC Type</mat-label>
                   <mat-select formControlName="productType">
                     <mat-option *ngFor="let pt of productTypeOptions" [value]="pt.id">
-                      {{ pt.value || pt.code }}
+                      {{ getProductTypeOptionLabel(pt) }}
                     </mat-option>
                   </mat-select>
                 </mat-form-field>
@@ -560,7 +560,9 @@
 
               <div fxFlexFill class="preview-field">
                 <span fxFlex="40%" class="preview-label">Type</span>
-                <span fxFlex="60%">{{ previewPayload.productType === 2 ? 'LOC Payable' : 'LOC Receivable' }}</span>
+                <span fxFlex="60%">{{
+                  'labels.inputs.' + getProductTypeDisplayName(previewPayload.productType) | translate
+                }}</span>
               </div>
 
               <div fxFlexFill class="preview-field">

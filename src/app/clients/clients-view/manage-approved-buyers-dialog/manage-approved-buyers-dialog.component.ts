@@ -11,6 +11,7 @@ import { DeleteDialogComponent } from 'app/shared/delete-dialog/delete-dialog.co
 
 /** Custom Models */
 import { Vendor, ApprovedBuyer, ManageApprovedBuyersDialogData } from '../../models/credit-line.model';
+import { isPayable as isLocPayable } from 'app/core/utils/loc-product-type';
 
 /**
  * Manage Approved Buyers Dialog Component
@@ -466,13 +467,13 @@ export class ManageApprovedBuyersDialogComponent implements OnInit {
    * Get the appropriate label for buyers/suppliers based on LOC type
    */
   getBuyerLabel(): string {
-    return this.data.locType === 'PAYABLE' ? 'Supplier' : 'Buyer';
+    return isLocPayable(this.data.locType) ? 'Supplier' : 'Buyer';
   }
 
   /**
    * Get the appropriate plural label for buyers/suppliers based on LOC type
    */
   getBuyersLabel(): string {
-    return this.data.locType === 'PAYABLE' ? 'Suppliers' : 'Buyers';
+    return isLocPayable(this.data.locType) ? 'Suppliers' : 'Buyers';
   }
 }

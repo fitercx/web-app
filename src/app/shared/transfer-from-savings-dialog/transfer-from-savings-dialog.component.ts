@@ -8,8 +8,12 @@ import { AccountTransfersService } from 'app/account-transfers/account-transfers
 import { Dates } from 'app/core/utils/dates';
 import { LoansService } from 'app/loans/loans.service';
 import {
-  allocateSettlement,
+  allocateOldestInstallmentFirst,
+  applyPreDateLpiFloor,
+  buildDueInstallmentBuckets,
   buildBackdateLimitMessage,
+  repaymentComponentOrder,
+  RepaymentPaymentAllocation,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
   computeSavingsBalanceAsOf,
@@ -18,6 +22,7 @@ import {
   computeSettlementRequired,
   computeUnearnedInterest,
   formatLpiWaivedAfterDateMessage,
+  includeLpiWaiveFootnote,
   reconcileAsOfDateAmounts,
   applyEmiAmountCoverage
 } from 'app/loans/common/backdated-settlement.util';
@@ -91,6 +96,11 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   private repaymentTemplateData: any;
   /** Full loan summary loaded from the loan API (not the client accounts list row). */
   private loanSummary: any;
+  /** Loan transaction-processing strategy. The entered-amount split follows this order. */
+  private transactionProcessingStrategyCode: string | null = null;
+  private paymentAllocations: RepaymentPaymentAllocation[] | null = null;
+  /** Overdue/LPI charges, used to put each day's fee on the installment it belongs to. */
+  private loanCharges: any[] = [];
   /** Shown when pending LPI is due on the selected date and will be paid with this settlement. */
   /**
    * Set when the selected (backdated) transaction date is not allowed for this loan's product
@@ -171,7 +181,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
       repaymentTemplate: this.loanService.getLoanRepaymentTemplate(loanId, transactionDate),
       penaltyTemplate: this.loanService.getLoanPenaltiesTemplate(loanId, transactionDate),
       // Client general-tab loan rows have no summary — always load authoritative outstanding here.
-      loanDetails: this.loanService.getLoanAccountResource(loanId, 'summary,repaymentSchedule,linkedAccount')
+      loanDetails: this.loanService.getLoanAccountResource(loanId, 'summary,repaymentSchedule,linkedAccount,charges')
     })
       .pipe(
         switchMap((templates: any) => {
@@ -180,6 +190,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
           this.repaymentTemplateData = templates.repaymentTemplate;
           this.captureLinkedSavingsFromLoanDetails(templates.loanDetails);
           this.applyLoanSummary(templates.loanDetails);
+          this.loanCharges = Array.isArray(templates.loanDetails?.charges) ? templates.loanDetails.charges : [];
           // Remaining-principal baseline for full settlement (all EMIs), not current-installment only.
           this.baselinePrincipalOutstanding = Number(templates.penaltyTemplate?.principalOutstanding || 0);
           this.baselineRemainingPrincipalOutstanding = Number(
@@ -341,6 +352,13 @@ export class TransferFromSavingsDialogComponent implements OnInit {
 
   /** Captures full-loan outstanding from the loan API — never from the client accounts list row. */
   private applyLoanSummary(loanDetails: any): void {
+    this.transactionProcessingStrategyCode =
+      loanDetails?.transactionProcessingStrategyCode || this.data.loan?.transactionProcessingStrategyCode || null;
+    this.paymentAllocations = Array.isArray(loanDetails?.paymentAllocation)
+      ? loanDetails.paymentAllocation
+      : Array.isArray(this.data.loan?.paymentAllocation)
+        ? this.data.loan.paymentAllocation
+        : null;
     this.loanSummary = loanDetails?.summary || null;
     const fromSummary = Number(this.loanSummary?.totalOutstanding || 0);
     const fromListBalance = Number(this.data.loan?.loanBalance || 0);
@@ -377,16 +395,17 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         : 0
     });
 
-    this.principalOutstanding = reconciled.principal;
-    this.remainingPrincipalOutstanding = reconciled.remainingPrincipal;
-    this.interestOutstanding = reconciled.interest;
-    this.feeOutstanding = reconciled.fee;
-    this.taxOutstanding = reconciled.tax;
-    this.penaltyOutstanding = reconciled.penalty;
-    const penaltyDue = this.roundAmount(Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalPenalty);
-    if (!this.onInstallmentDueDate && penaltyDue > this.penaltyOutstanding + 0.01) {
-      this.penaltyOutstanding = penaltyDue;
-    }
+    const withPreDateLpi = applyPreDateLpiFloor(
+      reconciled,
+      Number(penaltyTemplate?.penaltyAmountDue || 0) + additionalPenalty,
+      this.onInstallmentDueDate
+    );
+    this.principalOutstanding = withPreDateLpi.principal;
+    this.remainingPrincipalOutstanding = withPreDateLpi.remainingPrincipal;
+    this.interestOutstanding = withPreDateLpi.interest;
+    this.feeOutstanding = withPreDateLpi.fee;
+    this.taxOutstanding = withPreDateLpi.tax;
+    this.penaltyOutstanding = withPreDateLpi.penalty;
     this.suggestedTransactionAmount = this.roundAmount(
       this.principalOutstanding +
         this.interestOutstanding +
@@ -429,11 +448,15 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     return `Closes loan at ${this.currencySymbol} ${this.formatAmount(cap)}`;
   }
 
+  /**
+   * A partial that cannot clear every overdue installment is applied to the oldest one,
+   * in the loan's repayment-strategy order, before the next installment.
+   */
   private simulateSettlementAllocation(
     amount: number,
     transactionDateValue: Date
   ): { penalty: number; fee: number; tax: number; interest: number; principal: number; unallocated: number } {
-    return allocateSettlement(
+    return allocateOldestInstallmentFirst(
       amount,
       {
         penalty: this.penaltyOutstanding,
@@ -442,39 +465,20 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         interest: this.interestOutstanding,
         principal: this.remainingPrincipalOutstanding
       },
-      this.getOutstandingInstallmentBuckets(transactionDateValue)
+      buildDueInstallmentBuckets({
+        periods: this.data.loan?.repaymentSchedule?.periods,
+        charges: this.loanCharges,
+        transactionDate: this.toComparableDate(transactionDateValue)
+      }),
+      this.componentOrder
     );
   }
 
-  private getOutstandingInstallmentBuckets(
-    transactionDateValue: Date
-  ): Array<{ period: number; penalty: number; fee: number; tax: number; interest: number; principal: number }> {
-    const periods = this.data.loan?.repaymentSchedule?.periods;
-    if (!Array.isArray(periods)) {
-      return [];
-    }
-
-    const selected = this.toComparableDate(transactionDateValue);
-    if (!selected) {
-      return [];
-    }
-
-    return periods
-      .filter((period: any) => this.isRealOutstandingInstallment(period))
-      .filter((period: any) => {
-        const dueDate = this.toComparableDate(period.dueDate);
-        return dueDate && dueDate.getTime() <= selected.getTime();
-      })
-      .map((period: any) => ({
-        period: Number(period.period),
-        penalty: this.getPeriodComponentOutstanding(period, 'penalty'),
-        fee: this.getPeriodComponentOutstanding(period, 'fee'),
-        tax: this.getPeriodComponentOutstanding(period, 'tax'),
-        interest: this.getPeriodComponentOutstanding(period, 'interest'),
-        principal: this.getPeriodComponentOutstanding(period, 'principal')
-      }))
-      .filter((bucket) => bucket.penalty + bucket.fee + bucket.tax + bucket.interest + bucket.principal > 0.01)
-      .sort((a, b) => a.period - b.period);
+  private get componentOrder() {
+    return repaymentComponentOrder(
+      this.transactionProcessingStrategyCode || this.data.loan?.transactionProcessingStrategyCode,
+      this.paymentAllocations || this.data.loan?.paymentAllocation
+    );
   }
 
   private getPeriodComponentOutstanding(
@@ -717,7 +721,10 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         `+${this.currencySymbol} ${this.formatAmount(this.additionalFutureLpiAmount)} projected LPI (preview)`
       );
     }
-    if (this.penaltyWaivedByBackdate > 0.01) {
+    if (
+      includeLpiWaiveFootnote(this.willCloseLoan(this.displaySettlementTotal)) &&
+      this.penaltyWaivedByBackdate > 0.01
+    ) {
       const selectedDateLabel = this.selectedTransactionDateShortLabel;
       if (selectedDateLabel) {
         notes.push(
@@ -795,13 +802,22 @@ export class TransferFromSavingsDialogComponent implements OnInit {
 
   get paymentAllocationLines(): SettlementSummaryLine[] {
     const allocation = this.currentSettlementAllocation;
-    return [
-      { label: 'Principal', amount: allocation.principal },
-      { label: 'Interest', amount: allocation.interest },
-      { label: 'LPI', amount: allocation.penalty },
-      { label: 'Fees', amount: allocation.fee },
-      { label: 'Tax', amount: allocation.tax }
-    ].filter((line) => line.amount > 0.01);
+    const labels: Record<string, string> = {
+      principal: 'Principal',
+      interest: 'Interest',
+      penalty: 'LPI',
+      fee: 'Fees',
+      tax: 'Tax'
+    };
+    return ([
+        'principal',
+        'interest',
+        'penalty',
+        'fee',
+        'tax'
+      ] as const)
+      .map((key) => ({ label: labels[key], amount: allocation[key] }))
+      .filter((line) => line.amount > 0.01);
   }
 
   get displayLedgerToday(): number {

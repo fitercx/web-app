@@ -23,6 +23,7 @@ export interface SavingsAccountTransaction {
   lienTransaction: boolean;
   releaseTransactionId: number;
   chargesPaidByData: any[];
+  externalId?: string;
 }
 
 export interface SavingsAccountAssociatedLoan {

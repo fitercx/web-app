@@ -1155,6 +1155,10 @@
       "Principal Amount": "मूल रकम"
     },
     "inputs": {
+      "Invoice Discounting (Non-Recourse)": "Factoring",
+      "LOC Payable": "LOC Payable",
+      "LOC Receivable": "LOC Receivable",
+      "LOC Factoring": "LOC Factoring",
       "accounting": {
         "ASSET": "सम्पत्ति",
         "LIABILITY": "दायित्व",

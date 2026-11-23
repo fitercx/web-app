@@ -4,6 +4,12 @@ import { UntypedFormGroup, UntypedFormBuilder, Validators, AbstractControl } fro
 
 /** Custom Services */
 import { SettingsService } from 'app/settings/settings.service';
+import {
+  LocProductType,
+  isPayable as isLocPayable,
+  isReceivableFamily,
+  toLocProductType
+} from 'app/core/utils/loc-product-type';
 
 /**
  * Loans Account LOC Details Step
@@ -830,17 +836,26 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
   }
 
   /**
-   * Checks if the selected LOC type is receivable
+   * Product type code of the selected LOC (from LOC options, or the loan's stored LOC type in edit mode)
    */
-  get isReceivableType(): boolean {
+  get selectedLocProductType(): LocProductType | null {
     const locId = this.resolvedSelectedLocId;
-
-    // Find the selected LOC from the available options
     if (this.locOptions && locId) {
       const selectedLoc = this.locOptions.find((loc: any) => loc.id === locId);
       if (selectedLoc) {
-        return selectedLoc.productType === 'RECEIVABLE';
+        return toLocProductType(selectedLoc.productType);
       }
+    }
+    return toLocProductType(this.loansAccountTemplate?.additionalProperties?.locProductType);
+  }
+
+  /**
+   * Checks if the selected LOC type is receivable (receivable or receivable non-recourse)
+   */
+  get isReceivableType(): boolean {
+    const productType = this.selectedLocProductType;
+    if (productType) {
+      return isReceivableFamily(productType);
     }
 
     // Fallback: check if receivable-specific fields exist in the form data (for edit mode)
@@ -862,14 +877,9 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
    * Checks if the selected LOC type is payable
    */
   get isPayableType(): boolean {
-    const locId = this.resolvedSelectedLocId;
-
-    // Find the selected LOC from the available options
-    if (this.locOptions && locId) {
-      const selectedLoc = this.locOptions.find((loc: any) => loc.id === locId);
-      if (selectedLoc) {
-        return selectedLoc.productType === 'PAYABLE';
-      }
+    const productType = this.selectedLocProductType;
+    if (productType) {
+      return isLocPayable(productType);
     }
 
     // Fallback: check if payable-specific fields exist in the form data (for edit mode)
@@ -1031,7 +1041,9 @@ export class LoansAccountLocDetailsStepComponent implements OnInit, OnChanges {
     // Add LOC type information for proper preview display
     return {
       ...formData,
-      locType: this.isReceivableType ? 'RECEIVABLE' : this.isPayableType ? 'PAYABLE' : null,
+      locType:
+        this.selectedLocProductType ??
+        (this.isReceivableType ? LocProductType.RECEIVABLE : this.isPayableType ? LocProductType.PAYABLE : null),
       buyerSupplierOptions: this.buyerSupplierOptions,
       buyerDetails,
       supplierDetails

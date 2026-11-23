@@ -1,6 +1,7 @@
 /** Angular Imports */
 import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
 import { MatTableDataSource } from '@angular/material/table';
+import { isPayable as isLocPayable, isReceivableFamily } from 'app/core/utils/loc-product-type';
 
 /**
  * Create Loans Account Preview Step
@@ -74,11 +75,12 @@ export class LoansAccountPreviewStepComponent implements OnChanges {
   }
 
   /**
-   * Checks if the LOC type is receivable based on the locType flag
+   * Checks if the LOC type is receivable (receivable or receivable non-recourse) based on the locType flag
    */
   get isReceivableType(): boolean {
     return (
-      this.loansAccount?.locType === 'RECEIVABLE' || this.loansAccount?.additionalProperties?.locType === 'RECEIVABLE'
+      isReceivableFamily(this.loansAccount?.locType) ||
+      isReceivableFamily(this.loansAccount?.additionalProperties?.locType)
     );
   }
 
@@ -86,7 +88,7 @@ export class LoansAccountPreviewStepComponent implements OnChanges {
    * Checks if the LOC type is payable based on the locType flag
    */
   get isPayableType(): boolean {
-    return this.loansAccount?.locType === 'PAYABLE' || this.loansAccount?.additionalProperties?.locType === 'PAYABLE';
+    return isLocPayable(this.loansAccount?.locType) || isLocPayable(this.loansAccount?.additionalProperties?.locType);
   }
 
   /**

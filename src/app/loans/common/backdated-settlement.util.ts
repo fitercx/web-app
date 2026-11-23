@@ -36,6 +36,136 @@ const WATERFALL_ORDER: Array<keyof SettlementComponents> = [
   'principal'
 ];
 
+const PRINCIPAL_INTEREST_PENALTY_FEE: Array<keyof SettlementComponents> = [
+  'principal',
+  'interest',
+  'penalty',
+  'fee',
+  'tax'
+];
+
+const INTEREST_PRINCIPAL_PENALTY_FEE: Array<keyof SettlementComponents> = [
+  'interest',
+  'principal',
+  'penalty',
+  'fee',
+  'tax'
+];
+
+const PENALTY_INTEREST_PRINCIPAL_FEE: Array<keyof SettlementComponents> = [
+  'penalty',
+  'interest',
+  'principal',
+  'fee',
+  'tax'
+];
+
+const PRINCIPAL_INTEREST_FEE_PENALTY: Array<keyof SettlementComponents> = [
+  'principal',
+  'interest',
+  'fee',
+  'tax',
+  'penalty'
+];
+
+/**
+ * Due/on-time payment order for each loan transaction-processing strategy.
+ * Tax sits with fees; the processors do not allocate tax as its own step.
+ * Callers that omit a strategy keep {@link WATERFALL_ORDER}.
+ */
+const STRATEGY_COMPONENT_ORDERS: Record<string, Array<keyof SettlementComponents>> = {
+  'principal-interest-penalties-fees-order-strategy': PRINCIPAL_INTEREST_PENALTY_FEE,
+  'principal, interest, penalties, fees order': PRINCIPAL_INTEREST_PENALTY_FEE,
+  'heavensfamily-strategy': PRINCIPAL_INTEREST_FEE_PENALTY,
+  'interest-principal-penalties-fees-order-strategy': INTEREST_PRINCIPAL_PENALTY_FEE,
+  'interest, principal, penalties, fees order': INTEREST_PRINCIPAL_PENALTY_FEE,
+  'early-repayment-strategy': INTEREST_PRINCIPAL_PENALTY_FEE,
+  'due-penalty-interest-principal-fee-in-advance-penalty-interest-principal-fee-strategy':
+    PENALTY_INTEREST_PRINCIPAL_FEE,
+  'mifos-standard-strategy': WATERFALL_ORDER,
+  'pro-rata-mifos-standard-strategy': WATERFALL_ORDER,
+  'creocore-strategy': WATERFALL_ORDER,
+  'rbi-india-strategy': WATERFALL_ORDER,
+  'acme-standard-strategy': WATERFALL_ORDER,
+  'due-penalty-fee-interest-principal-in-advance-principal-penalty-fee-interest-strategy': WATERFALL_ORDER
+};
+
+const ADVANCED_RULE_COMPONENT: Record<string, keyof SettlementComponents> = {
+  PAST_DUE_PENALTY: 'penalty',
+  DUE_PENALTY: 'penalty',
+  IN_ADVANCE_PENALTY: 'penalty',
+  PAST_DUE_FEE: 'fee',
+  DUE_FEE: 'fee',
+  IN_ADVANCE_FEE: 'fee',
+  PAST_DUE_INTEREST: 'interest',
+  DUE_INTEREST: 'interest',
+  IN_ADVANCE_INTEREST: 'interest',
+  PAST_DUE_PRINCIPAL: 'principal',
+  DUE_PRINCIPAL: 'principal',
+  IN_ADVANCE_PRINCIPAL: 'principal'
+};
+
+export interface RepaymentPaymentAllocation {
+  transactionType?: string;
+  paymentAllocationOrder?: Array<{ paymentAllocationRule?: string; order?: number }>;
+}
+
+/**
+ * Component order a repayment uses on each due installment.
+ * `advanced-payment-allocation-strategy` follows the loan's DEFAULT allocation rules.
+ */
+export function repaymentComponentOrder(
+  strategyCode: string | null | undefined,
+  paymentAllocations?: RepaymentPaymentAllocation[] | null
+): Array<keyof SettlementComponents> {
+  const key = (strategyCode || '').trim().toLowerCase();
+  if (key === 'advanced-payment-allocation-strategy') {
+    const advanced = orderFromAdvancedAllocation(paymentAllocations);
+    if (advanced) {
+      return advanced;
+    }
+  }
+  return STRATEGY_COMPONENT_ORDERS[key] || WATERFALL_ORDER;
+}
+
+function orderFromAdvancedAllocation(
+  paymentAllocations?: RepaymentPaymentAllocation[] | null
+): Array<keyof SettlementComponents> | null {
+  const rows = paymentAllocations || [];
+  const selected = rows.find((row) => (row.transactionType || '').toUpperCase() === 'DEFAULT') || rows[0];
+  const rules = selected?.paymentAllocationOrder;
+  if (!rules?.length) {
+    return null;
+  }
+  const sorted = [...rules].sort((left, right) => Number(left.order || 0) - Number(right.order || 0));
+  const seen = new Set<keyof SettlementComponents>();
+  const order: Array<keyof SettlementComponents> = [];
+  for (const rule of sorted) {
+    const component = ADVANCED_RULE_COMPONENT[(rule.paymentAllocationRule || '').toUpperCase()];
+    if (!component || seen.has(component)) {
+      continue;
+    }
+    seen.add(component);
+    order.push(component);
+    if (component === 'fee') {
+      order.push('tax');
+      seen.add('tax');
+    }
+  }
+  for (const component of [
+    'penalty',
+    'fee',
+    'tax',
+    'interest',
+    'principal'
+  ] as const) {
+    if (!seen.has(component)) {
+      order.push(component);
+    }
+  }
+  return order;
+}
+
 /**
  * On-screen explanation of the transaction-date calendar's lower bound.
  *
@@ -57,6 +187,14 @@ export function computePenaltyWaivedByBackdate(penaltyInSummary: number, penalty
 /** Foreclosure copy when LPI accrued after the selected date is waived. Date is already formatted (e.g. 25-Aug). */
 export function formatWaivedLpiMessage(currencySymbol: string, amountLabel: string, fromDateLabel: string): string {
   return `Waived LPI amount of ${currencySymbol} ${amountLabel} from ${fromDateLabel} till today`;
+}
+
+/**
+ * Later LPI is waived only when the amount on screen actually closes the loan.
+ * The default as-of total and a partial entered amount must not say later LPI will be waived.
+ */
+export function includeLpiWaiveFootnote(paymentClosesLoan: boolean): boolean {
+  return paymentClosesLoan;
 }
 
 /** Make Repayment copy when LPI accrued after the selected date is waived. Date is already formatted (e.g. 18-Aug). */
@@ -267,6 +405,33 @@ export function reconcileAsOfDateAmounts(params: {
   };
 }
 
+/**
+ * Prefill for Make Repayment and Transfer from Savings.
+ * <p>
+ * The penalties template lists every unpaid LPI day strictly before the selected date. The repayment template often
+ * still has only the one day already sitting on the installment, and a backdated reconcile can copy that smaller
+ * figure. The amount the operator sees must keep the higher pre-date total. On an installment due date that same-day
+ * LPI is not part of the amount due, so the template figure is left as it is.
+ */
+export function applyPreDateLpiFloor(
+  reconciled: ReconciledAsOfDateAmounts,
+  penaltyTemplateDue: number,
+  onInstallmentDueDate: boolean
+): ReconciledAsOfDateAmounts {
+  const penaltyDue = roundAmount(Number(penaltyTemplateDue || 0));
+  if (onInstallmentDueDate || penaltyDue <= reconciled.penalty + 0.01) {
+    return reconciled;
+  }
+  const penalty = penaltyDue;
+  return {
+    ...reconciled,
+    penalty,
+    defaultTransactionAmount: roundAmount(
+      reconciled.principal + reconciled.interest + reconciled.fee + reconciled.tax + penalty
+    )
+  };
+}
+
 export function reconcilePenaltyWithLedger(params: {
   penaltyFromTemplate: number;
   penaltyInSummary: number;
@@ -330,11 +495,26 @@ export interface SchedulePeriod {
   interestDue?: number;
   interestPaid?: number;
   interestOriginalDue?: number;
+  principalOutstanding?: number;
+  interestOutstanding?: number;
   penaltyChargesDue?: number;
   penaltyChargesPaid?: number;
   penaltyChargesOutstanding?: number;
   feeChargesDue?: number;
   feeChargesPaid?: number;
+  feeChargesOutstanding?: number;
+  taxChargesDue?: number;
+  taxChargesPaid?: number;
+  taxChargesOutstanding?: number;
+}
+
+/** Unpaid overdue/LPI charge. `amountPercentageAppliedTo` is the EMI principal the daily fee was calculated on. */
+export interface OverduePenaltyCharge {
+  dueDate?: any;
+  amountOutstanding?: number;
+  penalty?: boolean;
+  waived?: boolean;
+  amountPercentageAppliedTo?: number;
 }
 
 function isRealScheduleInstallment(period: SchedulePeriod): boolean {
@@ -495,14 +675,222 @@ export function computeProjectedOverpayment(amount: number, settlementCap: numbe
 }
 
 /**
+ * Daily LPI dated before the selected value date can sit on the next installment, whose due date is
+ * still after that value date, so the due-EMI buckets do not include it. The penalty quote already
+ * counts those days. Add the shortfall onto the latest installment due on or before the value date
+ * so a partial payment takes that LPI before that installment's interest.
+ */
+export function includePenaltyDueOnLastDueBucket(
+  buckets: InstallmentBucket[],
+  penaltyDue: number
+): InstallmentBucket[] {
+  if (!buckets.length) {
+    return buckets;
+  }
+  const alreadyOnDueEmis = roundAmount(buckets.reduce((sum, bucket) => sum + (bucket.penalty || 0), 0));
+  const shortfall = roundAmount(penaltyDue - alreadyOnDueEmis);
+  if (shortfall <= 0.01) {
+    return buckets;
+  }
+  return buckets.map((bucket, index) => {
+    if (index !== buckets.length - 1) {
+      return bucket;
+    }
+    return { ...bucket, penalty: roundAmount((bucket.penalty || 0) + shortfall) };
+  });
+}
+
+function startOfDay(value: any): Date | null {
+  if (!value) {
+    return null;
+  }
+  if (value instanceof Date && !isNaN(value.getTime())) {
+    return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+  }
+  if (Array.isArray(value) && value.length >= 3) {
+    return new Date(Number(value[0]), Number(value[1]) - 1, Number(value[2]));
+  }
+  return null;
+}
+
+function componentOutstanding(
+  period: SchedulePeriod,
+  outstandingField: keyof SchedulePeriod,
+  dueField: keyof SchedulePeriod,
+  paidField: keyof SchedulePeriod
+): number {
+  const explicit = period[outstandingField];
+  if (explicit !== undefined && explicit !== null && explicit !== '') {
+    return roundAmount(Math.max(Number(explicit) || 0, 0));
+  }
+  return roundAmount(Math.max((Number(period[dueField]) || 0) - (Number(period[paidField]) || 0), 0));
+}
+
+function scheduledPrincipal(period: SchedulePeriod): number {
+  return roundAmount(Number(period.principalOriginalDue ?? period.principalDue ?? 0));
+}
+
+function principalStillOutstanding(period: SchedulePeriod): number {
+  return componentOutstanding(period, 'principalOutstanding', 'principalDue', 'principalPaid');
+}
+
+/**
+ * A charge belongs to the installment whose principal it was calculated on.
+ * Before any principal payment that is the scheduled principal. After a partial principal payment,
+ * later days are calculated on the reduced outstanding principal, which no longer equals principalDue.
+ */
+function periodContainsChargeBase(base: number, period: SchedulePeriod): boolean {
+  const scheduled = scheduledPrincipal(period);
+  const outstanding = principalStillOutstanding(period);
+  if (scheduled > 0.01 && Math.abs(base - scheduled) <= 0.02) {
+    return true;
+  }
+  if (outstanding > 0.01 && Math.abs(base - outstanding) <= 0.02) {
+    return true;
+  }
+  if (outstanding > 0.01 && base > outstanding + 0.02 && scheduled > base + 0.02) {
+    return true;
+  }
+  // Fully paid installment: later days were calculated on a principal between zero and the scheduled amount.
+  return outstanding <= 0.01 && base > 0.01 && scheduled > base + 0.02;
+}
+
+function chargeBelongsToPeriod(base: number, period: SchedulePeriod, periods: SchedulePeriod[]): boolean {
+  if (!periodContainsChargeBase(base, period)) {
+    return false;
+  }
+  const scheduled = scheduledPrincipal(period);
+  const aTighterInstallmentAlsoContainsThisBase = periods.some((other) => {
+    if (other === period || !periodContainsChargeBase(base, other)) {
+      return false;
+    }
+    return scheduledPrincipal(other) + 0.02 < scheduled;
+  });
+  return !aTighterInstallmentAlsoContainsThisBase;
+}
+
+/** Installment number that owns an LPI charge, from the principal the charge was calculated on. */
+export function installmentNumberForPenaltyCharge(
+  charge: { penalty?: boolean; amountPercentageAppliedTo?: number } | null | undefined,
+  periods: SchedulePeriod[] | undefined
+): number | null {
+  if (!charge?.penalty || !Array.isArray(periods) || !periods.length) {
+    return null;
+  }
+  const base = roundAmount(Number(charge.amountPercentageAppliedTo || 0));
+  if (base <= 0.01) {
+    return null;
+  }
+  const realPeriods = periods.filter((period) => isRealScheduleInstallment(period));
+  const owner = realPeriods.find((period) => chargeBelongsToPeriod(base, period, realPeriods));
+  const installmentNumber = Number(owner?.period || 0);
+  return installmentNumber > 0 ? installmentNumber : null;
+}
+
+function isPayablePenaltyCharge(charge: OverduePenaltyCharge, transactionDate: Date): boolean {
+  if (!charge?.penalty || charge.waived) {
+    return false;
+  }
+  if (roundAmount(Number(charge.amountOutstanding || 0)) <= 0.01) {
+    return false;
+  }
+  const due = startOfDay(charge.dueDate);
+  return !!due && due.getTime() < transactionDate.getTime();
+}
+
+function penaltyOwnedByPeriod(
+  period: SchedulePeriod,
+  periods: SchedulePeriod[],
+  charges: OverduePenaltyCharge[],
+  used: Set<OverduePenaltyCharge>
+): number {
+  if (scheduledPrincipal(period) <= 0.01 && principalStillOutstanding(period) <= 0.01) {
+    return 0;
+  }
+  return roundAmount(
+    charges
+      .filter((charge) => {
+        if (used.has(charge)) {
+          return false;
+        }
+        const base = roundAmount(Number(charge.amountPercentageAppliedTo || 0));
+        return base > 0.01 && chargeBelongsToPeriod(base, period, periods);
+      })
+      .reduce((sum, charge) => {
+        used.add(charge);
+        return sum + roundAmount(Number(charge.amountOutstanding || 0));
+      }, 0)
+  );
+}
+
+/**
+ * Due installments (due on or before `transactionDate`) with each EMI's own unpaid LPI.
+ * <p>
+ * Daily LPI stays linked to the EMI whose principal it was calculated on, even when the schedule
+ * column shows later days on the next period. A partial repayment clears the oldest EMI, in the
+ * loan's repayment-strategy order, before the next EMI, so the buckets have to carry that split.
+ */
+export function buildDueInstallmentBuckets(params: {
+  periods: SchedulePeriod[] | undefined;
+  charges?: OverduePenaltyCharge[] | null;
+  transactionDate: Date | null;
+}): InstallmentBucket[] {
+  const transactionDate = params.transactionDate;
+  if (!transactionDate || !Array.isArray(params.periods) || !params.periods.length) {
+    return [];
+  }
+  const selected = startOfDay(transactionDate);
+  if (!selected) {
+    return [];
+  }
+  const duePeriods = params.periods
+    .filter((period) => isRealScheduleInstallment(period) && !period.complete)
+    .filter((period) => {
+      const due = startOfDay(period.dueDate);
+      return !!due && due.getTime() <= selected.getTime();
+    })
+    .sort((left, right) => Number(left.period || 0) - Number(right.period || 0));
+  if (!duePeriods.length) {
+    return [];
+  }
+
+  const charges = Array.isArray(params.charges) ? params.charges : null;
+  const payableCharges = charges ? charges.filter((charge) => isPayablePenaltyCharge(charge, selected)) : [];
+  const usedCharges = new Set<OverduePenaltyCharge>();
+
+  return duePeriods
+    .map((period) => {
+      const penalty =
+        charges === null
+          ? componentOutstanding(period, 'penaltyChargesOutstanding', 'penaltyChargesDue', 'penaltyChargesPaid')
+          : penaltyOwnedByPeriod(period, duePeriods, payableCharges, usedCharges);
+      return {
+        period: Number(period.period || 0),
+        penalty,
+        fee: componentOutstanding(period, 'feeChargesOutstanding', 'feeChargesDue', 'feeChargesPaid'),
+        tax: componentOutstanding(period, 'taxChargesOutstanding', 'taxChargesDue', 'taxChargesPaid'),
+        interest: componentOutstanding(period, 'interestOutstanding', 'interestDue', 'interestPaid'),
+        principal: componentOutstanding(period, 'principalOutstanding', 'principalDue', 'principalPaid')
+      };
+    })
+    .filter((bucket) => bucket.penalty + bucket.fee + bucket.tax + bucket.interest + bucket.principal > 0.01);
+}
+
+/**
  * Waterfall allocation capped to as-of-date component totals.
- * Principal budget is remaining principal (all EMIs), matching mifos-standard in-advance
- * application. Penalty/interest budgets come from /template/penalties so waived LPI is not previewed.
+ * Principal budget is remaining principal (all EMIs). Penalty/interest budgets come from
+ * /template/penalties so waived LPI is not previewed.
+ * <p>
+ * `componentOrder` is the loan repayment strategy ({@link repaymentComponentOrder}). When omitted,
+ * the order is penalty, fee, tax, interest, principal. When several installments are overdue,
+ * Make Repayment uses {@link allocateOldestInstallmentFirst} so each installment is cleared in
+ * that order before the next installment starts.
  */
 export function allocateSettlement(
   amount: number,
   asOfDateComponents: SettlementComponents,
-  buckets: InstallmentBucket[] = []
+  buckets: InstallmentBucket[] = [],
+  componentOrder: Array<keyof SettlementComponents> = WATERFALL_ORDER
 ): SettlementAllocation {
   const allocation: SettlementAllocation = {
     penalty: 0,
@@ -535,20 +923,105 @@ export function allocateSettlement(
     budgets[key] = roundAmount(budgets[key] - applied);
   };
 
-  for (const bucket of buckets) {
-    if (remaining <= 0) {
-      break;
+  const order = componentOrder.length ? componentOrder : WATERFALL_ORDER;
+  // Unmapped LPI (schedule parked it on a later row) is taken when the strategy reaches penalty.
+  for (const key of order) {
+    if (key === 'penalty') {
+      const mappedPenalty = roundAmount(buckets.reduce((sum, bucket) => sum + roundAmount(bucket.penalty || 0), 0));
+      apply('penalty', Math.max(roundAmount(budgets.penalty - mappedPenalty), 0));
     }
-    for (const key of WATERFALL_ORDER) {
+    for (const bucket of buckets) {
+      if (remaining <= 0) {
+        break;
+      }
       apply(key, Math.min(roundAmount(bucket[key] || 0), budgets[key]));
     }
   }
 
-  for (const key of WATERFALL_ORDER) {
+  for (const key of order) {
     apply(key, budgets[key]);
   }
 
   allocation.unallocated = remaining;
+  return allocation;
+}
+
+/**
+ * Deduction preview when more than one installment is overdue.
+ * The oldest installment is cleared first, in `componentOrder`, before the next installment.
+ * A single installment delegates to {@link allocateSettlement}.
+ */
+export function allocateOldestInstallmentFirst(
+  amount: number,
+  asOfDateComponents: SettlementComponents,
+  buckets: InstallmentBucket[] = [],
+  componentOrder: Array<keyof SettlementComponents> = WATERFALL_ORDER
+): SettlementAllocation {
+  if (buckets.length <= 1) {
+    return allocateSettlement(amount, asOfDateComponents, buckets, componentOrder);
+  }
+
+  const budgets: SettlementComponents = {
+    penalty: roundAmount(asOfDateComponents.penalty),
+    fee: roundAmount(asOfDateComponents.fee),
+    tax: roundAmount(asOfDateComponents.tax),
+    interest: roundAmount(asOfDateComponents.interest),
+    principal: roundAmount(asOfDateComponents.principal)
+  };
+  const prepared = buckets.map((bucket) => ({
+    penalty: roundAmount(bucket.penalty),
+    fee: roundAmount(bucket.fee),
+    tax: roundAmount(bucket.tax),
+    interest: roundAmount(bucket.interest),
+    principal: roundAmount(bucket.principal)
+  }));
+  const mappedPenalty = roundAmount(prepared.reduce((sum, bucket) => sum + bucket.penalty, 0));
+  const unmappedPenalty = roundAmount(Math.max(budgets.penalty - mappedPenalty, 0));
+  if (unmappedPenalty > 0.01) {
+    const last = prepared[prepared.length - 1];
+    last.penalty = roundAmount(last.penalty + unmappedPenalty);
+  }
+
+  const allocation: SettlementAllocation = {
+    penalty: 0,
+    fee: 0,
+    tax: 0,
+    interest: 0,
+    principal: 0,
+    unallocated: 0
+  };
+  let remaining = roundAmount(amount);
+  const keys = componentOrder.length ? componentOrder : WATERFALL_ORDER;
+  for (const bucket of prepared) {
+    if (remaining <= 0.01) {
+      break;
+    }
+    const slice = allocateSettlement(
+      remaining,
+      {
+        penalty: Math.min(budgets.penalty, bucket.penalty),
+        fee: Math.min(budgets.fee, bucket.fee),
+        tax: Math.min(budgets.tax, bucket.tax),
+        interest: Math.min(budgets.interest, bucket.interest),
+        principal: Math.min(budgets.principal, bucket.principal)
+      },
+      [bucket],
+      keys
+    );
+    for (const key of keys) {
+      allocation[key] = roundAmount(allocation[key] + slice[key]);
+      budgets[key] = roundAmount(Math.max(budgets[key] - slice[key], 0));
+      remaining = roundAmount(remaining - slice[key]);
+    }
+  }
+  if (remaining > 0.01) {
+    const rest = allocateSettlement(remaining, budgets, [], keys);
+    for (const key of keys) {
+      allocation[key] = roundAmount(allocation[key] + rest[key]);
+      remaining = roundAmount(remaining - rest[key]);
+    }
+    allocation.unallocated = rest.unallocated;
+  }
   return allocation;
 }
 
