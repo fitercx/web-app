@@ -11,7 +11,12 @@ import * as XLSX from 'xlsx';
 /** Custom Services. */
 import { ClientsService, BulkLoanDisbursementResponse } from 'app/clients/clients.service';
 import { LoansService } from 'app/loans/loans.service';
-import { computeMonthlyAccrualRows } from 'app/loans/accrual-report.util';
+import {
+  ACCRUAL_REPORT_COLUMN_WIDTHS,
+  appendAccrualTotals,
+  computeMonthlyAccrualRows,
+  isAccrualForecastEnabled
+} from 'app/loans/accrual-report.util';
 import { Dates } from 'app/core/utils/dates';
 import { SettingsService } from 'app/settings/settings.service';
 import { LoanDownloadType } from 'app/shared/loan-downloads-menu/loan-downloads-menu.component';
@@ -548,12 +553,14 @@ export class GeneralTabComponent {
       .getLoanTransactions(String(loan.id), false)
       .pipe(take(1))
       .toPromise();
+    const forecastEnabled = isAccrualForecastEnabled(loan);
     const rows = computeMonthlyAccrualRows({
       periods,
       transactions: transactionsResponse?.transactions || [],
       startDate,
       maturityDate,
       businessDate: this.settingsService.businessDate,
+      forecastEnabled,
       parseDate: (value: any) => this.dateUtils.parseDate(value),
       formatMonthEnd: (date: Date) => this.dateUtils.formatDate(date, Dates.DEFAULT_DATEFORMAT)
     });
@@ -561,13 +568,8 @@ export class GeneralTabComponent {
       return;
     }
 
-    const worksheet = XLSX.utils.json_to_sheet(this.addAccrualTotalsRow(rows));
-    worksheet['!cols'] = [
-      { wch: 8 },
-      { wch: 15 },
-      { wch: 18 },
-      { wch: 18 },
-      { wch: 18 }];
+    const worksheet = XLSX.utils.json_to_sheet(appendAccrualTotals(rows, forecastEnabled));
+    worksheet['!cols'] = ACCRUAL_REPORT_COLUMN_WIDTHS;
     const workbook: XLSX.WorkBook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Accrual Report');
     const businessDate = this.dateUtils.formatDate(this.settingsService.businessDate, Dates.DEFAULT_DATEFORMAT);
@@ -619,19 +621,6 @@ export class GeneralTabComponent {
 
   private getDownloadPeriods(loan: any): any[] {
     return Array.isArray(loan?.repaymentSchedule?.periods) ? loan.repaymentSchedule.periods : [];
-  }
-
-  private addAccrualTotalsRow(accrualData: any[]): any[] {
-    return [
-      ...accrualData,
-      {
-        Index: 'Total',
-        'End of Month': '',
-        'Opening Principal': '',
-        'Closing Principal': '',
-        'Interest Accrued': accrualData.reduce((sum, row) => sum + this.asNumber(row['Interest Accrued']), 0).toFixed(2)
-      }
-    ];
   }
 
   private formatDownloadDate(value: any): string {
