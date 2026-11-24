@@ -33,7 +33,14 @@ import { FormfieldBase } from 'app/shared/form-dialog/formfield/model/formfield-
 import { InputBase } from 'app/shared/form-dialog/formfield/model/input-base';
 import { AdjustInstallmentDateDialogComponent } from '../custom-dialogs/adjust-installment-date-dialog/adjust-installment-date-dialog.component';
 import { LoansService } from 'app/loans/loans.service';
-import { computeMonthlyAccrualRows } from 'app/loans/accrual-report.util';
+import {
+  ACCRUAL_BOLD_TOTAL_ROW_COUNT,
+  ACCRUAL_REPORT_COLUMN_WIDTHS,
+  AccrualReportRow,
+  appendAccrualTotals,
+  computeMonthlyAccrualRows,
+  isAccrualForecastEnabled
+} from 'app/loans/accrual-report.util';
 import {
   reversedPaidLpiForLoan,
   reversedPaidLpiIndicatorForPeriod
@@ -1020,8 +1027,8 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
   }
 
   /**
-   * Exports the accrual report: principal from the repayment schedule, interest accrued from the loan's posted
-   * accrual transactions.
+   * Exports the accrual report: principal from the repayment schedule, actual interest from the loan's posted
+   * accrual transactions and the forecast of scheduled interest still to accrue.
    */
   exportAccrualReport() {
     if (
@@ -1056,6 +1063,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
       return;
     }
 
+    const forecastEnabled = isAccrualForecastEnabled(loanInfo);
     this.loansService
       .getLoanTransactions(String(loanId), false)
       .pipe(take(1))
@@ -1067,48 +1075,27 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
             startDate,
             maturityDate,
             businessDate: this.settingsService.businessDate,
+            forecastEnabled,
             parseDate: (value: any) => this.dateUtils.parseDate(value),
             formatMonthEnd: (date: Date) => this.dateUtils.formatDate(date, Dates.DEFAULT_DATEFORMAT)
           });
-          this.exportAccrualToExcel(accrualData, startDate);
+          this.exportAccrualToExcel(accrualData, forecastEnabled);
         },
         error: (error: any) => console.error('Accrual report: failed to load loan transactions', error)
       });
   }
 
   /**
-   * Formats a number as currency string
-   */
-  private formatCurrency(value: number): string {
-    if (value === null || value === undefined) {
-      return '0.00';
-    }
-    return value.toFixed(2);
-  }
-
-  /**
    * Exports accrual data to Excel file
    */
-  private exportAccrualToExcel(accrualData: any[], startDate: Date) {
+  private exportAccrualToExcel(accrualData: AccrualReportRow[], forecastEnabled: boolean) {
     if (!accrualData || accrualData.length === 0) {
       return;
     }
 
-    const accrualDataWithTotals = this.addAccrualTotalsRow(accrualData);
-
     // Create worksheet from data
-    const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(accrualDataWithTotals);
-
-    // Set column widths
-    const colWidths = [
-      { wch: 8 }, // Index
-      { wch: 15 }, // End of Month
-      { wch: 18 }, // Opening Principal
-      { wch: 18 }, // Closing Principal
-      { wch: 18 } // Interest Accrued
-
-    ];
-    ws['!cols'] = colWidths;
+    const ws: XLSX.WorkSheet = XLSX.utils.json_to_sheet(appendAccrualTotals(accrualData, forecastEnabled));
+    ws['!cols'] = ACCRUAL_REPORT_COLUMN_WIDTHS;
 
     // Create workbook and add worksheet
     const wb: XLSX.WorkBook = XLSX.utils.book_new();
@@ -1119,26 +1106,17 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
     const loanId = this.loanDetailsData?.id || this.loanData?.id || 'loan';
     const fileName = `Accrual-Report-${loanId}-${businessDate}.xlsx`;
 
-    // Save file
-    this.writeAccrualWorkbook(wb, fileName, accrualDataWithTotals.length + 1);
+    // Save file: header row 1, month rows from row 2, then the bold total rows.
+    const firstTotalRowNumber = accrualData.length + 2;
+    const totalRowNumbers = Array.from({ length: ACCRUAL_BOLD_TOTAL_ROW_COUNT }, (_, i) => firstTotalRowNumber + i);
+    this.writeAccrualWorkbook(wb, fileName, totalRowNumbers);
   }
 
-  private addAccrualTotalsRow(accrualData: any[]): any[] {
-    const interestAccruedTotal = accrualData.reduce((sum, row) => sum + this.toNumber(row['Interest Accrued']), 0);
-
-    return [
-      ...accrualData,
-      {
-        Index: 'Total',
-        'End of Month': '',
-        'Opening Principal': '',
-        'Closing Principal': '',
-        'Interest Accrued': this.formatCurrency(interestAccruedTotal)
-      }
-    ];
-  }
-
-  private async writeAccrualWorkbook(workbook: XLSX.WorkBook, fileName: string, totalRowNumber: number): Promise<void> {
+  private async writeAccrualWorkbook(
+    workbook: XLSX.WorkBook,
+    fileName: string,
+    totalRowNumbers: number[]
+  ): Promise<void> {
     const workbookData = XLSX.write(workbook, {
       bookType: 'xlsx',
       type: 'array',
@@ -1149,7 +1127,7 @@ export class RepaymentScheduleTabComponent implements OnInit, OnChanges {
 
     await this.applyBoldRowsToWorksheet(zip, 'xl/worksheets/sheet1.xml', [
       1,
-      totalRowNumber
+      ...totalRowNumbers
     ]);
 
     const blob = await zip.generateAsync({

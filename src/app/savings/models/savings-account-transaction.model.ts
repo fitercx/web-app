@@ -4,6 +4,7 @@ export interface SavingsAccountTransaction {
   id: number;
   transactionType: SavingsAccountTransactionType;
   transactionSubType?: SavingsAccountTransactionSubType;
+  associatedLoan?: SavingsAccountAssociatedLoan;
   entryType: string;
   accountId: number;
   accountNo: string;
@@ -23,6 +24,13 @@ export interface SavingsAccountTransaction {
   releaseTransactionId: number;
   chargesPaidByData: any[];
   externalId?: string;
+}
+
+export interface SavingsAccountAssociatedLoan {
+  loanId: number;
+  loanClientId: number;
+  fromInstallment?: number;
+  toInstallment?: number;
 }
 
 export interface SavingsAccountTransactionSubType {
