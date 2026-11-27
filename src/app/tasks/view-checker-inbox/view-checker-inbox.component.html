@@ -77,6 +77,33 @@
           <span fxFlex="60%">{{ checkerInboxDetail.groupName }}</span>
         </div>
 
+        <ng-container *ngIf="checkerInboxDetail.actionName === 'CHANGEEXPIRYDATE' && jsondata">
+          <h3 class="mat-h3" fxFlexFill>Expiry change</h3>
+          <mat-divider [inset]="true"></mat-divider>
+          <div fxFlexFill>
+            <span fxFlex="40%">End Date:</span>
+            <span fxFlex="60%">{{ jsondata.oldEndDate }} → {{ jsondata.endDate }}</span>
+          </div>
+          <div fxFlexFill>
+            <span fxFlex="40%">Next Review Date:</span>
+            <span fxFlex="60%"
+              >{{ jsondata.oldInterimReviewDate || '—' }} → {{ jsondata.interimReviewDate || '—' }}</span
+            >
+          </div>
+          <div fxFlexFill>
+            <span fxFlex="40%">Change type:</span>
+            <span fxFlex="60%">{{ jsondata.changeType }}</span>
+          </div>
+          <div fxFlexFill>
+            <span fxFlex="40%">Comment:</span>
+            <span fxFlex="60%">{{ jsondata.comment }}</span>
+          </div>
+          <div fxFlexFill *ngIf="jsondata.nextReviewDateWarning">
+            <span fxFlex="40%">Warning:</span>
+            <span fxFlex="60%">{{ jsondata.nextReviewDateWarning }}</span>
+          </div>
+        </ng-container>
+
         <ng-container *ngIf="displayJSONData">
           <h3 class="mat-h3" fxFlexFill>{{ 'labels.heading.Command' | translate }}</h3>
 

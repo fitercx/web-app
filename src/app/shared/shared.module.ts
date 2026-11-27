@@ -16,6 +16,7 @@ import { ChangePasswordDialogComponent } from './change-password-dialog/change-p
 import { EnableDialogComponent } from './enable-dialog/enable-dialog.component';
 import { DisableDialogComponent } from './disable-dialog/disable-dialog.component';
 import { ConfirmationDialogComponent } from './confirmation-dialog/confirmation-dialog.component';
+import { RejectCommentDialogComponent } from './reject-comment-dialog/reject-comment-dialog.component';
 import { ErrorDialogComponent } from './error-dialog/error-dialog.component';
 import { NotificationsTrayComponent } from './notifications-tray/notifications-tray.component';
 import { SearchToolComponent } from './search-tool/search-tool.component';
@@ -85,6 +86,7 @@ import { SettlementSummaryCardComponent } from './settlement-summary-card/settle
     EnableDialogComponent,
     DisableDialogComponent,
     ConfirmationDialogComponent,
+    RejectCommentDialogComponent,
     KeyboardShortcutsDialogComponent,
     ErrorDialogComponent,
     NotificationsTrayComponent,
@@ -125,6 +127,7 @@ import { SettlementSummaryCardComponent } from './settlement-summary-card/settle
     NotificationsTrayComponent,
     SearchToolComponent,
     ErrorDialogComponent,
+    RejectCommentDialogComponent,
     CommonModule,
     IconsModule,
     MaterialModule,

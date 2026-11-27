@@ -21,6 +21,44 @@
           </div>
         </mat-card-title>
 
+        <div class="expiry-pending-banner" *ngIf="pendingExpiry?.commandId">
+          <p>
+            Expiry change pending: {{ pendingExpiry.oldEndDate }} → {{ pendingExpiry.newEndDate }}, requested by
+            {{ pendingExpiry.maker }} on {{ pendingExpiry.requestedOn }}
+          </p>
+          <p *ngIf="pendingExpiry.comment">Comment: {{ pendingExpiry.comment }}</p>
+          <p *ngIf="pendingExpiry.oldNextReviewDate || pendingExpiry.newNextReviewDate">
+            Next Review Date: {{ pendingExpiry.oldNextReviewDate || '—' }} →
+            {{ pendingExpiry.newNextReviewDate || '—' }}
+          </p>
+          <p *ngIf="pendingExpiry.changeType">Change type: {{ pendingExpiry.changeType }}</p>
+          <div class="expiry-pending-actions">
+            <button mat-stroked-button type="button" *ngIf="isExpiryChangeMaker()" (click)="withdrawExpiryChange()">
+              Withdraw
+            </button>
+            <ng-container *ngIf="!isExpiryChangeMaker()">
+              <button
+                mat-raised-button
+                color="primary"
+                type="button"
+                *mifosxHasPermission="'CHANGEEXPIRYDATE_LINE_OF_CREDIT_CHECKER'"
+                (click)="approveExpiryChange()"
+              >
+                Approve
+              </button>
+              <button
+                mat-stroked-button
+                color="warn"
+                type="button"
+                *mifosxHasPermission="'CHANGEEXPIRYDATE_LINE_OF_CREDIT_CHECKER'"
+                (click)="rejectExpiryChange()"
+              >
+                Reject
+              </button>
+            </ng-container>
+          </div>
+        </div>
+
         <mat-card-subtitle>
           <div fxLayout="row" fxLayout.lt-md="column">
             <div fxFlex="50%">
@@ -223,6 +261,14 @@
           </mat-icon>
           Update Approved Facility Limit
         </button>
+        <ng-container *mifosxHasPermission="'CHANGEEXPIRYDATE_LINE_OF_CREDIT'">
+          <button mat-menu-item (click)="doAction('Change Expiry Date')" *ngIf="canChangeExpiryDate()">
+            <mat-icon matListIcon>
+              <fa-icon icon="calendar" size="sm"></fa-icon>
+            </mat-icon>
+            Change Expiry Date
+          </button>
+        </ng-container>
         <ng-container *mifosxHasPermission="'UPDATE_LINE_OF_CREDIT'">
           <button mat-menu-item (click)="doAction('Edit Blocked Amount')" *ngIf="canEditBlockedAmount()">
             <mat-icon matListIcon>

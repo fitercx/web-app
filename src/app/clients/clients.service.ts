@@ -404,6 +404,32 @@ export class ClientsService {
     return this.http.post(`/v1/clients/${clientId}/creditlines/${locId}/${action}`, actionData);
   }
 
+  submitLocExpiryChange(clientId: string, locId: string, payload: any): Observable<any> {
+    return this.http.post(`/v1/clients/${clientId}/creditlines/${locId}/changeexpirydate`, payload);
+  }
+
+  getPendingLocExpiryChange(clientId: string, locId: string): Observable<any> {
+    return this.http.get(`/v1/clients/${clientId}/creditlines/${locId}/changeexpirydate/pending`);
+  }
+
+  approveLocExpiryChange(commandId: number): Observable<any> {
+    const httpParams = new HttpParams().set('command', 'approve');
+    return this.http.post(`/makercheckers/${commandId}`, {}, { params: httpParams });
+  }
+
+  rejectLocExpiryChange(clientId: string, locId: string, commandId: number, rejectionComment: string): Observable<any> {
+    const httpParams = new HttpParams().set('command', 'reject');
+    return this.http.post(
+      `/v1/clients/${clientId}/creditlines/${locId}/changeexpirydate/${commandId}`,
+      { rejectionComment },
+      { params: httpParams }
+    );
+  }
+
+  withdrawLocExpiryChange(clientId: string, locId: string, commandId: number): Observable<any> {
+    return this.http.delete(`/v1/clients/${clientId}/creditlines/${locId}/changeexpirydate/${commandId}`);
+  }
+
   blockLocAmount(clientId: string, locId: string, payload: UpdateBlockedAmountRequest): Observable<any> {
     return this.http.post(`/v1/clients/${clientId}/creditlines/${locId}/blockamount`, payload);
   }

@@ -515,6 +515,15 @@ export class TasksService {
    * @param {makerCheckerId} MakerCheckerId
    * @param {command} Command
    */
+  rejectLocExpiryChange(clientId: any, locId: any, commandId: any, rejectionComment: string): Observable<any> {
+    const httpParams = new HttpParams().set('command', 'reject');
+    return this.http.post(
+      `/v1/clients/${clientId}/creditlines/${locId}/changeexpirydate/${commandId}`,
+      { rejectionComment },
+      { params: httpParams }
+    );
+  }
+
   executeMakerCheckerAction(makerCheckerId: any, command: any): Observable<any> {
     const httpParams = new HttpParams().set('command', command);
     return this.http.post(`/makercheckers/${makerCheckerId}`, {}, { params: httpParams });

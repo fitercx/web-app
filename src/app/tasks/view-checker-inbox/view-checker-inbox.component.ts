@@ -9,6 +9,7 @@ import { TasksService } from '../tasks.service';
 
 /** Dialog Components */
 import { ConfirmationDialogComponent } from 'app/shared/confirmation-dialog/confirmation-dialog.component';
+import { RejectCommentDialogComponent } from 'app/shared/reject-comment-dialog/reject-comment-dialog.component';
 import { TranslateService } from '@ngx-translate/core';
 
 @Component({
@@ -79,6 +80,25 @@ export class ViewCheckerInboxComponent {
    * Reject checker
    */
   rejectChecker() {
+    if (this.checkerInboxDetail?.actionName === 'CHANGEEXPIRYDATE') {
+      const commentDialogRef = this.dialog.open(RejectCommentDialogComponent, { width: '480px' });
+      commentDialogRef.afterClosed().subscribe((comment?: string) => {
+        if (!comment) {
+          return;
+        }
+        this.tasksService
+          .rejectLocExpiryChange(
+            this.checkerInboxDetail.clientId,
+            this.checkerInboxDetail.resourceId,
+            this.checkerInboxDetail.id,
+            comment
+          )
+          .subscribe(() => {
+            this.router.navigate(['../../'], { relativeTo: this.route });
+          });
+      });
+      return;
+    }
     const rejectCheckerDialogRef = this.dialog.open(ConfirmationDialogComponent, {
       data: {
         heading: this.translateService.instant('labels.heading.Reject Checker'),
