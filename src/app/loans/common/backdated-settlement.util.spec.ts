@@ -1,5 +1,7 @@
 import {
   allocateOldestInstallmentFirst,
+  allocateRepaymentPreview,
+  applyCrossEmiInstallmentCoverage,
   allocateSettlement,
   repaymentComponentOrder,
   buildDueInstallmentBuckets,
@@ -404,6 +406,94 @@ describe('backdated-settlement.util', () => {
     expect(clearsInstallment.interest).toBe(269.24);
     expect(clearsInstallment.penalty).toBe(230.76);
     expect(clearsInstallment.unallocated).toBe(0);
+  });
+
+  it('cross-emi strategy pays every EMI principal before any interest', () => {
+    const buckets = [
+      { period: 1, penalty: 0, fee: 100, tax: 0, interest: 1000, principal: 10000 },
+      { period: 2, penalty: 20, fee: 50, tax: 0, interest: 800, principal: 10000 }
+    ];
+    const components = { penalty: 20, fee: 150, tax: 0, interest: 1800, principal: 20000 };
+
+    const partial = allocateRepaymentPreview('cross-emi-principal-interest-fees-strategy', 15000, components, buckets);
+    expect(partial.principal).toBe(15000);
+    expect(partial.interest).toBe(0);
+    expect(partial.fee).toBe(0);
+    expect(partial.penalty).toBe(0);
+
+    const intoInterest = allocateRepaymentPreview(
+      'cross-emi-principal-interest-fees-strategy',
+      21000,
+      components,
+      buckets
+    );
+    expect(intoInterest.principal).toBe(20000);
+    expect(intoInterest.interest).toBe(1000);
+    expect(intoInterest.fee).toBe(0);
+  });
+
+  it('cross-emi preview pays overdue principal before overdue interest and leaves the rest unallocated', () => {
+    const overdueOnly = [
+      { period: 1, penalty: 1134.57, fee: 0, tax: 0, interest: 3965, principal: 0 },
+      { period: 2, penalty: 552.72, fee: 0, tax: 0, interest: 3346.51, principal: 22414.85 }
+    ];
+    const components = { penalty: 1687.29, fee: 0, tax: 0, interest: 7311.51, principal: 125000 };
+
+    const allocation = allocateRepaymentPreview(
+      'cross-emi-principal-interest-fees-strategy',
+      25000,
+      components,
+      overdueOnly
+    );
+
+    expect(allocation.principal).toBe(22414.85);
+    expect(allocation.interest).toBe(2585.15);
+    expect(allocation.penalty).toBe(0);
+    expect(allocation.unallocated).toBe(0);
+
+    const aboveOverdue = allocateRepaymentPreview(
+      'cross-emi-principal-interest-fees-strategy',
+      125000,
+      components,
+      overdueOnly
+    );
+    expect(aboveOverdue.principal).toBe(22414.85);
+    expect(aboveOverdue.interest).toBe(7311.51);
+    expect(aboveOverdue.penalty).toBe(1687.29);
+    expect(aboveOverdue.unallocated).toBe(93586.35);
+  });
+
+  it('cross-emi installment coverage pays overdue interest before overdue LPI', () => {
+    const covered = applyCrossEmiInstallmentCoverage(
+      [
+        { period: 2, principal: 0, interest: 669.3, fee: 0, tax: 0, penalty: 404.16 },
+        { period: 3, principal: 0, interest: 1807.78, fee: 0, tax: 0, penalty: 0 }
+      ],
+      2881.24
+    );
+
+    expect(covered[0].coverage).toBe('covered');
+    expect(covered[0].applied).toBe(1073.46);
+    expect(covered[1].coverage).toBe('covered');
+    expect(covered[1].applied).toBe(1807.78);
+  });
+
+  it('after principal is paid, interest-first still clears EMI1 interest before later principal', () => {
+    const order = repaymentComponentOrder('interest-principal-penalties-fees-order-strategy');
+    const allocation = allocateOldestInstallmentFirst(
+      1150,
+      { penalty: 90, fee: 190, tax: 0, interest: 2500, principal: 10000 },
+      [
+        { period: 1, penalty: 50, fee: 100, tax: 0, interest: 1000, principal: 0 },
+        { period: 2, penalty: 40, fee: 50, tax: 0, interest: 800, principal: 0 },
+        { period: 3, penalty: 0, fee: 40, tax: 0, interest: 700, principal: 10000 }
+      ],
+      order
+    );
+    expect(allocation.interest).toBe(1000);
+    expect(allocation.penalty).toBe(50);
+    expect(allocation.fee).toBe(100);
+    expect(allocation.principal).toBe(0);
   });
 
   it('interest-principal-penalties-fees pays interest before principal', () => {

@@ -101,6 +101,9 @@ export class LoanProductSettingsStepComponent implements OnInit {
       factorRateProductEnabled: this.loanProductsTemplate?.factorRateProductEnabled,
       factorRate: this.loanProductsTemplate?.factorRate,
       penaltyGracePeriod: this.loanProductsTemplate?.penaltyGracePeriod,
+      // Stored in the custom DPD config table, so it is returned under additionalProperties, not as a product column.
+      enableDpdPrincipalOnlyRepayment:
+        this.loanProductsTemplate?.additionalProperties?.enableDpdPrincipalOnlyRepayment ?? false,
       interestCalculationPeriodType: this.loanProductsTemplate.interestCalculationPeriodType.id,
       allowPartialPeriodInterestCalculation: this.loanProductsTemplate.allowPartialPeriodInterestCalculation,
       transactionProcessingStrategyCode: transactionProcessingStrategyCode,
@@ -278,6 +281,7 @@ export class LoanProductSettingsStepComponent implements OnInit {
         ]
       ],
       penaltyGracePeriod: [''],
+      enableDpdPrincipalOnlyRepayment: [false],
       amortizationType: [
         '',
         Validators.required

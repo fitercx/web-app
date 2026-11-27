@@ -8,11 +8,15 @@ import { AccountTransfersService } from 'app/account-transfers/account-transfers
 import { Dates } from 'app/core/utils/dates';
 import { LoansService } from 'app/loans/loans.service';
 import {
-  allocateOldestInstallmentFirst,
+  allocateRepaymentPreview,
+  applyCrossEmiInstallmentCoverage,
+  CROSS_EMI_AMOUNT_EXCEEDS_OVERDUE_MESSAGE,
+  CROSS_EMI_OVERDUE_CLEARED_MESSAGE,
+  crossEmiOverdueTotal as sumCrossEmiOverdue,
+  isCrossEmiPrincipalInterestFeesStrategy,
   applyPreDateLpiFloor,
   buildDueInstallmentBuckets,
   buildBackdateLimitMessage,
-  repaymentComponentOrder,
   RepaymentPaymentAllocation,
   computeAuthoritativeSettlementCap,
   computePenaltyWaivedByBackdate,
@@ -448,15 +452,50 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     return `Closes loan at ${this.currencySymbol} ${this.formatAmount(cap)}`;
   }
 
+  private get isCrossEmiStrategy(): boolean {
+    return isCrossEmiPrincipalInterestFeesStrategy(
+      this.transactionProcessingStrategyCode || this.data.loan?.transactionProcessingStrategyCode
+    );
+  }
+
+  private overdueBucketsFor(transactionDateValue: Date) {
+    return buildDueInstallmentBuckets({
+      periods: this.data.loan?.repaymentSchedule?.periods,
+      charges: this.loanCharges,
+      transactionDate: this.toComparableDate(transactionDateValue),
+      overdueOnly: this.isCrossEmiStrategy
+    });
+  }
+
+  get crossEmiOverdueTotal(): number {
+    if (!this.isCrossEmiStrategy) {
+      return 0;
+    }
+    return sumCrossEmiOverdue(this.overdueBucketsFor(this.transferForm?.value?.transactionDate));
+  }
+
+  get crossEmiRepaymentBlocked(): boolean {
+    return this.isCrossEmiStrategy && this.crossEmiOverdueTotal <= 0.01;
+  }
+
+  get crossEmiAmountExceedsOverdue(): boolean {
+    return (
+      this.isCrossEmiStrategy &&
+      !this.crossEmiRepaymentBlocked &&
+      this.enteredTransactionAmount > this.crossEmiOverdueTotal + 0.01
+    );
+  }
+
   /**
-   * A partial that cannot clear every overdue installment is applied to the oldest one,
-   * in the loan's repayment-strategy order, before the next installment.
+   * Entered amount is split the way the loan's stored repayment strategy will post it.
+   * Cross-EMI pays overdue principal, then overdue interest, then overdue fees, then overdue LPI.
    */
   private simulateSettlementAllocation(
     amount: number,
     transactionDateValue: Date
   ): { penalty: number; fee: number; tax: number; interest: number; principal: number; unallocated: number } {
-    return allocateOldestInstallmentFirst(
+    return allocateRepaymentPreview(
+      this.transactionProcessingStrategyCode || this.data.loan?.transactionProcessingStrategyCode,
       amount,
       {
         penalty: this.penaltyOutstanding,
@@ -465,18 +504,7 @@ export class TransferFromSavingsDialogComponent implements OnInit {
         interest: this.interestOutstanding,
         principal: this.remainingPrincipalOutstanding
       },
-      buildDueInstallmentBuckets({
-        periods: this.data.loan?.repaymentSchedule?.periods,
-        charges: this.loanCharges,
-        transactionDate: this.toComparableDate(transactionDateValue)
-      }),
-      this.componentOrder
-    );
-  }
-
-  private get componentOrder() {
-    return repaymentComponentOrder(
-      this.transactionProcessingStrategyCode || this.data.loan?.transactionProcessingStrategyCode,
+      this.overdueBucketsFor(transactionDateValue),
       this.paymentAllocations || this.data.loan?.paymentAllocation
     );
   }
@@ -527,6 +555,11 @@ export class TransferFromSavingsDialogComponent implements OnInit {
   }
 
   private patchDefaultTransactionAmount(): void {
+    if (this.isCrossEmiStrategy) {
+      const overdue = this.crossEmiOverdueTotal;
+      this.transferForm.patchValue({ transactionAmount: overdue > 0.01 ? overdue : '' }, { emitEvent: false });
+      return;
+    }
     const suggested = this.capEnteredAmount(this.dueAsOfDateTotal);
     if (suggested > 0) {
       this.transferForm.patchValue({ transactionAmount: suggested }, { emitEvent: false });
@@ -744,10 +777,50 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     return Number(this.transferForm?.get('transactionAmount')?.value || 0);
   }
 
-  /** Show waterfall of the typed amount when it differs from due-as-of-date (no extra toggle). */
+  /**
+   * Show how the typed amount will actually be posted. That includes the prefilled due total when the
+   * loan strategy does not clear those due components (cross-EMI pays remaining principal first).
+   */
   get isEnteredAmountPreview(): boolean {
-    return (
-      this.enteredTransactionAmount > 0.01 && Math.abs(this.enteredTransactionAmount - this.dueAsOfDateTotal) > 0.01
+    if (this.enteredTransactionAmount <= 0.01) {
+      return false;
+    }
+    if (Math.abs(this.enteredTransactionAmount - this.dueAsOfDateTotal) > 0.01) {
+      return true;
+    }
+    return this.enteredAmountAllocatesDifferentlyFromDueLines();
+  }
+
+  private enteredAmountAllocatesDifferentlyFromDueLines(): boolean {
+    const allocation = this.currentSettlementAllocation;
+    const due: Array<['principal' | 'interest' | 'penalty' | 'fee' | 'tax', number]> = [
+      [
+        'principal',
+        this.principalOutstanding
+      ],
+      [
+        'interest',
+        this.interestOutstanding
+      ],
+      [
+        'penalty',
+        this.penaltyOutstanding
+      ],
+      [
+        'fee',
+        this.feeOutstanding
+      ],
+      [
+        'tax',
+        this.taxOutstanding
+      ]
+
+    ];
+    return due.some(
+      ([
+        key,
+        amount
+      ]) => Math.abs(allocation[key] - this.roundAmount(amount)) > 0.01
     );
   }
 
@@ -834,12 +907,58 @@ export class TransferFromSavingsDialogComponent implements OnInit {
 
   /** Remaining outstanding EMIs covered (or partially covered) by the entered amount. */
   get displayEmis(): any[] {
+    if (isCrossEmiPrincipalInterestFeesStrategy(this.transactionProcessingStrategyCode)) {
+      return this.crossEmiDisplayEmis();
+    }
     return applyEmiAmountCoverage(
       this.dueEmis,
       this.enteredTransactionAmount,
       this.paymentClosesLoan,
       this.currentSettlementAllocation.penalty
     ).filter((emi) => emi.coverage !== 'uncovered');
+  }
+
+  get emiHintsCaption(): string {
+    return isCrossEmiPrincipalInterestFeesStrategy(this.transactionProcessingStrategyCode)
+      ? 'This payment applies to'
+      : 'Outstanding EMI';
+  }
+
+  private crossEmiDisplayEmis(): any[] {
+    const periods = this.data.loan?.repaymentSchedule?.periods;
+    const selected = this.toComparableDate(this.transferForm?.value?.transactionDate);
+    if (!Array.isArray(periods) || !selected) {
+      return [];
+    }
+    const installments = periods
+      .filter((period: any) => this.isRealOutstandingInstallment(period))
+      .sort((a: any, b: any) => Number(a.period) - Number(b.period))
+      .map((period: any) => {
+        const dueDate = this.toComparableDate(period.dueDate);
+        let state: 'overdue' | 'due' | 'upcoming' = 'upcoming';
+        if (dueDate && dueDate.getTime() < selected.getTime()) {
+          state = 'overdue';
+        } else if (dueDate && dueDate.getTime() === selected.getTime()) {
+          state = 'due';
+        }
+        return {
+          period: period.period,
+          dueDate: period.dueDate,
+          state,
+          include: state === 'overdue',
+          principal: this.getPeriodComponentOutstanding(period, 'principal'),
+          interest: this.getPeriodComponentOutstanding(period, 'interest'),
+          fee: this.getPeriodComponentOutstanding(period, 'fee'),
+          tax: this.getPeriodComponentOutstanding(period, 'tax'),
+          penalty: this.getPeriodComponentOutstanding(period, 'penalty')
+        };
+      });
+    return applyCrossEmiInstallmentCoverage(
+      installments.filter((installment) => installment.include),
+      this.enteredTransactionAmount
+    )
+      .filter((emi) => emi.coverage !== 'uncovered')
+      .map((emi) => ({ ...emi, amount: emi.applied }));
   }
 
   /** EMI chips for remaining installments (amounts exclude LPI). */
@@ -908,6 +1027,14 @@ export class TransferFromSavingsDialogComponent implements OnInit {
     }
     if (this.isFutureDateSelected) {
       return null;
+    }
+    if (this.crossEmiRepaymentBlocked) {
+      return CROSS_EMI_OVERDUE_CLEARED_MESSAGE;
+    }
+    if (this.crossEmiAmountExceedsOverdue) {
+      return `${CROSS_EMI_AMOUNT_EXCEEDS_OVERDUE_MESSAGE} Overdue amount is ${this.currencySymbol} ${this.formatAmount(
+        this.crossEmiOverdueTotal
+      )}.`;
     }
     if (!this.linkedSavingsAccountId) {
       return 'No linked savings account is available for this loan — transfer cannot be submitted.';

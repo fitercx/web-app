@@ -180,6 +180,19 @@
       </mat-error>
     </mat-form-field>
 
+    <mat-checkbox
+      fxFlex="96%"
+      labelPosition="before"
+      formControlName="enableDpdPrincipalOnlyRepayment"
+      matTooltip="{{
+        'tooltips.When enabled repayments on loans overdue beyond the DPD threshold are applied to principal only'
+          | translate
+      }}"
+      class="margin-v"
+    >
+      {{ 'labels.inputs.Enable DPD Principal Only Repayment' | translate }}
+    </mat-checkbox>
+
     <mat-form-field fxFlex="30%" *ngIf="isAdvancedTransactionProcessingStrategy">
       <mat-label>{{ 'labels.inputs.Loan Schedule Processing Type' | translate }}</mat-label>
       <mat-select formControlName="loanScheduleProcessingType" required>

@@ -408,6 +408,11 @@
     }}</span>
   </div>
 
+  <div fxFlexFill *ngIf="isDpdPrincipalOnlyRepaymentEnabled()">
+    <span fxFlex="47%">{{ 'labels.inputs.Enable DPD Principal Only Repayment' | translate }}:</span>
+    <span fxFlex="53%">{{ true | yesNo }}</span>
+  </div>
+
   <div fxFlexFill *ngIf="isAdvancedPaymentAllocation">
     <span fxFlex="47%">{{ 'labels.inputs.Loan Schedule Processing Type' | translate }}:</span>
     <span fxFlex="53%">{{ loanProduct.loanScheduleProcessingType.value }}</span>

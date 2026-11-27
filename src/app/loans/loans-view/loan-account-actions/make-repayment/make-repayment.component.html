@@ -94,6 +94,18 @@
             </ng-container>
           </div>
 
+          <div class="date-impact-banner date-impact-banner--blocked" *ngIf="crossEmiRepaymentBlocked">
+            <mat-icon>info</mat-icon>
+            <span>{{ crossEmiOverdueClearedMessage }}</span>
+          </div>
+          <div class="date-impact-banner date-impact-banner--blocked" *ngIf="crossEmiAmountExceedsOverdue">
+            <mat-icon>error</mat-icon>
+            <span>
+              {{ crossEmiAmountExceedsMessage }} Overdue amount is {{ currencyLabel }}
+              {{ crossEmiOverdueTotal | formatNumber }}.
+            </span>
+          </div>
+
           <mifosx-input-amount
             [currency]="currency"
             [isRequired]="true"
@@ -182,7 +194,13 @@
           <button
             mat-raised-button
             color="primary"
-            [disabled]="!repaymentLoanForm.valid || isFutureDateSelected || enteredAmountExceedsCap"
+            [disabled]="
+              !repaymentLoanForm.valid ||
+              isFutureDateSelected ||
+              enteredAmountExceedsCap ||
+              crossEmiRepaymentBlocked ||
+              crossEmiAmountExceedsOverdue
+            "
             *mifosxHasPermission="'REPAYMENT_LOAN'"
           >
             {{ 'labels.buttons.Submit' | translate }}

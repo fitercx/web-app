@@ -3,6 +3,10 @@ import { UntypedFormBuilder, UntypedFormGroup, Validators } from '@angular/forms
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { LoansService } from 'app/loans/loans.service';
+import {
+  CROSS_EMI_REQUIRES_OVERDUE_MESSAGE,
+  isCrossEmiPrincipalInterestFeesStrategy
+} from 'app/loans/common/backdated-settlement.util';
 
 @Component({
   selector: 'mifosx-change-repayment-strategy-dialog',
@@ -15,6 +19,8 @@ export class ChangeRepaymentStrategyDialogComponent implements OnInit {
   currentStrategyName = '';
   currentStrategyCode = '';
   unsupportedReason = '';
+  loanHasOverdueInstallments = true;
+  readonly crossEmiRequiresOverdueMessage = CROSS_EMI_REQUIRES_OVERDUE_MESSAGE;
   loading = true;
   submitting = false;
 
@@ -43,6 +49,7 @@ export class ChangeRepaymentStrategyDialogComponent implements OnInit {
         this.currentStrategyName = template?.transactionProcessingStrategyName || this.currentStrategyCode;
         this.strategyOptions = template?.transactionProcessingStrategyOptions || [];
         this.unsupportedReason = template?.unsupportedReason || '';
+        this.loanHasOverdueInstallments = template?.loanHasOverdueInstallments !== false;
         this.strategyForm.patchValue({ transactionProcessingStrategyCode: this.currentStrategyCode });
         if (this.unsupportedReason) {
           this.strategyForm.disable();
@@ -61,8 +68,19 @@ export class ChangeRepaymentStrategyDialogComponent implements OnInit {
     return this.strategyForm.get('transactionProcessingStrategyCode')?.value === this.currentStrategyCode;
   }
 
+  get crossEmiBlocked(): boolean {
+    const selectedCode = this.strategyForm.get('transactionProcessingStrategyCode')?.value;
+    return isCrossEmiPrincipalInterestFeesStrategy(selectedCode) && !this.loanHasOverdueInstallments;
+  }
+
   submit(): void {
-    if (this.strategyForm.invalid || this.selectedStrategyUnchanged || this.submitting || this.unsupportedReason) {
+    if (
+      this.strategyForm.invalid ||
+      this.selectedStrategyUnchanged ||
+      this.submitting ||
+      this.unsupportedReason ||
+      this.crossEmiBlocked
+    ) {
       return;
     }
     const selectedCode = this.strategyForm.get('transactionProcessingStrategyCode')?.value;
